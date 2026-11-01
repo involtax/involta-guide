@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { alexSession } from "@/lib/alex.mjs";
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
@@ -12,6 +14,7 @@ import {
   hasPublishedDescendants,
   LOCATION_KINDS,
 } from "@/lib/locations.mjs";
+import RestaurantHours from "@/components/RestaurantHours";
 import VoiceWidget from "@/components/VoiceWidget";
 export const dynamic = "force-dynamic";
 const load = cache(async (slug: string) => {
@@ -67,6 +70,18 @@ export default async function LocationPage({
   const content = version
     ? JSON.parse(version.content)
     : { intro: "", restaurants: [] };
+  const starIds = content.restaurants.map((r: any) => r.id).filter(Boolean);
+  const starred = starIds.length
+    ? await all(
+        "SELECT id,alex_star FROM restaurants WHERE id=ANY($1::uuid[])",
+        starIds,
+      )
+    : [];
+  const starMap = new Map(starred.map((r) => [r.id, r.alex_star]));
+  content.restaurants = content.restaurants.map((r: any) => ({
+    ...r,
+    alexStar: Boolean(starMap.get(r.id)),
+  }));
   const homeIds = [
     ...new Set(
       content.restaurants.map((r: any) => r.locationId).filter(Boolean),
@@ -79,6 +94,7 @@ export default async function LocationPage({
       )
     : [];
   const homeMap = new Map(homes.map((h) => [h.id, h]));
+  const alex = await alexSession((await cookies()).get("guide_alex")?.value);
   const title = locationHeading(c);
   const base = process.env.SITE_URL || "http://localhost:3000";
   const breadcrumbs = [
@@ -194,36 +210,63 @@ export default async function LocationPage({
             {String(content.restaurants.length).padStart(2, "0")} мест
           </span>
         </div>
-        {content.restaurants.map((r: any, i: number) => {
-          const home = homeMap.get(r.locationId);
-          return (
-            <article className="restaurant" key={r.id}>
-              <span className="rank">{String(i + 1).padStart(2, "0")}</span>
-              <div>
-                <p className="eyebrow">
-                  {r.cuisine}
-                  {home && home.id !== c.id && (
-                    <>
-                      {" "}
-                      · <Link href={"/guide/" + home.slug}>{home.name}</Link>
-                    </>
+        {[
+          content.restaurants.slice(0, c.top_limit),
+          content.restaurants.slice(c.top_limit),
+        ].map((group: any[], section: number) => {
+          const cards = group.map((r: any, index: number) => {
+            const i = index + (section ? c.top_limit : 0);
+            const home = homeMap.get(r.locationId);
+            return (
+              <article className="restaurant" key={r.id}>
+                <span className="rank">{String(i + 1).padStart(2, "0")}</span>
+                <div>
+                  <p className="eyebrow">
+                    {r.cuisine}
+                    {home && home.id !== c.id && (
+                      <>
+                        {" "}
+                        · <Link href={"/guide/" + home.slug}>{home.name}</Link>
+                      </>
+                    )}
+                  </p>
+                  <h2>
+                    {r.name}{" "}
+                    {r.alexStar && (
+                      <span title="Выбор Алекса" aria-label="Выбор Алекса">
+                        ★{" "}
+                      </span>
+                    )}
+                    <a
+                      href={r.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${r.name} — Яндекс Карты`}
+                      title="Яндекс Карты"
+                    >
+                      ↗
+                    </a>
+                  </h2>
+                  <p>{r.description}</p>
+                  {r.phone && (
+                    <p>
+                      <a href={`tel:${r.phone}`}>{r.phone}</a>
+                    </p>
                   )}
-                </p>
-                <h2>
-                  {r.name}{" "}
-                  <a
-                    href={r.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`${r.name} — Яндекс Карты`}
-                    title="Яндекс Карты"
-                  >
-                    ↗
-                  </a>
-                </h2>
-                <p>{r.description}</p>
-              </div>
-            </article>
+                  <RestaurantHours hours={r.openingHours} />
+                </div>
+              </article>
+            );
+          });
+          return section ? (
+            group.length > 0 && (
+              <details key="more" className="more-restaurants">
+                <summary>Ещё · {group.length}</summary>
+                {cards}
+              </details>
+            )
+          ) : (
+            <div key="top">{cards}</div>
           );
         })}
       </section>
@@ -238,6 +281,12 @@ export default async function LocationPage({
             ))}
           </div>
         </section>
+      )}
+      {alex && (
+        <p>
+          Режим Алекса: голосовая команда изменит страницу сразу.{" "}
+          <Link href="/alex">Журнал ↗</Link>
+        </p>
       )}
       <VoiceWidget locationId={c.id} locationName={c.name} />
       <script

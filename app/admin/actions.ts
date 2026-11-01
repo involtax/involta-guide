@@ -256,6 +256,10 @@ export async function proposalDecision(f: FormData) {
       cuisine: str(f, "cuisine"),
       description: str(f, "description"),
       mapsUrl: str(f, "mapsUrl"),
+      phone: str(f, "phone").replace(/[ ()-]/g, ""),
+      openingHours: str(f, "openingHours")
+        ? JSON.parse(str(f, "openingHours"))
+        : null,
       sources: [],
     });
     refresh();

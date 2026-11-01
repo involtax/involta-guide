@@ -5,6 +5,7 @@ import { writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { one, run, id, root, transaction } from "@/lib/db.mjs";
 import { checkOrigin } from "@/lib/auth";
+import { alexSession } from "@/lib/alex.mjs";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   let path: string | undefined;
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       (mime === "audio/wav" && bytes.subarray(0, 4).toString() === "RIFF");
     if (!valid) throw new Error("Файл не похож на аудиозапись");
     const jar = await cookies();
+    const alex = await alexSession(jar.get("guide_alex")?.value);
     let visitor = jar.get("guide_visitor")?.value;
     if (!visitor || !/^[a-f0-9-]{36}$/.test(visitor)) visitor = randomUUID();
     const reviewId = id();
@@ -102,6 +104,20 @@ export async function POST(request: Request) {
         ipHash,
         (request.headers.get("user-agent") || "").slice(0, 500),
       );
+      if (alex) {
+        await run(
+          "UPDATE reviews SET alex_session_id=$1 WHERE id=$2",
+          alex.id,
+          reviewId,
+        );
+        await run(
+          "INSERT INTO alex_changes(id,session_id,review_id,location_id,status,detail) VALUES($1,$2,$3,$4,'queued','Ожидает распознавания')",
+          id(),
+          alex.id,
+          reviewId,
+          locationId,
+        );
+      }
       await run(
         "INSERT INTO jobs(id,kind,location_id,review_id) VALUES($1,'review',$2,$3)",
         id(),

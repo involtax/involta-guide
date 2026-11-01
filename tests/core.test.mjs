@@ -34,6 +34,7 @@ const content = {
   restaurants: [
     {
       name: "Тестовое место",
+      phone: "+74951234567",
       cuisine: "Русская",
       description: "Тестовая рекомендация редактора.",
       mapsUrl: "https://yandex.ru/maps/?text=Иваново",
@@ -445,6 +446,104 @@ test("устаревшая генерация не перезаписывает 
     /Черновик изменён/,
   );
   assert.equal((await locationContent(city.id)).intro, content.intro);
+});
+test("Алекс: отдельная сессия, немедленная публикация, защищённая звезда и атомарный отказ", async () => {
+  const { createAlexSession, alexSession } = await import("../lib/alex.mjs");
+  const { applyAlexCommands } = await import("../lib/alex-editorial.mjs");
+  const token = await createAlexSession();
+  const session = await alexSession(token);
+  assert.ok(session);
+  assert.equal(await alexSession("bad"), null);
+  let version = await saveDraft(city.id, content);
+  await publish(city.id, version);
+  const card = (await locationContent(city.id)).restaurants[0];
+  async function review() {
+    const reviewId = id();
+    await run(
+      "INSERT INTO reviews(id,location_id,visitor,audio,mime,hash,ip_hash,device,alex_session_id) VALUES($1,$2,'alex','test.webm','audio/webm',$3,'network','browser',$4)",
+      reviewId,
+      city.id,
+      id(),
+      session.id,
+    );
+    await run(
+      "INSERT INTO alex_changes(id,session_id,review_id,location_id,status,detail) VALUES($1,$2,$3,$4,'queued','test')",
+      id(),
+      session.id,
+      reviewId,
+      city.id,
+    );
+    return await one("SELECT * FROM reviews WHERE id=$1", reviewId);
+  }
+  const first = await review();
+  version = await applyAlexCommands(
+    first,
+    {
+      actions: [
+        {
+          kind: "update",
+          restaurantId: card.id,
+          changes: { description: "Голосовая правка", alexStar: true },
+        },
+      ],
+    },
+    version,
+  );
+  assert.equal(
+    (await one("SELECT published_version FROM locations WHERE id=$1", city.id))
+      .published_version,
+    version,
+  );
+  assert.equal(
+    (await one("SELECT alex_star FROM restaurants WHERE id=$1", card.id))
+      .alex_star,
+    true,
+  );
+  assert.equal(
+    (await one("SELECT status FROM alex_changes WHERE review_id=$1", first.id))
+      .status,
+    "applied",
+  );
+  const bad = await review();
+  await assert.rejects(
+    () =>
+      applyAlexCommands(
+        bad,
+        {
+          actions: [
+            {
+              kind: "update",
+              restaurantId: card.id,
+              changes: { phone: "", alexStar: false },
+            },
+          ],
+        },
+        version,
+      ),
+    /нужен телефон/,
+  );
+  assert.equal(
+    (await one("SELECT alex_star FROM restaurants WHERE id=$1", card.id))
+      .alex_star,
+    true,
+  );
+  assert.equal(
+    (await one("SELECT draft_version FROM locations WHERE id=$1", city.id))
+      .draft_version,
+    version,
+  );
+  const regular = await locationContent(city.id);
+  regular.restaurants[0].alexStar = false;
+  const ordinary = await saveDraft(city.id, regular, "manual");
+  assert.equal((await locationContent(city.id)).restaurants[0].alexStar, true);
+  await publish(city.id, ordinary);
+  await run("UPDATE alex_sessions SET revoked=true WHERE id=$1", session.id);
+  assert.equal(await alexSession(token), undefined);
+  const revoked = await review();
+  await assert.rejects(
+    () => applyAlexCommands(revoked, { actions: [] }, ordinary),
+    /Сессия Алекса завершена/,
+  );
 });
 test.after(async () => {
   await closeDb();

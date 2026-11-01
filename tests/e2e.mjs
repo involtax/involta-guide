@@ -16,12 +16,14 @@ import { testDatabase } from "./database.mjs";
 const testDb = await testDatabase();
 const directory = mkdtempSync(join(tmpdir(), "involta-e2e-"));
 process.env.DATA_DIR = directory;
-const { closeDb, one, all } = await import("../lib/db.mjs");
+const { closeDb, one, all, run, saveDraft, publish } =
+  await import("../lib/db.mjs");
 const { migrate, seedLocations } = await import("../lib/migrate.mjs");
 await migrate();
 await seedLocations();
 const city = await one("SELECT * FROM locations WHERE slug='ivanovo'");
 const password = randomBytes(24).toString("hex");
+const alexToken = randomBytes(32).toString("hex");
 const apiCanary = `test-only-${randomBytes(32).toString("hex")}`;
 const server = spawn(
   process.execPath,
@@ -40,6 +42,7 @@ const server = spawn(
       ADMIN_PASSWORD: password,
       SESSION_SECRET: randomBytes(48).toString("hex"),
       OPENAI_API_KEY: apiCanary,
+      ALEX_ACCESS_TOKEN: alexToken,
       COOKIE_SECURE: "false",
       SITE_URL: "http://127.0.0.1:3107",
     },
@@ -133,6 +136,9 @@ try {
   await fieldset
     .getByLabel("Почему стоит зайти")
     .fill("Тестовая карточка для проверки публикации.");
+  await fieldset
+    .getByLabel("Телефон (обязателен для публикации)")
+    .fill("+74951234567");
   await fieldset
     .getByLabel("Яндекс Карты")
     .fill("https://yandex.ru/maps/?text=Иваново");
@@ -280,6 +286,9 @@ try {
     .getByLabel("Почему стоит зайти")
     .fill("Тестовая карточка дочерней локации.");
   await bayCard
+    .getByLabel("Телефон (обязателен для публикации)")
+    .fill("+74951234567");
+  await bayCard
     .getByLabel("Яндекс Карты")
     .fill("https://yandex.ru/maps/?text=Sochi");
   await page.getByRole("button", { name: "Сохранить новую версию" }).click();
@@ -331,6 +340,68 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("http://127.0.0.1:3107/guide");
   await page.screenshot({ path: "var/screenshots/home.png" });
+  // New contact fields, SSR-expanded reserve and separate Alex credentials.
+  await run("UPDATE locations SET top_limit=1 WHERE id=$1", city.id);
+  const sample = {
+    name: "Основной тест",
+    cuisine: "Русская",
+    description: "Первый ресторан",
+    mapsUrl: "https://yandex.ru/maps/org/test/123/",
+    phone: "+74951234567",
+    sources: [],
+    openingHours: {
+      timezone: "Europe/Moscow",
+      week: Array.from({ length: 7 }, () => [["00:00", "00:00"]]),
+    },
+  };
+  const updated = await saveDraft(city.id, {
+    intro: "Тест расширенного списка",
+    restaurants: [sample, { ...sample, name: "Резервный тест" }],
+  });
+  await publish(city.id, updated);
+  await page.goto("http://127.0.0.1:3107/guide/ivanovo");
+  await expect(
+    page.getByRole("heading", { name: /Основной тест/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Резервный тест/ }),
+  ).not.toBeVisible();
+  await page.getByText("Ещё · 1", { exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: /Резервный тест/ }),
+  ).toBeVisible();
+  assert.ok((await page.content()).includes("tel:+74951234567"));
+  await expect(page.getByText("Открыто до 00:00").first()).toBeVisible();
+  const alexContext = await browser.newContext();
+  const alexPage = await alexContext.newPage();
+  assert.equal(
+    (
+      await alexContext.request.get(
+        "http://127.0.0.1:3107/api/alex/audio/missing",
+      )
+    ).status(),
+    401,
+  );
+  await alexPage.goto("http://127.0.0.1:3107/alex/login?token=" + alexToken);
+  await expect(alexPage).toHaveURL("http://127.0.0.1:3107/alex");
+  assert.ok(!(await alexPage.content()).includes(alexToken));
+  assert.equal(
+    (await alexContext.cookies()).find((c) => c.name === "guide_alex").httpOnly,
+    true,
+  );
+  await alexPage.goto("http://127.0.0.1:3107/guide/ivanovo");
+  await expect(
+    alexPage.getByText("Режим Алекса:", { exact: false }),
+  ).toBeVisible();
+  await page.goto("http://127.0.0.1:3107/alex");
+  await page
+    .getByRole("button", { name: "Завершить все сессии Алекса" })
+    .click();
+  await alexPage.goto("http://127.0.0.1:3107/alex");
+  await expect(
+    alexPage.getByText("Для входа откройте персональную ссылку."),
+  ).toBeVisible();
+  await alexContext.close();
   assert.deepEqual(errors, []);
   assert.deepEqual(
     directOpenAIRequests,

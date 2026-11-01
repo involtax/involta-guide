@@ -1,4 +1,5 @@
 "use client";
+import HoursEditor from "./HoursEditor";
 import { useState } from "react";
 import { saveContent } from "@/app/admin/actions";
 type Restaurant = {
@@ -12,6 +13,9 @@ type Restaurant = {
   description: string;
   mapsUrl: string;
   sources: string[];
+  phone?: string;
+  openingHours?: any;
+  alexStar?: boolean;
 };
 export default function ContentEditor({
   locationId,
@@ -88,7 +92,7 @@ export default function ContentEditor({
           <button
             type="button"
             className="secondary"
-            disabled={!selected || restaurants.length >= 10}
+            disabled={!selected || restaurants.length >= 50}
             onClick={() => {
               const item = available.find((r) => r.id === selected);
               if (item) setRestaurants((items) => [...items, item]);
@@ -165,6 +169,27 @@ export default function ContentEditor({
               maxLength={2000}
             />
           </label>
+          <label>
+            Телефон (обязателен для публикации)
+            <input
+              type="tel"
+              value={r.phone || ""}
+              placeholder="+78121234567"
+              onChange={(e) =>
+                edit(i, "phone", e.target.value.replace(/[ ()-]/g, ""))
+              }
+            />
+          </label>
+          <HoursEditor
+            value={r.openingHours}
+            onChange={(value) =>
+              setRestaurants((items) =>
+                items.map((item, n) =>
+                  n === i ? { ...item, openingHours: value } : item,
+                ),
+              )
+            }
+          />
           <label>
             Яндекс Карты
             <input
@@ -243,7 +268,7 @@ export default function ContentEditor({
         <button
           type="button"
           className="secondary"
-          disabled={restaurants.length >= 10}
+          disabled={restaurants.length >= 50}
           onClick={() =>
             setRestaurants((rs) => [
               ...rs,

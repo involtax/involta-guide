@@ -165,6 +165,8 @@ export default async function Admin({
           {p.message}
         </p>
       )}
+      <Link href="/admin/contacts">Предложения телефонов ↗</Link>
+      <Link href="/alex">Алекс: сессии и журнал правок ↗</Link>
       {tab === "overview" && (
         <>
           <div className="stats">
@@ -684,6 +686,11 @@ async function LocationEditor({
                 cuisine: r.cuisine,
                 description: r.description,
                 mapsUrl: r.maps_url,
+                phone: r.phone || "",
+                openingHours: r.opening_hours
+                  ? JSON.parse(r.opening_hours)
+                  : null,
+                alexStar: r.alex_star,
                 sources: JSON.parse(r.sources),
                 locationId: r.location_id,
                 locationName: r.location_name,
@@ -868,7 +875,11 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
       {result && (
         <section className="panel">
           <h2>Разбор ИИ</h2>
-          {result.entries.map((e: any, i: number) => (
+          {result.comment && <p>{result.comment}</p>}
+          {result.actions && (
+            <pre>{JSON.stringify(result.actions, null, 2)}</pre>
+          )}
+          {(result.entries || []).map((e: any, i: number) => (
             <article className="entry" key={i}>
               <h3>
                 {e.restaurantName || "Ресторан не определён"} · {labels[e.type]}
@@ -967,6 +978,28 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
                     />
                   </label>
                   <label>
+                    Телефон
+                    <input
+                      name="phone"
+                      type="tel"
+                      defaultValue={payload.phone || old?.phone || ""}
+                      placeholder="+78121234567"
+                    />
+                  </label>
+                  <label>
+                    Режим работы (JSON)
+                    <textarea
+                      name="openingHours"
+                      defaultValue={
+                        payload.openingHours || old?.openingHours
+                          ? JSON.stringify(
+                              payload.openingHours || old?.openingHours,
+                            )
+                          : ""
+                      }
+                    />
+                  </label>
+                  <label>
                     Яндекс Карты
                     <input
                       name="mapsUrl"
@@ -1044,7 +1077,7 @@ async function InternalStats({ locationId }: { locationId: string }) {
   );
   const groups = new Map<string, any>();
   for (const r of rows) {
-    for (const e of JSON.parse(r.result).entries) {
+    for (const e of JSON.parse(r.result).entries || []) {
       const key = e.restaurantId || e.restaurantName;
       if (!key) continue;
       const group = groups.get(key) || {

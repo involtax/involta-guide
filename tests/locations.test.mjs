@@ -51,6 +51,7 @@ const input = (name, extra = {}) => ({
 });
 const card = {
   name: "Тестовый ресторан",
+  phone: "+74951234567",
   cuisine: "Русская",
   description: "Опубликованное описание.",
   mapsUrl: "https://yandex.ru/maps/org/test/123/",
