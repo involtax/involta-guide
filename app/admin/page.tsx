@@ -45,13 +45,19 @@ function Snapshot({ content }: { content: any }) {
       {content.restaurants.map((r: any, i: number) => (
         <div key={r.id || i}>
           <strong>
-            {i + 1}. {r.name}
+            {i + 1}. {r.name}{" "}
+            <a
+              href={r.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${r.name} — Яндекс Карты`}
+              title="Яндекс Карты"
+            >
+              ↗
+            </a>
           </strong>
           <small>{r.cuisine}</small>
           <p>{r.description}</p>
-          <a href={r.mapsUrl} target="_blank" rel="noreferrer">
-            Карты ↗
-          </a>
         </div>
       ))}
     </div>

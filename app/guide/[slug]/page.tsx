@@ -209,11 +209,19 @@ export default async function LocationPage({
                     </>
                   )}
                 </p>
-                <h2>{r.name}</h2>
+                <h2>
+                  {r.name}{" "}
+                  <a
+                    href={r.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${r.name} — Яндекс Карты`}
+                    title="Яндекс Карты"
+                  >
+                    ↗
+                  </a>
+                </h2>
                 <p>{r.description}</p>
-                <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer">
-                  На Яндекс Картах ↗
-                </a>
               </div>
             </article>
           );
