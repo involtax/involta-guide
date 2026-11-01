@@ -5,6 +5,7 @@ import { all, one, cityContent, setting } from "@/lib/db.mjs";
 import { reviewSignals } from "@/lib/signals.mjs";
 import ContentEditor from "@/components/ContentEditor";
 import QueueRunner from "@/components/QueueRunner";
+import RankingReport from "@/components/RankingReport";
 import * as actions from "./actions";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -521,6 +522,9 @@ async function CityEditor({
                 <button className="secondary">Наполнить через GPT ↗</button>
               </form>
             </div>
+            <RankingReport
+              report={(await cityContent(cityId)).rankingReport || []}
+            />
             <ContentEditor
               key={c.draft_version || cityId}
               cityId={cityId}

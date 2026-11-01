@@ -14,7 +14,11 @@ export default function ContentEditor({
   initial,
 }: {
   cityId: string;
-  initial: { intro: string; restaurants: Restaurant[] };
+  initial: {
+    intro: string;
+    restaurants: Restaurant[];
+    rankingReport?: unknown[];
+  };
 }) {
   const [intro, setIntro] = useState(initial.intro);
   const [restaurants, setRestaurants] = useState(initial.restaurants);
@@ -36,7 +40,13 @@ export default function ContentEditor({
       <input
         type="hidden"
         name="content"
-        value={JSON.stringify({ intro, restaurants })}
+        value={JSON.stringify({
+          intro,
+          restaurants,
+          ...(initial.rankingReport
+            ? { rankingReport: initial.rankingReport }
+            : {}),
+        })}
       />
       <label>
         Вступление

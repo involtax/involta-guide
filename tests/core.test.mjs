@@ -207,7 +207,44 @@ test("ИИ-генерация сохраняет проверенный стру
           content: [
             {
               type: "output_text",
-              text: JSON.stringify({ ...content, warnings: [] }),
+              text: JSON.stringify({
+                ...content,
+                warnings: [],
+                rankingReport: [
+                  {
+                    name: content.restaurants[0].name,
+                    mapsUrl: content.restaurants[0].mapsUrl,
+                    scores: Object.fromEntries(
+                      [
+                        "food",
+                        "consistency",
+                        "identity",
+                        "localConnection",
+                        "atmosphere",
+                        "service",
+                        "value",
+                        "destination",
+                      ].map((k) => [k, 7]),
+                    ),
+                    evidence: [
+                      "food",
+                      "consistency",
+                      "identity",
+                      "localConnection",
+                      "atmosphere",
+                      "service",
+                      "value",
+                      "destination",
+                    ].map((factor) => ({
+                      factor,
+                      reason: "Тестовый источник",
+                      confidence: "low",
+                      sources: [],
+                    })),
+                    totalScore: 7,
+                  },
+                ],
+              }),
             },
           ],
         },
@@ -225,6 +262,11 @@ test("ИИ-генерация сохраняет проверенный стру
       city.id,
     );
     assert.equal(v.source, "ai");
+    assert.equal(JSON.parse(v.content).rankingReport[0].totalScore, 7);
+    assert.equal(
+      contentSchema.parse(await cityContent(city.id)).rankingReport.length,
+      1,
+    );
     assert.match(v.prompt, /Иваново/);
     assert.ok(!v.prompt.includes("{город}"));
     assert.equal(

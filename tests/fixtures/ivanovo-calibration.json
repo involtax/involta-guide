@@ -1,0 +1,135 @@
+{
+  "note": "Условные оценки из обсуждения с пользователем. Только контроль арифметики; не результаты исследования ресторанов и не данные для публикации.",
+  "candidates": [
+    {
+      "name": "Сезоны",
+      "scores": {
+        "food": 9,
+        "consistency": 8,
+        "identity": 9,
+        "localConnection": 8,
+        "atmosphere": 9,
+        "service": 8,
+        "value": 7,
+        "destination": 9
+      }
+    },
+    {
+      "name": "Огонёк",
+      "scores": {
+        "food": 8,
+        "consistency": 8,
+        "identity": 8,
+        "localConnection": 6,
+        "atmosphere": 9,
+        "service": 8,
+        "value": 7,
+        "destination": 8
+      }
+    },
+    {
+      "name": "Пенаты",
+      "scores": {
+        "food": 8,
+        "consistency": 8,
+        "identity": 7,
+        "localConnection": 7,
+        "atmosphere": 8,
+        "service": 8,
+        "value": 7,
+        "destination": 8
+      }
+    },
+    {
+      "name": "Гастроли",
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 8,
+        "localConnection": 5,
+        "atmosphere": 8,
+        "service": 8,
+        "value": 7,
+        "destination": 8
+      }
+    },
+    {
+      "name": "Сулико",
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 6,
+        "localConnection": 3,
+        "atmosphere": 8,
+        "service": 7,
+        "value": 8,
+        "destination": 7
+      }
+    },
+    {
+      "name": "Панорама",
+      "scores": {
+        "food": 7,
+        "consistency": 7,
+        "identity": 6,
+        "localConnection": 5,
+        "atmosphere": 9,
+        "service": 7,
+        "value": 6,
+        "destination": 7
+      }
+    },
+    {
+      "name": "Шеш-Беш",
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 6,
+        "localConnection": 3,
+        "atmosphere": 7,
+        "service": 7,
+        "value": 8,
+        "destination": 7
+      }
+    },
+    {
+      "name": "Чешский дворик",
+      "scores": {
+        "food": 7,
+        "consistency": 8,
+        "identity": 6,
+        "localConnection": 4,
+        "atmosphere": 7,
+        "service": 7,
+        "value": 8,
+        "destination": 6
+      }
+    },
+    {
+      "name": "Встреча",
+      "scores": {
+        "food": 7,
+        "consistency": 7,
+        "identity": 5,
+        "localConnection": 6,
+        "atmosphere": 6,
+        "service": 7,
+        "value": 8,
+        "destination": 6
+      }
+    },
+    {
+      "name": "Мимино",
+      "scores": {
+        "food": 7,
+        "consistency": 7,
+        "identity": 6,
+        "localConnection": 3,
+        "atmosphere": 7,
+        "service": 7,
+        "value": 8,
+        "destination": 6
+      }
+    }
+  ]
+}
