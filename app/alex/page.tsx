@@ -1,3 +1,4 @@
+import { publicPath } from "@/lib/urls.mjs";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { isAdmin } from "@/lib/auth";
@@ -34,7 +35,7 @@ export default async function AlexPage() {
         снимать звезду. Неполные или неоднозначные команды сохраняются с ошибкой
         для уточнения.
       </p>
-      <Link href="/guide">Выбрать локацию ↗</Link>
+      <Link href="/">Выбрать локацию ↗</Link>
       {session && (
         <form action={alexLogout}>
           <button>Выйти</button>
@@ -66,7 +67,7 @@ export default async function AlexPage() {
             <audio
               controls
               preload="none"
-              src={"/api/alex/audio/" + c.review_id}
+              src={publicPath("/api/alex/audio/" + c.review_id)}
             />
           )}
           {c.review_id && (

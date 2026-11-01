@@ -1,4 +1,5 @@
 "use server";
+import { COOKIE_PATH } from "@/lib/urls.mjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -37,7 +38,7 @@ function back(path: string, message: string): never {
   );
 }
 function refresh() {
-  revalidatePath("/guide", "layout");
+  revalidatePath("/", "layout");
   revalidatePath("/admin");
 }
 export async function login(f: FormData) {
@@ -72,13 +73,16 @@ export async function login(f: FormData) {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "strict",
-    path: "/",
+    path: COOKIE_PATH,
     maxAge: 28800,
   });
   redirect("/admin");
 }
 export async function logout() {
-  (await cookies()).delete("guide_admin");
+  (await cookies()).set("guide_admin", "", {
+    path: COOKIE_PATH,
+    maxAge: 0,
+  });
   redirect("/admin");
 }
 export async function saveLocationAction(f: FormData) {

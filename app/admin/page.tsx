@@ -1,3 +1,4 @@
+import { publicPath } from "@/lib/urls.mjs";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -265,7 +266,10 @@ export default async function Admin({
               </select>
               <button>→</button>
             </form>
-            <a href="/api/admin/locations-export" className="add-link">
+            <a
+              href={publicPath("/api/admin/locations-export")}
+              className="add-link"
+            >
               Выгрузить справочник JSON ↗
             </a>
             <Link href="/admin?tab=locations&location=new" className="add-link">
@@ -612,7 +616,7 @@ async function LocationEditor({
           </details>
         )}
         {c && (
-          <Link href={"/guide/" + c.slug} target="_blank">
+          <Link href={"/" + c.slug} target="_blank">
             Открыть страницу ↗
           </Link>
         )}
@@ -835,7 +839,11 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
           {time(r.created_at)} · {labels[r.moderation]}{" "}
           {r.fraud ? "· ФРОД" : ""}
         </p>
-        <audio controls preload="none" src={"/api/admin/audio/" + r.id} />
+        <audio
+          controls
+          preload="none"
+          src={publicPath("/api/admin/audio/" + r.id)}
+        />
         <h3>Расшифровка</h3>
         <p className="transcript">
           {r.transcript || "Пока нет. Запустите обработку очереди."}

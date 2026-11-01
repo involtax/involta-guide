@@ -1,4 +1,5 @@
 "use client";
+import { publicPath } from "@/lib/urls.mjs";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 export default function QueueRunner() {
@@ -9,7 +10,9 @@ export default function QueueRunner() {
     setBusy(true);
     setMessage("");
     try {
-      const r = await fetch("/api/admin/process", { method: "POST" });
+      const r = await fetch(publicPath("/api/admin/process"), {
+        method: "POST",
+      });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setMessage(

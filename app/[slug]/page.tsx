@@ -1,3 +1,4 @@
+import { absoluteUrl } from "@/lib/urls.mjs";
 import { cookies } from "next/headers";
 import { alexSession } from "@/lib/alex.mjs";
 import type { Metadata } from "next";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 const load = cache(async (slug: string) => {
   const found = await locationBySlug(slug);
   if (!found) return null;
-  if (found.redirect) permanentRedirect("/guide/" + found.location.slug);
+  if (found.redirect) permanentRedirect("/" + found.location.slug);
   const c = found.location;
   const [parents, children, related, hasChildrenContent, version] =
     await Promise.all([
@@ -54,7 +55,7 @@ export async function generateMetadata({
     description:
       locationHeading(data.c) +
       `: короткая подборка ресторанов, кухня, причины зайти и Яндекс Карты. ${data.c.region}.`,
-    alternates: { canonical: "/guide/" + data.c.slug },
+    alternates: { canonical: absoluteUrl("/" + data.c.slug) },
     robots: { index: data.indexable, follow: true },
   };
 }
@@ -96,7 +97,7 @@ export default async function LocationPage({
   const homeMap = new Map(homes.map((h) => [h.id, h]));
   const alex = await alexSession((await cookies()).get("guide_alex")?.value);
   const title = locationHeading(c);
-  const base = process.env.SITE_URL || "http://localhost:3000";
+  const base = absoluteUrl().replace(/\/$/, "");
   const breadcrumbs = [
     { name: "Все локации", slug: "" },
     ...parents.map((p) => ({ name: p.name, slug: p.slug })),
@@ -110,7 +111,7 @@ export default async function LocationPage({
         "@type": "ListItem",
         position: i + 1,
         name: b.name,
-        item: base + "/guide" + (b.slug ? "/" + b.slug : ""),
+        item: base + "/" + b.slug,
       })),
     },
     ...(content.restaurants.length
@@ -141,16 +142,11 @@ export default async function LocationPage({
   return (
     <main>
       <nav className="breadcrumbs" aria-label="Навигационная цепочка">
-        <Link href="/guide">Все локации</Link>
+        <Link href="/">Все локации</Link>
         {parents.map((p) => (
           <span key={p.id}>
             {" "}
-            /{" "}
-            {p.active ? (
-              <Link href={"/guide/" + p.slug}>{p.name}</Link>
-            ) : (
-              p.name
-            )}
+            / {p.active ? <Link href={"/" + p.slug}>{p.name}</Link> : p.name}
           </span>
         ))}
         <span> / {c.name}</span>
@@ -186,7 +182,7 @@ export default async function LocationPage({
           </div>
           <div className="city-grid">
             {children.map((l) => (
-              <Link key={l.id} className="city-link" href={"/guide/" + l.slug}>
+              <Link key={l.id} className="city-link" href={"/" + l.slug}>
                 <span>
                   <strong>{l.name}</strong>
                   <small>
@@ -226,7 +222,7 @@ export default async function LocationPage({
                     {home && home.id !== c.id && (
                       <>
                         {" "}
-                        · <Link href={"/guide/" + home.slug}>{home.name}</Link>
+                        · <Link href={"/" + home.slug}>{home.name}</Link>
                       </>
                     )}
                   </p>
@@ -275,7 +271,7 @@ export default async function LocationPage({
           <h2>Рядом и также интересно</h2>
           <div className="button-row">
             {related.map((r) => (
-              <Link key={r.id} href={"/guide/" + r.slug}>
+              <Link key={r.id} href={"/" + r.slug}>
                 {r.name} →
               </Link>
             ))}

@@ -1,3 +1,4 @@
+import { COOKIE_PATH } from "@/lib/urls.mjs";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHash, createHmac, randomUUID } from "node:crypto";
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
       sameSite: "lax",
       secure: new URL(request.url).protocol === "https:",
       maxAge: 365 * 24 * 60 * 60,
-      path: "/",
+      path: COOKIE_PATH,
     });
     return NextResponse.json({ id: reviewId }, { status: 201 });
   } catch (e) {

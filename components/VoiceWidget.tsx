@@ -1,4 +1,5 @@
 "use client";
+import { publicPath } from "@/lib/urls.mjs";
 import { useEffect, useRef, useState } from "react";
 type Status = {
   id: string;
@@ -30,7 +31,9 @@ export default function VoiceWidget({
   const chunks = useRef<Blob[]>([]);
   async function load() {
     try {
-      const r = await fetch(`/api/my-reviews?location=${locationId}`);
+      const r = await fetch(
+        publicPath(`/api/my-reviews?location=${locationId}`),
+      );
       if (r.ok) setHistory(await r.json());
     } catch {}
   }
@@ -122,7 +125,10 @@ export default function VoiceWidget({
       f.set("locationId", locationId);
       f.set("duration", String(seconds));
       f.set("consent", "yes");
-      const r = await fetch("/api/reviews", { method: "POST", body: f });
+      const r = await fetch(publicPath("/api/reviews"), {
+        method: "POST",
+        body: f,
+      });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setBlob(null);

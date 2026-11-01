@@ -42,9 +42,9 @@ const server = spawn(
       ADMIN_PASSWORD: password,
       SESSION_SECRET: randomBytes(48).toString("hex"),
       OPENAI_API_KEY: apiCanary,
-      ALEX_ACCESS_TOKEN: alexToken,
+      ALEX_SECRET: alexToken,
       COOKIE_SECURE: "false",
-      SITE_URL: "http://127.0.0.1:3107",
+      SITE_URL: "http://127.0.0.1:3107/guide",
     },
     stdio: ["ignore", "pipe", "pipe"],
   },
@@ -79,8 +79,16 @@ try {
   const page = await context.newPage();
   const errors = [];
   const directOpenAIRequests = [];
+  const outsideMountRequests = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).hostname === "api.openai.com")
+    const target = new URL(request.url());
+    if (
+      target.protocol === "http:" &&
+      target.origin === "http://127.0.0.1:3107" &&
+      !target.pathname.startsWith("/guide")
+    )
+      outsideMountRequests.push(target.pathname);
+    if (target.hostname === "api.openai.com")
       directOpenAIRequests.push(request.url());
   });
   page.on("pageerror", (e) => errors.push(e.message));
@@ -91,28 +99,28 @@ try {
     /noindex/,
   );
   const unauthorized = await context.request.get(
-    "http://127.0.0.1:3107/api/admin/audio/missing",
+    "http://127.0.0.1:3107/guide/api/admin/audio/missing",
   );
   assert.equal(unauthorized.status(), 401);
   assert.equal(
     (
       await context.request.get(
-        "http://127.0.0.1:3107/api/admin/locations-export",
+        "http://127.0.0.1:3107/guide/api/admin/locations-export",
       )
     ).status(),
     401,
   );
   const forged = await context.request.post(
-    "http://127.0.0.1:3107/api/reviews",
+    "http://127.0.0.1:3107/guide/api/reviews",
     { headers: { origin: "https://evil.example" } },
   );
   assert.equal(forged.status(), 400);
-  await page.goto("http://127.0.0.1:3107/admin");
+  await page.goto("http://127.0.0.1:3107/guide/admin");
   await page.getByLabel("Пароль редакции").fill(password);
   await page.getByRole("button", { name: "Войти ↗" }).click();
   await page.getByRole("heading", { name: "Рабочий стол." }).waitFor();
   const exported = await context.request.get(
-    "http://127.0.0.1:3107/api/admin/locations-export",
+    "http://127.0.0.1:3107/guide/api/admin/locations-export",
   );
   assert.equal(exported.status(), 200);
   const catalogue = await exported.json();
@@ -123,7 +131,9 @@ try {
     !(await page.content()).includes(apiCanary),
     "Секрет не передаётся в HTML админки",
   );
-  await page.goto(`http://127.0.0.1:3107/admin?tab=cities&city=${city.id}`);
+  await page.goto(
+    `http://127.0.0.1:3107/guide/admin?tab=cities&city=${city.id}`,
+  );
   await page
     .getByLabel("Вступление")
     .fill("Короткая тестовая подборка Иванова.");
@@ -185,12 +195,12 @@ try {
   assert.ok(review.hash);
   const anonymous = await browser.newContext();
   const other = await anonymous.request.get(
-    `http://127.0.0.1:3107/api/my-reviews?city=${city.id}`,
+    `http://127.0.0.1:3107/guide/api/my-reviews?city=${city.id}`,
   );
   assert.deepEqual(await other.json(), []);
   await anonymous.close();
   await page.goto(
-    "http://127.0.0.1:3107/admin?tab=reviews&review=" + review.id,
+    "http://127.0.0.1:3107/guide/admin?tab=reviews&review=" + review.id,
   );
   await page.getByRole("button", { name: "Не одобрять", exact: true }).click();
   await page.getByText("Отклонено", { exact: false }).first().waitFor();
@@ -232,7 +242,9 @@ try {
   assert.equal(await page.locator(".city-grid .city-link").count(), 1);
   // Create/edit a child location through the actual admin form.
   const sochi = await one("SELECT id FROM locations WHERE slug='sochi'");
-  await page.goto("http://127.0.0.1:3107/admin?tab=locations&location=new");
+  await page.goto(
+    "http://127.0.0.1:3107/guide/admin?tab=locations&location=new",
+  );
   const locationForm = page
     .locator("form")
     .filter({ has: page.getByLabel("Форма для заголовка") });
@@ -276,7 +288,7 @@ try {
     .waitFor();
   // A published child restaurant can be selected for a hub without a second DB row.
   await page.goto(
-    "http://127.0.0.1:3107/admin?tab=locations&location=" + bay.id,
+    "http://127.0.0.1:3107/guide/admin?tab=locations&location=" + bay.id,
   );
   await page.getByRole("button", { name: "+ Ресторан" }).click();
   const bayCard = page.locator("fieldset");
@@ -302,7 +314,7 @@ try {
     bay.id,
   );
   await page.goto(
-    "http://127.0.0.1:3107/admin?tab=locations&location=" + sochi.id,
+    "http://127.0.0.1:3107/guide/admin?tab=locations&location=" + sochi.id,
   );
   await page.getByLabel("Ресторан из дочерних локаций").selectOption(shared.id);
   await page
@@ -377,13 +389,17 @@ try {
   assert.equal(
     (
       await alexContext.request.get(
-        "http://127.0.0.1:3107/api/alex/audio/missing",
+        "http://127.0.0.1:3107/guide/api/alex/audio/missing",
       )
     ).status(),
     401,
   );
-  await alexPage.goto("http://127.0.0.1:3107/alex/login?token=" + alexToken);
-  await expect(alexPage).toHaveURL("http://127.0.0.1:3107/alex");
+  await alexPage.goto("http://127.0.0.1:3107/guide/?q=" + alexToken);
+  assert.ok(
+    !(await alexContext.cookies()).some((c) => c.name === "guide_alex"),
+  );
+  await alexPage.goto("http://127.0.0.1:3107/guide/?" + alexToken);
+  await expect(alexPage).toHaveURL(/\/guide\/?$/);
   assert.ok(!(await alexPage.content()).includes(alexToken));
   assert.equal(
     (await alexContext.cookies()).find((c) => c.name === "guide_alex").httpOnly,
@@ -393,15 +409,20 @@ try {
   await expect(
     alexPage.getByText("Режим Алекса:", { exact: false }),
   ).toBeVisible();
-  await page.goto("http://127.0.0.1:3107/alex");
+  await page.goto("http://127.0.0.1:3107/guide/alex");
   await page
     .getByRole("button", { name: "Завершить все сессии Алекса" })
     .click();
-  await alexPage.goto("http://127.0.0.1:3107/alex");
+  await alexPage.goto("http://127.0.0.1:3107/guide/alex");
   await expect(
     alexPage.getByText("Для входа откройте персональную ссылку."),
   ).toBeVisible();
   await alexContext.close();
+  assert.deepEqual(
+    outsideMountRequests,
+    [],
+    "Все браузерные запросы остаются под /guide",
+  );
   assert.deepEqual(errors, []);
   assert.deepEqual(
     directOpenAIRequests,

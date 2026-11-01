@@ -1,0 +1,10 @@
+.git
+node_modules
+.next
+var
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets

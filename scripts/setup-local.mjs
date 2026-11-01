@@ -32,7 +32,7 @@ if (!values.get("TEST_DATABASE_URL"))
 if (!values.get("SESSION_SECRET"))
   additions.push(["SESSION_SECRET", randomBytes(48).toString("hex")]);
 if (!values.get("SITE_URL"))
-  additions.push(["SITE_URL", "http://localhost:3000"]);
+  additions.push(["SITE_URL", "http://localhost:3000/guide"]);
 let updated = original;
 for (const [key, value] of additions) {
   const pattern = new RegExp(`^${key}=.*$`, "m");

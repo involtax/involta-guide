@@ -1,4 +1,5 @@
 "use server";
+import { COOKIE_PATH } from "@/lib/urls.mjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -16,6 +17,6 @@ export async function alexLogout() {
   const session = await alexSession(jar.get("guide_alex")?.value);
   if (session)
     await run("UPDATE alex_sessions SET revoked=true WHERE id=$1", session.id);
-  jar.delete("guide_alex");
-  redirect("/guide");
+  jar.set("guide_alex", "", { path: COOKIE_PATH, maxAge: 0 });
+  redirect("/");
 }

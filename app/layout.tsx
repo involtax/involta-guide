@@ -1,8 +1,9 @@
+import { siteUrl } from "@/lib/urls.mjs";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./style.css";
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.SITE_URL || "http://localhost:3000"),
+  metadataBase: new URL(siteUrl() + "/"),
   title: {
     default: "Инвольта гид — где поесть в России",
     template: "%s · Инвольта гид",
@@ -15,17 +16,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <html lang="ru">
       <body>
         <header className="header">
-          <Link href="/guide" className="brand">
+          <Link href="/" className="brand">
             инвольта<span>гид</span>
             <sup>Россия</sup>
           </Link>
-          <Link href="/guide" className="header-note">
+          <Link href="/" className="header-note">
             Места, ради которых стоит зайти.
           </Link>
         </header>
         {children}
         <footer>
-          <Link href="/guide">Инвольта гид</Link>
+          <Link href="/">Инвольта гид</Link>
           <span>Небольшие подборки. Личный опыт.</span>
           <Link href="/admin">Редакция ↗</Link>
         </footer>
