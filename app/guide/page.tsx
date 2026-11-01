@@ -1,25 +1,31 @@
 import Link from "next/link";
-import { all, one } from "@/lib/db.mjs";
+import { one } from "@/lib/db.mjs";
+import { searchLocations, LOCATION_KINDS } from "@/lib/locations.mjs";
 export const dynamic = "force-dynamic";
 export default async function Guide({
   searchParams,
 }: {
-  searchParams: Promise<{
-    q?: string;
-  }>;
+  searchParams: Promise<{ q?: string; kind?: string; page?: string }>;
 }) {
-  const { q = "" } = await searchParams;
+  const { q = "", kind = "", page = "1" } = await searchParams;
   const query = q.trim().slice(0, 100);
-  const cities = await all(
-    "SELECT * FROM cities WHERE active=1 AND (name LIKE $1 OR region LIKE $2) ORDER BY name",
-    `%${query}%`,
-    `%${query}%`,
-  );
-  const total = (await one("SELECT count(*) AS n FROM cities WHERE active=1"))!;
+  const result = await searchLocations({
+    query,
+    kind,
+    status: "active",
+    page: Number(page),
+    rootsOnly: true,
+    publicOnly: true,
+  });
+  const total = (await one(
+    "SELECT count(*) AS n FROM locations WHERE active=1 AND (listed OR published_version IS NOT NULL)",
+  ))!;
+  const pageUrl = (n: number) =>
+    "/guide?" + new URLSearchParams({ q: query, kind, page: String(n) });
   return (
     <main>
       <section className="hero">
-        <p className="eyebrow">ЕДА. ГОРОДА. ЛИЧНЫЙ ОПЫТ.</p>
+        <p className="eyebrow">ЕДА. МЕСТА. ЛИЧНЫЙ ОПЫТ.</p>
         <h1>
           Хорошие места.
           <br />
@@ -27,53 +33,78 @@ export default async function Guide({
         </h1>
         <div className="hero-bottom">
           <p>
-            Короткий список ресторанов, ради которых стоит выйти в город.
+            Короткие подборки ресторанов в городах, районах и на курортах.
             Выбираем внимательно. Прислушиваемся к вам.
           </p>
           <span className="counter">
             {Number(total.n).toLocaleString("ru-RU")}
-            <small>городов в справочнике</small>
+            <small>локаций в справочнике</small>
           </span>
         </div>
       </section>
       <section className="cities">
         <div className="section-heading">
-          <h2>С какого города начнём?</h2>
+          <h2>Куда отправимся?</h2>
           <span className="muted">01 / География</span>
         </div>
-        <form className="search">
+        <form className="search location-search">
           <label className="sr-only" htmlFor="q">
-            Название города или региона
+            Город, район или курорт
           </label>
           <input
             id="q"
             name="q"
-            placeholder="Найти город или регион"
+            placeholder="Город, район или курорт"
             defaultValue={query}
           />
+          <select name="kind" defaultValue={kind} aria-label="Тип локации">
+            <option value="">Все типы</option>
+            {Object.entries(LOCATION_KINDS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
           <button>Найти ↗</button>
         </form>
         <p className="muted">
-          {query
-            ? `Найдено: ${cities.length}`
-            : "Все города России · подборки наполняются редакцией"}
+          {query || kind
+            ? `Найдено: ${result.total}`
+            : "Города и направления · районы и курорты — внутри или через поиск"}
         </p>
         <div className="city-grid">
-          {cities.map((c) => (
+          {result.rows.map((c) => (
             <Link className="city-link" key={c.id} href={`/guide/${c.slug}`}>
               <span>
                 <strong>{c.name}</strong>
-                <small>{c.region}</small>
+                <small>
+                  {LOCATION_KINDS[c.kind as keyof typeof LOCATION_KINDS]} ·{" "}
+                  {c.parent_name || c.region}
+                  {Number(c.child_count) > 0
+                    ? ` · внутри ${c.child_count}`
+                    : ""}
+                </small>
               </span>
               <span className="city-arrow">
-                {c.published_version ? "↗" : "→"}
+                {c.is_hub ? "↳" : c.published_version ? "↗" : "→"}
               </span>
             </Link>
           ))}
         </div>
-        {!cities.length && (
-          <p>Такого города пока нет. Попробуйте другое название.</p>
+        {!result.total && (
+          <p>Пока не нашли такую локацию. Попробуйте другое название.</p>
         )}
+        <nav className="pagination" aria-label="Страницы справочника">
+          {result.page > 1 && (
+            <Link href={pageUrl(result.page - 1)}>← Назад</Link>
+          )}
+          <span>
+            {result.page} / {result.pages}
+          </span>
+          {result.page < result.pages && (
+            <Link href={pageUrl(result.page + 1)}>Дальше →</Link>
+          )}
+        </nav>
       </section>
     </main>
   );

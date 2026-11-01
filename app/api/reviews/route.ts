@@ -39,11 +39,18 @@ export async function POST(request: Request) {
     });
     const form = await bounded.formData();
     const audio = form.get("audio");
-    const cityId = String(form.get("cityId") || "");
+    const locationId = String(
+      form.get("locationId") || form.get("cityId") || "",
+    );
     const duration = Number(form.get("duration"));
     if (form.get("consent") !== "yes") throw new Error("Необходимо согласие");
-    if (!(await one("SELECT id FROM cities WHERE id=$1 AND active=1", cityId)))
-      throw new Error("Город не найден");
+    if (
+      !(await one(
+        "SELECT id FROM locations WHERE id=$1 AND active=1",
+        locationId,
+      ))
+    )
+      throw new Error("Локация не найдена");
     if (
       !(audio instanceof File) ||
       audio.size < 100 ||
@@ -85,9 +92,9 @@ export async function POST(request: Request) {
       .digest("hex");
     await transaction(async () => {
       await run(
-        "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+        "INSERT INTO reviews(id,location_id,visitor,audio,mime,hash,ip_hash,device) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
         reviewId,
-        cityId,
+        locationId,
         visitor,
         filename,
         mime,
@@ -96,9 +103,9 @@ export async function POST(request: Request) {
         (request.headers.get("user-agent") || "").slice(0, 500),
       );
       await run(
-        "INSERT INTO jobs(id,kind,city_id,review_id) VALUES($1,'review',$2,$3)",
+        "INSERT INTO jobs(id,kind,location_id,review_id) VALUES($1,'review',$2,$3)",
         id(),
-        cityId,
+        locationId,
         reviewId,
       );
     });

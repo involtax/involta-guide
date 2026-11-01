@@ -1,7 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import LocationForm from "@/components/LocationForm";
+import {
+  searchLocations,
+  LOCATION_KINDS,
+  ancestors,
+  childLocations,
+  relatedLocations,
+  availableRestaurants,
+} from "@/lib/locations.mjs";
 import { isAdmin } from "@/lib/auth";
-import { all, one, cityContent, setting } from "@/lib/db.mjs";
+import { all, one, locationContent, setting } from "@/lib/db.mjs";
 import { reviewSignals } from "@/lib/signals.mjs";
 import ContentEditor from "@/components/ContentEditor";
 import QueueRunner from "@/components/QueueRunner";
@@ -52,7 +62,12 @@ export default async function Admin({
 }: {
   searchParams: Promise<{
     tab?: string;
+    location?: string;
     city?: string;
+    kind?: string;
+    parent?: string;
+    state?: string;
+    page?: string;
     review?: string;
     q?: string;
     message?: string;
@@ -61,6 +76,17 @@ export default async function Admin({
   }>;
 }) {
   const p = await searchParams;
+  if (p.tab === "cities" || p.city) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(p))
+      if (v)
+        params.set(
+          k === "city" ? "location" : k,
+          k === "tab" && v === "cities" ? "locations" : v,
+        );
+    redirect("/admin?" + params);
+  }
+
   if (!(await isAdmin()))
     return (
       <main className="login">
@@ -86,9 +112,17 @@ export default async function Admin({
         </form>
       </main>
     );
+  const listing = await searchLocations({
+    query: p.q || "",
+    kind: p.kind || "",
+    parentId: p.parent || null,
+    status: p.state || "all",
+    page: Number(p.page || 1),
+    pageSize: 60,
+  });
   const tab = p.tab || "overview";
   const counts = (await one(
-    `SELECT count(*) AS total,sum(CASE WHEN draft='[]' THEN 1 ELSE 0 END) AS empty,sum(CASE WHEN published_version IS NOT NULL THEN 1 ELSE 0 END) AS published FROM cities WHERE active=1`,
+    `SELECT count(*) AS total,count(*) FILTER(WHERE listed OR published_version IS NOT NULL) AS public_count,count(*) FILTER(WHERE NOT listed AND published_version IS NULL) AS internal_count,sum(CASE WHEN draft='[]' AND (listed OR published_version IS NOT NULL) THEN 1 ELSE 0 END) AS empty,sum(CASE WHEN published_version IS NOT NULL THEN 1 ELSE 0 END) AS published FROM locations WHERE active=1`,
   ))!;
   const reviewCount = (await one(
     "SELECT count(*) n FROM reviews WHERE moderation='pending'",
@@ -107,7 +141,7 @@ export default async function Admin({
       <nav className="tabs">
         {[
           ["overview", "Обзор"],
-          ["cities", "Города и страницы"],
+          ["locations", "Локации и страницы"],
           ["fill", "Наполнение"],
           ["reviews", `Отзывы · ${reviewCount}`],
         ].map(([key, label]) => (
@@ -129,7 +163,8 @@ export default async function Admin({
         <>
           <div className="stats">
             {[
-              [counts.total, "городов"],
+              [counts.public_count, "локаций в каталоге"],
+              [counts.internal_count, "внутренних территорий"],
               [counts.empty, "без подборки"],
               [counts.published, "опубликовано"],
               [reviewCount, "отзывов на проверке"],
@@ -143,8 +178,8 @@ export default async function Admin({
           <section className="panel">
             <h2>Порядок работы</h2>
             <p>
-              Настройте промпт, запустите один город, проверьте черновик и
-              опубликуйте. После проверки можно поставить остальные города в
+              Настройте промпт, запустите одну локацию, проверьте черновик и
+              опубликуйте. После проверки можно поставить остальные локации в
               очередь.
             </p>
             <p>
@@ -168,38 +203,81 @@ export default async function Admin({
           </section>
         </>
       )}
-      {tab === "cities" && (
+      {tab === "locations" && (
         <div className="admin-columns">
           <aside>
-            <form className="search">
-              <input type="hidden" name="tab" value="cities" />
+            <form className="stack">
+              <input type="hidden" name="tab" value="locations" />
               <input
                 name="q"
-                aria-label="Поиск города"
-                placeholder="Город или регион"
+                aria-label="Поиск локации"
+                placeholder="Локация или регион"
                 defaultValue={p.q}
               />
+              <select
+                name="kind"
+                aria-label="Тип локации в админке"
+                defaultValue={p.kind || ""}
+              >
+                <option value="">Все типы</option>
+                {Object.entries(LOCATION_KINDS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="state"
+                aria-label="Статус локации"
+                defaultValue={p.state || "all"}
+              >
+                <option value="all">Все статусы</option>
+                <option value="active">Включённые</option>
+                <option value="inactive">Отключённые</option>
+                <option value="empty">Без подборки</option>
+                <option value="draft">Есть черновик</option>
+                <option value="published">Опубликованные</option>
+                <option value="hidden">Внутренний справочник</option>
+              </select>
+              <select
+                name="parent"
+                aria-label="Внутри направления"
+                defaultValue={p.parent || ""}
+              >
+                <option value="">Все направления</option>
+                {(
+                  await all(
+                    "SELECT id,name,region FROM locations WHERE is_hub=true ORDER BY name",
+                  )
+                ).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} · {l.region}
+                  </option>
+                ))}
+              </select>
               <button>→</button>
             </form>
-            <Link href="/admin?tab=cities&city=new" className="add-link">
-              + Добавить город
+            <a href="/api/admin/locations-export" className="add-link">
+              Выгрузить справочник JSON ↗
+            </a>
+            <Link href="/admin?tab=locations&location=new" className="add-link">
+              + Добавить локацию
             </Link>
             <div className="city-sidebar">
-              {(
-                await all(
-                  "SELECT id,name,region,active,published_version,draft FROM cities WHERE name LIKE $1 OR region LIKE $2 ORDER BY name LIMIT 100",
-                  `%${p.q || ""}%`,
-                  `%${p.q || ""}%`,
-                )
-              ).map((c) => (
+              {listing.rows.map((c) => (
                 <Link
-                  className={p.city === c.id ? "active" : ""}
+                  className={p.location === c.id ? "active" : ""}
                   key={c.id}
-                  href={`/admin?tab=cities&city=${c.id}&q=${encodeURIComponent(p.q || "")}`}
+                  href={`/admin?tab=locations&location=${c.id}&q=${encodeURIComponent(p.q || "")}`}
                 >
                   <strong>{c.name}</strong>
                   <small>
-                    {c.region} ·{" "}
+                    {LOCATION_KINDS[c.kind as keyof typeof LOCATION_KINDS]} ·{" "}
+                    {c.parent_name || c.region}
+                    {!c.listed && !c.published_version
+                      ? " · внутренний справочник"
+                      : ""}{" "}
+                    ·{" "}
                     {!c.active
                       ? "отключён"
                       : c.published_version
@@ -211,14 +289,52 @@ export default async function Admin({
                 </Link>
               ))}
             </div>
-            <small>Первые 100 результатов. Уточните поиск.</small>
+            <nav className="pagination">
+              <span>
+                {listing.total} · {listing.page}/{listing.pages}
+              </span>
+              {listing.page > 1 && (
+                <Link
+                  href={
+                    "/admin?" +
+                    new URLSearchParams({
+                      tab: "locations",
+                      q: p.q || "",
+                      kind: p.kind || "",
+                      state: p.state || "all",
+                      parent: p.parent || "",
+                      page: String(listing.page - 1),
+                    })
+                  }
+                >
+                  ←
+                </Link>
+              )}
+              {listing.page < listing.pages && (
+                <Link
+                  href={
+                    "/admin?" +
+                    new URLSearchParams({
+                      tab: "locations",
+                      q: p.q || "",
+                      kind: p.kind || "",
+                      state: p.state || "all",
+                      parent: p.parent || "",
+                      page: String(listing.page + 1),
+                    })
+                  }
+                >
+                  →
+                </Link>
+              )}
+            </nav>
           </aside>
           <section>
-            {p.city ? (
-              <CityEditor cityId={p.city} versionId={p.version} />
+            {p.location ? (
+              <LocationEditor locationId={p.location} versionId={p.version} />
             ) : (
               <div className="empty">
-                <h2>Выберите город</h2>
+                <h2>Выберите локацию</h2>
                 <p>
                   Здесь — ручное редактирование, публикация и история страницы.
                 </p>
@@ -232,8 +348,8 @@ export default async function Admin({
           <section className="panel">
             <h2>Промпт наполнения</h2>
             <p className="muted">
-              Переменные: {"{город}"}, {"{регион}"}, {"{лимит}"}. Промпт каждого
-              запуска сохраняется в истории соответствующей страницы.
+              Переменные: {"{локация}"}, {"{регион}"}, {"{лимит}"}. Промпт
+              каждого запуска сохраняется в истории соответствующей страницы.
             </p>
             <form action={actions.savePrompt} className="stack">
               <label>
@@ -251,16 +367,19 @@ export default async function Admin({
             </form>
           </section>
           <section className="panel">
-            <h2>Сначала один город</h2>
+            <h2>Сначала одна локация</h2>
             <p>
               Генерация использует сохранённый промпт. Результат появится в
               черновике, затем вы сможете его отредактировать и опубликовать.
             </p>
             <form action={actions.generate} className="button-row">
-              <select name="cityId" aria-label="Город для пробного запуска">
+              <select
+                name="locationId"
+                aria-label="Локация для пробного запуска"
+              >
                 {(
                   await all(
-                    "SELECT id,name,region FROM cities WHERE active=1 ORDER BY name",
+                    "SELECT id,name,region FROM locations WHERE active=1 ORDER BY name",
                   )
                 ).map((c) => (
                   <option key={c.id} value={c.id}>
@@ -273,16 +392,16 @@ export default async function Admin({
             <details>
               <summary>Массовое наполнение</summary>
               <p>
-                Каждый город — отдельный платный API-запрос. Автоматической
-                публикации нет. Одновременные задания одного города исключены.
+                Каждый локация — отдельный платный API-запрос. Автоматической
+                публикации нет. Одновременные задания одной локации исключены.
               </p>
               <form action={actions.generate} className="button-row">
                 <select name="scope" aria-label="Область наполнения">
                   <option value="empty">
-                    Только пустые города ({counts.empty})
+                    Только пустые локации ({counts.empty})
                   </option>
                   <option value="all">
-                    Все активные города ({counts.total})
+                    Все локации каталога ({counts.public_count})
                   </option>
                 </select>
                 <button>Поставить в очередь</button>
@@ -311,7 +430,7 @@ export default async function Admin({
                 <thead>
                   <tr>
                     <th>Задание</th>
-                    <th>Город</th>
+                    <th>Локация</th>
                     <th>Статус</th>
                     <th>Подробности</th>
                   </tr>
@@ -319,7 +438,7 @@ export default async function Admin({
                 <tbody>
                   {(
                     await all(
-                      "SELECT j.*,c.name FROM jobs j LEFT JOIN cities c ON c.id=j.city_id ORDER BY j.created_at DESC,j.id DESC LIMIT 100",
+                      "SELECT j.*,c.name FROM jobs j LEFT JOIN locations c ON c.id=j.location_id ORDER BY j.created_at DESC,j.id DESC LIMIT 100",
                     )
                   ).map((j) => (
                     <tr key={j.id}>
@@ -328,7 +447,11 @@ export default async function Admin({
                         <small>{time(j.created_at)}</small>
                       </td>
                       <td>
-                        <Link href={"/admin?tab=cities&city=" + j.city_id}>
+                        <Link
+                          href={
+                            "/admin?tab=locations&location=" + j.location_id
+                          }
+                        >
                           {j.name}
                         </Link>
                       </td>
@@ -377,7 +500,7 @@ export default async function Admin({
             <div className="city-sidebar">
               {(
                 await all(
-                  `SELECT r.*,c.name FROM reviews r JOIN cities c ON c.id=r.city_id ${p.filter === "all" ? "" : "WHERE r.moderation=$1"} ORDER BY r.created_at DESC LIMIT 100`,
+                  `SELECT r.*,c.name FROM reviews r JOIN locations c ON c.id=r.location_id ${p.filter === "all" ? "" : "WHERE r.moderation=$1"} ORDER BY r.created_at DESC LIMIT 100`,
                   ...(p.filter === "all"
                     ? []
                     : [
@@ -427,22 +550,22 @@ export default async function Admin({
     </main>
   );
 }
-async function CityEditor({
-  cityId,
+async function LocationEditor({
+  locationId,
   versionId,
 }: {
-  cityId: string;
+  locationId: string;
   versionId?: string;
 }) {
   const c =
-    cityId === "new"
+    locationId === "new"
       ? null
-      : await one("SELECT * FROM cities WHERE id=$1", cityId);
-  if (cityId !== "new" && !c) return <p>Город не найден</p>;
+      : await one("SELECT * FROM locations WHERE id=$1", locationId);
+  if (locationId !== "new" && !c) return <p>Локация не найдена</p>;
   const versions = c
     ? await all(
-        "SELECT * FROM versions WHERE city_id=$1 ORDER BY number DESC",
-        cityId,
+        "SELECT * FROM versions WHERE location_id=$1 ORDER BY number DESC",
+        locationId,
       )
     : [];
   const selected = versionId
@@ -454,58 +577,32 @@ async function CityEditor({
   return (
     <>
       <section className="panel">
-        <h2>{c ? c.name : "Новый город"}</h2>
-        <form action={actions.saveCity} className="stack">
-          <input type="hidden" name="id" value={c?.id || ""} />
-          <div className="field-grid">
-            <label>
-              Название
-              <input
-                name="name"
-                defaultValue={c?.name}
-                required
-                maxLength={150}
-              />
-            </label>
-            <label>
-              Регион
-              <input
-                name="region"
-                defaultValue={c?.region}
-                required
-                maxLength={200}
-              />
-            </label>
-            <label>
-              URL города
-              <input
-                name="slug"
-                defaultValue={c?.slug}
-                placeholder="ivanovo"
-                pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              />
-            </label>
-            <label>
-              Население
-              <input
-                name="population"
-                type="number"
-                defaultValue={c?.population || 0}
-                min={0}
-                max={100000000}
-              />
-            </label>
-          </div>
-          <label className="inline">
-            <input
-              type="checkbox"
-              name="active"
-              defaultChecked={c ? !!c.active : true}
-            />{" "}
-            Город доступен на сайте
-          </label>
-          <button>Сохранить город</button>
-        </form>
+        <h2>{c ? c.name : "Новая локация"}</h2>
+        <LocationForm
+          key={c?.id || "new"}
+          location={c}
+          options={(
+            await all("SELECT id,name,region,slug FROM locations ORDER BY name")
+          ).map((l) => ({
+            id: l.id,
+            name: l.name,
+            region: l.region,
+            slug: l.slug,
+          }))}
+          relatedIds={
+            c
+              ? (
+                  await relatedLocations(locationId, { includeHidden: true })
+                ).map((l) => l.id)
+              : []
+          }
+        />
+        {c && c.source_metadata && c.source_metadata !== "{}" && (
+          <details>
+            <summary>Источник и исходные данные</summary>
+            <pre>{JSON.stringify(JSON.parse(c.source_metadata), null, 2)}</pre>
+          </details>
+        )}
         {c && (
           <Link href={"/guide/" + c.slug} target="_blank">
             Открыть страницу ↗
@@ -515,24 +612,80 @@ async function CityEditor({
       {c && (
         <>
           <section className="panel">
+            <h2>Иерархия и охват</h2>
+            <div className="button-row">
+              {(await ancestors(locationId)).map((a) => (
+                <Link key={a.id} href={"/admin?tab=locations&location=" + a.id}>
+                  {a.name} →
+                </Link>
+              ))}
+              <strong>{c.name}</strong>
+            </div>
+            <div className="location-tree">
+              {(await childLocations(locationId, { includeHidden: true })).map(
+                (l) => (
+                  <Link
+                    key={l.id}
+                    href={"/admin?tab=locations&location=" + l.id}
+                  >
+                    {l.name} ·{" "}
+                    {LOCATION_KINDS[l.kind as keyof typeof LOCATION_KINDS]}
+                  </Link>
+                ),
+              )}
+            </div>
+            <form action={actions.attachRestaurant} className="stack">
+              <h3>Связать существующий ресторан</h3>
+              <input type="hidden" name="locationId" value={locationId} />
+              <label>
+                Ресторан
+                <select name="restaurantId">
+                  {(
+                    await all(
+                      "SELECT r.id,r.name,l.name location_name FROM restaurants r JOIN locations l ON l.id=r.location_id ORDER BY r.name LIMIT 1000",
+                    )
+                  ).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} · {r.location_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="secondary">Связать с локацией</button>
+              <small>
+                Создаётся связь, без копии ресторана и без публикации.
+              </small>
+            </form>
+          </section>
+          <section className="panel">
             <div className="section-heading">
               <h2>Черновик страницы</h2>
               <form action={actions.generate}>
-                <input type="hidden" name="cityId" value={cityId} />
+                <input type="hidden" name="locationId" value={locationId} />
                 <button className="secondary">Наполнить через GPT ↗</button>
               </form>
             </div>
             <RankingReport
-              report={(await cityContent(cityId)).rankingReport || []}
+              report={(await locationContent(locationId)).rankingReport || []}
             />
             <ContentEditor
-              key={c.draft_version || cityId}
-              cityId={cityId}
-              initial={await cityContent(cityId)}
+              key={c.draft_version || locationId}
+              locationId={locationId}
+              initial={await locationContent(locationId)}
+              available={(await availableRestaurants(locationId)).map((r) => ({
+                id: r.id,
+                name: r.name,
+                cuisine: r.cuisine,
+                description: r.description,
+                mapsUrl: r.maps_url,
+                sources: JSON.parse(r.sources),
+                locationId: r.location_id,
+                locationName: r.location_name,
+              }))}
             />
             {c.draft_version && (
               <form action={actions.publishVersion} className="publish">
-                <input type="hidden" name="cityId" value={cityId} />
+                <input type="hidden" name="locationId" value={locationId} />
                 <input type="hidden" name="versionId" value={c.draft_version} />
                 <button>Опубликовать текущий черновик ↗</button>
                 <small>Публичная страница изменится сразу после нажатия.</small>
@@ -550,7 +703,7 @@ async function CityEditor({
                     <Link
                       key={v.id}
                       className={selected?.id === v.id ? "selected" : ""}
-                      href={`/admin?tab=cities&city=${cityId}&version=${v.id}`}
+                      href={`/admin?tab=locations&location=${locationId}&version=${v.id}`}
                     >
                       v{v.number} · {v.source}{" "}
                       {v.id === c.published_version ? "· на сайте" : ""}
@@ -585,7 +738,11 @@ async function CityEditor({
                     )}
                     <div className="button-row">
                       <form action={actions.restoreVersion}>
-                        <input type="hidden" name="cityId" value={cityId} />
+                        <input
+                          type="hidden"
+                          name="locationId"
+                          value={locationId}
+                        />
                         <input
                           type="hidden"
                           name="versionId"
@@ -596,7 +753,11 @@ async function CityEditor({
                         </button>
                       </form>
                       <form action={actions.publishVersion}>
-                        <input type="hidden" name="cityId" value={cityId} />
+                        <input
+                          type="hidden"
+                          name="locationId"
+                          value={locationId}
+                        />
                         <input
                           type="hidden"
                           name="versionId"
@@ -611,11 +772,11 @@ async function CityEditor({
             )}
           </section>
           <details className="panel">
-            <summary>База ресторанов города</summary>
+            <summary>База ресторанов локации</summary>
             {(
               await all(
-                "SELECT * FROM restaurants WHERE city_id=$1 ORDER BY name",
-                cityId,
+                "SELECT * FROM restaurants WHERE location_id=$1 ORDER BY name",
+                locationId,
               )
             ).map((r) => (
               <p key={r.id}>
@@ -631,7 +792,7 @@ async function CityEditor({
 }
 async function ReviewEditor({ reviewId }: { reviewId: string }) {
   const r = await one(
-    "SELECT r.*,c.name,c.slug FROM reviews r JOIN cities c ON c.id=r.city_id WHERE r.id=$1",
+    "SELECT r.*,c.name,c.slug FROM reviews r JOIN locations c ON c.id=r.location_id WHERE r.id=$1",
     reviewId,
   );
   if (!r) return <p>Отзыв не найден</p>;
@@ -643,7 +804,7 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
       reviewId,
     ),
   );
-  const current = await cityContent(r.city_id);
+  const current = await locationContent(r.location_id);
   const proposals = await all(
     "SELECT * FROM proposals WHERE review_id=$1",
     reviewId,
@@ -653,8 +814,8 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
       <section className="panel">
         <div className="section-heading">
           <h2>{r.name} · отзыв</h2>
-          <Link href={"/admin?tab=cities&city=" + r.city_id}>
-            К странице города ↗
+          <Link href={"/admin?tab=locations&location=" + r.location_id}>
+            К странице локации ↗
           </Link>
         </div>
         <p className="muted">
@@ -744,7 +905,7 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
         {proposals.length === 0 && (
           <p>
             Дополнительных предложений нет. Редактор может вручную изменить
-            подборку города.
+            подборку локации.
           </p>
         )}
         {proposals.map((p) => {
@@ -861,19 +1022,19 @@ async function ReviewEditor({ reviewId }: { reviewId: string }) {
         </details>
       </section>
       <section className="panel">
-        <h2>Внутренние оценки ресторанов города</h2>
+        <h2>Внутренние оценки ресторанов локации</h2>
         <p className="muted">
           Только одобренные, без фрода. Публичные места в топе задаёт редактор.
         </p>
-        <InternalStats cityId={r.city_id} />
+        <InternalStats locationId={r.location_id} />
       </section>
     </>
   );
 }
-async function InternalStats({ cityId }: { cityId: string }) {
+async function InternalStats({ locationId }: { locationId: string }) {
   const rows = await all(
-    "SELECT result,visitor FROM reviews WHERE city_id=$1 AND moderation='approved' AND fraud=0 AND result IS NOT NULL",
-    cityId,
+    "SELECT result,visitor FROM reviews WHERE location_id=$1 AND moderation='approved' AND fraud=0 AND result IS NOT NULL",
+    locationId,
   );
   const groups = new Map<string, any>();
   for (const r of rows) {

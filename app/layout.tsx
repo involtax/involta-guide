@@ -4,11 +4,11 @@ import "./style.css";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL || "http://localhost:3000"),
   title: {
-    default: "Инвольта гид — где поесть в городах России",
+    default: "Инвольта гид — где поесть в России",
     template: "%s · Инвольта гид",
   },
   description:
-    "Короткие подборки ресторанов по городам России. Редакционный выбор и голосовые отзывы гостей.",
+    "Короткие подборки ресторанов в городах, районах и на курортах России. Редакционный выбор и голосовые отзывы гостей.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

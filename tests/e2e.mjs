@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import {
   mkdtempSync,
@@ -17,10 +17,10 @@ const testDb = await testDatabase();
 const directory = mkdtempSync(join(tmpdir(), "involta-e2e-"));
 process.env.DATA_DIR = directory;
 const { closeDb, one, all } = await import("../lib/db.mjs");
-const { migrate, seedCities } = await import("../lib/migrate.mjs");
+const { migrate, seedLocations } = await import("../lib/migrate.mjs");
 await migrate();
-await seedCities();
-const city = await one("SELECT * FROM cities WHERE slug='ivanovo'");
+await seedLocations();
+const city = await one("SELECT * FROM locations WHERE slug='ivanovo'");
 const password = randomBytes(24).toString("hex");
 const apiCanary = `test-only-${randomBytes(32).toString("hex")}`;
 const server = spawn(
@@ -91,6 +91,14 @@ try {
     "http://127.0.0.1:3107/api/admin/audio/missing",
   );
   assert.equal(unauthorized.status(), 401);
+  assert.equal(
+    (
+      await context.request.get(
+        "http://127.0.0.1:3107/api/admin/locations-export",
+      )
+    ).status(),
+    401,
+  );
   const forged = await context.request.post(
     "http://127.0.0.1:3107/api/reviews",
     { headers: { origin: "https://evil.example" } },
@@ -100,6 +108,14 @@ try {
   await page.getByLabel("Пароль редакции").fill(password);
   await page.getByRole("button", { name: "Войти ↗" }).click();
   await page.getByRole("heading", { name: "Рабочий стол." }).waitFor();
+  const exported = await context.request.get(
+    "http://127.0.0.1:3107/api/admin/locations-export",
+  );
+  assert.equal(exported.status(), 200);
+  const catalogue = await exported.json();
+  assert.ok(catalogue.length > 1400);
+  assert.equal(catalogue.filter((l) => l.name === "Газпром Поляна").length, 1);
+  assert.ok(!JSON.stringify(catalogue).includes(apiCanary));
   assert.ok(
     !(await page.content()).includes(apiCanary),
     "Секрет не передаётся в HTML админки",
@@ -159,7 +175,7 @@ try {
     "SELECT * FROM reviews ORDER BY created_at DESC LIMIT 1",
   );
   assert.ok(review);
-  assert.equal(review.city_id, city.id);
+  assert.equal(review.location_id, city.id);
   assert.ok(review.hash);
   const anonymous = await browser.newContext();
   const other = await anonymous.request.get(
@@ -178,6 +194,127 @@ try {
     "rejected",
   );
   assert.equal((await all("SELECT id FROM reviews")).length, 1);
+  // Public location hierarchy and aliases.
+  await page.goto("http://127.0.0.1:3107/guide/sirius");
+  await page.getByRole("heading", { level: 1, name: /в Сириусе/ }).waitFor();
+  await page
+    .getByRole("navigation", { name: "Навигационная цепочка" })
+    .getByRole("link", { name: "Сочи", exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("heading", { name: "Тестовый ресторан", exact: true })
+      .count(),
+    0,
+    "Нет подмены подборкой другого города",
+  );
+  const aliasResponse = await context.request.get(
+    "http://127.0.0.1:3107/guide/gazprom-laura",
+    { maxRedirects: 0 },
+  );
+  assert.equal(aliasResponse.status(), 308);
+  assert.ok(
+    aliasResponse.headers().location.endsWith("/guide/gazprom-polyana"),
+  );
+  await page.goto("http://127.0.0.1:3107/guide/moskva");
+  assert.equal(await page.locator(".location-children .city-link").count(), 20);
+  assert.ok(!(await page.locator("main").innerText()).includes("Капотня"));
+  await page.goto(
+    "http://127.0.0.1:3107/guide?q=" + encodeURIComponent("Лаура"),
+  );
+  await page.getByRole("link", { name: /Газпром Поляна/ }).waitFor();
+  assert.equal(await page.locator(".city-grid .city-link").count(), 1);
+  // Create/edit a child location through the actual admin form.
+  const sochi = await one("SELECT id FROM locations WHERE slug='sochi'");
+  await page.goto("http://127.0.0.1:3107/admin?tab=locations&location=new");
+  const locationForm = page
+    .locator("form")
+    .filter({ has: page.getByLabel("Форма для заголовка") });
+  await locationForm
+    .getByLabel("Название", { exact: true })
+    .fill("Тестовая бухта");
+  await locationForm
+    .getByRole("textbox", { name: "Административный регион", exact: true })
+    .fill("Краснодарский край");
+  await locationForm.getByLabel("URL локации").fill("test-bay");
+  await locationForm.getByLabel("Форма для заголовка").fill("в Тестовой бухте");
+  await locationForm.getByLabel("Альтернативные названия").fill("Моя бухта");
+  await locationForm.getByLabel("Надлокация: найти").fill("Сочи");
+  await locationForm
+    .getByRole("combobox", { name: /Родительская локация/ })
+    .selectOption(sochi.id);
+  await locationForm.getByRole("button", { name: "Сохранить локацию" }).click();
+  await page
+    .getByRole("heading", { name: "Тестовая бухта", exact: true })
+    .waitFor();
+  const bay = await one("SELECT * FROM locations WHERE slug='test-bay'");
+  assert.equal(bay.parent_id, sochi.id);
+  await page.getByLabel("URL локации").fill("test-bay-new");
+  await page
+    .getByRole("button", { name: "Сохранить локацию", exact: true })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await one("SELECT slug FROM locations WHERE id=$1", bay.id)).slug,
+    )
+    .toBe("test-bay-new");
+  const oldAddress = await context.request.get(
+    "http://127.0.0.1:3107/guide/test-bay",
+    { maxRedirects: 0 },
+  );
+  assert.equal(oldAddress.status(), 308);
+  await page.goto("http://127.0.0.1:3107/guide/test-bay-new");
+  await page
+    .getByRole("heading", { level: 1, name: /в Тестовой бухте/ })
+    .waitFor();
+  // A published child restaurant can be selected for a hub without a second DB row.
+  await page.goto(
+    "http://127.0.0.1:3107/admin?tab=locations&location=" + bay.id,
+  );
+  await page.getByRole("button", { name: "+ Ресторан" }).click();
+  const bayCard = page.locator("fieldset");
+  await bayCard.getByLabel("Название", { exact: true }).fill("Прибрежный тест");
+  await bayCard.getByLabel("Кухня", { exact: true }).fill("Европейская");
+  await bayCard
+    .getByLabel("Почему стоит зайти")
+    .fill("Тестовая карточка дочерней локации.");
+  await bayCard
+    .getByLabel("Яндекс Карты")
+    .fill("https://yandex.ru/maps/?text=Sochi");
+  await page.getByRole("button", { name: "Сохранить новую версию" }).click();
+  await page.getByText("Черновик сохранён.", { exact: false }).waitFor();
+  await page
+    .getByRole("button", { name: "Опубликовать текущий черновик ↗" })
+    .click();
+  await page.getByText("Версия опубликована", { exact: true }).waitFor();
+  const shared = await one(
+    "SELECT id FROM restaurants WHERE location_id=$1",
+    bay.id,
+  );
+  await page.goto(
+    "http://127.0.0.1:3107/admin?tab=locations&location=" + sochi.id,
+  );
+  await page.getByLabel("Ресторан из дочерних локаций").selectOption(shared.id);
+  await page
+    .getByRole("button", { name: "Добавить в черновик", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Сохранить новую версию" }).click();
+  await page.getByText("Черновик сохранён.", { exact: false }).waitFor();
+  assert.equal(
+    (await one("SELECT count(*) n FROM restaurants WHERE id=$1", shared.id)).n,
+    1,
+  );
+  assert.equal(
+    (await one("SELECT location_id FROM restaurants WHERE id=$1", shared.id))
+      .location_id,
+    bay.id,
+  );
+  assert.equal(
+    (await one("SELECT published_version FROM locations WHERE id=$1", sochi.id))
+      .published_version,
+    null,
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("http://127.0.0.1:3107/guide/ivanovo");
   assert.ok(
@@ -213,7 +350,7 @@ try {
     );
   }
   console.log(
-    "E2E PASS: вход, защита API, черновик, публикация, HTML SEO, микрофон, cookie-история, модерация, мобильная вёрстка.",
+    "E2E PASS: вход, SEO, микрофон, модерация, иерархия, 20 зон Москвы, алиасы, редактор локаций и общий ресторан без копий.",
   );
 } catch (e) {
   console.error(e);

@@ -19,16 +19,16 @@ const {
   id,
   saveDraft,
   publish,
-  cityContent,
+  locationContent,
   queueGeneration,
 } = await import("../lib/db.mjs");
 const { reviewSchema, contentSchema } = await import("../lib/schema.mjs");
 const { similarity, reviewSignals } = await import("../lib/signals.mjs");
 const { processJob } = await import("../lib/ai.mjs");
-const { migrate, seedCities } = await import("../lib/migrate.mjs");
+const { migrate, seedLocations } = await import("../lib/migrate.mjs");
 await migrate();
-await seedCities();
-const city = await one("SELECT * FROM cities WHERE slug='ivanovo'");
+await seedLocations();
+const city = await one("SELECT * FROM locations WHERE slug='ivanovo'");
 const content = {
   intro: "Местная подборка",
   restaurants: [
@@ -42,10 +42,10 @@ const content = {
   ],
 };
 test("импорт городов содержит регионы, уникальные URL и Иваново", async () => {
-  assert.ok((await all("SELECT id FROM cities")).length > 1100);
+  assert.ok((await all("SELECT id FROM locations")).length > 1100);
   assert.equal(city.name, "Иваново");
   assert.equal(
-    (await all("SELECT slug FROM cities GROUP BY slug HAVING count(*)>1"))
+    (await all("SELECT slug FROM locations GROUP BY slug HAVING count(*)>1"))
       .length,
     0,
   );
@@ -59,7 +59,7 @@ test("черновик не публикуется сам; публикация 
     "test-model",
   );
   assert.equal(
-    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
+    (await one("SELECT published_version FROM locations WHERE id=$1", city.id))
       .published_version,
     null,
   );
@@ -69,14 +69,14 @@ test("черновик не публикуется сам; публикация 
     intro: "Новое вступление",
   });
   assert.equal(
-    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
+    (await one("SELECT published_version FROM locations WHERE id=$1", city.id))
       .published_version,
     first,
   );
   await publish(city.id, next);
   await publish(city.id, first);
   assert.equal(
-    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
+    (await one("SELECT published_version FROM locations WHERE id=$1", city.id))
       .published_version,
     first,
   );
@@ -85,7 +85,7 @@ test("черновик не публикуется сам; публикация 
     "Промпт конкретного запуска",
   );
   assert.equal(
-    (await all("SELECT * FROM versions WHERE city_id=$1", city.id)).length,
+    (await all("SELECT * FROM versions WHERE location_id=$1", city.id)).length,
     2,
   );
   await assert.rejects(() => publish(city.id, id()), /Версия/);
@@ -182,7 +182,7 @@ test("очередь исключает повтор генерации и со�
 });
 test("без ключа задание завершается явной ошибкой, контент не меняется", async () => {
   delete process.env.OPENAI_API_KEY;
-  const before = await cityContent(city.id);
+  const before = await locationContent(city.id);
   await processJob();
   assert.equal(
     (await one("SELECT status FROM jobs WHERE kind='generate'")).status,
@@ -192,7 +192,7 @@ test("без ключа задание завершается явной оши�
     (await one("SELECT error FROM jobs WHERE kind='generate'")).error,
     /OPENAI_API_KEY/,
   );
-  assert.deepEqual(await cityContent(city.id), before);
+  assert.deepEqual(await locationContent(city.id), before);
 });
 test("ИИ-генерация сохраняет проверенный структурированный черновик и промпт страницы", async () => {
   const original = globalThis.fetch;
@@ -258,20 +258,24 @@ test("ИИ-генерация сохраняет проверенный стру
     );
     await processJob();
     const v = await one(
-      "SELECT * FROM versions WHERE city_id=$1 ORDER BY number DESC LIMIT 1",
+      "SELECT * FROM versions WHERE location_id=$1 ORDER BY number DESC LIMIT 1",
       city.id,
     );
     assert.equal(v.source, "ai");
     assert.equal(JSON.parse(v.content).rankingReport[0].totalScore, 7);
     assert.equal(
-      contentSchema.parse(await cityContent(city.id)).rankingReport.length,
+      contentSchema.parse(await locationContent(city.id)).rankingReport.length,
       1,
     );
     assert.match(v.prompt, /Иваново/);
     assert.ok(!v.prompt.includes("{город}"));
     assert.equal(
-      (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
-        .published_version !== v.id,
+      (
+        await one(
+          "SELECT published_version FROM locations WHERE id=$1",
+          city.id,
+        )
+      ).published_version !== v.id,
       true,
     );
   } finally {
@@ -284,7 +288,7 @@ test("разбор записи всегда создаёт отзыв или о
   process.env.OPENAI_API_KEY = "test-key-not-real";
   const reviewId = id();
   await run(
-    "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device,transcript) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+    "INSERT INTO reviews(id,location_id,visitor,audio,mime,hash,ip_hash,device,transcript) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     reviewId,
     city.id,
     "visitor",
@@ -296,7 +300,7 @@ test("разбор записи всегда создаёт отзыв или о
     "Очень вкусно в новом месте",
   );
   await run(
-    "INSERT INTO jobs(id,kind,city_id,review_id) VALUES($1,'review',$2,$3)",
+    "INSERT INTO jobs(id,kind,location_id,review_id) VALUES($1,'review',$2,$3)",
     id(),
     city.id,
     reviewId,
@@ -379,14 +383,14 @@ test("одновременные сохранения страницы полу�
     ),
   );
   const versions = await all(
-    "SELECT number FROM versions WHERE city_id=$1",
+    "SELECT number FROM versions WHERE location_id=$1",
     city.id,
   );
   assert.equal(new Set(versions.map((v) => v.number)).size, versions.length);
 });
 test("дубликаты очереди исключены при конкурентных запросах, задания не выдаются двум воркерам", async () => {
   const cities = await all(
-    "SELECT id FROM cities WHERE id<>$1 LIMIT 8",
+    "SELECT id FROM locations WHERE id<>$1 LIMIT 8",
     city.id,
   );
   const inserted = await Promise.all(
@@ -410,22 +414,22 @@ test("принятие предложения атомарно и защищен
     "SELECT id FROM proposals WHERE review_id=$1 LIMIT 1",
     review.id,
   );
-  const before = (await cityContent(city.id)).restaurants.length;
+  const before = (await locationContent(city.id)).restaurants.length;
   const outcomes = await Promise.allSettled([
     applyProposal(proposal.id, content.restaurants[0]),
     applyProposal(proposal.id, content.restaurants[0]),
   ]);
   assert.equal(outcomes.filter((o) => o.status === "fulfilled").length, 1);
-  assert.equal((await cityContent(city.id)).restaurants.length, before + 1);
+  assert.equal((await locationContent(city.id)).restaurants.length, before + 1);
   const link = await one(
-    "SELECT review_id FROM version_reviews WHERE version_id=(SELECT draft_version FROM cities WHERE id=$1)",
+    "SELECT review_id FROM version_reviews WHERE version_id=(SELECT draft_version FROM locations WHERE id=$1)",
     city.id,
   );
   assert.equal(link.review_id, review.id);
 });
 test("устаревшая генерация не перезаписывает изменённый черновик", async () => {
   const previous = (
-    await one("SELECT draft_version FROM cities WHERE id=$1", city.id)
+    await one("SELECT draft_version FROM locations WHERE id=$1", city.id)
   ).draft_version;
   await saveDraft(city.id, content);
   await assert.rejects(
@@ -440,7 +444,7 @@ test("устаревшая генерация не перезаписывает 
       ),
     /Черновик изменён/,
   );
-  assert.equal((await cityContent(city.id)).intro, content.intro);
+  assert.equal((await locationContent(city.id)).intro, content.intro);
 });
 test.after(async () => {
   await closeDb();

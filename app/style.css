@@ -904,3 +904,64 @@ blockquote {
     display: none;
   }
 }
+.location-search select {
+  width: auto;
+  max-width: 240px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.pagination {
+  display: flex;
+  gap: 25px;
+  justify-content: center;
+  margin-top: 35px;
+  font-size: 13px;
+}
+.location-children {
+  padding: 25px 0 40px;
+  border-top: 1px solid var(--line);
+}
+.coverage {
+  max-width: 720px;
+  font-size: 12px;
+  color: var(--muted);
+  border-left: 2px solid var(--line);
+  padding-left: 14px;
+}
+.breadcrumbs {
+  flex-wrap: wrap;
+}
+.location-form select[multiple] {
+  min-height: 130px;
+}
+.location-tree a {
+  display: block;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.source-badge {
+  font-size: 11px;
+  background: var(--soft);
+  padding: 5px 9px;
+}
+.map-coordinates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 550px) {
+  .location-search {
+    flex-wrap: wrap;
+  }
+  .location-search input {
+    width: 100%;
+  }
+  .location-search select {
+    flex: 1;
+    max-width: none;
+  }
+  .city-hero h1 {
+    font-size: 48px;
+  }
+}

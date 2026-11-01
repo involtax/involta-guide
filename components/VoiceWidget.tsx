@@ -10,11 +10,11 @@ type Status = {
   published: boolean;
 };
 export default function VoiceWidget({
-  cityId,
-  cityName,
+  locationId,
+  locationName,
 }: {
-  cityId: string;
-  cityName: string;
+  locationId: string;
+  locationName: string;
 }) {
   const [state, setState] = useState<
     "idle" | "recording" | "ready" | "sending"
@@ -30,7 +30,7 @@ export default function VoiceWidget({
   const chunks = useRef<Blob[]>([]);
   async function load() {
     try {
-      const r = await fetch(`/api/my-reviews?city=${cityId}`);
+      const r = await fetch(`/api/my-reviews?location=${locationId}`);
       if (r.ok) setHistory(await r.json());
     } catch {}
   }
@@ -41,7 +41,7 @@ export default function VoiceWidget({
       clearInterval(timer);
       stream.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [cityId]);
+  }, [locationId]);
   useEffect(() => {
     if (!blob) {
       setPreview("");
@@ -119,7 +119,7 @@ export default function VoiceWidget({
     try {
       const f = new FormData();
       f.set("audio", blob, "voice");
-      f.set("cityId", cityId);
+      f.set("locationId", locationId);
       f.set("duration", String(seconds));
       f.set("consent", "yes");
       const r = await fetch("/api/reviews", { method: "POST", body: f });
@@ -144,7 +144,7 @@ export default function VoiceWidget({
         </h2>
         <p>
           Хороший ужин, неудачный опыт или место, которого не хватает в подборке{" "}
-          {cityName}? Нажмите кнопку и расскажите голосом. Редакция услышит.
+          {locationName}? Нажмите кнопку и расскажите голосом. Редакция услышит.
         </p>
         <small>
           До 2 минут. Без регистрации. Отзыв появится в обработке, а изменения в

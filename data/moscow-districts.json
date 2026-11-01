@@ -1,0 +1,794 @@
+[
+  {
+    "name": "Академический",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Академическом",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Алексеевский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Алексеевском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Алтуфьевский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Алтуфьевском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Арбат",
+    "administrative_area": "ЦАО",
+    "in_phrase": "на Арбате",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Аэропорт",
+    "administrative_area": "САО",
+    "in_phrase": "в районе Аэропорт",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бабушкинский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Бабушкинском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Басманный",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Басманном районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Беговой",
+    "administrative_area": "САО",
+    "in_phrase": "в Беговой",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бекасово",
+    "administrative_area": "ТАО",
+    "in_phrase": "в Бекасове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бескудниковский",
+    "administrative_area": "САО",
+    "in_phrase": "в Бескудниковском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бибирево",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Бибиреве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бирюлёво Восточное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Бирюлёве Восточном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бирюлёво Западное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Бирюлёве Западном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Богородское",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Богородском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Братеево",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Братееве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Бутырский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Бутырском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Вешняки",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Вешняках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Внуково",
+    "administrative_area": "НАО",
+    "in_phrase": "в Внукове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Войковский",
+    "administrative_area": "САО",
+    "in_phrase": "в Войковском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Вороново",
+    "administrative_area": "ТАО",
+    "in_phrase": "в Вороновом",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Восточное Дегунино",
+    "administrative_area": "САО",
+    "in_phrase": "в Восточном Дегунине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Восточное Измайлово",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Восточном Измайлове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Восточный",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Восточном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Выхино-Жулебино",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Выхине-Жулебине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Гагаринский",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Гагаринском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Головинский",
+    "administrative_area": "САО",
+    "in_phrase": "в Головинском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Гольяново",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Гольянове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Даниловский",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Даниловском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Дмитровский",
+    "administrative_area": "САО",
+    "in_phrase": "в Дмитровском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Донской",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Донской",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Дорогомилово",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Дорогомилове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Замоскворечье",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Замоскворечье",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Западное Дегунино",
+    "administrative_area": "САО",
+    "in_phrase": "в Западном Дегунине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Зюзино",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Зюзине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Зябликово",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Зябликове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ивановское",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Ивановском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Измайлово",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Измайлове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Капотня",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Капотне",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Коммунарка",
+    "administrative_area": "НАО",
+    "in_phrase": "в Коммунарке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Коньково",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Конькове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Коптево",
+    "administrative_area": "САО",
+    "in_phrase": "в Коптеве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Косино-Ухтомский",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Косине-Ухтомском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Котловка",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Котловке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Краснопахорский",
+    "administrative_area": "ТАО",
+    "in_phrase": "в Краснопахорском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Красносельский",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Красносельском районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Крылатское",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Крылатском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Крюково",
+    "administrative_area": "ЗелАО",
+    "in_phrase": "в Крюкове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Кузьминки",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Кузьминке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Кунцево",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Кунцеве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Куркино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Куркине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Левобережный",
+    "administrative_area": "САО",
+    "in_phrase": "в Левобережном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Лефортово",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Лефортове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Лианозово",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Лианозове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ломоносовский",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Ломоносовском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Лосиноостровский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Лосиноостровском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Люблино",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Люблине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Марфино",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Марфине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Марьина Роща",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Марьине Роще",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Марьино",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Марьине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Матушкино",
+    "administrative_area": "ЗелАО",
+    "in_phrase": "в Матушкином",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Метрогородок",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Метрогородке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Мещанский",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Мещанском районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Митино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Митине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Можайский",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Можайском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Молжаниновский",
+    "administrative_area": "САО",
+    "in_phrase": "в Молжаниновском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Москворечье-Сабурово",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Москворечье-Сабурове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Нагатино-Садовники",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Нагатине-Садовниках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Нагатинский Затон",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Нагатинском Затоне",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Нагорный",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Нагорном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Некрасовка",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Некрасовке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Нижегородский",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Нижегородском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Новогиреево",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Новогирееве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Новокосино",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Новокосине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ново-Переделкино",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Новом-Переделкине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Обручевский",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Обручевском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Орехово-Борисово Северное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Орехове-Борисове Северном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Орехово-Борисово Южное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Орехове-Борисове Южном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Останкинский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Останкинском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Отрадное",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Отрадном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Очаково-Матвеевское",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Очакове-Матвеевском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Перово",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Перове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Печатники",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Печатниках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Покровское-Стрешнево",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Покровском-Стрешневе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Преображенское",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Преображенском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Пресненский",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Пресненском районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Проспект Вернадского",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Проспекте Вернадском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Раменки",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Раменках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ростокино",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Ростокине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Рязанский",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Рязанском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Савёлки",
+    "administrative_area": "ЗелАО",
+    "in_phrase": "в Савёлке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Савёловский",
+    "administrative_area": "САО",
+    "in_phrase": "в Савёловском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Свиблово",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Свиблове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Северное Бутово",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Северном Бутове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Северное Измайлово",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Северном Измайлове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Северное Медведково",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Северном Медведкове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Северное Тушино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Северном Тушине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Северный",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Северном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Силино",
+    "administrative_area": "ЗелАО",
+    "in_phrase": "в Силине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Сокол",
+    "administrative_area": "САО",
+    "in_phrase": "в Соколе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Соколиная Гора",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Соколиной Горе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Сокольники",
+    "administrative_area": "ВАО",
+    "in_phrase": "в Сокольниках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Солнцево",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Солнцеве",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Старое Крюково",
+    "administrative_area": "ЗелАО",
+    "in_phrase": "в Старом Крюкове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Строгино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Строгине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Таганский",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Таганском районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Тверской",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Тверском районе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Текстильщики",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Текстильщиках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Тёплый Стан",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Тёплом Стане",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Тимирязевский",
+    "administrative_area": "САО",
+    "in_phrase": "в Тимирязевском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Троицк",
+    "administrative_area": "ТАО",
+    "in_phrase": "в Троицке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Тропарёво-Никулино",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Тропарёве-Никулине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Филёвский Парк",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Филёвском Парке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Фили-Давыдково",
+    "administrative_area": "ЗАО",
+    "in_phrase": "в Филях-Давыдкове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Филимонковский",
+    "administrative_area": "НАО",
+    "in_phrase": "в Филимонковском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Хамовники",
+    "administrative_area": "ЦАО",
+    "in_phrase": "в Хамовниках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ховрино",
+    "administrative_area": "САО",
+    "in_phrase": "в Ховрине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Хорошёво-Мнёвники",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Хорошёве-Мнёвниках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Хорошёвский",
+    "administrative_area": "САО",
+    "in_phrase": "в Хорошёвском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Царицыно",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Царицыне",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Черёмушки",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Черёмушках",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Чертаново Северное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Чертанове Северном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Чертаново Центральное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Чертанове Центральном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Чертаново Южное",
+    "administrative_area": "ЮАО",
+    "in_phrase": "в Чертанове Южном",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Щербинка",
+    "administrative_area": "НАО",
+    "in_phrase": "в Щербинке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Щукино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Щукине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Южное Бутово",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Южном Бутове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Южное Медведково",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Южном Медведкове",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Южное Тушино",
+    "administrative_area": "СЗАО",
+    "in_phrase": "в Южном Тушине",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Южнопортовый",
+    "administrative_area": "ЮВАО",
+    "in_phrase": "в Южнопортовом",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Якиманка",
+    "administrative_area": "ЦАО",
+    "in_phrase": "на Якиманке",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ярославский",
+    "administrative_area": "СВАО",
+    "in_phrase": "в Ярославском",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  },
+  {
+    "name": "Ясенево",
+    "administrative_area": "ЮЗАО",
+    "in_phrase": "в Ясеневе",
+    "source": "https://ru.wikipedia.org/wiki/Районы_Москвы"
+  }
+]

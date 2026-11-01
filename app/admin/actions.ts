@@ -13,11 +13,12 @@ import {
   slugify,
   saveDraft,
   publish,
-  cityById,
+  locationById,
   queueGeneration,
   setSetting,
   setting,
 } from "@/lib/db.mjs";
+import { saveLocation, linkRestaurant } from "@/lib/locations.mjs";
 import { applyProposal, restorePageVersion } from "@/lib/editorial.mjs";
 import { contentSchema } from "@/lib/schema.mjs";
 import {
@@ -80,96 +81,94 @@ export async function logout() {
   (await cookies()).delete("guide_admin");
   redirect("/admin");
 }
-export async function saveCity(f: FormData) {
+export async function saveLocationAction(f: FormData) {
   await requireAdmin();
-  let cityId = str(f, "id");
+  let locationId = str(f, "id");
+  const number = (key: string) =>
+    str(f, key) === "" ? null : Number(str(f, key));
   try {
-    const name = z.string().min(1).max(150).parse(str(f, "name"));
-    const region = z.string().min(1).max(200).parse(str(f, "region"));
-    const slug = z
-      .string()
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-      .max(200)
-      .parse(str(f, "slug") || slugify(name));
-    const population = z.coerce
-      .number()
-      .int()
-      .min(0)
-      .max(100000000)
-      .parse(str(f, "population") || 0);
-    if (cityId) {
-      await cityById(cityId);
-      await run(
-        "UPDATE cities SET name=$1,region=$2,slug=$3,population=$4,active=$5 WHERE id=$6",
-        name,
-        region,
-        slug,
-        population,
-        f.get("active") === "on" ? 1 : 0,
-        cityId,
-      );
-    } else {
-      cityId = id();
-      await run(
-        "INSERT INTO cities(id,name,region,slug,population) VALUES($1,$2,$3,$4,$5)",
-        cityId,
-        name,
-        region,
-        slug,
-        population,
-      );
-    }
-    await audit("city", cityId);
+    locationId = await saveLocation(locationId || null, {
+      name: str(f, "name"),
+      region: str(f, "region"),
+      slug: str(f, "slug") || slugify(str(f, "name")),
+      kind: str(f, "kind"),
+      parentId: str(f, "parentId") || null,
+      isHub: f.get("isHub") === "on",
+      inPhrase: str(f, "inPhrase"),
+      aliases: str(f, "aliases")
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+      priority: str(f, "priority"),
+      topLimit: Number(str(f, "topLimit")),
+      active: f.get("active") === "on",
+      listed: f.get("listed") === "on",
+      population: number("population"),
+      populationVerified: f.get("populationVerified") === "on",
+      latitude: number("latitude"),
+      longitude: number("longitude"),
+      coverageNote: str(f, "coverageNote"),
+      bounds: str(f, "bounds") ? JSON.parse(str(f, "bounds")) : null,
+      relatedIds: f.getAll("relatedIds").map(String),
+    });
     refresh();
   } catch (e) {
     back(
-      "/admin",
-      e instanceof Error && /unique|duplicate/i.test(e.message)
-        ? "Такой URL уже занят"
-        : "Проверьте название, регион, URL и население",
+      "/admin?tab=locations" + (locationId ? "&location=" + locationId : ""),
+      "Не сохранено: " + (e instanceof Error ? e.message : "Проверьте данные"),
     );
   }
-  redirect("/admin?tab=cities&city=" + cityId);
+  redirect("/admin?tab=locations&location=" + locationId);
+}
+export async function attachRestaurant(f: FormData) {
+  await requireAdmin();
+  const locationId = str(f, "locationId");
+  await linkRestaurant(str(f, "restaurantId"), locationId);
+  refresh();
+  back(
+    "/admin?tab=locations&location=" + locationId,
+    "Ресторан связан с локацией. Теперь его можно добавить в черновик.",
+  );
 }
 export async function saveContent(f: FormData) {
   await requireAdmin();
-  const cityId = str(f, "cityId");
+  const locationId = str(f, "locationId");
   try {
     const content = contentSchema.parse(JSON.parse(str(f, "content")));
-    await saveDraft(cityId, content);
+    await saveDraft(locationId, content);
     refresh();
   } catch (e) {
     back(
-      "/admin?tab=cities&city=" + cityId,
+      "/admin?tab=locations&location=" + locationId,
       "Не сохранено: " + (e instanceof Error ? e.message : "ошибка"),
     );
   }
   back(
-    "/admin?tab=cities&city=" + cityId,
+    "/admin?tab=locations&location=" + locationId,
     "Черновик сохранён. Для публикации нажмите отдельную кнопку.",
   );
 }
 export async function publishVersion(f: FormData) {
   await requireAdmin();
-  const cityId = str(f, "cityId");
+  const locationId = str(f, "locationId");
   try {
-    await publish(cityId, str(f, "versionId"));
+    await publish(locationId, str(f, "versionId"));
     refresh();
   } catch (e) {
     back(
-      "/admin?tab=cities&city=" + cityId,
+      "/admin?tab=locations&location=" + locationId,
       e instanceof Error ? e.message : "Ошибка",
     );
   }
-  back("/admin?tab=cities&city=" + cityId, "Версия опубликована");
+  back("/admin?tab=locations&location=" + locationId, "Версия опубликована");
 }
 export async function restoreVersion(f: FormData) {
   await requireAdmin();
-  const cityId = str(f, "cityId");
+  const locationId = str(f, "locationId");
   const versionId = str(f, "versionId");
-  await restorePageVersion(cityId, versionId);
+  await restorePageVersion(locationId, versionId);
   refresh();
-  redirect("/admin?tab=cities&city=" + cityId);
+  redirect("/admin?tab=locations&location=" + locationId);
 }
 export async function savePrompt(f: FormData) {
   await requireAdmin();
@@ -181,18 +180,18 @@ export async function savePrompt(f: FormData) {
 export async function generate(f: FormData) {
   await requireAdmin();
   const prompt = await setting("prompt");
-  const cityId = str(f, "cityId");
+  const locationId = str(f, "locationId");
   let count = 0;
   await transaction(async () => {
-    if (cityId) {
-      await cityById(cityId);
-      if (await queueGeneration(cityId, prompt)) count++;
+    if (locationId) {
+      await locationById(locationId);
+      if (await queueGeneration(locationId, prompt)) count++;
     } else {
       const scope = str(f, "scope");
       if (!["empty", "all"].includes(scope))
         throw new Error("Выберите область");
       for (const c of await all(
-        "SELECT id FROM cities WHERE active=1" +
+        "SELECT id FROM locations WHERE active=1 AND (listed OR published_version IS NOT NULL)" +
           (scope === "empty" ? " AND draft='[]'" : ""),
       )) {
         if (await queueGeneration(c.id, prompt)) count++;
@@ -266,7 +265,7 @@ export async function proposalDecision(f: FormData) {
       "Не применено: " + (e instanceof Error ? e.message : "ошибка"),
     );
   }
-  back(target, "Добавлено в черновик. Публикация — на странице города.");
+  back(target, "Добавлено в черновик. Публикация — на странице локации.");
 }
 export async function retryJob(f: FormData) {
   await requireAdmin();

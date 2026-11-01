@@ -14,14 +14,19 @@ test("параллельные миграции и импорт городов �
           [
             "--input-type=module",
             "-e",
-            "const {migrate,seedCities}=await import('./lib/migrate.mjs');const {one,closeDb}=await import('./lib/db.mjs');await migrate();await seedCities();console.log((await one('SELECT count(*) AS n FROM cities')).n);await closeDb();",
+            "const {migrate,seedLocations}=await import('./lib/migrate.mjs');const {one,closeDb}=await import('./lib/db.mjs');await migrate();await seedLocations();console.log((await one('SELECT count(*) AS n FROM locations')).n);await closeDb();",
           ],
           { cwd: process.cwd(), env: { ...process.env }, timeout: 30000 },
         ),
       ),
     );
-    for (const result of results)
-      assert.equal(Number(result.stdout.trim()), 1134);
+    for (const result of results) {
+      assert.equal(
+        Number(result.stdout.trim()),
+        Number(results[0].stdout.trim()),
+      );
+      assert.ok(Number(result.stdout.trim()) > 1400);
+    }
   } finally {
     await testDb.cleanup();
   }

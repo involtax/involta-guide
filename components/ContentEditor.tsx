@@ -3,6 +3,10 @@ import { useState } from "react";
 import { saveContent } from "@/app/admin/actions";
 type Restaurant = {
   id?: string;
+  locationId?: string;
+  locationName?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   name: string;
   cuisine: string;
   description: string;
@@ -10,16 +14,19 @@ type Restaurant = {
   sources: string[];
 };
 export default function ContentEditor({
-  cityId,
+  locationId,
   initial,
+  available = [],
 }: {
-  cityId: string;
+  locationId: string;
+  available?: Restaurant[];
   initial: {
     intro: string;
     restaurants: Restaurant[];
     rankingReport?: unknown[];
   };
 }) {
+  const [selected, setSelected] = useState("");
   const [intro, setIntro] = useState(initial.intro);
   const [restaurants, setRestaurants] = useState(initial.restaurants);
   function edit(i: number, key: keyof Restaurant, value: string) {
@@ -36,7 +43,7 @@ export default function ContentEditor({
   }
   return (
     <form action={saveContent} className="stack">
-      <input type="hidden" name="cityId" value={cityId} />
+      <input type="hidden" name="locationId" value={locationId} />
       <input
         type="hidden"
         name="content"
@@ -57,9 +64,52 @@ export default function ContentEditor({
           maxLength={4000}
         />
       </label>
+      {available.length > 0 && (
+        <div className="panel">
+          <h3>Из других локаций направления</h3>
+          <p className="muted">
+            Только опубликованные подборки дочерних территорий и вручную
+            связанные рестораны. Общая страница собирается редактором.
+          </p>
+          <select
+            aria-label="Ресторан из дочерних локаций"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">Выберите ресторан</option>
+            {available
+              .filter((r) => !restaurants.some((item) => item.id === r.id))
+              .map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} · {r.locationName}
+                </option>
+              ))}
+          </select>
+          <button
+            type="button"
+            className="secondary"
+            disabled={!selected || restaurants.length >= 10}
+            onClick={() => {
+              const item = available.find((r) => r.id === selected);
+              if (item) setRestaurants((items) => [...items, item]);
+              setSelected("");
+            }}
+          >
+            Добавить в черновик
+          </button>
+        </div>
+      )}
       {restaurants.map((r, i) => (
         <fieldset key={r.id || i}>
           <legend>Место {i + 1}</legend>
+          {r.locationName && (
+            <span className="source-badge">
+              {r.locationName}
+              {r.locationId !== locationId
+                ? " · общий ресторан, без копии в БД"
+                : ""}
+            </span>
+          )}
           <div className="button-row">
             <button
               type="button"
@@ -125,6 +175,58 @@ export default function ContentEditor({
               placeholder="https://yandex.ru/maps/…"
             />
           </label>
+          <div className="map-coordinates">
+            <label>
+              Широта ресторана
+              <input
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                value={r.latitude ?? ""}
+                onChange={(e) =>
+                  setRestaurants((items) =>
+                    items.map((v, n) =>
+                      n === i
+                        ? {
+                            ...v,
+                            latitude:
+                              e.target.value === ""
+                                ? null
+                                : Number(e.target.value),
+                          }
+                        : v,
+                    ),
+                  )
+                }
+              />
+            </label>
+            <label>
+              Долгота ресторана
+              <input
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                value={r.longitude ?? ""}
+                onChange={(e) =>
+                  setRestaurants((items) =>
+                    items.map((v, n) =>
+                      n === i
+                        ? {
+                            ...v,
+                            longitude:
+                              e.target.value === ""
+                                ? null
+                                : Number(e.target.value),
+                          }
+                        : v,
+                    ),
+                  )
+                }
+              />
+            </label>
+          </div>
           {r.sources?.length > 0 && (
             <div className="sources">
               Источники:{" "}
