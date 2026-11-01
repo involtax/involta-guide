@@ -616,9 +616,9 @@ async function LocationEditor({
           </details>
         )}
         {c && (
-          <Link href={"/" + c.slug} target="_blank">
+          <a href={publicPath("/" + c.slug)} target="_blank">
             Открыть страницу ↗
-          </Link>
+          </a>
         )}
       </section>
       {c && (

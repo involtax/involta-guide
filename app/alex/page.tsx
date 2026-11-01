@@ -35,7 +35,7 @@ export default async function AlexPage() {
         снимать звезду. Неполные или неоднозначные команды сохраняются с ошибкой
         для уточнения.
       </p>
-      <Link href="/">Выбрать локацию ↗</Link>
+      <a href={publicPath("/")}>Выбрать локацию ↗</a>
       {session && (
         <form action={alexLogout}>
           <button>Выйти</button>

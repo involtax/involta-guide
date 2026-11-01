@@ -25,30 +25,22 @@ const city = await one("SELECT * FROM locations WHERE slug='ivanovo'");
 const password = randomBytes(24).toString("hex");
 const alexToken = randomBytes(32).toString("hex");
 const apiCanary = `test-only-${randomBytes(32).toString("hex")}`;
-const server = spawn(
-  process.execPath,
-  [
-    "node_modules/next/dist/bin/next",
-    "start",
-    "--hostname",
-    "127.0.0.1",
-    "--port",
-    "3107",
-  ],
-  {
-    env: {
-      ...process.env,
-      DATA_DIR: directory,
-      ADMIN_PASSWORD: password,
-      SESSION_SECRET: randomBytes(48).toString("hex"),
-      OPENAI_API_KEY: apiCanary,
-      ALEX_SECRET: alexToken,
-      COOKIE_SECURE: "false",
-      SITE_URL: "http://127.0.0.1:3107/guide",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
+const server = spawn(process.execPath, ["scripts/server.mjs"], {
+  env: {
+    ...process.env,
+    DATA_DIR: directory,
+    PORT: "3107",
+    HOST: "127.0.0.1",
+    NODE_ENV: "production",
+    ADMIN_PASSWORD: password,
+    SESSION_SECRET: randomBytes(48).toString("hex"),
+    OPENAI_API_KEY: apiCanary,
+    ALEX_SECRET: alexToken,
+    COOKIE_SECURE: "false",
+    SITE_URL: "http://127.0.0.1:3107/guide",
   },
-);
+  stdio: ["ignore", "pipe", "pipe"],
+});
 let logs = "";
 server.stdout.on("data", (d) => (logs += d));
 server.stderr.on("data", (d) => (logs += d));
@@ -401,6 +393,36 @@ try {
   ).toBeVisible();
   assert.ok((await page.content()).includes("tel:+74951234567"));
   await expect(page.getByText("Открыто до 00:00").first()).toBeVisible();
+  const publicContext = await browser.newContext();
+  const publicPage = await publicContext.newPage();
+  const publicScripts = [];
+  publicPage.on("request", (request) => {
+    if (request.resourceType() === "script") publicScripts.push(request.url());
+  });
+  const plain = await publicPage.goto("http://127.0.0.1:3107/guide/ivanovo");
+  const publicHtml = await plain.text();
+  assert.ok(
+    !publicHtml.includes("/_next/") && !publicHtml.includes("__next_f"),
+    "В публичном HTML нет React runtime и Next hydration",
+  );
+  await publicPage.waitForLoadState("networkidle");
+  assert.ok(
+    publicScripts.length > 0 &&
+      publicScripts.every((url) => !url.includes("/_next/")),
+    "Публичный браузер загружает только самостоятельные скрипты",
+  );
+  await publicContext.close();
+  const noJsContext = await browser.newContext({ javaScriptEnabled: false });
+  const noJs = await noJsContext.newPage();
+  await noJs.goto("http://127.0.0.1:3107/guide/ivanovo");
+  await expect(
+    noJs.getByRole("heading", { name: /Основной тест/ }),
+  ).toBeVisible();
+  await noJs.getByText("Ещё · 1", { exact: true }).click();
+  await expect(
+    noJs.getByRole("heading", { name: /Резервный тест/ }),
+  ).toBeVisible();
+  await noJsContext.close();
   const alexContext = await browser.newContext();
   const alexPage = await alexContext.newPage();
   assert.equal(
@@ -459,7 +481,7 @@ try {
     );
   }
   console.log(
-    "E2E PASS: вход, SEO, микрофон, модерация, иерархия, 20 зон Москвы, алиасы, редактор локаций и общий ресторан без копий.",
+    "E2E PASS: HTML без React, работа без JS, вход, SEO, микрофон, модерация, иерархия, 20 зон Москвы, алиасы, редактор локаций и общий ресторан без копий.",
   );
 } catch (e) {
   console.error(e);

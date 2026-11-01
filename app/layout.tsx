@@ -1,4 +1,4 @@
-import { siteUrl } from "@/lib/urls.mjs";
+import { publicPath, siteUrl } from "@/lib/urls.mjs";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./style.css";
@@ -16,17 +16,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <html lang="ru">
       <body>
         <header className="header">
-          <Link href="/" className="brand">
+          <a href={publicPath("/")} className="brand">
             инвольта<span>гид</span>
             <sup>Россия</sup>
-          </Link>
-          <Link href="/" className="header-note">
+          </a>
+          <a href={publicPath("/")} className="header-note">
             Места, ради которых стоит зайти.
-          </Link>
+          </a>
         </header>
         {children}
         <footer>
-          <Link href="/">Инвольта гид</Link>
+          <a href={publicPath("/")}>Инвольта гид</a>
           <span>Небольшие подборки. Личный опыт.</span>
           <Link href="/admin">Редакция ↗</Link>
         </footer>
