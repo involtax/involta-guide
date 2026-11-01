@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+var/
+*.tsbuildinfo
+next-env.d.ts
+# Runtime secrets and credentials
+secrets/
+*.pem
+*.key
+credentials*.json
