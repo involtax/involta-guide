@@ -8,6 +8,7 @@ if (basePath.endsWith("/"))
   throw new Error("Уберите завершающий слэш NEXT_PUBLIC_BASE_PATH");
 const config: NextConfig = {
   basePath,
+  skipTrailingSlashRedirect: true,
   serverExternalPackages: ["pg"],
   experimental: {
     useTypeScriptCli: false,

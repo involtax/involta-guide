@@ -75,6 +75,23 @@ try {
       "--use-fake-device-for-media-stream",
     ],
   });
+  const slashRedirect = await fetch("http://127.0.0.1:3107/guide?q=test", {
+    redirect: "manual",
+  });
+  assert.equal(slashRedirect.status, 302);
+  assert.equal(
+    new URL(slashRedirect.headers.get("location"), "http://127.0.0.1:3107")
+      .href,
+    "http://127.0.0.1:3107/guide/?q=test",
+  );
+  const slashRoot = await fetch("http://127.0.0.1:3107/guide/", {
+    redirect: "manual",
+  });
+  assert.equal(
+    slashRoot.status,
+    200,
+    "Корень со слэшем не перенаправляет обратно",
+  );
   const context = await browser.newContext({ permissions: ["microphone"] });
   const page = await context.newPage();
   const errors = [];
@@ -399,7 +416,7 @@ try {
     !(await alexContext.cookies()).some((c) => c.name === "guide_alex"),
   );
   await alexPage.goto("http://127.0.0.1:3107/guide/?" + alexToken);
-  await expect(alexPage).toHaveURL(/\/guide\/?$/);
+  await expect(alexPage).toHaveURL("http://127.0.0.1:3107/guide/");
   assert.ok(!(await alexPage.content()).includes(alexToken));
   assert.equal(
     (await alexContext.cookies()).find((c) => c.name === "guide_alex").httpOnly,

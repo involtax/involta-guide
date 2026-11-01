@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createAlexSession } from "./lib/alex.mjs";
-import { COOKIE_PATH, siteUrl } from "./lib/urls.mjs";
+import { BASE_PATH, COOKIE_PATH, siteUrl } from "./lib/urls.mjs";
 export async function proxy(request: NextRequest) {
+  const incoming = new URL(request.url);
+  if (BASE_PATH && incoming.pathname === BASE_PATH) {
+    const destination = new URL(siteUrl() + "/");
+    destination.search = incoming.search;
+    const response = NextResponse.redirect(destination, 302);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
+  }
   const configured = process.env.ALEX_SECRET;
   const entries = [...request.nextUrl.searchParams.entries()];
   // Next.js may normalize ?SECRET to ?SECRET= during slash normalization.
