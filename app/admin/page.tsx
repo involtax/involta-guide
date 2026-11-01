@@ -86,12 +86,12 @@ export default async function Admin({
       </main>
     );
   const tab = p.tab || "overview";
-  const counts = one(
+  const counts = (await one(
     `SELECT count(*) AS total,sum(CASE WHEN draft='[]' THEN 1 ELSE 0 END) AS empty,sum(CASE WHEN published_version IS NOT NULL THEN 1 ELSE 0 END) AS published FROM cities WHERE active=1`,
-  )!;
-  const reviewCount = one(
+  ))!;
+  const reviewCount = (await one(
     "SELECT count(*) n FROM reviews WHERE moderation='pending'",
-  )!.n;
+  ))!.n;
   return (
     <main className="admin">
       <div className="section-heading">
@@ -184,10 +184,12 @@ export default async function Admin({
               + Добавить город
             </Link>
             <div className="city-sidebar">
-              {all(
-                "SELECT id,name,region,active,published_version,draft FROM cities WHERE name LIKE ? OR region LIKE ? ORDER BY name LIMIT 100",
-                `%${p.q || ""}%`,
-                `%${p.q || ""}%`,
+              {(
+                await all(
+                  "SELECT id,name,region,active,published_version,draft FROM cities WHERE name LIKE $1 OR region LIKE $2 ORDER BY name LIMIT 100",
+                  `%${p.q || ""}%`,
+                  `%${p.q || ""}%`,
+                )
               ).map((c) => (
                 <Link
                   className={p.city === c.id ? "active" : ""}
@@ -237,7 +239,7 @@ export default async function Admin({
                 Инструкция для GPT
                 <textarea
                   name="prompt"
-                  defaultValue={setting("prompt")}
+                  defaultValue={await setting("prompt")}
                   rows={9}
                   required
                   minLength={50}
@@ -255,8 +257,10 @@ export default async function Admin({
             </p>
             <form action={actions.generate} className="button-row">
               <select name="cityId" aria-label="Город для пробного запуска">
-                {all(
-                  "SELECT id,name,region FROM cities WHERE active=1 ORDER BY name",
+                {(
+                  await all(
+                    "SELECT id,name,region FROM cities WHERE active=1 ORDER BY name",
+                  )
                 ).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} · {c.region}
@@ -312,8 +316,10 @@ export default async function Admin({
                   </tr>
                 </thead>
                 <tbody>
-                  {all(
-                    "SELECT j.*,c.name FROM jobs j LEFT JOIN cities c ON c.id=j.city_id ORDER BY j.created_at DESC,j.id DESC LIMIT 100",
+                  {(
+                    await all(
+                      "SELECT j.*,c.name FROM jobs j LEFT JOIN cities c ON c.id=j.city_id ORDER BY j.created_at DESC,j.id DESC LIMIT 100",
+                    )
                   ).map((j) => (
                     <tr key={j.id}>
                       <td>
@@ -368,17 +374,19 @@ export default async function Admin({
               <button className="secondary">Показать</button>
             </form>
             <div className="city-sidebar">
-              {all(
-                `SELECT r.*,c.name FROM reviews r JOIN cities c ON c.id=r.city_id ${p.filter === "all" ? "" : "WHERE r.moderation=?"} ORDER BY r.created_at DESC LIMIT 100`,
-                ...(p.filter === "all"
-                  ? []
-                  : [
-                      p.filter === "approved"
-                        ? "approved"
-                        : p.filter === "rejected"
-                          ? "rejected"
-                          : "pending",
-                    ]),
+              {(
+                await all(
+                  `SELECT r.*,c.name FROM reviews r JOIN cities c ON c.id=r.city_id ${p.filter === "all" ? "" : "WHERE r.moderation=$1"} ORDER BY r.created_at DESC LIMIT 100`,
+                  ...(p.filter === "all"
+                    ? []
+                    : [
+                        p.filter === "approved"
+                          ? "approved"
+                          : p.filter === "rejected"
+                            ? "rejected"
+                            : "pending",
+                      ]),
+                )
               ).map((r) => (
                 <Link
                   key={r.id}
@@ -418,7 +426,7 @@ export default async function Admin({
     </main>
   );
 }
-function CityEditor({
+async function CityEditor({
   cityId,
   versionId,
 }: {
@@ -426,16 +434,21 @@ function CityEditor({
   versionId?: string;
 }) {
   const c =
-    cityId === "new" ? null : one("SELECT * FROM cities WHERE id=?", cityId);
+    cityId === "new"
+      ? null
+      : await one("SELECT * FROM cities WHERE id=$1", cityId);
   if (cityId !== "new" && !c) return <p>Город не найден</p>;
   const versions = c
-    ? all("SELECT * FROM versions WHERE city_id=? ORDER BY number DESC", cityId)
+    ? await all(
+        "SELECT * FROM versions WHERE city_id=$1 ORDER BY number DESC",
+        cityId,
+      )
     : [];
   const selected = versionId
     ? versions.find((v) => v.id === versionId)
     : versions[0];
   const pub = c?.published_version
-    ? one("SELECT content FROM versions WHERE id=?", c.published_version)
+    ? await one("SELECT content FROM versions WHERE id=$1", c.published_version)
     : null;
   return (
     <>
@@ -511,7 +524,7 @@ function CityEditor({
             <ContentEditor
               key={c.draft_version || cityId}
               cityId={cityId}
-              initial={cityContent(cityId)}
+              initial={await cityContent(cityId)}
             />
             {c.draft_version && (
               <form action={actions.publishVersion} className="publish">
@@ -595,9 +608,11 @@ function CityEditor({
           </section>
           <details className="panel">
             <summary>База ресторанов города</summary>
-            {all(
-              "SELECT * FROM restaurants WHERE city_id=? ORDER BY name",
-              cityId,
+            {(
+              await all(
+                "SELECT * FROM restaurants WHERE city_id=$1 ORDER BY name",
+                cityId,
+              )
             ).map((r) => (
               <p key={r.id}>
                 <strong>{r.name}</strong> · {r.cuisine}
@@ -610,22 +625,25 @@ function CityEditor({
     </>
   );
 }
-function ReviewEditor({ reviewId }: { reviewId: string }) {
-  const r = one(
-    "SELECT r.*,c.name,c.slug FROM reviews r JOIN cities c ON c.id=r.city_id WHERE r.id=?",
+async function ReviewEditor({ reviewId }: { reviewId: string }) {
+  const r = await one(
+    "SELECT r.*,c.name,c.slug FROM reviews r JOIN cities c ON c.id=r.city_id WHERE r.id=$1",
     reviewId,
   );
   if (!r) return <p>Отзыв не найден</p>;
   const result = r.result ? JSON.parse(r.result) : null;
   const signals = reviewSignals(
     r,
-    all(
-      "SELECT * FROM reviews WHERE id<>? ORDER BY created_at DESC LIMIT 2000",
+    await all(
+      "SELECT * FROM reviews WHERE id<>$1 ORDER BY created_at DESC LIMIT 2000",
       reviewId,
     ),
   );
-  const current = cityContent(r.city_id);
-  const proposals = all("SELECT * FROM proposals WHERE review_id=?", reviewId);
+  const current = await cityContent(r.city_id);
+  const proposals = await all(
+    "SELECT * FROM proposals WHERE review_id=$1",
+    reviewId,
+  );
   return (
     <>
       <section className="panel">
@@ -848,9 +866,9 @@ function ReviewEditor({ reviewId }: { reviewId: string }) {
     </>
   );
 }
-function InternalStats({ cityId }: { cityId: string }) {
-  const rows = all(
-    "SELECT result,visitor FROM reviews WHERE city_id=? AND moderation='approved' AND fraud=0 AND result IS NOT NULL",
+async function InternalStats({ cityId }: { cityId: string }) {
+  const rows = await all(
+    "SELECT result,visitor FROM reviews WHERE city_id=$1 AND moderation='approved' AND fraud=0 AND result IS NOT NULL",
     cityId,
   );
   const groups = new Map<string, any>();

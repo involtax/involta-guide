@@ -5,12 +5,14 @@ import { one } from "@/lib/db.mjs";
 import VoiceWidget from "@/components/VoiceWidget";
 export const dynamic = "force-dynamic";
 async function getCity(slug: string) {
-  return one("SELECT * FROM cities WHERE slug=? AND active=1", slug);
+  return await one("SELECT * FROM cities WHERE slug=$1 AND active=1", slug);
 }
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{
+    slug: string;
+  }>;
 }): Promise<Metadata> {
   const { slug } = await params;
   const c = await getCity(slug);
@@ -27,13 +29,15 @@ export async function generateMetadata({
 export default async function City({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{
+    slug: string;
+  }>;
 }) {
   const { slug } = await params;
   const c = await getCity(slug);
   if (!c) notFound();
   const version = c.published_version
-    ? one("SELECT * FROM versions WHERE id=?", c.published_version)
+    ? await one("SELECT * FROM versions WHERE id=$1", c.published_version)
     : null;
   const content = version
     ? JSON.parse(version.content)

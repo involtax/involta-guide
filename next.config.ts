@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
-  serverExternalPackages: ["node:sqlite"],
+  serverExternalPackages: ["pg"],
   experimental: {
     useTypeScriptCli: false,
     serverActions: { bodySizeLimit: "1mb" },

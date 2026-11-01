@@ -4,16 +4,18 @@ export const dynamic = "force-dynamic";
 export default async function Guide({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{
+    q?: string;
+  }>;
 }) {
   const { q = "" } = await searchParams;
   const query = q.trim().slice(0, 100);
-  const cities = all(
-    "SELECT * FROM cities WHERE active=1 AND (name LIKE ? OR region LIKE ?) ORDER BY name",
+  const cities = await all(
+    "SELECT * FROM cities WHERE active=1 AND (name LIKE $1 OR region LIKE $2) ORDER BY name",
     `%${query}%`,
     `%${query}%`,
   );
-  const total = one("SELECT count(*) AS n FROM cities WHERE active=1")!;
+  const total = (await one("SELECT count(*) AS n FROM cities WHERE active=1"))!;
   return (
     <main>
       <section className="hero">

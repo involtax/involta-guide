@@ -17,8 +17,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: guide_test
+          POSTGRES_PASSWORD: ci-only-ephemeral-password
+          POSTGRES_DB: guide_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U guide_test -d guide_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://guide_test:ci-only-ephemeral-password@127.0.0.1:5432/guide_test
+      TEST_DATABASE_URL: postgresql://guide_test:ci-only-ephemeral-password@127.0.0.1:5432/guide_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,6 +40,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run db:migrate
+      - run: npm run db:seed
       - run: npm run check
       - run: npm test
       - run: npm run build

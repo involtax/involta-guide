@@ -12,10 +12,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import assert from "node:assert/strict";
+import { testDatabase } from "./database.mjs";
+const testDb = await testDatabase();
 const directory = mkdtempSync(join(tmpdir(), "involta-e2e-"));
 process.env.DATA_DIR = directory;
-const { db, one, all } = await import("../lib/db.mjs");
-const city = one("SELECT * FROM cities WHERE slug='ivanovo'");
+const { closeDb, one, all } = await import("../lib/db.mjs");
+const { migrate, seedCities } = await import("../lib/migrate.mjs");
+await migrate();
+await seedCities();
+const city = await one("SELECT * FROM cities WHERE slug='ivanovo'");
 const password = randomBytes(24).toString("hex");
 const apiCanary = `test-only-${randomBytes(32).toString("hex")}`;
 const server = spawn(
@@ -150,7 +155,9 @@ try {
   const uploaded = await uploadResponse;
   assert.equal(uploaded.status(), 201, await uploaded.text());
   await page.getByRole("heading", { name: "Ваш голос в работе" }).waitFor();
-  const review = one("SELECT * FROM reviews ORDER BY created_at DESC LIMIT 1");
+  const review = await one(
+    "SELECT * FROM reviews ORDER BY created_at DESC LIMIT 1",
+  );
   assert.ok(review);
   assert.equal(review.city_id, city.id);
   assert.ok(review.hash);
@@ -166,10 +173,11 @@ try {
   await page.getByRole("button", { name: "Не одобрять", exact: true }).click();
   await page.getByText("Отклонено", { exact: false }).first().waitFor();
   assert.equal(
-    one("SELECT moderation FROM reviews WHERE id=?", review.id).moderation,
+    (await one("SELECT moderation FROM reviews WHERE id=$1", review.id))
+      .moderation,
     "rejected",
   );
-  assert.equal(all("SELECT id FROM reviews").length, 1);
+  assert.equal((await all("SELECT id FROM reviews")).length, 1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("http://127.0.0.1:3107/guide/ivanovo");
   assert.ok(
@@ -215,6 +223,7 @@ try {
   await browser?.close();
   server.kill("SIGTERM");
   await new Promise((r) => server.once("exit", r));
-  db.close();
+  await closeDb();
+  await testDb.cleanup();
   rmSync(directory, { recursive: true, force: true });
 }

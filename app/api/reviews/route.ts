@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const cityId = String(form.get("cityId") || "");
     const duration = Number(form.get("duration"));
     if (form.get("consent") !== "yes") throw new Error("Необходимо согласие");
-    if (!one("SELECT id FROM cities WHERE id=? AND active=1", cityId))
+    if (!(await one("SELECT id FROM cities WHERE id=$1 AND active=1", cityId)))
       throw new Error("Город не найден");
     if (
       !(audio instanceof File) ||
@@ -83,9 +83,9 @@ export async function POST(request: Request) {
           "unknown",
       )
       .digest("hex");
-    transaction(() => {
-      run(
-        "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device) VALUES(?,?,?,?,?,?,?,?)",
+    await transaction(async () => {
+      await run(
+        "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
         reviewId,
         cityId,
         visitor,
@@ -95,8 +95,8 @@ export async function POST(request: Request) {
         ipHash,
         (request.headers.get("user-agent") || "").slice(0, 500),
       );
-      run(
-        "INSERT INTO jobs(id,kind,city_id,review_id) VALUES(?,'review',?,?)",
+      await run(
+        "INSERT INTO jobs(id,kind,city_id,review_id) VALUES($1,'review',$2,$3)",
         id(),
         cityId,
         reviewId,

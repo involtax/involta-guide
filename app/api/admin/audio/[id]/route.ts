@@ -5,11 +5,17 @@ import { isAdmin } from "@/lib/auth";
 import { one, root } from "@/lib/db.mjs";
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  {
+    params,
+  }: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
   if (!(await isAdmin())) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
-  const r = one("SELECT audio,mime FROM reviews WHERE id=?", id);
+  const r = await one("SELECT audio,mime FROM reviews WHERE id=$1", id);
   if (!r) return new Response("Not found", { status: 404 });
   try {
     return new NextResponse(await readFile(join(root, "audio", r.audio)), {

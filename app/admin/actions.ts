@@ -13,12 +13,12 @@ import {
   slugify,
   saveDraft,
   publish,
-  cityContent,
   cityById,
   queueGeneration,
   setSetting,
   setting,
 } from "@/lib/db.mjs";
+import { applyProposal, restorePageVersion } from "@/lib/editorial.mjs";
 import { contentSchema } from "@/lib/schema.mjs";
 import {
   requireAdmin,
@@ -41,7 +41,7 @@ function refresh() {
 }
 export async function login(f: FormData) {
   const key = await requestFingerprint();
-  const attempt = one("SELECT * FROM login_attempts WHERE key=?", key);
+  const attempt = await one("SELECT * FROM login_attempts WHERE key=$1", key);
   if (attempt && attempt.reset_at > Date.now() && attempt.count >= 10)
     back("/admin", "Слишком много попыток. Повторите через 15 минут.");
   const configured = process.env.ADMIN_PASSWORD;
@@ -51,8 +51,8 @@ export async function login(f: FormData) {
       "Настройте ADMIN_PASSWORD (от 12 символов) и SESSION_SECRET на сервере.",
     );
   if (!secureEqual(str(f, "password"), configured)) {
-    run(
-      "INSERT INTO login_attempts(key,count,reset_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN reset_at<? THEN 1 ELSE count+1 END,reset_at=CASE WHEN reset_at<? THEN excluded.reset_at ELSE reset_at END",
+    await run(
+      "INSERT INTO login_attempts(key,count,reset_at) VALUES($1,1,$2) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN login_attempts.reset_at<$3 THEN 1 ELSE login_attempts.count+1 END,reset_at=CASE WHEN login_attempts.reset_at<$4 THEN excluded.reset_at ELSE login_attempts.reset_at END",
       key,
       Date.now() + 900000,
       Date.now(),
@@ -66,7 +66,7 @@ export async function login(f: FormData) {
   } catch {
     back("/admin", "Настройте SESSION_SECRET (от 32 символов)");
   }
-  run("DELETE FROM login_attempts WHERE key=?", key);
+  await run("DELETE FROM login_attempts WHERE key=$1", key);
   (await cookies()).set("guide_admin", token!, {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
@@ -98,9 +98,9 @@ export async function saveCity(f: FormData) {
       .max(100000000)
       .parse(str(f, "population") || 0);
     if (cityId) {
-      cityById(cityId);
-      run(
-        "UPDATE cities SET name=?,region=?,slug=?,population=?,active=? WHERE id=?",
+      await cityById(cityId);
+      await run(
+        "UPDATE cities SET name=$1,region=$2,slug=$3,population=$4,active=$5 WHERE id=$6",
         name,
         region,
         slug,
@@ -110,8 +110,8 @@ export async function saveCity(f: FormData) {
       );
     } else {
       cityId = id();
-      run(
-        "INSERT INTO cities(id,name,region,slug,population) VALUES(?,?,?,?,?)",
+      await run(
+        "INSERT INTO cities(id,name,region,slug,population) VALUES($1,$2,$3,$4,$5)",
         cityId,
         name,
         region,
@@ -119,12 +119,12 @@ export async function saveCity(f: FormData) {
         population,
       );
     }
-    audit("city", cityId);
+    await audit("city", cityId);
     refresh();
   } catch (e) {
     back(
       "/admin",
-      e instanceof Error && e.message.includes("UNIQUE")
+      e instanceof Error && /unique|duplicate/i.test(e.message)
         ? "Такой URL уже занят"
         : "Проверьте название, регион, URL и население",
     );
@@ -136,7 +136,7 @@ export async function saveContent(f: FormData) {
   const cityId = str(f, "cityId");
   try {
     const content = contentSchema.parse(JSON.parse(str(f, "content")));
-    saveDraft(cityId, content);
+    await saveDraft(cityId, content);
     refresh();
   } catch (e) {
     back(
@@ -153,7 +153,7 @@ export async function publishVersion(f: FormData) {
   await requireAdmin();
   const cityId = str(f, "cityId");
   try {
-    publish(cityId, str(f, "versionId"));
+    await publish(cityId, str(f, "versionId"));
     refresh();
   } catch (e) {
     back(
@@ -167,53 +167,35 @@ export async function restoreVersion(f: FormData) {
   await requireAdmin();
   const cityId = str(f, "cityId");
   const versionId = str(f, "versionId");
-  const v = one(
-    "SELECT * FROM versions WHERE id=? AND city_id=?",
-    versionId,
-    cityId,
-  );
-  if (!v) throw new Error("Версия не найдена");
-  const newId = saveDraft(
-    cityId,
-    contentSchema.parse(JSON.parse(v.content)),
-    "restore",
-  );
-  transaction(() => {
-    run("DELETE FROM version_reviews WHERE version_id=?", newId);
-    run(
-      "INSERT INTO version_reviews(version_id,review_id) SELECT ?,review_id FROM version_reviews WHERE version_id=?",
-      newId,
-      versionId,
-    );
-  });
+  await restorePageVersion(cityId, versionId);
   refresh();
   redirect("/admin?tab=cities&city=" + cityId);
 }
 export async function savePrompt(f: FormData) {
   await requireAdmin();
   const prompt = z.string().min(50).max(16000).parse(str(f, "prompt"));
-  setSetting("prompt", prompt);
+  await setSetting("prompt", prompt);
   refresh();
   back("/admin?tab=fill", "Промпт сохранён");
 }
 export async function generate(f: FormData) {
   await requireAdmin();
-  const prompt = setting("prompt");
+  const prompt = await setting("prompt");
   const cityId = str(f, "cityId");
   let count = 0;
-  transaction(() => {
+  await transaction(async () => {
     if (cityId) {
-      cityById(cityId);
-      if (queueGeneration(cityId, prompt)) count++;
+      await cityById(cityId);
+      if (await queueGeneration(cityId, prompt)) count++;
     } else {
       const scope = str(f, "scope");
       if (!["empty", "all"].includes(scope))
         throw new Error("Выберите область");
-      for (const c of all(
+      for (const c of await all(
         "SELECT id FROM cities WHERE active=1" +
           (scope === "empty" ? " AND draft='[]'" : ""),
       )) {
-        if (queueGeneration(c.id, prompt)) count++;
+        if (await queueGeneration(c.id, prompt)) count++;
       }
     }
   });
@@ -230,11 +212,11 @@ export async function moderate(f: FormData) {
     .enum(["approved", "rejected", "fraud", "reset"])
     .parse(str(f, "decision"));
   const reason = str(f, "reason").slice(0, 2000);
-  transaction(() => {
-    const r = one("SELECT * FROM reviews WHERE id=?", reviewId);
+  await transaction(async () => {
+    const r = await one("SELECT * FROM reviews WHERE id=$1", reviewId);
     if (!r) throw new Error("Отзыв не найден");
-    run(
-      "UPDATE reviews SET moderation=?,fraud=?,reason=? WHERE id=?",
+    await run(
+      "UPDATE reviews SET moderation=$1,fraud=$2,reason=$3 WHERE id=$4",
       decision === "fraud"
         ? "rejected"
         : decision === "reset"
@@ -244,7 +226,7 @@ export async function moderate(f: FormData) {
       reason,
       reviewId,
     );
-    audit("review_" + decision, reviewId, reason);
+    await audit("review_" + decision, reviewId, reason);
   });
   refresh();
   redirect("/admin?tab=reviews&review=" + reviewId);
@@ -252,15 +234,15 @@ export async function moderate(f: FormData) {
 export async function proposalDecision(f: FormData) {
   await requireAdmin();
   const proposalId = str(f, "id");
-  const p = one(
-    "SELECT p.*,r.moderation,r.fraud FROM proposals p JOIN reviews r ON r.id=p.review_id WHERE p.id=?",
+  const p = await one(
+    "SELECT p.*,r.moderation,r.fraud FROM proposals p JOIN reviews r ON r.id=p.review_id WHERE p.id=$1",
     proposalId,
   );
   if (!p) throw new Error("Предложение не найдено");
   const target = "/admin?tab=reviews&review=" + p.review_id;
   if (str(f, "decision") === "reject") {
-    run(
-      "UPDATE proposals SET status='rejected' WHERE id=? AND status='pending'",
+    await run(
+      "UPDATE proposals SET status='rejected' WHERE id=$1 AND status='pending'",
       proposalId,
     );
     refresh();
@@ -270,36 +252,12 @@ export async function proposalDecision(f: FormData) {
   if (p.moderation !== "approved" || p.fraud)
     back(target, "Сначала одобрите исходный отзыв и снимите отметку фрода");
   try {
-    const draft = cityContent(p.city_id);
-    const payload = JSON.parse(p.payload);
-    const edited = {
+    await applyProposal(proposalId, {
       name: str(f, "name"),
       cuisine: str(f, "cuisine"),
       description: str(f, "description"),
       mapsUrl: str(f, "mapsUrl"),
       sources: [],
-    };
-    if (p.kind === "restaurant") draft.restaurants.push(edited);
-    else {
-      const index = draft.restaurants.findIndex(
-        (r: any) => r.id === payload.restaurantId,
-      );
-      if (index < 0)
-        throw new Error(
-          "Ресторан не определён или отсутствует в черновике. Внесите правку на странице города.",
-        );
-      draft.restaurants[index] = { ...draft.restaurants[index], ...edited };
-    }
-    const parsed = contentSchema.parse(draft);
-    const versionId = saveDraft(p.city_id, parsed, "review");
-    transaction(() => {
-      run(
-        "INSERT OR IGNORE INTO version_reviews(version_id,review_id) VALUES(?,?)",
-        versionId,
-        p.review_id,
-      );
-      run("UPDATE proposals SET status='approved' WHERE id=?", proposalId);
-      audit("proposal_draft", p.city_id, p.review_id);
     });
     refresh();
   } catch (e) {
@@ -312,18 +270,18 @@ export async function proposalDecision(f: FormData) {
 }
 export async function retryJob(f: FormData) {
   await requireAdmin();
-  const job = one(
-    "SELECT * FROM jobs WHERE id=? AND status='failed'",
+  const job = await one(
+    "SELECT * FROM jobs WHERE id=$1 AND status='failed'",
     str(f, "id"),
   );
   if (job) {
-    run(
-      "UPDATE jobs SET status='queued',error=NULL,started_at=NULL WHERE id=?",
+    await run(
+      "UPDATE jobs SET status='queued',error=NULL,started_at=NULL WHERE id=$1",
       job.id,
     );
     if (job.review_id)
-      run(
-        "UPDATE reviews SET status='pending',error=NULL WHERE id=?",
+      await run(
+        "UPDATE reviews SET status='pending',error=NULL WHERE id=$1",
         job.review_id,
       );
   }
@@ -332,7 +290,7 @@ export async function retryJob(f: FormData) {
 }
 export async function cancelJobs() {
   await requireAdmin();
-  run(
+  await run(
     "UPDATE jobs SET status='cancelled',finished_at=CURRENT_TIMESTAMP WHERE status='queued'",
   );
   refresh();

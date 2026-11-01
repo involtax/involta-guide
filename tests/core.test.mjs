@@ -3,10 +3,16 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { testDatabase } from "./database.mjs";
+const testDb = await testDatabase();
 const directory = mkdtempSync(join(tmpdir(), "involta-unit-"));
 process.env.DATA_DIR = directory;
 const {
-  db,
+  closeDb,
+  transaction,
+  claimJob,
+  setSetting,
+  setting,
   all,
   one,
   run,
@@ -19,7 +25,10 @@ const {
 const { reviewSchema, contentSchema } = await import("../lib/schema.mjs");
 const { similarity, reviewSignals } = await import("../lib/signals.mjs");
 const { processJob } = await import("../lib/ai.mjs");
-const city = one("SELECT * FROM cities WHERE slug='ivanovo'");
+const { migrate, seedCities } = await import("../lib/migrate.mjs");
+await migrate();
+await seedCities();
+const city = await one("SELECT * FROM cities WHERE slug='ivanovo'");
 const content = {
   intro: "Местная подборка",
   restaurants: [
@@ -32,16 +41,17 @@ const content = {
     },
   ],
 };
-test("импорт городов содержит регионы, уникальные URL и Иваново", () => {
-  assert.ok(all("SELECT id FROM cities").length > 1100);
+test("импорт городов содержит регионы, уникальные URL и Иваново", async () => {
+  assert.ok((await all("SELECT id FROM cities")).length > 1100);
   assert.equal(city.name, "Иваново");
   assert.equal(
-    all("SELECT slug FROM cities GROUP BY slug HAVING count(*)>1").length,
+    (await all("SELECT slug FROM cities GROUP BY slug HAVING count(*)>1"))
+      .length,
     0,
   );
 });
-test("черновик не публикуется сам; публикация и откат сохраняют историю страницы", () => {
-  const first = saveDraft(
+test("черновик не публикуется сам; публикация и откат сохраняют историю страницы", async () => {
+  const first = await saveDraft(
     city.id,
     content,
     "ai",
@@ -49,33 +59,36 @@ test("черновик не публикуется сам; публикация 
     "test-model",
   );
   assert.equal(
-    one("SELECT published_version FROM cities WHERE id=?", city.id)
+    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
       .published_version,
     null,
   );
-  publish(city.id, first);
-  const next = saveDraft(city.id, { ...content, intro: "Новое вступление" });
+  await publish(city.id, first);
+  const next = await saveDraft(city.id, {
+    ...content,
+    intro: "Новое вступление",
+  });
   assert.equal(
-    one("SELECT published_version FROM cities WHERE id=?", city.id)
+    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
       .published_version,
     first,
   );
-  publish(city.id, next);
-  publish(city.id, first);
+  await publish(city.id, next);
+  await publish(city.id, first);
   assert.equal(
-    one("SELECT published_version FROM cities WHERE id=?", city.id)
+    (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
       .published_version,
     first,
   );
   assert.equal(
-    one("SELECT prompt FROM versions WHERE id=?", first).prompt,
+    (await one("SELECT prompt FROM versions WHERE id=$1", first)).prompt,
     "Промпт конкретного запуска",
   );
   assert.equal(
-    all("SELECT * FROM versions WHERE city_id=?", city.id).length,
+    (await all("SELECT * FROM versions WHERE city_id=$1", city.id)).length,
     2,
   );
-  assert.throws(() => publish(city.id, id()), /Версия/);
+  await assert.rejects(() => publish(city.id, id()), /Версия/);
 });
 test("URL для карточек ограничены HTTPS и Яндексом", () => {
   assert.ok(contentSchema.safeParse(content).success);
@@ -159,27 +172,27 @@ test("похожие тексты и повтор аудио — сигналы,
   assert.equal(found[0].sameAudio, true);
   assert.equal(found[0].sameVisitor, false);
 });
-test("очередь исключает повтор генерации и сохраняет версию промпта", () => {
-  assert.equal(queueGeneration(city.id, "test prompt"), true);
-  assert.equal(queueGeneration(city.id, "another prompt"), false);
+test("очередь исключает повтор генерации и сохраняет версию промпта", async () => {
+  assert.equal(await queueGeneration(city.id, "test prompt"), true);
+  assert.equal(await queueGeneration(city.id, "another prompt"), false);
   assert.equal(
-    one("SELECT prompt FROM jobs WHERE kind='generate'").prompt,
+    (await one("SELECT prompt FROM jobs WHERE kind='generate'")).prompt,
     "test prompt",
   );
 });
 test("без ключа задание завершается явной ошибкой, контент не меняется", async () => {
   delete process.env.OPENAI_API_KEY;
-  const before = cityContent(city.id);
+  const before = await cityContent(city.id);
   await processJob();
   assert.equal(
-    one("SELECT status FROM jobs WHERE kind='generate'").status,
+    (await one("SELECT status FROM jobs WHERE kind='generate'")).status,
     "failed",
   );
   assert.match(
-    one("SELECT error FROM jobs WHERE kind='generate'").error,
+    (await one("SELECT error FROM jobs WHERE kind='generate'")).error,
     /OPENAI_API_KEY/,
   );
-  assert.deepEqual(cityContent(city.id), before);
+  assert.deepEqual(await cityContent(city.id), before);
 });
 test("ИИ-генерация сохраняет проверенный структурированный черновик и промпт страницы", async () => {
   const original = globalThis.fetch;
@@ -202,17 +215,20 @@ test("ИИ-генерация сохраняет проверенный стру
     });
   };
   try {
-    queueGeneration(city.id, "Город {город}, регион {регион}, лимит {лимит}");
+    await queueGeneration(
+      city.id,
+      "Город {город}, регион {регион}, лимит {лимит}",
+    );
     await processJob();
-    const v = one(
-      "SELECT * FROM versions WHERE city_id=? ORDER BY number DESC LIMIT 1",
+    const v = await one(
+      "SELECT * FROM versions WHERE city_id=$1 ORDER BY number DESC LIMIT 1",
       city.id,
     );
     assert.equal(v.source, "ai");
     assert.match(v.prompt, /Иваново/);
     assert.ok(!v.prompt.includes("{город}"));
     assert.equal(
-      one("SELECT published_version FROM cities WHERE id=?", city.id)
+      (await one("SELECT published_version FROM cities WHERE id=$1", city.id))
         .published_version !== v.id,
       true,
     );
@@ -225,8 +241,8 @@ test("разбор записи всегда создаёт отзыв или о
   const original = globalThis.fetch;
   process.env.OPENAI_API_KEY = "test-key-not-real";
   const reviewId = id();
-  run(
-    "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device,transcript) VALUES(?,?,?,?,?,?,?,?,?)",
+  await run(
+    "INSERT INTO reviews(id,city_id,visitor,audio,mime,hash,ip_hash,device,transcript) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     reviewId,
     city.id,
     "visitor",
@@ -237,8 +253,8 @@ test("разбор записи всегда создаёт отзыв или о
     "device",
     "Очень вкусно в новом месте",
   );
-  run(
-    "INSERT INTO jobs(id,kind,city_id,review_id) VALUES(?,'review',?,?)",
+  await run(
+    "INSERT INTO jobs(id,kind,city_id,review_id) VALUES($1,'review',$2,$3)",
     id(),
     city.id,
     reviewId,
@@ -279,18 +295,21 @@ test("разбор записи всегда создаёт отзыв или о
     });
   try {
     await processJob();
-    const review = one("SELECT * FROM reviews WHERE id=?", reviewId);
+    const review = await one("SELECT * FROM reviews WHERE id=$1", reviewId);
     assert.equal(review.status, "processed");
     assert.equal(review.moderation, "pending");
     assert.equal(JSON.parse(review.result).entries[0].sentiment, 8);
     assert.equal(
-      all("SELECT * FROM proposals WHERE review_id=?", reviewId).length,
+      (await all("SELECT * FROM proposals WHERE review_id=$1", reviewId))
+        .length,
       1,
     );
     assert.equal(
-      all(
-        "SELECT * FROM proposals WHERE review_id=? AND status='approved'",
-        reviewId,
+      (
+        await all(
+          "SELECT * FROM proposals WHERE review_id=$1 AND status='approved'",
+          reviewId,
+        )
       ).length,
       0,
     );
@@ -299,7 +318,90 @@ test("разбор записи всегда создаёт отзыв или о
     delete process.env.OPENAI_API_KEY;
   }
 });
-test.after(() => {
-  db.close();
+
+test("ошибка откатывает все запросы транзакции", async () => {
+  await assert.rejects(
+    () =>
+      transaction(async () => {
+        await setSetting("rollback_test", "value");
+        throw new Error("rollback");
+      }),
+    /rollback/,
+  );
+  assert.equal(await setting("rollback_test", "missing"), "missing");
+});
+test("одновременные сохранения страницы получают разные номера версий", async () => {
+  await Promise.all(
+    Array.from({ length: 5 }, (_, i) =>
+      saveDraft(city.id, { ...content, intro: `Версия ${i}` }),
+    ),
+  );
+  const versions = await all(
+    "SELECT number FROM versions WHERE city_id=$1",
+    city.id,
+  );
+  assert.equal(new Set(versions.map((v) => v.number)).size, versions.length);
+});
+test("дубликаты очереди исключены при конкурентных запросах, задания не выдаются двум воркерам", async () => {
+  const cities = await all(
+    "SELECT id FROM cities WHERE id<>$1 LIMIT 8",
+    city.id,
+  );
+  const inserted = await Promise.all(
+    Array.from({ length: 12 }, () => queueGeneration(cities[0].id, "prompt")),
+  );
+  assert.equal(inserted.filter(Boolean).length, 1);
+  await Promise.all(
+    cities.slice(1).map((c) => queueGeneration(c.id, "prompt")),
+  );
+  const jobs = (
+    await Promise.all(Array.from({ length: 12 }, () => claimJob()))
+  ).filter(Boolean);
+  assert.equal(jobs.length, 8);
+  assert.equal(new Set(jobs.map((j) => j.id)).size, 8);
+});
+test("принятие предложения атомарно и защищено от двойного применения", async () => {
+  const { applyProposal } = await import("../lib/editorial.mjs");
+  const review = await one("SELECT id FROM reviews LIMIT 1");
+  await run("UPDATE reviews SET moderation='approved' WHERE id=$1", review.id);
+  const proposal = await one(
+    "SELECT id FROM proposals WHERE review_id=$1 LIMIT 1",
+    review.id,
+  );
+  const before = (await cityContent(city.id)).restaurants.length;
+  const outcomes = await Promise.allSettled([
+    applyProposal(proposal.id, content.restaurants[0]),
+    applyProposal(proposal.id, content.restaurants[0]),
+  ]);
+  assert.equal(outcomes.filter((o) => o.status === "fulfilled").length, 1);
+  assert.equal((await cityContent(city.id)).restaurants.length, before + 1);
+  const link = await one(
+    "SELECT review_id FROM version_reviews WHERE version_id=(SELECT draft_version FROM cities WHERE id=$1)",
+    city.id,
+  );
+  assert.equal(link.review_id, review.id);
+});
+test("устаревшая генерация не перезаписывает изменённый черновик", async () => {
+  const previous = (
+    await one("SELECT draft_version FROM cities WHERE id=$1", city.id)
+  ).draft_version;
+  await saveDraft(city.id, content);
+  await assert.rejects(
+    () =>
+      saveDraft(
+        city.id,
+        { ...content, intro: "Устаревший результат" },
+        "ai",
+        null,
+        null,
+        previous,
+      ),
+    /Черновик изменён/,
+  );
+  assert.equal((await cityContent(city.id)).intro, content.intro);
+});
+test.after(async () => {
+  await closeDb();
+  await testDb.cleanup();
   rmSync(directory, { recursive: true, force: true });
 });
