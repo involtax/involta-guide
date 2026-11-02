@@ -312,3 +312,40 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
     assert usage["estimated_cost_usd"] == 0.0002
     assert len(captured) == 1
     provider.close()
+
+
+@pytest.mark.parametrize("code", ["insufficient_quota", "rate_limit_exceeded"])
+def test_provider_429_reason_persisted_without_response_secrets(database, code):
+    import httpx
+    from pydantic import SecretStr
+
+    from involta_guide.infrastructure.ai.openai import OpenAIProvider, ProviderUnavailable
+
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-test-only")})
+    service.enqueue(location["id"])
+    job = queue.claim()
+    provider = OpenAIProvider(
+        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
+    )
+    provider.client.close()
+    provider.client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                429,
+                json={"error": {"code": code, "message": "sk-private-do-not-expose"}},
+                headers={"x-request-id": "req_test123"},
+            )
+        )
+    )
+    try:
+        with pytest.raises(ProviderUnavailable, match=code) as failure:
+            provider.generate("test prompt", job["id"])
+        usage = queries.rows("ai_usage")[0]
+        assert usage["status"] == "failed"
+        assert usage["detail"] == str(failure.value)
+        assert "req_test123" in usage["detail"]
+        assert "sk-private" not in usage["detail"]
+        assert not queries.rows("versions")
+    finally:
+        provider.close()

@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -15,6 +16,44 @@ from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 class ProviderUnavailable(RuntimeError):
     pass
+
+
+def provider_error(response: httpx.Response) -> str:
+    """Expose diagnostic identifiers, never provider prose or response bodies."""
+    hints = {
+        "insufficient_quota": "Квота OpenAI исчерпана: проверьте баланс API и бюджет проекта.",
+        "billing_hard_limit_reached": "Достигнут лимит расходов OpenAI API.",
+        "rate_limit_exceeded": "Превышен лимит частоты запросов или токенов. Повторите позже.",
+        "unsupported_country_region_territory": "OpenAI не поддерживает регион сервера.",
+        "invalid_api_key": "OpenAI отклонил API-ключ.",
+        "model_not_found": "Модель не найдена или недоступна этому проекту OpenAI.",
+        "invalid_json_schema": "OpenAI отклонил JSON-схему результата.",
+        "unsupported_parameter": "OpenAI не поддерживает один из параметров запроса.",
+        "unsupported_value": "OpenAI не поддерживает одно из значений параметров.",
+        "invalid_request_error": "OpenAI отклонил параметры запроса.",
+        "permission_denied": "Проекту OpenAI не хватает прав на этот запрос.",
+    }
+    message = f"OpenAI HTTP {response.status_code}"
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict):
+        code = next(
+            (
+                value
+                for key in ("code", "type")
+                if isinstance(value := error.get(key), str) and value in hints
+            ),
+            None,
+        )
+        if code:
+            message += f" [{code}]. {hints[code]}"
+    request_id = response.headers.get("x-request-id", "")
+    if re.fullmatch(r"req_[A-Za-z0-9_-]{1,90}", request_id):
+        message += f" (request_id={request_id})"
+    return message
 
 
 class OpenAIProvider:
@@ -78,7 +117,7 @@ class OpenAIProvider:
                 data=data,
             )
             if response.status_code >= 400:
-                raise ProviderUnavailable(f"OpenAI HTTP {response.status_code}")
+                raise ProviderUnavailable(provider_error(response))
             result = response.json()
             usage = result.get("usage", {})
             input_tokens = usage.get("input_tokens", usage.get("prompt_tokens", 0))
