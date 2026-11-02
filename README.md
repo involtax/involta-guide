@@ -150,8 +150,8 @@ adoption, UUID/snapshots/FKs, конкурентные правки/worker, fake
   backup и проверенная настройка Nginx для `/guide/`, HTTPS checks и rollback.
 - `deploy-production.yml`: обновления только Guide по SHA/digest с rollback.
 
-Оба запускаются вручную из main; bootstrap требует Required reviewers в Environment
-`prod` и проверяет, что защита действительно настроена. PR/push production не меняют.
+Оба запускаются вручную из main через Run workflow, без обязательных reviewers.
+Environment `prod` хранит secrets приложения. PR/push production не меняют.
 Используются `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`.
 Дополнительные secrets приложения и поддерживаемые схемы Nginx описаны в документации.
 

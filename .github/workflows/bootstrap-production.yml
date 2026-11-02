@@ -13,27 +13,6 @@ concurrency:
   group: involta-guide-production
   cancel-in-progress: false
 jobs:
-  approval-policy:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      deployments: read
-    steps:
-      - name: Fail closed unless prod requires a human reviewer
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const {owner, repo} = context.repo;
-            try {
-              const {data} = await github.rest.repos.getEnvironment({owner, repo, environment_name: 'prod'});
-              const rule = (data.protection_rules || []).find(r => r.type === 'required_reviewers');
-              if (!rule || !(rule.reviewers || []).length) {
-                core.setFailed('Configure Settings → Environments → prod → Required reviewers before bootstrap. No SSH or server changes performed.');
-              }
-            } catch (error) {
-              core.setFailed(`Cannot verify prod approval protection (${error.status || 'API error'}). No SSH or server changes performed.`);
-            }
   build:
     if: github.ref == 'refs/heads/main'
     permissions:
@@ -43,7 +22,7 @@ jobs:
     with:
       sha: ${{ inputs.sha }}
   bootstrap:
-    needs: [approval-policy, build]
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:

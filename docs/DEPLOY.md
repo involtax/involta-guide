@@ -12,15 +12,12 @@
 
 ## Однократная настройка GitHub
 
-В Settings → Environments → **prod** включить **Required reviewers**, выбрать
-подтверждающего человека. Желательно запретить обход защиты администраторами и
-разрешить deployment только из main. Это настройка GitHub, не сервера.
-Одного `environment: prod` в YAML недостаточно: GitHub не создаёт Required reviewers
-из workflow. Bootstrap отдельно проверяет существование правила с непустым списком
-reviewers через API и останавливается до SSH, если защита отсутствует или её
-невозможно проверить. После проверки privileged job проходит native Environment gate.
-Некоторые тарифы GitHub ограничивают Environment protection в private-репозиториях;
-такой случай также не приводит к незащищённому bootstrap.
+Обязательные reviewers не нужны. Подтверждение запуска — нажатие **Run workflow**
+с выбранным SHA. После успешной сборки bootstrap продолжает настройку сервера
+без отдельного Approve deployment. Environment **prod** используется для secrets.
+Если в нём ранее включались Required reviewers или wait timer, отключите эти
+необязательные ограничения в Settings → Environments → prod: workflow не обходит
+настройки GitHub Environment. Доступ к запуску workflow определяется правами GitHub.
 
 Существующие четыре SSH-секрета могут быть repository secrets. Для приложения в
 Environment **prod** можно дополнительно задать:
@@ -167,4 +164,4 @@ backup path и результатом rollback. Summary содержит commit 
 редактирование nginx и failure/rollback paths; реальные Bash/flock контроллеры
 проверяются с fake Docker/curl. CI также проверяет Compose, actionlint и Docker build.
 Это **не** утверждение, что production уже настроен: первый реальный запуск выполняется
-только после review, merge и подтверждения пользователя/Environment reviewer.
+вручную через Run workflow после слияния изменений в main.
