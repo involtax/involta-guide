@@ -114,6 +114,40 @@ def main():
             item = json.loads(metadata)
             if item.get("owner") != "production":
                 item.pop("error", None)
+            if (
+                item.get("owner") == "production"
+                and item.get("name") == "/involta-guide-production-worker-1"
+                and item.get("status") == "running"
+            ):
+                program = """
+import json
+from sqlalchemy import text
+from involta_guide.config import Settings
+from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.infrastructure.persistence.unit_of_work import create_database
+settings=Settings()
+engine=create_database(settings)
+audit=AIAudit(engine,settings)
+with engine.connect() as conn:
+    ids=conn.execute(text("SELECT j.id FROM jobs j WHERE j.kind='generate' AND j.status='failed' AND EXISTS(SELECT 1 FROM audit a WHERE a.action='temporary_public_fill' AND a.target=j.id::text) ORDER BY j.created_at DESC LIMIT 3")).scalars().all()
+reports=[]
+for job_id in ids:
+    detail=audit.detail(str(job_id))
+    events=[]
+    for event in detail['events']:
+        payload=event['payload']
+        if not isinstance(payload,dict): continue
+        if payload.get('event')=='response': events.append(payload)
+        if payload.get('event')=='job_failed': events.append({'event':'job_failed','data':{k:v for k,v in payload.get('data',{}).items() if k in ('message','validation_errors','exception_type')}})
+    reports.append({'job_id':str(job_id),'location':detail['job']['location_name'],'error':detail['job']['error'],'events':events})
+print(json.dumps(audit.clean(reports),ensure_ascii=False))
+engine.dispose()
+"""
+                probe_code, probe, _ = run([*docker, "exec", identifier, "python", "-c", program])
+                if probe_code == 0:
+                    report["public_generation_errors"] = json.loads(probe)
+                else:
+                    report["public_generation_errors"] = "Diagnostic unavailable"
             for binary in ("nginx", "/usr/local/openresty/nginx/sbin/nginx"):
                 code, _, _ = run([*docker, "exec", identifier, binary, "-v"])
                 if code == 0:
