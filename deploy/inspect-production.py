@@ -80,18 +80,34 @@ def main():
                 )
         except OSError:
             pass
+    code, virtualization, _ = run(["systemd-detect-virt", "--container"])
+    report["container_virtualization"] = virtualization.strip()
     report["docker_binary"] = shutil.which("docker")
     report["containers"] = []
     if report["docker_binary"]:
         docker = ["docker", "--host=unix:///var/run/docker.sock"]
-        code, output, _ = run([*docker, "ps", "--quiet"])
+        code, metadata, _ = run(
+            [
+                *docker,
+                "info",
+                "--format",
+                '{"version":{{json .ServerVersion}},"driver":{{json .Driver}},"cgroup_driver":{{json .CgroupDriver}},"cgroup_version":{{json .CgroupVersion}},"security_options":{{json .SecurityOptions}}}',
+            ]
+        )
+        if code == 0:
+            report["docker_info"] = json.loads(metadata)
+        code, version, _ = run([*docker, "compose", "version", "--short"])
+        report["compose_version"] = version.strip() if code == 0 else "unavailable"
+        code, output, _ = run([*docker, "ps", "--all", "--quiet"])
         report["docker_access_exit"] = code
         for identifier in output.splitlines():
-            template = '{"name":{{json .Name}},"image":{{json .Config.Image}},"network_mode":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}}}'
+            template = '{"name":{{json .Name}},"image":{{json .Config.Image}},"network_mode":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}},"owner":{{json (index .Config.Labels "com.involta.guide.owner")}},"status":{{json .State.Status}},"exit_code":{{json .State.ExitCode}},"error":{{json .State.Error}}}'
             code, metadata, _ = run([*docker, "inspect", "--format", template, identifier])
             if code:
                 continue
             item = json.loads(metadata)
+            if item.get("owner") != "production":
+                item.pop("error", None)
             for binary in ("nginx", "/usr/local/openresty/nginx/sbin/nginx"):
                 code, _, _ = run([*docker, "exec", identifier, binary, "-v"])
                 if code == 0:
