@@ -8,6 +8,10 @@ on:
         type: string
 permissions:
   contents: read
+# Explicit bash enables -e -o pipefail; tee must never hide an SSH/rollback failure.
+defaults:
+  run:
+    shell: bash
 # Shared across BOTH workflows; never cancel an active production operation.
 concurrency:
   group: involta-guide-production
