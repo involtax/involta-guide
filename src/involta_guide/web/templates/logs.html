@@ -1,0 +1,40 @@
+{%extends 'base.html'%}
+{%from 'macros.html' import csrf,generation_model_picker with context%}
+{%block body%}
+<main id="logs-main">
+<header class="admin-header"><h1>Логи</h1>
+{%if logs_admin%}<form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button></form>
+{%else%}<a href="{{settings.path('/admin')}}">Войти в админку ↗</a>{%endif%}
+</header>
+{%if logs_admin%}{%include 'admin_navigation.html'%}{%endif%}
+{%if message%}<p role="status">{{message}}</p>{%endif%}
+<div class="logs-layout">
+<aside class="logs-sidebar" id="log-requests" aria-label="Запросы">
+<h2>Запросы · {{audit_jobs.total}}</h2>
+<form method="get" action="{{settings.path('/logs')}}" class="stack">
+<label>Город или адрес лога<input name="q" value="{{q}}" placeholder="Иваново или ivanovo/2"></label>
+<label>Статус<select name="status">
+{%for value,label in [('', 'Все'),('queued','В очереди'),('running','В работе'),('done','Готово'),('failed','Ошибка'),('cancelled','Отменено')]%}
+<option value="{{value}}" {%if status==value%}selected{%endif%}>{{label}}</option>{%endfor%}
+</select></label><button>Найти</button></form>
+<nav aria-label="Список запросов">
+{%for j in audit_jobs.rows%}
+<a class="log-request {{'selected' if audit_detail and audit_detail.job.log_path==j.log_path else ''}}" href="{{settings.path(j.log_path)}}?{{audit_page(audit_jobs.page)}}" {%if audit_detail and audit_detail.job.log_path==j.log_path%}aria-current="page"{%endif%}>
+<strong>{{j.location_name}} / {{j.run_number}}</strong>
+<span>{{j.location_slug}}/{{j.run_number}} · {{j.status}}</span>
+<small>{{j.model_name or j.kind}} · {{j.created_at}}</small>
+</a>
+{%else%}<p>Запросов пока нет.</p>{%endfor%}
+</nav>
+<nav aria-label="Страницы запросов">
+{%if audit_jobs.page>1%}<a href="{{settings.path('/logs')}}?{{audit_page(audit_jobs.page-1)}}">← Назад</a>{%endif%}
+ {{audit_jobs.page}} / {{audit_jobs.pages}}
+{%if audit_jobs.page<audit_jobs.pages%}<a href="{{settings.path('/logs')}}?{{audit_page(audit_jobs.page+1)}}">Дальше →</a>{%endif%}
+</nav>
+</aside>
+<section class="logs-content" aria-label="Выбранный лог">
+{%if audit_detail%}{%include 'log_detail.html'%}{%else%}<h2>Выберите запрос</h2><p>Здесь появятся промт, полный ответ, ошибки и созданная версия страницы.</p>{%endif%}
+</section>
+</div>
+</main>
+{%endblock%}

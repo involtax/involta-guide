@@ -82,7 +82,7 @@ def test_manual_repeat_creates_new_log_and_draft_without_replacing_published(dat
     assert audit.resolve("ivanovo", 2, public_only=True) == new_id
     detail = audit.detail(new_id)
     assert detail["job"]["model_name"] == "gpt-5"
-    assert detail["job"]["generation_config"]["previous_job"] == first["id"]
+    assert detail["job"]["generation_config"]["previous_number"] == 1
     assert detail["versions"][0]["id"] == location_after["draft_version"]
     assert detail["versions"][0]["model"] == "gpt-5"
     with TestClient(create_app(settings)) as client:
@@ -119,7 +119,7 @@ def test_legacy_numbers_remain_stable_when_backfilled_and_repeated(database):
     new_id = service.regenerate(originals[1], model="gpt-5")
     assert [audit.resolve("ivanovo", n) for n in (1, 2)] == originals
     assert audit.resolve("ivanovo", 3) == new_id
-    assert audit.detail(originals[0])["job"]["generation_config"]["legacy"]
+    assert audit.detail(originals[0])["job"]["log_path"] == "/logs/ivanovo/1"
 
 
 def test_concurrent_manual_repeats_get_one_new_number_and_preserve_old_failure(database):

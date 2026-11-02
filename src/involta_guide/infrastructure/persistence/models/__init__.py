@@ -125,6 +125,14 @@ class JobRow(Base):
     applied: Mapped[bool] = mapped_column(Boolean)
 
 
+class RequestLogRow(Base):
+    __tablename__ = "request_logs"
+    location_slug: Mapped[str] = mapped_column(Text, primary_key=True)
+    number: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    job_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    path: Mapped[str] = mapped_column(Text)
+
+
 class AuditRow(Base):
     __tablename__ = "audit"
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)

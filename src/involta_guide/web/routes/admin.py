@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from starlette.datastructures import FormData
 
 from involta_guide.application.commands.schemas import ContentInput, LocationInput, RestaurantInput
@@ -88,6 +88,26 @@ def redirect(request: Request, tab: str = "overview", message: str = "", **param
         + urlencode({"tab": tab, "message": message, **params}),
         status_code=303,
     )
+
+
+def log_redirect(request: Request, path: str, *, code: int = 303) -> Response:
+    url = context(request).settings.path(path)
+    if request.headers.get("HX-Request") == "true":
+        return Response(headers={"HX-Redirect": url})
+    return RedirectResponse(url, status_code=code)
+
+
+def submitted_log(request: Request, form: FormData) -> str:
+    try:
+        number = int(key(form, "log_number"))
+    except ValueError:
+        raise RuleViolation("Выберите лог города и номер запроса") from None
+    job_id = AIAudit(context(request).engine, context(request).settings).resolve(
+        key(form, "log_slug"), number
+    )
+    if not job_id:
+        raise HTTPException(404, "Лог не найден")
+    return job_id
 
 
 def routes(prefix: str) -> APIRouter:
@@ -184,19 +204,12 @@ def routes(prefix: str) -> APIRouter:
             data["sessions"] = ctx.queries.rows("admin_sessions")
         elif tab == "ai-audit":
             store = AIAudit(ctx.engine, ctx.settings)
-            try:
-                page = int(params.get("page", "1"))
-            except ValueError:
-                page = 1
-            data["audit_jobs"] = store.listing(page, q, "" if status == "all" else status)
-            data["audit_detail"] = None
             if params.get("job"):
-                data["audit_detail"] = store.detail(uid(params["job"]))
-                if data["audit_detail"] is None:
+                old_log = store.detail(uid(params["job"]))
+                if old_log is None:
                     raise HTTPException(404, "Задание не найдено")
-            data["audit_page"] = lambda page: urlencode(
-                {"tab": "ai-audit", "q": q, "status": status, "page": page}
-            )
+                return log_redirect(request, old_log["job"]["log_path"], code=308)
+            return log_redirect(request, "/logs", code=308)
         return render(request, "admin.html", data)
 
     @router.get(prefix + "/admin/ai-audit/{job_id}.json")
@@ -206,14 +219,7 @@ def routes(prefix: str) -> APIRouter:
         detail = AIAudit(ctx.engine, ctx.settings).detail(uid(job_id))
         if detail is None:
             raise HTTPException(404, "Задание не найдено")
-        return JSONResponse(
-            detail,
-            headers={
-                "Cache-Control": "private, no-store",
-                "Content-Disposition": f'attachment; filename="ai-audit-{uid(job_id)}.json"',
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
+        return log_redirect(request, detail["job"]["log_path"] + ".json?download=1", code=308)
 
     @router.post(prefix + "/admin/login")
     def login(request: Request, form: FormData = Depends(form_data)) -> Response:
@@ -366,14 +372,11 @@ def routes(prefix: str) -> APIRouter:
                 )
             if action == "regenerate":
                 new_id = ctx.jobs.regenerate(
-                    uid(key(form, "job_id")), model=key(form, "model") or None
+                    submitted_log(request, form), model=key(form, "model") or None
                 )
-                return redirect(
-                    request,
-                    "ai-audit",
-                    "Создан новый запрос с текущим промтом и выбранной моделью. Старый журнал сохранён.",
-                    job=new_id,
-                )
+                detail = AIAudit(ctx.engine, ctx.settings).detail(new_id)
+                assert detail is not None
+                return log_redirect(request, detail["job"]["log_path"])
             if action == "generate":
                 count = ctx.jobs.enqueue(
                     uid(location) if location else None,
@@ -384,7 +387,7 @@ def routes(prefix: str) -> APIRouter:
                     request, "fill", f"Поставлено в очередь: {count}. Публикация отдельно."
                 )
             if action == "retry":
-                ctx.jobs.retry(uid(key(form, "job_id")))
+                ctx.jobs.retry(submitted_log(request, form))
                 return redirect(request, "fill", "Задание поставлено повторно")
             if action == "cancel":
                 ctx.jobs.cancel()

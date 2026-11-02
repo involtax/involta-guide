@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse,
 from involta_guide.domain.hours import DAYS, opening_status
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
-from involta_guide.web.http import check_origin, context
+from involta_guide.web.http import admin_token, check_origin, context, require_admin
+from involta_guide.web.routes.admin import render
 
 
 def routes(prefix: str) -> APIRouter:
@@ -103,41 +104,54 @@ def routes(prefix: str) -> APIRouter:
 
     def log_store(request: Request) -> AIAudit:
         ctx = context(request)
-        if not ctx.settings.public_fill_logs_enabled:
+        if not ctx.settings.public_fill_logs_enabled and not ctx.security.principal(
+            admin_token(request)
+        ):
             raise HTTPException(404, "Публичные логи отключены")
         return AIAudit(ctx.engine, ctx.settings)
 
-    def log_page(request: Request, job_id: str | None, q: str, page: int) -> Response:
+    def log_page(
+        request: Request, job_id: str | None, q: str, page: int, status: str = ""
+    ) -> Response:
         store = log_store(request)
-        detail = store.detail(job_id, public_only=True) if job_id else None
+        ctx = context(request)
+        admin = bool(ctx.security.principal(admin_token(request)))
+        listing = store.listing(page, q, status, public_only=not admin)
+        if not job_id and listing["rows"]:
+            job_id = str(listing["rows"][0]["id"])
+        detail = store.detail(job_id, public_only=not admin) if job_id else None
         if job_id and detail is None:
             raise HTTPException(404, "Публичный журнал не найден")
-        if detail:
-            q = detail["job"]["location_slug"]
-        return request.app.state.templates.TemplateResponse(
-            request=request,
-            name="public_logs.html",
-            headers=log_headers,
-            context={
-                "settings": context(request).settings,
-                "audit_public": True,
+        response = render(
+            request,
+            "logs.html",
+            {
+                "admin_ui": admin,
+                "fragment": False,
+                "logs_admin": admin,
+                "audit_public": not admin,
                 "audit_detail": detail,
-                "audit_jobs": store.listing(page, q, public_only=True),
+                "audit_jobs": listing,
                 "q": q,
-                "status": "all",
-                "title": "Логи наполнения — Инвольта гид",
-                "audit_page": lambda n: urlencode({"q": q, "page": n}),
+                "status": status,
+                "tab": "logs",
+                "title": "Логи — Инвольта гид",
+                "message": request.query_params.get("message", ""),
+                "audit_page": lambda n: urlencode({"q": q, "status": status, "page": n}),
             },
         )
+        response.headers.update({**log_headers, "Vary": "Cookie"})
+        return response
 
     @router.get(prefix + "/logs")
-    def public_logs(request: Request, q: str = "", page: int = 1) -> Response:
-        return log_page(request, None, q, page)
+    def public_logs(request: Request, q: str = "", page: int = 1, status: str = "") -> Response:
+        return log_page(request, None, q, page, status)
 
     def numbered_detail(request: Request, slug: str, number: int) -> dict:
         store = log_store(request)
-        job_id = store.resolve(slug, number, public_only=True) if number > 0 else None
-        detail = store.detail(job_id, public_only=True) if job_id else None
+        public_only = not bool(context(request).security.principal(admin_token(request)))
+        job_id = store.resolve(slug, number, public_only=public_only) if number > 0 else None
+        detail = store.detail(job_id, public_only=public_only) if job_id else None
         if detail is None:
             raise HTTPException(404, "Версия журнала не найдена")
         return detail
@@ -145,19 +159,45 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix + "/logs/{slug}/{number}.json")
     def numbered_json(request: Request, slug: str, number: int) -> Response:
         detail = numbered_detail(request, slug, number)
-        return JSONResponse(detail, headers=log_headers)
+        if slug != detail["job"]["location_slug"]:
+            suffix = "?download=1" if request.query_params.get("download") == "1" else ""
+            return RedirectResponse(
+                context(request).settings.path(detail["job"]["log_path"]) + ".json" + suffix,
+                status_code=308,
+                headers=log_headers,
+            )
+        headers = dict(log_headers)
+        if request.query_params.get("download") == "1":
+            headers["Content-Disposition"] = (
+                f'attachment; filename="log-{detail["job"]["location_slug"]}-{number}.json"'
+            )
+        return JSONResponse(detail, headers={**headers, "Vary": "Cookie"})
+
+    @router.get(prefix + "/logs/{slug}/{number}/audio")
+    def log_audio(request: Request, slug: str, number: int) -> Response:
+        require_admin(request)
+        detail = numbered_detail(request, slug, number)
+        if not detail["review"]:
+            raise HTTPException(404, "Аудиозапись не найдена")
+        data, mime = context(request).reviews.audio(detail["review"]["id"])
+        return Response(data, media_type=mime, headers={"Cache-Control": "private, no-store"})
 
     @router.get(prefix + "/logs/{slug}/{number}")
-    def numbered_log(request: Request, slug: str, number: int, page: int = 1) -> Response:
+    def numbered_log(
+        request: Request, slug: str, number: int, page: int = 1, q: str = "", status: str = ""
+    ) -> Response:
         detail = numbered_detail(request, slug, number)
         canonical = context(request).settings.path(detail["job"]["log_path"])
         if slug != detail["job"]["location_slug"]:
             return RedirectResponse(canonical, status_code=308, headers=log_headers)
-        return log_page(request, detail["job"]["id"], slug, page)
+        return log_page(request, detail["job"]["id"], q, page, status)
 
     @router.get(prefix + "/logs/{job_id}.json")
     def public_log_json(request: Request, job_id: UUID) -> Response:
-        detail = log_store(request).detail(str(job_id), public_only=True)
+        detail = log_store(request).detail(
+            str(job_id),
+            public_only=not bool(context(request).security.principal(admin_token(request))),
+        )
         if detail is None:
             raise HTTPException(404, "Публичный журнал не найден")
         return RedirectResponse(
@@ -172,7 +212,10 @@ def routes(prefix: str) -> APIRouter:
             identifier = str(UUID(job_id))
         except ValueError:
             return log_page(request, None, job_id, page)
-        detail = log_store(request).detail(identifier, public_only=True)
+        detail = log_store(request).detail(
+            identifier,
+            public_only=not bool(context(request).security.principal(admin_token(request))),
+        )
         if detail is None:
             raise HTTPException(404, "Публичный журнал не найден")
         return RedirectResponse(

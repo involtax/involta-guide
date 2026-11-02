@@ -93,9 +93,7 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("link", name="Открыть логи наполнения ↗")).to_be_visible()
                 logs = context.new_page()
                 logs.goto(base + "/logs")
-                expect(
-                    logs.get_by_role("heading", name="Публичные логи наполнения")
-                ).to_be_visible()
+                expect(logs.get_by_role("heading", name="Логи", exact=True)).to_be_visible()
                 logs.close()
                 submissions = []
 
@@ -191,15 +189,32 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                         "validation_errors": [
                             {"loc": ["restaurants", 0, "phone"], "msg": "Телефон неверен"}
                         ],
-                        "traceback": "browser audit fixture",
+                        "traceback": "browser audit fixture\n" * 200,
                     },
                 )
-                page.get_by_role("link", name="Аудит ИИ", exact=True).click()
-                expect(page.get_by_role("heading", name="Аудит ИИ", exact=True)).to_be_visible()
-                page.goto(base + "/admin?tab=ai-audit&job=" + job["id"])
+                page.get_by_role("link", name="Логи", exact=True).click()
+                expect(page.get_by_role("heading", name="Логи", exact=True)).to_be_visible()
+                with PostgresUow(engine) as tx:
+                    reference = tx.repo.log_reference(job["id"])
+                page.goto(base + reference["path"])
                 expect(page.locator("pre").filter(has_text="Телефон неверен")).to_be_visible()
+                sidebar = page.get_by_role("complementary", name="Запросы").bounding_box()
+                content = page.get_by_role("region", name="Выбранный лог").bounding_box()
+                assert sidebar["x"] < content["x"]
+                for width in (1280, 390):
+                    page.set_viewport_size({"width": width, "height": 844})
+                    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+                    assert (
+                        page.evaluate("""() => [...document.querySelectorAll('#logs-main *')].filter(e => {
+                        const s=getComputedStyle(e);
+                        return e.clientHeight>0 && ((['auto','scroll'].includes(s.overflowY) && e.scrollHeight>e.clientHeight+1)
+                            || (['auto','scroll'].includes(s.overflowX) && e.scrollWidth>e.clientWidth+1));
+                    }).length""")
+                        == 0
+                    )
+                page.set_viewport_size({"width": 1280, "height": 844})
                 with page.expect_download() as downloaded:
-                    page.get_by_role("link", name="Скачать полный аудит JSON ↗").click()
+                    page.get_by_role("link", name="Скачать полный JSON ↗").click()
                 export = json.loads(Path(downloaded.value.path()).read_text())
                 assert export["job"]["id"] == job["id"]
                 failed_id = str(uuid4())
@@ -218,17 +233,18 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 repeat = page.locator('form[action$="/regenerate"]')
                 repeat.get_by_label("Модель нового запроса").select_option("gpt-6-astra")
                 repeat.get_by_role("button", name="Повторить новым запросом").click()
-                expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
+                expect(page.get_by_role("heading", name="Иваново / 3", exact=False)).to_be_visible()
+                expect(page).to_have_url(base + "/logs/ivanovo/3")
                 new_job = queries.rows("jobs", {"kind": "generate", "status": "queued"})[0]
                 assert new_job["id"] != failed_id
                 config = queries.rows(
                     "audit", {"action": "generation_run", "target": new_job["id"]}
                 )[0]
                 assert json.loads(config["detail"])["model"] == "gpt-6-astra"
-                page.goto(base + "/logs/ivanovo/2")
-                expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
-                expect(page.get_by_role("link", name="Открыть полный JSON ↗")).to_have_attribute(
-                    "href", "/guide/logs/ivanovo/2.json"
+                page.goto(base + "/logs/ivanovo/3")
+                expect(page.get_by_role("heading", name="Иваново / 3", exact=False)).to_be_visible()
+                expect(page.get_by_role("link", name="Скачать полный JSON ↗")).to_have_attribute(
+                    "href", "/guide/logs/ivanovo/3.json?download=1"
                 )
                 # Alex bootstrap is not a named parameter and is cleared from the URL.
                 alex = browser.new_context()

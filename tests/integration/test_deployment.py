@@ -52,7 +52,8 @@ if args[0]=='inspect':
  print('unhealthy' if service.get('sha')==os.getenv('FAKE_FAIL_SHA') else 'healthy')
  sys.exit(0)
 if args[0]=='compose':
- command=next(x for x in args if x in ('up','ps','stop','rm','logs'))
+ command=next(x for x in args if x in ('up','ps','stop','rm','logs','run'))
+ if command=='run' and os.getenv('FAKE_MIGRATION_FAIL')=='1':sys.exit(1)
  if command=='up':
   services=[s for s in ('web','worker') if s in args]
   for service in services:state.setdefault('services',{})[service]={'sha':os.environ['RELEASE_SHA'],'image':os.environ['IMAGE_REF']}
@@ -133,6 +134,15 @@ def test_failed_update_restores_previous_release_without_deleting_data(tmp_path)
     commands = Path(str(state) + ".log").read_text()
     assert "--volumes" not in commands and "prune" not in commands
     assert not list(root.glob(".registry.*"))
+
+
+def test_migration_failure_restores_previous_containers(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    result = deploy(root, {**env, "FAKE_MIGRATION_FAIL": "1"}, B, "2-1")
+    assert result.returncode != 0
+    assert "Rollback to " + A + " succeeded" in result.stderr
+    assert json.loads(state.read_text())["services"]["web"]["image"] == IMAGES[A]
 
 
 def test_external_rollback_and_old_run_guard(tmp_path):

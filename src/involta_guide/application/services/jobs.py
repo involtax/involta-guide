@@ -67,33 +67,7 @@ class JobService:
         public_fill: bool = False,
         previous_job: str | None = None,
     ) -> str | None:
-        # The caller holds the location row lock. Assign numbers once, including old history.
-        history = sorted(
-            repo.rows("jobs", {"kind": "generate", "location_id": location["id"]}, limit=100000),
-            key=lambda row: (row["created_at"], row["id"]),
-        )
-        counter = 0
-        for old in history:
-            config = self.generation_config(repo, old["id"])
-            if config:
-                counter = max(counter, int(config["number"]))
-                continue
-            counter += 1
-            calls = repo.rows("ai_usage", {"job_id": old["id"]}, limit=1)
-            repo.audit(
-                "generation_run",
-                old["id"],
-                json.dumps(
-                    {
-                        "number": counter,
-                        "model": calls[0]["model"] if calls else self.provider.model,
-                        "public_log": self._is_public_fill(repo, old["id"]),
-                        "legacy": True,
-                    }
-                ),
-            )
-        counter_key = "generation_counter_" + location["id"]
-        counter = max(counter, int(repo.setting(counter_key, "0")))
+        # The DB assigns the canonical city/number key atomically for every request.
         chosen = self._model(model or repo.setting("generation_model", self.provider.model))
         job_id = str(uuid4())
         if not repo.queue(
@@ -105,20 +79,22 @@ class JobService:
             }
         ):
             return None
+        reference = repo.log_reference(job_id)
         repo.audit(
             "generation_run",
             job_id,
             json.dumps(
                 {
-                    "number": counter + 1,
+                    "number": reference["number"],
                     "model": chosen,
                     "public_log": True,
-                    "previous_job": previous_job,
+                    "previous_number": repo.log_reference(previous_job)["number"]
+                    if previous_job
+                    else None,
                     "baseline_version": location["draft_version"],
                 }
             ),
         )
-        repo.set_setting(counter_key, str(counter + 1))
         if public_fill:
             repo.audit("temporary_public_fill", job_id, location["id"])
         return job_id

@@ -1,0 +1,7 @@
+<nav class="admin-tabs" aria-label="Администрирование">
+{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Наполнение'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
+<a href="{{settings.path('/admin')}}?tab={{key}}" class="{{'selected' if tab==key else ''}}">{{label}}</a>
+{%endfor%}
+<a href="{{settings.path('/logs')}}" hx-boost="false" class="{{'selected' if tab=='logs' else ''}}">Логи</a>
+<a href="{{settings.path('/alex')}}" hx-boost="false">Алекс ↗</a>
+</nav>

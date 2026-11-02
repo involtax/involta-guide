@@ -12,13 +12,12 @@ from sqlalchemy import Engine, text
 from involta_guide.config import Settings
 
 HISTORY = """WITH numbered AS (
- SELECT j.*,l.name location_name,l.slug location_slug,
- row_number() OVER(PARTITION BY j.location_id,j.kind ORDER BY j.created_at,j.id) ordinal,
+ SELECT j.*,l.name location_name,r.location_slug,r.number ordinal,r.path log_path,
  (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
  (SELECT u.model FROM ai_usage u WHERE u.job_id=j.id ORDER BY u.created_at,u.id LIMIT 1) actual_model
- FROM jobs j LEFT JOIN locations l ON l.id=j.location_id
+ FROM jobs j JOIN request_logs r ON r.job_id=j.id JOIN locations l ON l.slug=r.location_slug
 ), history AS (
- SELECT *,CASE WHEN kind='generate' THEN coalesce((generation_config->>'number')::bigint,ordinal) END run_number,
+ SELECT *,ordinal run_number,
  coalesce(generation_config->>'model',actual_model,'') model_name FROM numbered
 ) """
 PUBLIC_GENERATION = """j.kind='generate' AND j.review_id IS NULL AND
@@ -88,7 +87,7 @@ class AIAudit:
     def listing(
         self, page: int, query: str = "", status: str = "", *, public_only: bool = False
     ) -> dict[str, Any]:
-        where = "WHERE (:q='' OR j.location_name ILIKE :search OR j.location_slug=:q OR j.id::text=:q) AND (:status='' OR j.status=:status)"
+        where = "WHERE (:q='' OR j.location_name ILIKE :search OR j.location_slug=:q OR (j.location_slug||'/'||j.run_number::text)=:q) AND (:status='' OR j.status=:status)"
         if public_only:
             where += " AND " + PUBLIC_GENERATION
         params = {"q": query, "search": "%" + query + "%", "status": status}
@@ -124,11 +123,6 @@ class AIAudit:
 
     @staticmethod
     def _job(job: dict[str, Any]) -> dict[str, Any]:
-        job["log_path"] = (
-            f"/logs/{job['location_slug']}/{job['run_number']}"
-            if job["kind"] == "generate"
-            else None
-        )
         return job
 
     def resolve(self, slug: str, number: int, *, public_only: bool = False) -> str | None:
@@ -136,7 +130,7 @@ class AIAudit:
             value = conn.execute(
                 text(
                     HISTORY
-                    + "SELECT j.id FROM history j WHERE j.kind='generate' AND (j.location_slug=:slug OR j.location_id IN (SELECT location_id FROM location_slug_redirects WHERE slug=:slug)) AND j.run_number=:number"
+                    + "SELECT j.id FROM history j WHERE (j.location_slug=:slug OR j.location_id IN (SELECT location_id FROM location_slug_redirects WHERE slug=:slug)) AND j.run_number=:number"
                     + (" AND " + PUBLIC_GENERATION if public_only else "")
                 ),
                 {"slug": slug, "number": number},

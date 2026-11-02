@@ -5,16 +5,15 @@
 <article class="panel">
 <strong>{{j.location_name}}{%if j.run_number%} / {{j.run_number}}{%endif%} · {{j.status}}</strong>
 <p>{{j.model_name}} · попыток {{j.attempts}} · {{j.error or ''}}</p>
-<a href="{{settings.path('/admin')}}?tab=ai-audit&amp;job={{j.id}}">Запросы, ответы и подробный журнал ↗</a>
+<a href="{{settings.path(j.log_path)}}" hx-boost="false">Лог {{j.location_slug}}/{{j.run_number}} ↗</a>
 {%if j.kind=='generate'%}
-<a href="{{settings.path(j.log_path)}}" hx-boost="false">Открыть лог {{j.location_slug}}/{{j.run_number}} ↗</a>
-<form method="post" action="{{settings.path('/admin/actions/regenerate')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
+<form method="post" action="{{settings.path('/admin/actions/regenerate')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="log_slug" value="{{j.location_slug}}"><input type="hidden" name="log_number" value="{{j.run_number}}">
 {{generation_model_picker('Модель нового запроса',generation_model)}}
 <small>* Цены — для примера со вкладки «Наполнение».</small>
 <button {%if j.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button>
 </form>
 {%elif j.status=='failed'%}
-<form method="post" action="{{settings.path('/admin/actions/retry')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
+<form method="post" action="{{settings.path('/admin/actions/retry')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="log_slug" value="{{j.location_slug}}"><input type="hidden" name="log_number" value="{{j.run_number}}">
 <button>Повторить</button>
 </form>
 {%endif%}

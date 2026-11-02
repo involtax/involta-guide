@@ -91,6 +91,11 @@ class PostgresRepository:
             "audit", {"id": str(uuid4()), "action": action, "target": str(target), "detail": detail}
         )
 
+    def log_reference(self, job_id: str) -> Record:
+        return self.query(
+            "SELECT location_slug,number,path FROM request_logs WHERE job_id=:id", {"id": job_id}
+        )[0]
+
     def by_slug(self, slug: str) -> tuple[Record, bool] | None:
         direct = self.query("SELECT * FROM locations WHERE slug=:slug AND active=1", {"slug": slug})
         if direct:

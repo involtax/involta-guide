@@ -983,3 +983,33 @@ pre.audit-json {
   vertical-align: top;
   border-bottom: 1px solid #ddd;
 }
+.logs-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 280px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.logs-sidebar, .logs-content { min-width: 0; }
+#logs-main .admin-tabs { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
+#logs-main input, #logs-main select { min-width: 0; max-width: 100%; }
+.log-request {
+  display: grid;
+  gap: 6px;
+  padding: 14px 10px;
+  border-bottom: 1px solid #ddd;
+  overflow-wrap: anywhere;
+}
+.log-request.selected { outline: 1px solid #111; }
+.logs-content .audit-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: none;
+  overflow: visible;
+}
+.logs-content details, .logs-content summary { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .logs-layout { display: flex; flex-direction: column; }
+  .logs-sidebar, .logs-content { width: 100%; }
+  .logs-content { order: -1; }
+}

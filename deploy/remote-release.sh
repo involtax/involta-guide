@@ -145,7 +145,7 @@ timeout 300 docker pull "$target_image" >/dev/null
 revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$target_image")
 [[ "$revision" == "$target_sha" ]] || { echo 'Image revision does not match requested SHA' >&2; exit 1; }
 docker volume inspect "$AUDIO_VOLUME" >/dev/null
-# No migrations, seed, nginx edits, volume deletion or registry pruning here.
+# Schema upgrades must be additive and image rollback compatible. Never seed/drop data here.
 changed=0
 failed() {
   local status=$1
@@ -170,7 +170,8 @@ trap 'failed $?' ERR
 trap 'failed 143' HUP TERM
 trap 'failed 130' INT
 changed=1
-if [[ -n "$previous_sha" ]]; then compose "$previous_sha" "$previous_image" stop --timeout 240 worker; fi
+if [[ -n "$previous_sha" ]]; then compose "$previous_sha" "$previous_image" stop --timeout 240 worker web; fi
+compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
 compose "$target_sha" "$target_image" up -d --no-build web
 wait_health "$target_sha" "$target_image" web
 check_local "$target_sha"

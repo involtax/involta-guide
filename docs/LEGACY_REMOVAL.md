@@ -15,6 +15,10 @@
 перенаправляют на `/guide/logs/ivanovo/1` и соответствующий JSON. Старые ссылки
 уже отправлялись пользователю.
 
+Сюда же относятся старые `/guide/admin?tab=ai-audit&job=<uuid>` и
+`/guide/admin/ai-audit/<uuid>.json`: они только перенаправляют на единые «Логи».
+Отдельная страница аудита удалена.
+
 Код: [public.py](../src/involta_guide/web/routes/public.py), обработчики
 `public_log` и `public_log_json`. В `public_log` также есть действующий список
 города `/guide/logs/ivanovo` — его сохранить.
@@ -25,28 +29,27 @@
 
 ## LEG-002. Задания без сохранённого номера и модели
 
-**Статус: ожидает.** Для старых заданий номер вычисляется по `created_at, id`,
-модель берётся из сохранённого вызова, если он есть. При новом запуске города
-старая история получает постоянные записи `audit.action=generation_run`.
+**Статус: частично удалено, 2026-11-02.** Вычисление номера при просмотре
+и заполнение номеров из `_queue_generation` удалены. Миграция `0003_logs`
+сохраняет номера всех старых запросов в `request_logs`, новые назначает PostgreSQL.
+Идентичность лога теперь хранится как `location_slug, number, path`.
 
-Код: [jobs.py](../src/involta_guide/application/services/jobs.py),
-`_queue_generation` — заполнение старой истории;
-[audit.py](../src/involta_guide/infrastructure/ai/audit.py), `HISTORY` — резервные
-`row_number`/`actual_model`;
+Остались: неиспользуемые старые ключи `settings.generation_counter_*`,
+исторические записи `generation_run` и резерв модели `actual_model` в
+[audit.py](../src/involta_guide/infrastructure/ai/audit.py);
 [openai.py](../src/involta_guide/infrastructure/ai/openai.py), `generate` —
 резерв модели для старого задания.
 
-Условие удаления: заполнены метаданные всех старых заданий и счётчики городов,
-закончился период отката на старое приложение. Одного нового запроса в Иваново
-недостаточно — проверить остальные города. Проверка полноты, только чтение:
+Условие удаления старых счётчиков: закончился период отката на прежнее приложение.
+Резерв модели удалять только после подтверждения моделей для старых заданий.
+Проверка полноты новых идентификаторов, только чтение:
 
 ```sql
-SELECT count(*) AS generation_jobs_without_metadata
+SELECT count(*) AS requests_without_log_identity
 FROM jobs j
-WHERE j.kind = 'generate'
+WHERE j.location_id IS NOT NULL
   AND NOT EXISTS (
-    SELECT 1 FROM audit a
-    WHERE a.action = 'generation_run' AND a.target = j.id::text
+    SELECT 1 FROM request_logs r WHERE r.job_id = j.id
   );
 ```
 
@@ -105,7 +108,7 @@ bootstrap, инспекции и смены пароля.
 разрешение закрыть логи. Переключатель `PUBLIC_FILL_LOGS_ENABLED`.
 
 Код: [public.py](../src/involta_guide/web/routes/public.py),
-[public_logs.html](../src/involta_guide/web/templates/public_logs.html),
+[logs.html](../src/involta_guide/web/templates/logs.html),
 публичные ссылки в [location.html](../src/involta_guide/web/templates/location.html).
 
 Возвращаться к удалению после решения владельца о завершении публичного режима.
@@ -136,4 +139,11 @@ bootstrap, инспекции и смены пароля.
 
 ## Удалённое
 
-Пока нет. Для удаления записывать дату, ID записи, коммит и результат проверок.
+- 2026-11-02: отдельная страница «Аудит ИИ» и шаблоны `ai_audit.html`,
+  `public_logs.html` заменены едиными «Логами». Все новые ссылки и формы используют
+  город/номер. Обратная совместимость старых адресов остаётся в LEG-001.
+- 2026-11-02, часть LEG-002: резервный расчёт порядкового номера и запись старой
+  истории из сервиса заменены миграцией `0003_logs` и триггером PostgreSQL.
+  Проверки: перенос старых номеров/ответов, каскадная смена slug, конкурентные
+  запросы, браузер без вложенных скроллов, rollback при ошибке миграции.
+  Коммит — изменение с названием «Persist readable log identities and unify log browsing».
