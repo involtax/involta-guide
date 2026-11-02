@@ -1,14 +1,26 @@
 {%set d=audit_detail%}
 <header>
-<h2>{{d.job.location_name}} / {{d.job.run_number}} · {{d.job.status}}</h2>
+<h2>{{d.job.location_name}} / {{d.job.run_number}}</h2>
+<div id="log-live" data-url="{{settings.path(d.job.log_path)}}/status" data-active="{{'true' if d.job.status in ['queued','running'] else 'false'}}">
+<p role="status"><strong data-stage>{{d.job.stage_label}}</strong></p>
+<p data-progress>{%if d.job.response_id%}Запрос принят OpenAI. Проверок состояния: {{d.job.poll_count}}.{%endif%}</p>
+<p data-error role="alert">{{d.job.error or ''}}</p>
+</div>
 <p><strong>{{d.job.location_slug}}/{{d.job.run_number}}</strong> · {{d.job.model_name}} · {{d.job.kind}} · {{d.job.created_at}}</p>
 <a href="{{settings.path(d.job.log_path)}}.json{%if logs_admin%}?download=1{%endif%}">{{'Скачать полный JSON ↗' if logs_admin else 'Открыть полный JSON ↗'}}</a>
+ · <a href="{{settings.path(d.job.log_path)}}">Обновить полный лог ↻</a>
  · <a href="#log-requests">К списку запросов ↑</a>
 </header>
-{%if d.job.error%}<p role="alert">{{d.job.error}}</p>{%endif%}
 {%for v in d.versions%}<p>Результат запроса: версия страницы №{{v.number}}.</p>{%endfor%}
 {%if not d.versions and d.job.kind=='generate' and d.job.status=='failed'%}<p>Новая версия страницы не создана.</p>{%endif%}
 {%if logs_admin%}
+{%if d.job.can_resume%}
+<form method="post" action="{{settings.path('/admin/actions/resume-generation')}}">{{csrf()}}
+<input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}">
+<button>{{'Проверить сохранённый ответ повторно' if d.job.generation_state=='completed' else 'Продолжить получение того же ответа'}}</button>
+<small>Без новой генерации OpenAI. Этот лог и исходный ответ сохраняются.</small>
+</form>
+{%endif%}
 {%if d.job.kind=='generate'%}
 <form method="post" action="{{settings.path('/admin/actions/regenerate')}}" class="stack">{{csrf()}}
 <input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}">
@@ -26,10 +38,10 @@
 <audio controls preload="none" src="{{settings.path(d.job.log_path+'/audio')}}"></audio>
 {%endif%}
 <h3>Обращения к OpenAI</h3>
-<p>done у обращения означает получение ответа API. Проверка данных может завершиться ошибкой — её подробности ниже.</p>
+<p>Одно обращение — одна генерация. GET в хронологии только проверяет тот же ответ. done означает, что полный ответ сохранён; публикация показана отдельно выше. Пока статистика OpenAI не получена, нули токенов не означают отсутствие расходов.</p>
 {%for c in d.calls%}<details open><summary>{{c.created_at}} · {{c.model}} · {{c.operation}} · {{c.status}}</summary><pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>{%else%}<p>Обращений к провайдеру нет.</p>{%endfor%}
 <h3>Хронология</h3>
-{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Отправленный запрос','response':'Полный ответ OpenAI','provider_error':'Ошибка провайдера','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы'}%}
+{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Запрос к OpenAI: метод указан ниже','response':'Полный ответ OpenAI','provider_error':'Ошибка связи с OpenAI','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы','generation_status':'Состояние генерации OpenAI','generation_resumed':'Продолжение без новой генерации','response_validated':'Ответ прошёл проверку'}%}
 {%for e in d.events%}
 <details open><summary>{{e.time}} · {{labels.get(e.payload.event,e.payload.event|default('Событие'))}}</summary>
 {%if e.response_body is defined%}<pre class="audit-json">{{e.response_meta|tojson(indent=2)}}</pre><pre class="audit-json">{{e.response_body}}</pre>

@@ -72,6 +72,11 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
         assert "secret-cookie" not in exported.text
         assert settings.session_secret.get_secret_value() not in exported.text
         assert settings.database_url.get_secret_value() not in exported.text
+        status = client.get("/guide/logs/ivanovo/1/status")
+        assert status.status_code == 200 and status.json()["job"]["stage_label"] == "В очереди"
+        assert "prompt" not in status.text and "private" not in status.text
+        assert client.get("/guide/logs/ivanovo/2/status").status_code == 404
+        assert client.get("/guide/logs/abrau-dyurso/1/status").status_code == 404
         for key in (admin_job["id"], private_id, str(uuid4())):
             assert client.get("/guide/logs/" + key).status_code == 404
             assert client.get("/guide/logs/" + key + ".json").status_code == 404
@@ -80,4 +85,5 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
     disabled = settings.model_copy(update={"public_fill_logs_enabled": False})
     with TestClient(create_app(disabled)) as client:
         assert client.get("/guide/logs").status_code == 404
+        assert client.get("/guide/logs/ivanovo/1/status").status_code == 404
         assert client.get("/guide/logs/" + public_job["id"] + ".json").status_code == 404

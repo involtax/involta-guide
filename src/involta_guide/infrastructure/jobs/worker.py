@@ -10,6 +10,7 @@ from involta_guide.application.services.jobs import JobService
 from involta_guide.config import Settings
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.infrastructure.ai.errors import GenerationPending
 from involta_guide.infrastructure.ai.openai import OpenAIProvider, ProviderUnavailable
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
@@ -42,7 +43,10 @@ class Worker:
         thread = threading.Thread(target=heartbeat, daemon=True)
         thread.start()
         try:
-            self.audit.record(job["id"], "job_started", {"attempt": job["attempts"], "job": job})
+            if not job.get("background_resume"):
+                self.audit.record(
+                    job["id"], "job_started", {"attempt": job["attempts"], "job": job}
+                )
             self.service.process(job)
             self.audit.record(
                 job["id"],
@@ -51,6 +55,8 @@ class Worker:
                     "attempt": job["attempts"],
                 },
             )
+        except GenerationPending as exc:
+            self.queue.defer(job, str(exc))
         except (RuleViolation, Conflict, ValidationError) as exc:
             self.audit.record(
                 job["id"],
@@ -80,7 +86,9 @@ class Worker:
                     "traceback": traceback.format_exc(),
                 },
             )
-            self.queue.fail(job, str(exc), retry=not job.get("_temporary_public_fill", False))
+            self.queue.fail(
+                job, str(exc), retry=exc.retryable and not job.get("_temporary_public_fill", False)
+            )
         except Exception:
             self.audit.record(
                 job["id"],

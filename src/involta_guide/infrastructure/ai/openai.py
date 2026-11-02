@@ -2,23 +2,21 @@ import hashlib
 import json
 import re
 import time
+from contextlib import nullcontext
 from typing import Any
 from uuid import uuid4
 
 import httpx
 from pydantic import BaseModel
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
 
 from involta_guide.application.commands.schemas import AlexCommands, Analysis, Generation
 from involta_guide.application.ports.repositories import Record
 from involta_guide.config import Settings
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.infrastructure.ai.errors import ProviderUnavailable
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
-
-
-class ProviderUnavailable(RuntimeError):
-    pass
 
 
 def provider_error(response: httpx.Response) -> str:
@@ -71,11 +69,13 @@ class OpenAIProvider:
     def close(self) -> None:
         self.client.close()
 
-    def _reserve(self, job_id: str, operation: str, model: str) -> str:
+    def _reserve(
+        self, job_id: str, operation: str, model: str, connection: Connection | None = None
+    ) -> str:
         if not self.settings.openai_api_key.get_secret_value():
             raise RuleViolation("OPENAI_API_KEY не настроен. Добавьте ключ в окружение сервера.")
         key = str(uuid4())
-        with self.engine.begin() as conn:
+        with nullcontext(connection) if connection is not None else self.engine.begin() as conn:
             conn.execute(text("SELECT pg_advisory_xact_lock(47031009)"))
             stats = (
                 conn.execute(
@@ -229,7 +229,13 @@ class OpenAIProvider:
         }
         if search:
             body["tools"] = [{"type": "web_search_preview"}]
-        result = self._request("responses", job_id, selected_model, body=body)
+        if search:
+            from involta_guide.infrastructure.ai.background import BackgroundGeneration
+
+            body.update(background=True, store=True)
+            result = BackgroundGeneration(self).advance(job_id, body)
+        else:
+            result = self._request("responses", job_id, selected_model, body=body)
         output = "".join(
             part.get("text", "")
             for item in result.get("output", [])
@@ -239,7 +245,11 @@ class OpenAIProvider:
         try:
             return dict(json.loads(output))
         except (ValueError, TypeError):
-            raise ProviderUnavailable("ИИ не вернул структурированный JSON") from None
+            from involta_guide.infrastructure.ai.errors import GenerationStopped
+
+            raise GenerationStopped(
+                "ИИ не вернул структурированный JSON; ответ сохранён в логе"
+            ) from None
 
     def generate(self, prompt: str, job_id: str) -> Record:
         with self.engine.connect() as conn:

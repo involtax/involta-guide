@@ -30,13 +30,15 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
         return httpx.Response(
             200,
             json={
+                "id": "resp_model_snapshot",
+                "status": "completed",
                 "output": [
                     {
                         "content": [
                             {"type": "output_text", "text": json.dumps(FakeAI().generate("", ""))}
                         ]
                     }
-                ]
+                ],
             },
         )
 

@@ -173,6 +173,18 @@ def routes(prefix: str) -> APIRouter:
             )
         return JSONResponse(detail, headers={**headers, "Vary": "Cookie"})
 
+    @router.get(prefix + "/logs/{slug}/{number}/status")
+    def log_status(request: Request, slug: str, number: int) -> Response:
+        store = log_store(request)
+        job = store.status(
+            slug,
+            number,
+            public_only=not bool(context(request).security.principal(admin_token(request))),
+        )
+        if job is None:
+            raise HTTPException(404, "Журнал не найден")
+        return JSONResponse({"job": job}, headers={**log_headers, "Vary": "Cookie"})
+
     @router.get(prefix + "/logs/{slug}/{number}/audio")
     def log_audio(request: Request, slug: str, number: int) -> Response:
         require_admin(request)

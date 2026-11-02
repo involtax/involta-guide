@@ -1,7 +1,7 @@
 from base64 import b64decode
 from pathlib import Path
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     worker_heartbeat_file: Path = Path("/tmp/involta-worker-heartbeat")
     lease_seconds: int = 240
     max_job_attempts: int = 3
+    generation_poll_seconds: int = Field(default=10, ge=5, le=300)
+    generation_wait_seconds: int = Field(default=3600, ge=60, le=86400)
+    generation_parallel_limit: int = Field(default=2, ge=1, le=10)
     root_dir: Path = Path(__file__).resolve().parents[2]
 
     @field_validator("release_sha")

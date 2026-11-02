@@ -53,7 +53,7 @@ if args[0]=='inspect':
  sys.exit(0)
 if args[0]=='compose':
  command=next(x for x in args if x in ('up','ps','stop','rm','logs','run'))
- if command=='run' and os.getenv('FAKE_MIGRATION_FAIL')=='1':sys.exit(1)
+ if command=='run' and 'alembic' in args and os.getenv('FAKE_MIGRATION_FAIL')=='1':sys.exit(1)
  if command=='up':
   services=[s for s in ('web','worker') if s in args]
   for service in services:state.setdefault('services',{})[service]={'sha':os.environ['RELEASE_SHA'],'image':os.environ['IMAGE_REF']}

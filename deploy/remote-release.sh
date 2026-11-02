@@ -106,6 +106,8 @@ restore_previous() {
   compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
   wait_health "$previous_sha" "$previous_image" web || return 1
   check_local "$previous_sha" || return 1
+  # An older worker must not turn a pending background GET into another paid POST.
+  compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
   compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
   wait_health "$previous_sha" "$previous_image" worker || return 1
   write_state "$state_file" "$previous_sha" "$previous_image" "$previous_id"

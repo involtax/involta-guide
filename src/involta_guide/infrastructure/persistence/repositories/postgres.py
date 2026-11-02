@@ -96,6 +96,14 @@ class PostgresRepository:
             "SELECT location_slug,number,path FROM request_logs WHERE job_id=:id", {"id": job_id}
         )[0]
 
+    def generation_prompt(self, job_id: str) -> str | None:
+        return self.session.execute(
+            text(
+                "SELECT request_json->'input'->1->>'content' FROM generation_requests WHERE job_id=:id"
+            ),
+            {"id": job_id},
+        ).scalar_one_or_none()
+
     def by_slug(self, slug: str) -> tuple[Record, bool] | None:
         direct = self.query("SELECT * FROM locations WHERE slug=:slug AND active=1", {"slug": slug})
         if direct:

@@ -13,9 +13,13 @@ from involta_guide.config import Settings
 
 HISTORY = """WITH numbered AS (
  SELECT j.*,l.name location_name,r.location_slug,r.number ordinal,r.path log_path,
+ g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
+ EXISTS(SELECT 1 FROM audit published WHERE published.action='ai_result' AND published.target=j.id::text
+   AND published.detail::jsonb->'data'->>'version_id'=l.published_version::text) result_published,
  (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
  (SELECT u.model FROM ai_usage u WHERE u.job_id=j.id ORDER BY u.created_at,u.id LIMIT 1) actual_model
  FROM jobs j JOIN request_logs r ON r.job_id=j.id JOIN locations l ON l.slug=r.location_slug
+ LEFT JOIN generation_requests g ON g.job_id=j.id
 ), history AS (
  SELECT *,ordinal run_number,
  coalesce(generation_config->>'model',actual_model,'') model_name FROM numbered
@@ -123,6 +127,45 @@ class AIAudit:
 
     @staticmethod
     def _job(job: dict[str, Any]) -> dict[str, Any]:
+        state = job.get("generation_state")
+        labels = {
+            "queued": "В очереди",
+            "running": "Обрабатывается",
+            "failed": "Ошибка",
+            "done": "Готово",
+            "cancelled": "Остановлено",
+        }
+        job["stage_label"] = labels.get(job["status"], job["status"])
+        if job["kind"] == "generate":
+            if job["status"] == "done":
+                job["stage_label"] = (
+                    "Опубликовано"
+                    if job.get("result_published")
+                    else "Черновик создан; ещё не опубликован"
+                )
+            elif job["status"] != "cancelled" and state:
+                job["stage_label"] = {
+                    "submitting": "Отправляется в OpenAI",
+                    "queued": "В очереди OpenAI",
+                    "in_progress": "OpenAI выполняет запрос",
+                    "unknown": "Исход отправки неизвестен",
+                    "paused": "Ожидание приостановлено; запрос сохранён",
+                    "unavailable": "Не удалось получить сохранённый ответ",
+                    "failed": "OpenAI отклонил или завершил запрос с ошибкой",
+                    "cancelled": "OpenAI отменил запрос",
+                    "incomplete": "OpenAI вернул незавершённый ответ",
+                    "completed": "Ответ сохранён; проверка или применение не прошли"
+                    if job["status"] == "failed"
+                    else "Ответ сохранён; проверяется",
+                }.get(state, job["stage_label"])
+                if job["status"] == "failed" and state in ("queued", "in_progress"):
+                    job["stage_label"] = "Обработка остановлена; запрос OpenAI сохранён"
+        job["can_resume"] = (
+            job["status"] == "failed"
+            and not job["applied"]
+            and bool(job.get("response_id"))
+            and state in ("completed", "paused", "unavailable", "queued", "in_progress")
+        )
         return job
 
     def resolve(self, slug: str, number: int, *, public_only: bool = False) -> str | None:
@@ -136,6 +179,27 @@ class AIAudit:
                 {"slug": slug, "number": number},
             ).scalar_one_or_none()
         return str(value) if value else None
+
+    def status(self, slug: str, number: int, *, public_only: bool = False) -> dict[str, Any] | None:
+        job_id = self.resolve(slug, number, public_only=public_only)
+        if not job_id:
+            return None
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    text(
+                        HISTORY
+                        + """SELECT j.kind,j.status,j.error,j.applied,
+                j.generation_state,j.response_id,j.poll_count,j.result_published,j.log_path,
+                j.location_slug FROM history j WHERE j.id=:id"""
+                        + (" AND " + PUBLIC_GENERATION if public_only else "")
+                    ),
+                    {"id": job_id},
+                )
+                .mappings()
+                .first()
+            )
+        return self.clean(self._job(dict(row))) if row else None
 
     def detail(self, job_id: str, *, public_only: bool = False) -> dict[str, Any] | None:
         with self.engine.connect() as conn:

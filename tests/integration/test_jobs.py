@@ -298,6 +298,8 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
         return httpx.Response(
             200,
             json={
+                "id": "resp_budget",
+                "status": "completed",
                 "usage": {"input_tokens": 100, "output_tokens": 50},
                 "output": [{"content": [{"type": "output_text", "text": '{"ok":true}'}]}],
             },
@@ -306,8 +308,9 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
     provider.client.close()
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     assert provider.generate("test prompt", job["id"]) == {"ok": True}
+    assert provider.generate("test prompt", job["id"]) == {"ok": True}
     with pytest.raises(ValueError):
-        provider.generate("another", job["id"])
+        provider.generate("another", str(uuid4()))
     usage = queries.rows("ai_usage")[0]
     assert usage["input_tokens"] == 100 and usage["output_tokens"] == 50
     assert usage["estimated_cost_usd"] == 0.0002

@@ -26,6 +26,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     response["intro"] = "<script>alert('xss')</script> sk-private-never-store"
     envelope = {
         "id": "resp_test_full_response",
+        "status": "completed",
         "usage": {"input_tokens": 125, "output_tokens": 256},
         "output": [{"content": [{"type": "output_text", "text": json.dumps(response)}]}],
     }
@@ -52,7 +53,13 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     assert detail["trace_available"]
     events = [e["payload"] for e in detail["events"]]
     assert {e["event"] for e in events[:2]} == {"temporary_public_fill", "generation_run"}
-    assert [e["event"] for e in events[2:]] == ["job_started", "request", "response", "job_failed"]
+    assert [e["event"] for e in events[2:]] == [
+        "job_started",
+        "request",
+        "response",
+        "generation_status",
+        "job_failed",
+    ]
     request = next(e for e in events if e["event"] == "request")
     assert request["data"]["json"]["tools"] == [{"type": "web_search_preview"}]
     assert "Иваново" in request["data"]["json"]["input"][1]["content"]

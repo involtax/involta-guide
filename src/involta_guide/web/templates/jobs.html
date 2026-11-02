@@ -3,7 +3,7 @@
 <h2>Очередь</h2>
 {%for j in jobs%}
 <article class="panel">
-<strong>{{j.location_name}}{%if j.run_number%} / {{j.run_number}}{%endif%} · {{j.status}}</strong>
+<strong>{{j.location_name}}{%if j.run_number%} / {{j.run_number}}{%endif%} · {{j.stage_label}}</strong>
 <p>{{j.model_name}} · попыток {{j.attempts}} · {{j.error or ''}}</p>
 <a href="{{settings.path(j.log_path)}}" hx-boost="false">Лог {{j.location_slug}}/{{j.run_number}} ↗</a>
 {%if j.kind=='generate'%}

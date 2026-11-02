@@ -240,6 +240,9 @@ class JobService:
     def cancel(self) -> None:
         with self.uow() as uow:
             for row in uow.repo.rows("jobs", {"status": "queued"}, limit=100000):
+                # Deferred background work is already executing at OpenAI.
+                if row["kind"] == "generate" and row["started_at"]:
+                    continue
                 uow.repo.change(
                     "jobs", row["id"], {"status": "cancelled", "finished_at": datetime.now(UTC)}
                 )
@@ -255,9 +258,12 @@ class JobService:
     def process(self, job: Record) -> None:
         with self.uow() as uow:
             location = require(uow.repo, "locations", job["location_id"])
+            saved_prompt = (
+                uow.repo.generation_prompt(job["id"]) if job["kind"] == "generate" else None
+            )
             is_public = job["kind"] == "generate" and self._is_public_fill(uow.repo, job["id"])
             job["_temporary_public_fill"] = is_public
-            if is_public:
+            if is_public and saved_prompt is None:
                 if not self.public_fill_enabled:
                     raise RuleViolation("Временное наполнение отключено")
                 if self._has_data(location):
@@ -271,11 +277,12 @@ class JobService:
             review = require(uow.repo, "reviews", job["review_id"]) if job["review_id"] else None
             config = self.generation_config(uow.repo, job["id"])
             generation_model = config.get("model", self.provider.model)
-            if (
+            baseline_changed = (
                 job["kind"] == "generate"
                 and "baseline_version" in config
                 and config["baseline_version"] != baseline
-            ):
+            )
+            if baseline_changed and saved_prompt is None:
                 raise Conflict("Черновик изменён после постановки запроса. Создайте новый запрос.")
         if job["kind"] == "generate":
             scope = (
@@ -304,9 +311,18 @@ class JobService:
                 default=str,
                 ensure_ascii=False,
             )
+            prompt = saved_prompt or prompt
             generated = Generation.model_validate(
                 self.provider.generate(prompt, job["id"])
             ).model_dump(mode="json", exclude_none=True)
+            # Finish retrieving an already-paid response even if an editor changed the page.
+            # Save it for audit, but never overwrite the editor's new version.
+            if baseline_changed:
+                raise Conflict(
+                    "Ответ сохранён, но черновик изменён после постановки запроса. Автоматическое применение отменено."
+                )
+            if is_public and not self.public_fill_enabled:
+                raise RuleViolation("Ответ сохранён; временное наполнение отключено")
             result = rank(generated, location["top_limit"])
             ContentInput.model_validate(result)
             with self.uow() as uow:
@@ -332,6 +348,9 @@ class JobService:
                 if is_public:
                     publish(repo, location["id"], version_id, None)
                     repo.audit("temporary_public_fill_published", location["id"], version_id)
+                repo.audit(
+                    "ai_trace", job["id"], json.dumps({"event": "response_validated", "data": {}})
+                )
                 repo.audit(
                     "ai_result",
                     job["id"],

@@ -243,6 +243,17 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 assert json.loads(config["detail"])["model"] == "gpt-6-astra"
                 page.goto(base + "/logs/ivanovo/3")
                 expect(page.get_by_role("heading", name="Иваново / 3", exact=False)).to_be_visible()
+                # Status updates without navigation or replacing the model selection form.
+                with PostgresUow(engine) as tx:
+                    tx.repo.change(
+                        "jobs",
+                        new_job["id"],
+                        {"status": "failed", "error": "Проверка живого статуса"},
+                    )
+                expect(page.locator("#log-live [data-error]")).to_have_text(
+                    "Проверка живого статуса", timeout=15000
+                )
+                expect(page.locator("#log-live [data-stage]")).to_have_text("Ошибка")
                 expect(page.get_by_role("link", name="Скачать полный JSON ↗")).to_have_attribute(
                     "href", "/guide/logs/ivanovo/3.json?download=1"
                 )

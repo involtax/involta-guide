@@ -377,6 +377,16 @@ def routes(prefix: str) -> APIRouter:
                 detail = AIAudit(ctx.engine, ctx.settings).detail(new_id)
                 assert detail is not None
                 return log_redirect(request, detail["job"]["log_path"])
+            if action == "resume-generation":
+                from involta_guide.infrastructure.ai.background import resume_generation
+
+                job_id = submitted_log(request, form)
+                resume_generation(ctx.engine, job_id, ctx.settings.generation_wait_seconds)
+                store = AIAudit(ctx.engine, ctx.settings)
+                store.record(job_id, "generation_resumed", {"new_generation": False})
+                detail = store.detail(job_id)
+                assert detail is not None
+                return log_redirect(request, detail["job"]["log_path"])
             if action == "generate":
                 count = ctx.jobs.enqueue(
                     uid(location) if location else None,
