@@ -1,18 +1,33 @@
-name: Python checks
+name: Test and publish SHA image
 on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      sha:
+        required: true
+        type: string
+    outputs:
+      sha:
+        value: ${{ jobs.verify.outputs.sha }}
+      image:
+        value: ${{ jobs.verify.outputs.image }}
+      digest:
+        value: ${{ jobs.publish.outputs.digest }}
 permissions:
   contents: read
+# Never cancel a workflow while it might be changing production.
 concurrency:
-  group: checks-${{ github.ref }}
-  cancel-in-progress: true
+  group: checks-${{ github.event_name }}-${{ github.ref }}-${{ inputs.sha || github.sha }}
+  cancel-in-progress: false
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+      image: ${{ steps.revision.outputs.image }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -30,20 +45,61 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-with-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: revision
+        name: Resolve and validate immutable revision
+        env:
+          REQUESTED_SHA: ${{ inputs.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          if [[ -n "$REQUESTED_SHA" ]]; then
+            [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ && "$sha" == "$REQUESTED_SHA" ]]
+            git merge-base --is-ancestor "$sha" origin/main
+          fi
+          printf 'sha=%s\nimage=ghcr.io/%s\n' "$sha" "${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.12.23"
           enable-cache: true
       - run: uv sync --frozen
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: uv run ruff check src tests migrations
-      - run: uv run ruff format --check src tests migrations
+      - run: uv run ruff check src tests migrations deploy
+      - run: uv run ruff format --check src tests migrations deploy
       - run: uv run mypy
       - run: uv run playwright install --with-deps chromium
-      - run: uv run pytest -q
+      - run: uv run pytest -q tests/unit tests/integration tests/e2e tests/deployment
         env:
           CHROMIUM_PATH: ""
-      - run: docker build -t involta-guide:ci .
+      - name: Build production image (also for pull requests)
+        run: docker build -t involta-guide:ci .
+      - name: Validate generated routes with real nginx
+        run: uv run python tests/deployment/nginx_smoke.py
+      - name: Check deployment shell scripts
+        run: |
+          bash -n deploy/*.sh
+          shellcheck --severity=warning deploy/*.sh
+      - run: uv run python -m compileall -q deploy
+      - name: Validate workflows
+        env:
+          GOTOOLCHAIN: auto
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Validate production Compose files
+        env:
+          IMAGE_REF: ghcr.io/involtax/involta-guide@sha256:1111111111111111111111111111111111111111111111111111111111111111
+          POSTGRES_IMAGE: postgres@sha256:2222222222222222222222222222222222222222222222222222222222222222
+          RELEASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DEPLOY_ROOT: /tmp/guide-compose-check
+          AUDIO_VOLUME: guide-test-audio
+          NGINX_NETWORK: guide-test-network
+        run: |
+          mkdir -p "$DEPLOY_ROOT"
+          touch "$DEPLOY_ROOT/.env.production" "$DEPLOY_ROOT/.env.database"
+          for file in deploy/compose*.yaml; do docker compose -f "$file" config --quiet; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,3 +107,38 @@ jobs:
           path: var/screenshots/
           if-no-files-found: ignore
           retention-days: 7
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    concurrency:
+      group: ghcr-${{ needs.verify.outputs.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ needs.verify.outputs.image }}:${{ needs.verify.outputs.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.verify.outputs.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

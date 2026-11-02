@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?}
+    container_name: involta-guide-postgres
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    network_mode: host
+    env_file: ${DEPLOY_ROOT:?}/.env.database
+    command: ["postgres", "-p", "15432", "-c", "listen_addresses=127.0.0.1"]
+    volumes: ["database:/var/lib/postgresql/data"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 15432 -U guide -d guide"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+volumes:
+  database:
+    external: true
+    name: involta-guide-postgres-data
