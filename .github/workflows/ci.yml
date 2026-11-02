@@ -80,7 +80,9 @@ jobs:
       - name: Validate generated routes with real nginx
         run: uv run python tests/deployment/nginx_smoke.py
       - name: Check deployment shell scripts
-        run: bash -n deploy/*.sh
+        run: |
+          bash -n deploy/*.sh
+          shellcheck --severity=warning deploy/*.sh
       - run: uv run python -m compileall -q deploy
       - name: Validate workflows
         env:

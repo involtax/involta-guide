@@ -35,7 +35,7 @@ if Path(sys.argv[0]).name=='curl':
   print('200 '+mime)
  sys.exit(0)
 if args[0]=='login':sys.stdin.read();sys.exit(0)
-if args[0]=='pull':time.sleep(float(os.getenv('FAKE_PULL_SLEEP','0')));sys.exit(0)
+if args[0]=='pull':time.sleep(float(os.getenv('FAKE_PULL_SLEEP','0')));sys.exit(1 if args[-1]==os.getenv('FAKE_PULL_FAIL_IMAGE') else 0)
 if args[:2]==['volume','inspect']:sys.exit(0)
 if args[:2]==['image','inspect']:print(state['labels'][args[-1]]);sys.exit(0)
 if args[0]=='inspect':
@@ -247,3 +247,12 @@ def test_wrong_asset_response_triggers_rollback(tmp_path):
     result = deploy(root, {**env, "FAKE_BAD_ASSET": "style.css", "FAKE_BAD_ASSET_SHA": B}, B, "2-1")
     assert result.returncode != 0
     assert json.loads(state.read_text())["services"]["web"]["sha"] == A
+
+
+def test_rollback_uses_cached_previous_image_if_registry_is_unavailable(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    result = deploy(root, {**env, "FAKE_FAIL_SHA": B, "FAKE_PULL_FAIL_IMAGE": IMAGES[A]}, B, "2-1")
+    assert result.returncode != 0
+    assert "Rollback to " + A + " succeeded" in result.stderr
+    assert (root / "current-release").read_text().split()[0] == A

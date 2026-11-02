@@ -30,7 +30,7 @@ while IFS='=' read -r key value || [[ -n "$key" ]]; do
     BASE_PATH) BASE_PATH=$value ;;
     NGINX_NETWORK) NGINX_NETWORK=$value ;;
     NETWORK_MODE) NETWORK_MODE=$value ;;
-    POSTGRES_IMAGE) POSTGRES_IMAGE=$value ;;
+    POSTGRES_IMAGE) [[ "$value" =~ ^postgres@sha256:[0-9a-f]{64}$ ]] || exit 2 ;;
     *) echo "Unknown deploy.env field: $key" >&2; exit 2 ;;
   esac
 done < "$DEPLOY_ROOT/deploy.env"
@@ -92,7 +92,7 @@ write_state() {
 restore_previous() {
   [[ -n "$previous_sha" ]] || return 1
   echo "Restoring previous release $previous_sha"
-  timeout 300 docker pull "$previous_image" >/dev/null || return 1
+  docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
   compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
   wait_health "$previous_sha" "$previous_image" web || return 1
   check_local "$previous_sha" || return 1
