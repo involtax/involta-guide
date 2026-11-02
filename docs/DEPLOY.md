@@ -198,3 +198,9 @@ backup path и результатом rollback. Summary содержит commit 
 Этот режим выполняет только инвентаризацию ОС, служб, портов и Nginx/контейнеров,
 без сборки образов, установки пакетов, изменения конфигураций или reload.
 Env и полные конфигурации не выводятся; результат — artifact `server-inventory`.
+
+Docker в LXC: bootstrap определяет LXC и использует для своих контейнеров
+`apparmor=unconfined`, поскольку вложенный daemon не может загружать docker-default
+в ядро внешнего хоста. Внешний LXC-профиль и глобальная конфигурация Docker не
+изменяются; seccomp, no-new-privileges, UID 10001 и dropped capabilities web/worker
+сохраняются. Выбранный профиль записывается в deploy.env и применяется при обновлениях.

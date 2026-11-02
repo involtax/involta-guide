@@ -9,7 +9,7 @@ services:
     env_file: ${DEPLOY_ROOT:?}/.env.database
     command: ["postgres", "-p", "15432", "-c", "listen_addresses=127.0.0.1"]
     volumes: ["database:/var/lib/postgresql/data"]
-    security_opt: ["no-new-privileges:true"]
+    security_opt: ["no-new-privileges:true", "apparmor=${GUIDE_APPARMOR_PROFILE:-docker-default}"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 15432 -U guide -d guide"]
       interval: 3s

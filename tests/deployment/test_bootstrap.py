@@ -574,3 +574,55 @@ def test_external_proxy_saved_options_match_application_binding(tmp_path, monkey
 def test_external_port_is_validated_before_provisioning(port):
     with pytest.raises(bootstrap.Failure, match="HTTP port"):
         bootstrap.validate_request(request(proxy_mode="external", http_port=port))
+
+
+def test_lxc_uses_scoped_apparmor_compatibility(monkeypatch):
+    monkeypatch.setattr(
+        bootstrap, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "lxc\n", "")
+    )
+    assert bootstrap.detect_apparmor_profile() == "unconfined"
+
+
+def test_native_apparmor_profile_is_preserved(monkeypatch):
+    monkeypatch.setattr(
+        bootstrap, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, "none\n", "")
+    )
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda _: "/bin/docker")
+    monkeypatch.setattr(
+        bootstrap,
+        "docker",
+        lambda *a, **k: subprocess.CompletedProcess(
+            a, 0, '["name=apparmor,profile=default","name=seccomp,profile=builtin"]', ""
+        ),
+    )
+    assert bootstrap.detect_apparmor_profile() == "docker-default"
+
+
+def test_failed_first_install_can_add_runtime_profile_without_changing_secrets(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / "guide"
+    root.mkdir()
+    monkeypatch.setattr(bootstrap, "ROOT", root)
+    monkeypatch.setattr(bootstrap, "owned", lambda *a: False)
+    monkeypatch.setattr(
+        bootstrap, "docker", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", "")
+    )
+    original = external_request()
+    bootstrap.initialize(original, "host")
+    secrets_before = {
+        name: (root / name).read_bytes() for name in (".env.database", ".env.production")
+    }
+    path = root / "deploy.env"
+    path.write_text(
+        "\n".join(
+            line
+            for line in path.read_text().splitlines()
+            if not line.startswith("GUIDE_APPARMOR_PROFILE=")
+        )
+        + "\n"
+    )
+    bootstrap.initialize({**original, "apparmor_profile": "unconfined"}, "host")
+    assert "GUIDE_APPARMOR_PROFILE=unconfined\n" in path.read_text()
+    for name, before in secrets_before.items():
+        assert (root / name).read_bytes() == before

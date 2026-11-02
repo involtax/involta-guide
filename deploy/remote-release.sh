@@ -21,13 +21,14 @@ fi
 exec 9>"$DEPLOY_ROOT/deploy.lock"
 flock --wait 300 9 || { echo 'Another server deployment holds the lock' >&2; exit 1; }
 # Parse only non-secret deployment options, never source an env file as shell code.
-AUDIO_VOLUME=''; GUIDE_HTTP_PORT=3000; BASE_PATH=/guide; NGINX_NETWORK=involta-guide-frontend; NETWORK_MODE=bridge; GUIDE_BIND_ADDRESS=127.0.0.1
+AUDIO_VOLUME=''; GUIDE_HTTP_PORT=3000; BASE_PATH=/guide; NGINX_NETWORK=involta-guide-frontend; NETWORK_MODE=bridge; GUIDE_BIND_ADDRESS=127.0.0.1; GUIDE_APPARMOR_PROFILE=docker-default
 while IFS='=' read -r key value || [[ -n "$key" ]]; do
   [[ -z "$key" || "$key" == \#* ]] && continue
   case "$key" in
     AUDIO_VOLUME) AUDIO_VOLUME=$value ;;
     GUIDE_HTTP_PORT) GUIDE_HTTP_PORT=$value ;;
     GUIDE_BIND_ADDRESS) GUIDE_BIND_ADDRESS=$value ;;
+    GUIDE_APPARMOR_PROFILE) GUIDE_APPARMOR_PROFILE=$value ;;
     BASE_PATH) BASE_PATH=$value ;;
     NGINX_NETWORK) NGINX_NETWORK=$value ;;
     NETWORK_MODE) NETWORK_MODE=$value ;;
@@ -40,6 +41,8 @@ done < "$DEPLOY_ROOT/deploy.env"
 [[ "$NGINX_NETWORK" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]] || exit 2
 [[ "$NETWORK_MODE" == host || "$NETWORK_MODE" == bridge ]] || exit 2
 [[ "$GUIDE_BIND_ADDRESS" == 127.0.0.1 || "$GUIDE_BIND_ADDRESS" == 0.0.0.0 ]] || exit 2
+[[ "$GUIDE_APPARMOR_PROFILE" == docker-default || "$GUIDE_APPARMOR_PROFILE" == unconfined ]] || exit 2
+export GUIDE_APPARMOR_PROFILE
 export DEPLOY_ROOT AUDIO_VOLUME GUIDE_HTTP_PORT GUIDE_BIND_ADDRESS BASE_PATH NGINX_NETWORK NETWORK_MODE
 # Registry credentials live in a private temporary config and are removed on exit.
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS DOCKER_TLS_VERIFY DOCKER_CERT_PATH

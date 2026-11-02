@@ -200,10 +200,29 @@ def nginx_candidates():
     return command, target, original, proposed, frontend, container
 
 
+def detect_apparmor_profile():
+    result = run(["systemd-detect-virt", "--container"], check=False)
+    if result.stdout.strip() == "lxc":
+        return "unconfined"
+    if shutil.which("docker"):
+        result = docker("info", "--format", "{{json .SecurityOptions}}", check=False)
+        if result.returncode == 0:
+            try:
+                options = json.loads(result.stdout)
+                if isinstance(options, list) and not any(
+                    "name=apparmor" in item for item in options
+                ):
+                    return "unconfined"
+            except ValueError:
+                pass
+    return "docker-default"
+
+
 def runtime_options(request, frontend):
     external = request.get("proxy_mode", "local") == "external"
     return {
         "AUDIO_VOLUME": "involta-guide-audio",
+        "GUIDE_APPARMOR_PROFILE": request.get("apparmor_profile", "docker-default"),
         "GUIDE_HTTP_PORT": str(request.get("http_port", 3001) if external else 3080),
         "GUIDE_BIND_ADDRESS": "0.0.0.0" if external else "127.0.0.1",
         "BASE_PATH": "/guide",
@@ -549,7 +568,18 @@ def initialize(request, frontend, container=None):
     options = {**runtime_options(request, frontend), "POSTGRES_IMAGE": request["postgres_image"]}
     contents = "".join(f"{key}={value}\n" for key, value in options.items())
     if env_file.exists() and env_file.read_text() != contents:
-        raise Failure("Existing deployment options differ; refusing to overwrite them")
+        old_options = dict(
+            line.split("=", 1) for line in env_file.read_text().splitlines() if "=" in line
+        )
+        # Upgrade only the newly introduced runtime option after a failed initial bootstrap.
+        expected_old = {
+            key: value for key, value in options.items() if key != "GUIDE_APPARMOR_PROFILE"
+        }
+        if old_options != expected_old:
+            raise Failure("Existing deployment options differ; refusing to overwrite them")
+        temporary = ROOT / "deploy.env.upgrade"
+        write_private(temporary, contents)
+        temporary.replace(env_file)
     if not env_file.exists():
         write_private(env_file, contents)
     shutil.copyfile(
@@ -604,6 +634,8 @@ def bootstrap(request):
         try:
             release, nginx, homepage, present, compose_present = preflight(request)
             command, target, original, proposed, frontend, container = nginx
+            request = {**request, "apparmor_profile": detect_apparmor_profile()}
+            report["container_apparmor_profile"] = request["apparmor_profile"]
             report.update(
                 {
                     "os": release["PRETTY_NAME"],
@@ -685,7 +717,9 @@ def bootstrap(request):
                     "run",
                     "--rm",
                     "--network",
-                    "none",
+                    "host" if frontend == "host" else "none",
+                    "--security-opt",
+                    "apparmor=" + request["apparmor_profile"],
                     "--user",
                     "0:0",
                     "--entrypoint",
@@ -738,6 +772,7 @@ def bootstrap(request):
                     "proxy_mode": "external" if external else "local",
                     "http_port": request.get("http_port", 3001),
                     "trusted_proxy_ips": request.get("trusted_proxy_ips", ""),
+                    "apparmor_profile": request["apparmor_profile"],
                 }
                 if not external:
                     report["stage"] = "backup/test/reload nginx"
@@ -870,6 +905,7 @@ def rollback_bootstrap(request):
             **request,
             "proxy_mode": state.get("proxy_mode", "local"),
             "http_port": state.get("http_port", 3001),
+            "apparmor_profile": state.get("apparmor_profile", "docker-default"),
         }
         if baseline() != state["homepage"]:
             raise Failure("Main site did not return to baseline after nginx rollback")

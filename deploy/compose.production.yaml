@@ -15,7 +15,7 @@ services:
     read_only: true
     tmpfs: ["/tmp:mode=1777"]
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    security_opt: ["no-new-privileges:true", "apparmor=${GUIDE_APPARMOR_PROFILE:-docker-default}"]
     stop_grace_period: 30s
     healthcheck:
       interval: 5s
@@ -37,7 +37,7 @@ services:
     read_only: true
     tmpfs: ["/tmp:mode=1777"]
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    security_opt: ["no-new-privileges:true", "apparmor=${GUIDE_APPARMOR_PROFILE:-docker-default}"]
     stop_grace_period: 240s
     healthcheck:
       test: ["CMD", "guide", "worker-health"]
