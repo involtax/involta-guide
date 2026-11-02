@@ -222,6 +222,45 @@ def validate_request(request):
         raise Failure("ALEX_SECRET must be a string")
 
 
+def validate_os_release(release):
+    name = release.get("PRETTY_NAME", release.get("ID", "unknown"))
+    print(
+        f"Detected OS: {name}; ID={release.get('ID')}; VERSION_ID={release.get('VERSION_ID')}; codename={release.get('VERSION_CODENAME')}",
+        flush=True,
+    )
+    if release.get("ID") not in ("ubuntu", "debian"):
+        raise Failure(
+            f"Unsupported package manager for {name}; bootstrap requires Ubuntu/Debian APT; no changes made"
+        )
+    if not release.get("VERSION_CODENAME", "").isalnum():
+        raise Failure(f"Cannot determine safe OS codename for {name}; no changes made")
+
+
+def check_docker_repository(release):
+    url = f"https://download.docker.com/linux/{release['ID']}/dists/{release['VERSION_CODENAME']}/Release"
+    result = run(
+        [
+            "curl",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--head",
+            "--max-time",
+            "20",
+            "--output",
+            "/dev/null",
+            "--write-out",
+            "%{http_code}",
+            url,
+        ],
+        check=False,
+    )
+    if result.returncode or result.stdout.strip() != "200":
+        raise Failure(
+            f"Official Docker repository unavailable: {url} (HTTP {result.stdout.strip() or 'unknown'}); no package changes made"
+        )
+
+
 def preflight(request):
     validate_request(request)
     if os.geteuid() != 0:
@@ -235,13 +274,7 @@ def preflight(request):
         if "=" in line
     )
     release = {k: v.strip('"') for k, v in release.items()}
-    supported = {"ubuntu": {"22.04", "24.04"}, "debian": {"12", "13"}}
-    if release.get("VERSION_ID") not in supported.get(release.get("ID"), set()):
-        raise Failure(
-            "Supported bootstrap OS: Ubuntu 22.04/24.04 or Debian 12/13; no package changes made"
-        )
-    if not release.get("VERSION_CODENAME", "").isalnum():
-        raise Failure("Cannot determine OS codename")
+    validate_os_release(release)
     if not Path("/run/systemd/system").exists():
         raise Failure("Bootstrap requires systemd; refusing to change another init system")
     if ROOT.is_symlink() or (ROOT.exists() and not (ROOT / ".bootstrap-owner").is_file()):
@@ -273,7 +306,9 @@ def preflight(request):
                     raise Failure(
                         "Existing database volume has no credential files; refusing to replace credentials"
                     )
-    if not docker_present or docker("compose", "version", check=False).returncode:
+    compose_present = docker_present and docker("compose", "version", check=False).returncode == 0
+    if not docker_present or not compose_present:
+        check_docker_repository(release)
         if POLICY.exists():
             raise Failure(
                 "Existing policy-rc.d requires operator-specific package handling; no changes made"
@@ -307,7 +342,6 @@ def preflight(request):
         raise Failure("Less than 3 GiB available in /opt")
     home = baseline()
     # Detect distro/conflicting installs before apt is allowed to change anything.
-    compose_present = docker_present and docker("compose", "version", check=False).returncode == 0
     installed = run(["dpkg-query", "-W", "-f=${Package} ${Status}\n"], check=False).stdout
     conflicts = [
         line.split()[0]

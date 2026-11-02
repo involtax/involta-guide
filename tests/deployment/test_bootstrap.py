@@ -435,3 +435,46 @@ def test_arbitrary_alex_secret_survives_production_environment(tmp_path, monkeyp
     assert base64.b64decode(values["ALEX_SECRET_BASE64"]).decode("utf-8") == secret
     configured = Settings(_env_file=root / ".env.production")
     assert configured.alex_secret.get_secret_value() == secret
+
+
+@pytest.mark.parametrize(
+    "family,version,codename",
+    [
+        ("ubuntu", "20.04", "focal"),
+        ("ubuntu", "25.10", "questing"),
+        ("ubuntu", "26.04", "resolute"),
+        ("debian", "11", "bullseye"),
+        ("debian", "13", "trixie"),
+    ],
+)
+def test_os_detection_uses_family_and_repository_not_fixed_version_list(family, version, codename):
+    bootstrap.validate_os_release(
+        {"ID": family, "VERSION_ID": version, "VERSION_CODENAME": codename}
+    )
+
+
+@pytest.mark.parametrize(
+    "release",
+    [
+        {"ID": "fedora", "VERSION_CODENAME": "x"},
+        {"ID": "ubuntu", "VERSION_CODENAME": "../noble"},
+        {"ID": "debian"},
+    ],
+)
+def test_unsupported_package_manager_or_unsafe_codename_still_stops(release):
+    with pytest.raises(bootstrap.Failure):
+        bootstrap.validate_os_release(release)
+
+
+def test_official_repository_unavailable_fails_without_installing_packages(monkeypatch):
+    calls = []
+
+    def missing(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 22, "404", "")
+
+    monkeypatch.setattr(bootstrap, "run", missing)
+    with pytest.raises(bootstrap.Failure, match="Official Docker repository unavailable"):
+        bootstrap.check_docker_repository({"ID": "ubuntu", "VERSION_CODENAME": "focal"})
+    assert len(calls) == 1 and calls[0][0] == "curl"
+    assert calls[0][-1] == "https://download.docker.com/linux/ubuntu/dists/focal/Release"
