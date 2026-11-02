@@ -177,3 +177,8 @@ backup path и результатом rollback. Summary содержит commit 
 проверяются с fake Docker/curl. CI также проверяет Compose, actionlint и Docker build.
 Это **не** утверждение, что production уже настроен: первый реальный запуск выполняется
 вручную через Run workflow после слияния изменений в main.
+
+Для быстрой диагностики в Bootstrap production можно включить `inspect_only`.
+Этот режим выполняет только инвентаризацию ОС, служб, портов и Nginx/контейнеров,
+без сборки образов, установки пакетов, изменения конфигураций или reload.
+Env и полные конфигурации не выводятся; результат — artifact `server-inventory`.

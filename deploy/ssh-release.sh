@@ -7,13 +7,17 @@ mode=${1:-deploy}
 : "${DEPLOY_SSH_USER:?Set repository secret DEPLOY_USER}"
 : "${DEPLOY_SSH_KEY:?Set repository secret DEPLOY_SSH_KEY}"
 DEPLOY_SSH_KNOWN_HOSTS=${DEPLOY_SSH_KNOWN_HOSTS:-}
-: "${TARGET_SHA:?}" "${IMAGE_REF:?}" "${GHCR_TOKEN:?}" "${GITHUB_ACTOR:?}" "${GITHUB_RUN_ID:?}"
+: "${GITHUB_RUN_ID:?}"
+if [[ "$mode" != inspect ]]; then
+  : "${TARGET_SHA:?}" "${IMAGE_REF:?}" "${GHCR_TOKEN:?}" "${GITHUB_ACTOR:?}"
+  [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 2
+fi
 DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT:-22}; DEPLOY_ROOT=${DEPLOY_ROOT:-/opt/involta-guide}
 PUBLIC_URL=${PUBLIC_URL:-https://involta.ru/guide/}
-[[ "$mode" == deploy || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback ]] || exit 2
+[[ "$mode" == deploy || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect ]] || exit 2
 [[ "$DEPLOY_SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ && "$DEPLOY_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 2
 (( DEPLOY_SSH_PORT > 0 && DEPLOY_SSH_PORT < 65536 )) || exit 2
-[[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ && "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 2
+[[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || exit 2
 [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]] || exit 2
 work=$(mktemp -d)
 remote_dir="/tmp/involta-guide-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
@@ -29,12 +33,18 @@ else
   echo 'SSH host-key verification: temporarily disabled' >&2
 fi
 unset DEPLOY_SSH_KEY DEPLOY_SSH_KNOWN_HOSTS
+remote_created=0
 cleanup() {
-  ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "rm -rf -- '$remote_dir'" </dev/null >/dev/null 2>&1 || true
+  if [[ "$remote_created" == 1 ]]; then ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "rm -rf -- '$remote_dir'" </dev/null >/dev/null 2>&1 || true; fi
   rm -rf -- "$work"
 }
 trap cleanup EXIT
+if [[ "$mode" == inspect ]]; then
+  ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" 'python3 -' < deploy/inspect-production.py
+  exit 0
+fi
 ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "umask 077; mkdir '$remote_dir'"
+remote_created=1
 scp "${opts[@]}" -P "$DEPLOY_SSH_PORT" deploy/remote-release.sh deploy/check-release.sh deploy/compose.production.yaml deploy/compose.database.yaml deploy/compose.host.yaml deploy/compose.database-host.yaml deploy/bootstrap-production.py deploy/nginx_config.py "$remote:$remote_dir/"
 # Check privilege before executing any production tooling. No password prompts.
 privilege=$(ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" 'if [ "$(id -u)" = 0 ]; then echo root; elif command -v sudo >/dev/null && sudo -n true; then echo sudo; else echo "Root or passwordless sudo is required" >&2; exit 1; fi')

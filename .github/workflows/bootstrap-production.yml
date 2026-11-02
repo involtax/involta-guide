@@ -6,6 +6,11 @@ on:
         description: "Optional commit SHA; leave empty to deploy current main"
         required: false
         type: string
+      inspect_only:
+        description: "Read-only server inventory; do not install or deploy anything"
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: read
 # Explicit bash enables -e -o pipefail; tee must never hide an SSH/rollback failure.
@@ -17,8 +22,30 @@ concurrency:
   group: involta-guide-production
   cancel-in-progress: false
 jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main' && inputs.inspect_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: prod
+    env:
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read-only service, network and nginx inventory
+        run: bash deploy/ssh-release.sh inspect | tee server-inventory.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-inventory
+          path: server-inventory.json
+          retention-days: 7
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.inspect_only
     permissions:
       contents: read
       packages: write
