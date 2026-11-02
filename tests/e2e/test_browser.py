@@ -1,3 +1,4 @@
+import json
 import os
 import socket
 import subprocess
@@ -9,6 +10,7 @@ import httpx
 from playwright.sync_api import expect, sync_playwright
 
 from involta_guide.application.services.locations import Queries
+from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 
 
@@ -162,6 +164,25 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 page.get_by_role("link", name="Наполнение", exact=True).click()
                 expect(page.get_by_role("heading", name="Наполнение", exact=True)).to_be_visible()
                 assert page.locator("#admin-main").count() == 1
+                job = queries.rows("jobs", {"review_id": review["id"]})[0]
+                AIAudit(engine, settings).record(
+                    job["id"],
+                    "job_failed",
+                    {
+                        "validation_errors": [
+                            {"loc": ["restaurants", 0, "phone"], "msg": "Телефон неверен"}
+                        ],
+                        "traceback": "browser audit fixture",
+                    },
+                )
+                page.get_by_role("link", name="Аудит ИИ", exact=True).click()
+                expect(page.get_by_role("heading", name="Аудит ИИ", exact=True)).to_be_visible()
+                page.goto(base + "/admin?tab=ai-audit&job=" + job["id"])
+                expect(page.locator("pre").filter(has_text="Телефон неверен")).to_be_visible()
+                with page.expect_download() as downloaded:
+                    page.get_by_role("link", name="Скачать полный аудит JSON ↗").click()
+                export = json.loads(Path(downloaded.value.path()).read_text())
+                assert export["job"]["id"] == job["id"]
                 # Alex bootstrap is not a named parameter and is cleared from the URL.
                 alex = browser.new_context()
                 alex_page = alex.new_page()

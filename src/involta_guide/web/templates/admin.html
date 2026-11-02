@@ -8,7 +8,7 @@
 </form>
 </header>
 <nav class="admin-tabs">
-{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Наполнение'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
+{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Наполнение'),('ai-audit','Аудит ИИ'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
 <a href="{{settings.path('/admin')}}?tab={{key}}" class="{{'selected' if tab==key else ''}}">{{label}}</a>
 {%endfor%}
 <a href="{{settings.path('/alex')}}">Алекс ↗</a>
@@ -16,6 +16,7 @@
 {%if message%}
 <p role="status" class="notice">{{message}}</p>
 {%endif%}
+{%if tab=='ai-audit'%}{%include 'ai_audit.html'%}{%endif%}
 {%if tab=='overview'%}
 <section class="stats">
 <article>

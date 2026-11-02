@@ -1,6 +1,7 @@
 import logging
 import signal
 import threading
+import traceback
 from typing import Any
 
 from pydantic import ValidationError
@@ -8,6 +9,7 @@ from pydantic import ValidationError
 from involta_guide.application.services.jobs import JobService
 from involta_guide.config import Settings
 from involta_guide.domain.entities import Conflict, RuleViolation
+from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.openai import OpenAIProvider, ProviderUnavailable
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
@@ -20,6 +22,7 @@ class Worker:
         self.queue = queue
         self.service = service
         self.stop = threading.Event()
+        self.audit = AIAudit(queue.engine, queue.settings)
 
     def once(self) -> bool:
         job = self.queue.claim()
@@ -39,15 +42,54 @@ class Worker:
         thread = threading.Thread(target=heartbeat, daemon=True)
         thread.start()
         try:
+            self.audit.record(job["id"], "job_started", {"attempt": job["attempts"], "job": job})
             self.service.process(job)
+            self.audit.record(
+                job["id"],
+                "job_completed",
+                {
+                    "attempt": job["attempts"],
+                },
+            )
         except (RuleViolation, Conflict, ValidationError) as exc:
+            self.audit.record(
+                job["id"],
+                "job_failed",
+                {
+                    "attempt": job["attempts"],
+                    "exception_type": type(exc).__name__,
+                    "message": str(exc),
+                    "traceback": traceback.format_exc(),
+                    "validation_errors": exc.errors(include_url=False)
+                    if isinstance(exc, ValidationError)
+                    else None,
+                },
+            )
             message = (
                 "AI response validation failed" if isinstance(exc, ValidationError) else str(exc)
             )
             self.queue.fail(job, message, retry=False)
         except ProviderUnavailable as exc:
+            self.audit.record(
+                job["id"],
+                "job_failed",
+                {
+                    "attempt": job["attempts"],
+                    "exception_type": type(exc).__name__,
+                    "message": str(exc),
+                    "traceback": traceback.format_exc(),
+                },
+            )
             self.queue.fail(job, str(exc), retry=not job.get("_temporary_public_fill", False))
         except Exception:
+            self.audit.record(
+                job["id"],
+                "job_failed",
+                {
+                    "attempt": job["attempts"],
+                    "traceback": traceback.format_exc(),
+                },
+            )
             self.queue.fail(
                 job, "Internal processing error; inspect server diagnostics", retry=True
             )

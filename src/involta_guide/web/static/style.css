@@ -965,3 +965,11 @@ blockquote {
     font-size: 48px;
   }
 }
+pre.audit-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  padding: 16px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+}

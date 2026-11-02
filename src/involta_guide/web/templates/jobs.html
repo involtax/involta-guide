@@ -5,6 +5,7 @@
 <article class="panel">
 <strong>{{j.kind}} · {{j.status}}</strong>
 <p>{{j.location_id}} · попыток {{j.attempts}} · {{j.error or ''}}</p>
+<a href="{{settings.path('/admin')}}?tab=ai-audit&amp;job={{j.id}}">Запросы, ответы и подробный журнал ↗</a>
 {%if j.status=='failed'%}
 <form method="post" action="{{settings.path('/admin/actions/retry')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
 <button>Повторить</button>

@@ -346,6 +346,13 @@ def test_provider_429_reason_persisted_without_response_secrets(database, code):
         assert usage["detail"] == str(failure.value)
         assert "req_test123" in usage["detail"]
         assert "sk-private" not in usage["detail"]
+        detail = provider.audit.detail(job["id"])
+        responses = [
+            e["payload"] for e in detail["events"] if e["payload"].get("event") == "response"
+        ]
+        assert responses[0]["data"]["status"] == 429
+        assert code in responses[0]["data"]["body"]
+        assert "sk-private" not in responses[0]["data"]["body"]
         assert not queries.rows("versions")
     finally:
         provider.close()

@@ -1,0 +1,60 @@
+<section>
+<h2>Аудит ИИ</h2>
+<p>Все задания, попытки и ответы. Запрос сохраняется до отправки, полный ответ — до разбора и проверки данных. Секреты скрыты. Автоматического удаления журнала нет.</p>
+<form method="get" action="{{settings.path('/admin')}}" class="stack">
+<input type="hidden" name="tab" value="ai-audit">
+<label>Локация или UUID задания<input name="q" value="{{q}}"></label>
+<label>Статус<select name="status">
+{%for value,label in [('all','Все'),('queued','В очереди'),('running','В работе'),('done','Готово'),('failed','Ошибка'),('cancelled','Отменено')]%}
+<option value="{{value}}" {%if status==value%}selected{%endif%}>{{label}}</option>
+{%endfor%}
+</select></label><button>Найти</button>
+</form>
+{%if audit_detail%}
+{%set d=audit_detail%}
+<article class="panel">
+<h2>{{d.job.location_name}} · {{d.job.status}}</h2>
+<p>{{d.job.id}} · {{d.job.kind}} · попыток {{d.job.attempts}} · {{d.job.created_at}}</p>
+{%if d.job.error%}<p role="alert">{{d.job.error}}</p>{%endif%}
+<a href="{{settings.path('/admin/ai-audit/')}}{{d.job.id}}.json" hx-boost="false">Скачать полный аудит JSON ↗</a>
+{%if not d.trace_available%}<p class="notice">Старое задание: полные запросы и ответы тогда не сохранялись. Восстановить их нельзя. Ниже доступны сохранившиеся данные; новые попытки будут записаны полностью.</p>{%endif%}
+<details><summary>Данные задания и исходный промт</summary><pre class="audit-json">{{d.job|tojson(indent=2)}}</pre></details>
+{%if d.review%}
+<details><summary>Исходный отзыв, расшифровка и результат</summary><pre class="audit-json">{{d.review|tojson(indent=2)}}</pre></details>
+<a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{d.review.id}}">Открыть отзыв и аудиозапись ↗</a>
+{%endif%}
+<h3>Каждое обращение к OpenAI</h3>
+<p>Статус обращения done означает, что получен и разобран ответ API. Подборка при этом может не пройти последующую проверку — результат задания и подробности ниже.</p>
+{%for c in d.calls%}
+<details open><summary>{{c.created_at}} · {{c.model}} · {{c.operation}} · {{c.status}}</summary>
+<pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>
+{%else%}<p>Обращения к провайдеру не зарегистрированы.</p>{%endfor%}
+<h3>Хронология обработки</h3>
+{%set labels={'job_started':'Начало попытки','request':'Отправленный запрос','response':'Полный ответ OpenAI','provider_error':'Ошибка провайдера','job_failed':'Ошибка обработки: подробности и поля','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы'}%}
+{%for e in d.events%}
+<details open><summary>{{e.time}} · {{labels.get(e.payload.event, e.payload.event|default('Событие'))}}</summary>
+{%if e.response_body is defined%}
+<pre class="audit-json">{{e.response_meta|tojson(indent=2)}}</pre>
+<pre class="audit-json">{{e.response_body}}</pre>
+{%else%}
+<pre class="audit-json">{{e.payload|tojson(indent=2)}}</pre>
+{%endif%}
+</details>
+{%endfor%}
+{%for v in d.versions%}<details><summary>Сохранённая версия {{v.number}} · {{v.id}}</summary><pre class="audit-json">{{v|tojson(indent=2)}}</pre></details>{%endfor%}
+</article>
+{%endif%}
+<h3>Задания · {{audit_jobs.total}}</h3>
+{%for j in audit_jobs.rows%}
+<article class="panel">
+<a href="{{settings.path('/admin')}}?tab=ai-audit&amp;job={{j.id}}"><strong>{{j.location_name}} · {{j.kind}} · {{j.status}}</strong></a>
+<p>{{j.created_at}} · попыток {{j.attempts}} · обращений к API {{j.calls}}</p>
+{%if j.error%}<p>{{j.error}}</p>{%endif%}
+</article>
+{%else%}<p>Заданий пока нет.</p>{%endfor%}
+<nav>
+{%if audit_jobs.page>1%}<a href="?{{audit_page(audit_jobs.page-1)}}">← Назад</a>{%endif%}
+ {{audit_jobs.page}} / {{audit_jobs.pages}}
+{%if audit_jobs.page<audit_jobs.pages%}<a href="?{{audit_page(audit_jobs.page+1)}}">Дальше →</a>{%endif%}
+</nav>
+</section>

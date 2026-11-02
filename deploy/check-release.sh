@@ -9,11 +9,11 @@ proxy_mode=${3:-local}
 [[ "$base_url" =~ ^https?://[^[:space:]\?#]+/?$ ]] || { echo 'Invalid public URL' >&2; exit 2; }
 [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full commit SHA' >&2; exit 2; }
 base_url=${base_url%/}
-body=$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+body=$(curl --retry 2 --retry-delay 2 --retry-all-errors --fail --silent --show-error --connect-timeout 10 --max-time 20 \
   --header 'Cache-Control: no-cache' --url "$base_url/health/ready?revision=$expected_sha")
 printf '%s' "$body" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("status")=="ready" and data.get("revision")==sys.argv[1], "Unexpected running release"' "$expected_sha"
 for path in / /widget.js /assets/style.css /assets/htmx.min.js /admin; do
-  metadata=$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+  metadata=$(curl --retry 2 --retry-delay 2 --retry-all-errors --fail --silent --show-error --connect-timeout 10 --max-time 20 \
     --output /dev/null --write-out '%{http_code} %{content_type}' --url "$base_url$path")
   case "$path" in
     *.css) [[ "$metadata" == '200 text/css'* ]] ;;
@@ -21,7 +21,7 @@ for path in / /widget.js /assets/style.css /assets/htmx.min.js /admin; do
     *) [[ "$metadata" == '200 text/html'* ]] ;;
   esac || { echo "Unexpected status/content type at $path: $metadata" >&2; exit 1; }
 done
-redirect=$(curl --silent --show-error --connect-timeout 5 --max-time 15 \
+redirect=$(curl --retry 2 --retry-delay 2 --retry-all-errors --silent --show-error --connect-timeout 10 --max-time 20 \
   --output /dev/null --write-out '%{http_code} %{redirect_url}' --url "$base_url?probe=guide-check")
 if [[ "$proxy_mode" == local ]]; then
   [[ "$redirect" == "302 $base_url/?probe=guide-check" ]] || { echo "Expected backend /guide → 302 /guide/ with query preserved; got: $redirect" >&2; exit 1; }

@@ -56,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.context = ctx
     directory = Path(__file__).parent / "web"
     app.state.templates = Jinja2Templates(directory=directory / "templates")
+    app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
     app.mount(settings.path("/assets"), StaticFiles(directory=directory / "static"), name="assets")
 
     @app.get(settings.path("/widget.js"))

@@ -249,6 +249,16 @@ class JobService:
                 if is_public:
                     publish(repo, location["id"], version_id, None)
                     repo.audit("temporary_public_fill_published", location["id"], version_id)
+                repo.audit(
+                    "ai_result",
+                    job["id"],
+                    json.dumps(
+                        {
+                            "event": "result_saved",
+                            "data": {"version_id": version_id},
+                        }
+                    ),
+                )
                 if result.get("warnings"):
                     repo.audit("generation_warnings", location["id"], "\n".join(result["warnings"]))
                 self._done(repo, job)

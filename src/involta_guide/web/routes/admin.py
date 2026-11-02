@@ -5,12 +5,13 @@ from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.datastructures import FormData
 
 from involta_guide.application.commands.schemas import ContentInput, LocationInput, RestaurantInput
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, KINDS
+from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.web.http import (
     admin_token,
     check_csrf,
@@ -165,7 +166,38 @@ def routes(prefix: str) -> APIRouter:
             data["contacts"] = ctx.queries.contacts()
         elif tab == "sessions":
             data["sessions"] = ctx.queries.rows("admin_sessions")
+        elif tab == "ai-audit":
+            store = AIAudit(ctx.engine, ctx.settings)
+            try:
+                page = int(params.get("page", "1"))
+            except ValueError:
+                page = 1
+            data["audit_jobs"] = store.listing(page, q, "" if status == "all" else status)
+            data["audit_detail"] = None
+            if params.get("job"):
+                data["audit_detail"] = store.detail(uid(params["job"]))
+                if data["audit_detail"] is None:
+                    raise HTTPException(404, "Задание не найдено")
+            data["audit_page"] = lambda page: urlencode(
+                {"tab": "ai-audit", "q": q, "status": status, "page": page}
+            )
         return render(request, "admin.html", data)
+
+    @router.get(prefix + "/admin/ai-audit/{job_id}.json")
+    def audit_download(request: Request, job_id: str) -> Response:
+        require_admin(request)
+        ctx = context(request)
+        detail = AIAudit(ctx.engine, ctx.settings).detail(uid(job_id))
+        if detail is None:
+            raise HTTPException(404, "Задание не найдено")
+        return JSONResponse(
+            detail,
+            headers={
+                "Cache-Control": "private, no-store",
+                "Content-Disposition": f'attachment; filename="ai-audit-{uid(job_id)}.json"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @router.post(prefix + "/admin/login")
     def login(request: Request, form: FormData = Depends(form_data)) -> Response:

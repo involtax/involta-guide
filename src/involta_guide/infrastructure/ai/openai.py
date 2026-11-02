@@ -1,5 +1,7 @@
+import hashlib
 import json
 import re
+import time
 from typing import Any
 from uuid import uuid4
 
@@ -11,6 +13,7 @@ from involta_guide.application.commands.schemas import AlexCommands, Analysis, G
 from involta_guide.application.ports.repositories import Record
 from involta_guide.config import Settings
 from involta_guide.domain.entities import RuleViolation
+from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 
@@ -62,6 +65,7 @@ class OpenAIProvider:
         self.engine = engine
         self.storage = storage
         self.model = settings.openai_model
+        self.audit = AIAudit(engine, settings)
         self.client = httpx.Client(timeout=httpx.Timeout(180, connect=15), trust_env=True)
 
     def close(self) -> None:
@@ -106,6 +110,29 @@ class OpenAIProvider:
         data: Any = None,
     ) -> Record:
         usage_id = self._reserve(job_id, path, model)
+        attachments = {
+            name: {
+                "name": file[0],
+                "bytes": len(file[1]),
+                "sha256": hashlib.sha256(file[1]).hexdigest(),
+                "mime": file[2],
+            }
+            for name, file in (files or {}).items()
+        }
+        self.audit.record(
+            job_id,
+            "request",
+            {
+                "method": "POST",
+                "url": "https://api.openai.com/v1/" + path,
+                "model": model,
+                "json": body,
+                "form": data,
+                "attachments": attachments,
+            },
+            call_id=usage_id,
+        )
+        started = time.monotonic()
         try:
             response = self.client.post(
                 "https://api.openai.com/v1/" + path,
@@ -115,6 +142,17 @@ class OpenAIProvider:
                 json=body,
                 files=files,
                 data=data,
+            )
+            self.audit.record(
+                job_id,
+                "response",
+                {
+                    "status": response.status_code,
+                    "duration_ms": round((time.monotonic() - started) * 1000),
+                    "headers": dict(response.headers),
+                    "body": response.text,
+                },
+                call_id=usage_id,
             )
             if response.status_code >= 400:
                 raise ProviderUnavailable(provider_error(response))
@@ -142,6 +180,16 @@ class OpenAIProvider:
                 str(exc)
                 if isinstance(exc, ProviderUnavailable)
                 else "OpenAI network/response error"
+            )
+            self.audit.record(
+                job_id,
+                "provider_error",
+                {
+                    "exception_type": type(exc).__name__,
+                    "message": str(exc),
+                    "public_message": message,
+                },
+                call_id=usage_id,
             )
             with self.engine.begin() as conn:
                 conn.execute(
