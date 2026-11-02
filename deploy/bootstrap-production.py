@@ -47,7 +47,12 @@ def run(args, *, data=None, check=True, timeout=300, env=None):
         env=env,
     )
     if check and result.returncode:
-        # Output may contain environment values, registry credentials or nginx config.
+        # Release verification contains only public URLs/statuses, never environment or credentials.
+        if len(args) > 1 and Path(args[1]).name == "check-release.sh":
+            raise Failure(
+                f"Release verification failed (exit {result.returncode}): {result.stderr.strip()[-2000:]}"
+            )
+        # Other commands may contain environment values, registry credentials or nginx config.
         raise Failure(
             f"{Path(args[0]).name} failed (exit {result.returncode}); command output withheld"
         )
@@ -839,6 +844,7 @@ def bootstrap(request):
                                 str(SCRIPT / "check-release.sh"),
                                 "https://involta.ru/guide/",
                                 request["sha"],
+                                "external" if external else "local",
                             ]
                         )
                         if baseline() != homepage:

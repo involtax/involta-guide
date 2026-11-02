@@ -100,7 +100,7 @@ jobs:
           BOOTSTRAP_ALEX_SECRET: ${{ secrets.ALEX_SECRET }}
         run: bash deploy/ssh-release.sh bootstrap | tee bootstrap-output.log
       - name: Verify HTTPS from outside the server
-        run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA"
+        run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA" external
       - name: Roll back bootstrap if the external check fails
         if: failure() && steps.remote.outcome == 'success'
         env:

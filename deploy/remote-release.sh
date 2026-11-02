@@ -89,6 +89,11 @@ check_local() {
   fi
   bash "$script_dir/check-release.sh" "http://$host:$port$BASE_PATH/" "$1"
 }
+check_public() {
+  local proxy_mode=local
+  [[ "$GUIDE_BIND_ADDRESS" != 0.0.0.0 ]] || proxy_mode=external
+  bash "$script_dir/check-release.sh" "$public_url" "$1" "$proxy_mode"
+}
 write_state() {
   local file=$1 sha=$2 image=$3 id=$4
   printf '%s %s %s\n' "$sha" "$image" "$id" > "$file.tmp"
@@ -119,7 +124,7 @@ if [[ "$mode" == rollback ]]; then
   read_state "$previous_file" || { echo 'Invalid previous release state' >&2; exit 1; }
   compose "$target_sha" "$target_image" stop --timeout 240 worker
   restore_previous
-  bash "$script_dir/check-release.sh" "$public_url" "$previous_sha"
+  check_public "$previous_sha"
   echo 'External-check rollback completed'
   exit 0
 fi
@@ -171,7 +176,7 @@ wait_health "$target_sha" "$target_image" web
 check_local "$target_sha"
 compose "$target_sha" "$target_image" up -d --no-build worker
 wait_health "$target_sha" "$target_image" worker
-if [[ "${BOOTSTRAP_LOCAL_ONLY:-0}" != 1 ]]; then bash "$script_dir/check-release.sh" "$public_url" "$target_sha"; fi
+if [[ "${BOOTSTRAP_LOCAL_ONLY:-0}" != 1 ]]; then check_public "$target_sha"; fi
 if [[ -n "$previous_sha" ]]; then write_state "$previous_file" "$previous_sha" "$previous_image" "$previous_id"; fi
 write_state "$state_file" "$target_sha" "$target_image" "$deployment_id"
 trap - ERR HUP INT TERM

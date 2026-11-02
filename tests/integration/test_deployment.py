@@ -27,8 +27,11 @@ def save():file.write_text(json.dumps(state))
 if Path(sys.argv[0]).name=='curl':
  url=args[args.index('--url')+1];sha=state.get('services',{}).get('web',{}).get('sha','')
  if url.startswith('https:') and sha==os.getenv('FAKE_FAIL_PUBLIC_SHA'):sys.exit(22)
- if url.endswith('/health/ready'):print(json.dumps({'status':'ready','revision':sha}))
- elif '?probe=' in url:print('302 '+url.replace('?probe=','/?probe='))
+ if url.split('?',1)[0].endswith('/health/ready'):print(json.dumps({'status':'ready','revision':sha}))
+ elif '?probe=' in url:
+  if url.startswith('https:') and os.getenv('FAKE_PUBLIC_REDIRECT'):
+   print(os.environ['FAKE_PUBLIC_REDIRECT']+' '+os.getenv('FAKE_REDIRECT_TARGET',url.split('?',1)[0]+'/'))
+  else:print(os.getenv('FAKE_LOCAL_REDIRECT','302')+' '+url.replace('?probe=','/?probe='))
  elif '--write-out' in args:
   mime='text/css' if url.endswith('.css') else 'application/javascript' if url.endswith('.js') else 'text/html'
   if url.endswith(os.getenv('FAKE_BAD_ASSET','__never__')) and sha==os.getenv('FAKE_BAD_ASSET_SHA'):mime='text/html'
@@ -256,3 +259,43 @@ def test_rollback_uses_cached_previous_image_if_registry_is_unavailable(tmp_path
     assert result.returncode != 0
     assert "Rollback to " + A + " succeeded" in result.stderr
     assert (root / "current-release").read_text().split()[0] == A
+
+
+def test_external_nginx_301_does_not_undo_healthy_backend(tmp_path):
+    root, state, env = harness(tmp_path)
+    with (root / "deploy.env").open("a") as out:
+        out.write("GUIDE_BIND_ADDRESS=0.0.0.0\n")
+    result = deploy(root, {**env, "FAKE_PUBLIC_REDIRECT": "301"}, A)
+    assert result.returncode == 0, result.stderr
+    assert (root / "current-release").read_text().split()[0] == A
+    assert "External nginx redirect: 301 https://guide.example/guide/" in result.stdout
+
+
+def test_external_redirect_to_another_origin_is_rejected(tmp_path):
+    root, state, env = harness(tmp_path)
+    with (root / "deploy.env").open("a") as out:
+        out.write("GUIDE_BIND_ADDRESS=0.0.0.0\n")
+    result = deploy(
+        root,
+        {
+            **env,
+            "FAKE_PUBLIC_REDIRECT": "301",
+            "FAKE_REDIRECT_TARGET": "https://wrong.example/guide/",
+        },
+        A,
+    )
+    assert result.returncode != 0
+    assert not (root / "current-release").exists()
+
+
+def test_backend_redirect_still_requires_302_and_query(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    result = subprocess.run(
+        ["bash", str(ROOT / "deploy/check-release.sh"), "http://127.0.0.1:3001/guide/", A],
+        env={**env, "FAKE_LOCAL_REDIRECT": "301"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "Expected backend /guide" in result.stderr
