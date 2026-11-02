@@ -89,6 +89,13 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 fill = page.locator("[data-public-fill]")
                 fill_button = fill.get_by_role("button", name="Запарсить эти данные", exact=True)
                 expect(fill_button).to_be_visible()
+                expect(page.get_by_role("link", name="Открыть логи наполнения ↗")).to_be_visible()
+                logs = context.new_page()
+                logs.goto(base + "/logs")
+                expect(
+                    logs.get_by_role("heading", name="Публичные логи наполнения")
+                ).to_be_visible()
+                logs.close()
                 submissions = []
 
                 def accept_fill(route):

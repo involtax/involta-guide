@@ -1,0 +1,376 @@
+{
+  "intro": "В Иваново мы отобрали несколько ресторанов, заслуживающих внимания за их кухню, атмосферу и сервис.",
+  "restaurants": [
+    {
+      "name": "Огонёк моей души",
+      "cuisine": "Русская",
+      "description": "Расположенное в центре города кафе с авторской русской кухней и внимательным обслуживанием. Подходит для ценителей традиционных блюд в современном исполнении.",
+      "mapsUrl": "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/",
+      "sources": [
+        "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+      ],
+      "phone": "+74932324576",
+      "openingHours": {
+        "timezone": "Europe/Moscow",
+        "week": [
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ]
+        ],
+        "exceptions": {}
+      }
+    },
+    {
+      "name": "Mustang",
+      "cuisine": "Европейская",
+      "description": "Ресторан с акцентом на мясные блюда, предлагающий также изысканные рыбные позиции. Отличается профессиональным сервисом и уютной атмосферой.",
+      "mapsUrl": "https://yandex.com/maps/org/mustang/1746124838/reviews/",
+      "sources": [
+        "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+      ],
+      "phone": "+74932938937",
+      "openingHours": {
+        "timezone": "Europe/Moscow",
+        "week": [
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "02:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "02:00"
+            }
+          ],
+          [
+            {
+              "start": "12:00",
+              "end": "00:00"
+            }
+          ]
+        ],
+        "exceptions": {}
+      }
+    },
+    {
+      "name": "ТАНИТ Ресторан",
+      "cuisine": "Гриль, Здоровая",
+      "description": "Ресторан с разнообразным меню, включающим блюда на гриле и здоровую пищу. Отличается высоким уровнем сервиса и приятной атмосферой.",
+      "mapsUrl": "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+      ],
+      "phone": "",
+      "openingHours": null
+    }
+  ],
+  "rankingReport": [
+    {
+      "name": "Огонёк моей души",
+      "mapsUrl": "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/",
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 7,
+        "localConnection": 6,
+        "atmosphere": 8,
+        "service": 8,
+        "value": 7,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Посетители отмечают вкусные блюда, особенно ризотто с белыми грибами, хотя некоторые считают его не аутентичным.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Отзывы в целом положительные, но есть небольшие замечания по отдельным блюдам.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Кафе предлагает авторскую русскую кухню с современным подходом, что выделяет его среди других заведений.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Использование местных продуктов и рецептов придаёт заведению связь с местной культурой.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Интерьер продуман до мелочей, создавая уютную и приятную обстановку для гостей.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Персонал описывается как спокойный, уважительный и внимательный к деталям.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Цены соответствуют качеству предлагаемых блюд и уровню обслуживания.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Расположение в центре города делает кафе удобным для посещения как местными жителями, так и туристами.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/ogonyok_moyey_dushi/203809153135/reviews/"
+          ]
+        }
+      ],
+      "totalScore": 7.25
+    },
+    {
+      "name": "Mustang",
+      "mapsUrl": "https://yandex.com/maps/org/mustang/1746124838/reviews/",
+      "scores": {
+        "food": 9,
+        "consistency": 8,
+        "identity": 7,
+        "localConnection": 5,
+        "atmosphere": 8,
+        "service": 9,
+        "value": 7,
+        "destination": 8
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Блюда, такие как тартар из лосося с манго и лосось с соусом берблан, получают высокие оценки за вкус и подачу.",
+          "confidence": "high",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Положительные отзывы о качестве блюд и обслуживания повторяются в разных источниках.",
+          "confidence": "high",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Ресторан специализируется на мясных блюдах, предлагая также изысканные рыбные позиции, что придаёт ему уникальность.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Связь с местной культурой не является основной концепцией заведения.",
+          "confidence": "low",
+          "sources": []
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Уютная обстановка и профессиональный сервис создают приятную атмосферу для гостей.",
+          "confidence": "high",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Персонал описывается как внимательный и профессиональный, обеспечивая высокий уровень обслуживания.",
+          "confidence": "high",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Цены соответствуют качеству предлагаемых блюд и уровню сервиса.",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Ресторан является привлекательным местом для посещения благодаря высокому качеству кухни и обслуживания.",
+          "confidence": "high",
+          "sources": [
+            "https://yandex.com/maps/org/mustang/1746124838/reviews/"
+          ]
+        }
+      ],
+      "totalScore": 7.63
+    },
+    {
+      "name": "ТАНИТ Ресторан",
+      "mapsUrl": "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html",
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 6,
+        "localConnection": 5,
+        "atmosphere": 7,
+        "service": 8,
+        "value": 7,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Меню включает разнообразные блюда на гриле и здоровую пищу, получающие положительные отзывы.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Отзывы в целом положительные, но есть небольшие замечания по отдельным аспектам.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Ресторан предлагает стандартное меню без ярко выраженной уникальности.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Связь с местной культурой не является основной концепцией заведения.",
+          "confidence": "low",
+          "sources": []
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Приятная атмосфера и интерьер создают комфортные условия для посетителей.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Персонал описывается как внимательный и профессиональный, обеспечивая высокий уровень обслуживания.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Цены соответствуют качеству предлагаемых блюд и уровню сервиса.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Ресторан является привлекательным местом для посещения благодаря высокому качеству кухни и обслуживания.",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g790136-d6743562-Reviews-Tanit_Restaurant-Ivanovo_Ivanovsky_District_Ivanovo_Oblast_Central_Russia.html"
+          ]
+        }
+      ],
+      "totalScore": 6.88
+    }
+  ],
+  "warnings": [
+    "Для ресторана 'ТАНИТ Ресторан' не найден проверенный номер телефона, что может затруднить публикацию."
+  ]
+}

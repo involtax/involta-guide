@@ -1,14 +1,18 @@
 <section>
+{%set public_view=audit_public|default(false)%}
+{%set audit_url=settings.path('/logs') if public_view else settings.path('/admin')%}
 <h2>Аудит ИИ</h2>
 <p>Все задания, попытки и ответы. Запрос сохраняется до отправки, полный ответ — до разбора и проверки данных. Секреты скрыты. Автоматического удаления журнала нет.</p>
-<form method="get" action="{{settings.path('/admin')}}" class="stack">
+<form method="get" action="{{audit_url}}" class="stack">
+{%if not public_view%}
 <input type="hidden" name="tab" value="ai-audit">
+{%endif%}
 <label>Локация или UUID задания<input name="q" value="{{q}}"></label>
-<label>Статус<select name="status">
+{%if not public_view%}<label>Статус<select name="status">
 {%for value,label in [('all','Все'),('queued','В очереди'),('running','В работе'),('done','Готово'),('failed','Ошибка'),('cancelled','Отменено')]%}
 <option value="{{value}}" {%if status==value%}selected{%endif%}>{{label}}</option>
 {%endfor%}
-</select></label><button>Найти</button>
+</select></label>{%endif%}<button>Найти</button>
 </form>
 {%if audit_detail%}
 {%set d=audit_detail%}
@@ -16,7 +20,7 @@
 <h2>{{d.job.location_name}} · {{d.job.status}}</h2>
 <p>{{d.job.id}} · {{d.job.kind}} · попыток {{d.job.attempts}} · {{d.job.created_at}}</p>
 {%if d.job.error%}<p role="alert">{{d.job.error}}</p>{%endif%}
-<a href="{{settings.path('/admin/ai-audit/')}}{{d.job.id}}.json" hx-boost="false">Скачать полный аудит JSON ↗</a>
+<a href="{{settings.path('/logs/') if public_view else settings.path('/admin/ai-audit/')}}{{d.job.id}}.json" hx-boost="false">{{'Открыть полный JSON ↗' if public_view else 'Скачать полный аудит JSON ↗'}}</a>
 {%if not d.trace_available%}<p class="notice">Старое задание: полные запросы и ответы тогда не сохранялись. Восстановить их нельзя. Ниже доступны сохранившиеся данные; новые попытки будут записаны полностью.</p>{%endif%}
 <details><summary>Данные задания и исходный промт</summary><pre class="audit-json">{{d.job|tojson(indent=2)}}</pre></details>
 {%if d.review%}
@@ -47,7 +51,7 @@
 <h3>Задания · {{audit_jobs.total}}</h3>
 {%for j in audit_jobs.rows%}
 <article class="panel">
-<a href="{{settings.path('/admin')}}?tab=ai-audit&amp;job={{j.id}}"><strong>{{j.location_name}} · {{j.kind}} · {{j.status}}</strong></a>
+<a href="{{settings.path('/logs/'+j.id|string) if public_view else settings.path('/admin')+'?tab=ai-audit&job='+j.id|string}}"><strong>{{j.location_name}} · {{j.kind}} · {{j.status}}</strong></a>
 <p>{{j.created_at}} · попыток {{j.attempts}} · обращений к API {{j.calls}}</p>
 {%if j.error%}<p>{{j.error}}</p>{%endif%}
 </article>

@@ -12,6 +12,21 @@ class Hours(BaseModel):
     week: list[list[tuple[str, str]]] = Field(min_length=7, max_length=7)
     exceptions: dict[str, list[tuple[str, str]]] = Field(default_factory=dict)
 
+    @field_validator("week", "exceptions", mode="before")
+    @classmethod
+    def intervals(cls, value: Any) -> Any:
+        # Both representations describe the same interval; storage remains [start, end].
+        def convert(item: Any) -> Any:
+            if isinstance(item, dict):
+                if set(item) == {"start", "end"}:
+                    return [item["start"], item["end"]]
+                return {key: convert(val) for key, val in item.items()}
+            if isinstance(item, list):
+                return [convert(val) for val in item]
+            return item
+
+        return convert(value)
+
     @field_validator("timezone")
     @classmethod
     def zone(cls, value: str) -> str:

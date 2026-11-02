@@ -1,4 +1,5 @@
 from urllib.parse import urlencode
+from uuid import UUID
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
@@ -6,6 +7,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse,
 
 from involta_guide.domain.hours import DAYS, opening_status
 from involta_guide.domain.rules import KINDS
+from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.web.http import check_origin, context
 
 
@@ -71,7 +73,7 @@ def routes(prefix: str) -> APIRouter:
     def robots(request: Request) -> Response:
         s = context(request).settings
         return PlainTextResponse(
-            f"User-agent: *\nAllow: {s.path('/')}\nDisallow: {s.path('/admin')}\nDisallow: {s.path('/api')}\nDisallow: {s.path('/alex')}\nSitemap: {s.url('/sitemap.xml')}\n"
+            f"User-agent: *\nAllow: {s.path('/')}\nDisallow: {s.path('/admin')}\nDisallow: {s.path('/api')}\nDisallow: {s.path('/alex')}\nDisallow: {s.path('/logs')}\nSitemap: {s.url('/sitemap.xml')}\n"
         )
 
     @router.get(prefix + "/sitemap.xml")
@@ -93,6 +95,54 @@ def routes(prefix: str) -> APIRouter:
         return Response(body, media_type="application/xml")
 
     # TEMPORARY public test controls; explicitly no login or privileged session required.
+    log_headers = {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Content-Type-Options": "nosniff",
+    }
+
+    def log_store(request: Request) -> AIAudit:
+        ctx = context(request)
+        if not ctx.settings.public_fill_logs_enabled:
+            raise HTTPException(404, "Публичные логи отключены")
+        return AIAudit(ctx.engine, ctx.settings)
+
+    def log_page(request: Request, job_id: str | None, q: str, page: int) -> Response:
+        store = log_store(request)
+        detail = store.detail(job_id, public_only=True) if job_id else None
+        if job_id and detail is None:
+            raise HTTPException(404, "Публичный журнал не найден")
+        return request.app.state.templates.TemplateResponse(
+            request=request,
+            name="public_logs.html",
+            headers=log_headers,
+            context={
+                "settings": context(request).settings,
+                "audit_public": True,
+                "audit_detail": detail,
+                "audit_jobs": store.listing(page, q, public_only=True),
+                "q": q,
+                "status": "all",
+                "title": "Логи наполнения — Инвольта гид",
+                "audit_page": lambda n: urlencode({"q": q, "page": n}),
+            },
+        )
+
+    @router.get(prefix + "/logs")
+    def public_logs(request: Request, q: str = "", page: int = 1) -> Response:
+        return log_page(request, None, q, page)
+
+    @router.get(prefix + "/logs/{job_id}.json")
+    def public_log_json(request: Request, job_id: UUID) -> Response:
+        detail = log_store(request).detail(str(job_id), public_only=True)
+        if detail is None:
+            raise HTTPException(404, "Публичный журнал не найден")
+        return JSONResponse(detail, headers=log_headers)
+
+    @router.get(prefix + "/logs/{job_id}")
+    def public_log(request: Request, job_id: UUID, page: int = 1) -> Response:
+        return log_page(request, str(job_id), "", page)
+
     @router.post(prefix + "/api/locations/{slug}/fill")
     def public_fill(request: Request, slug: str) -> Response:
         ctx = context(request)

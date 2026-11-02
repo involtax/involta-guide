@@ -3,8 +3,10 @@
 import json
 import re
 from typing import Any
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
+from pydantic import SecretStr
 from sqlalchemy import Engine, text
 
 from involta_guide.config import Settings
@@ -14,22 +16,44 @@ class AIAudit:
     def __init__(self, engine: Engine, settings: Settings) -> None:
         self.engine = engine
         self.settings = settings
+        self.secrets = {
+            value.get_secret_value()
+            for name in type(settings).model_fields
+            if isinstance(value := getattr(settings, name), SecretStr) and value.get_secret_value()
+        }
+        db_password = urlsplit(settings.database_url.get_secret_value()).password
+        if db_password:
+            self.secrets.add(unquote(db_password))
 
     def clean(self, value: Any) -> Any:
         if isinstance(value, dict):
             return {
                 str(k): "[REDACTED]"
-                if str(k).lower() in {"authorization", "cookie", "set-cookie", "api_key"}
+                if str(k).lower()
+                in {
+                    "authorization",
+                    "cookie",
+                    "set-cookie",
+                    "api_key",
+                    "password",
+                    "admin_password_hash",
+                    "session_secret",
+                    "token_hash",
+                    "csrf_hash",
+                }
                 else self.clean(v)
                 for k, v in value.items()
             }
         if isinstance(value, (list, tuple)):
             return [self.clean(v) for v in value]
         if isinstance(value, str):
-            secret = self.settings.openai_api_key.get_secret_value()
-            if secret:
-                value = value.replace(secret, "[REDACTED]")
-            return re.sub(r"\bsk-[A-Za-z0-9_-]{8,}", "[REDACTED]", value)
+            for secret in sorted(self.secrets, key=len, reverse=True):
+                if len(secret) >= 8:
+                    value = value.replace(secret, "[REDACTED]")
+                else:
+                    value = re.sub(r"(?<!\w)" + re.escape(secret) + r"(?!\w)", "[REDACTED]", value)
+            value = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}", "[REDACTED]", value)
+            return re.sub(r"(postgres(?:ql)?(?:\+psycopg)?://)[^\s@]+@", r"\1[REDACTED]@", value)
         return value
 
     def record(self, job_id: str, event: str, data: Any, *, call_id: str | None = None) -> None:
@@ -48,8 +72,12 @@ class AIAudit:
                 },
             )
 
-    def listing(self, page: int, query: str = "", status: str = "") -> dict[str, Any]:
+    def listing(
+        self, page: int, query: str = "", status: str = "", *, public_only: bool = False
+    ) -> dict[str, Any]:
         where = "WHERE (:q='' OR l.name ILIKE :search OR j.id::text=:q) AND (:status='' OR j.status=:status)"
+        if public_only:
+            where += " AND j.kind='generate' AND j.review_id IS NULL AND EXISTS(SELECT 1 FROM audit a WHERE a.action='temporary_public_fill' AND a.target=j.id::text)"
         params = {"q": query, "search": "%" + query + "%", "status": status}
         with self.engine.connect() as conn:
             total = conn.execute(
@@ -74,9 +102,11 @@ class AIAudit:
                 .mappings()
                 .all()
             )
-        return {"rows": [dict(r) for r in rows], "total": total, "page": page, "pages": pages}
+        return self.clean(
+            {"rows": [dict(r) for r in rows], "total": total, "page": page, "pages": pages}
+        )
 
-    def detail(self, job_id: str) -> dict[str, Any] | None:
+    def detail(self, job_id: str, *, public_only: bool = False) -> dict[str, Any] | None:
         with self.engine.connect() as conn:
             job = (
                 conn.execute(
@@ -89,6 +119,17 @@ class AIAudit:
                 .first()
             )
             if job is None:
+                return None
+            if public_only and (
+                job["kind"] != "generate"
+                or job["review_id"] is not None
+                or not conn.execute(
+                    text(
+                        "SELECT 1 FROM audit WHERE target=:id AND action='temporary_public_fill' LIMIT 1"
+                    ),
+                    {"id": job_id},
+                ).first()
+            ):
                 return None
             calls = (
                 conn.execute(

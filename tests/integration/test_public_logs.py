@@ -1,0 +1,75 @@
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+
+from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.main import create_app
+
+from .test_jobs import setup
+
+
+def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    service.enqueue_public_fill(location["id"])
+    public_job = queries.rows("jobs")[0]
+    other = queries.directory(query="Абрау-Дюрсо")["rows"][0]
+    service.enqueue(other["id"])
+    admin_job = queries.rows("jobs", {"location_id": other["id"]})[0]
+    private_id = str(uuid4())
+    with uow() as tx:
+        tx.repo.queue(
+            {
+                "id": private_id,
+                "kind": "review",
+                "location_id": location["id"],
+                "prompt": "private voice text",
+            }
+        )
+    audit = AIAudit(engine, settings)
+    audit.record(
+        public_job["id"],
+        "response",
+        {
+            "status": 200,
+            "body": '{"result":"Открытый ответ <script>alert(1)</script>"}',
+            "headers": {"set-cookie": "secret-cookie"},
+        },
+    )
+    audit.record(
+        public_job["id"],
+        "job_failed",
+        {
+            "traceback": "password="
+            + settings.session_secret.get_secret_value()
+            + " "
+            + settings.database_url.get_secret_value(),
+            "validation_errors": [{"loc": ["restaurants", 0, "phone"], "msg": "Неверный телефон"}],
+        },
+    )
+    audit.record(admin_job["id"], "response", {"body": "private admin response"})
+    audit.record(private_id, "response", {"body": "private voice response"})
+    with TestClient(create_app(settings)) as client:
+        index = client.get("/guide/logs")
+        assert index.status_code == 200
+        assert public_job["id"] in index.text and admin_job["id"] not in index.text
+        assert private_id not in index.text
+        assert "noindex" in index.headers["x-robots-tag"]
+        page = client.get("/guide/logs/" + public_job["id"])
+        assert page.status_code == 200, page.text
+        assert "Открытый ответ" in page.text and "Неверный телефон" in page.text
+        assert "<script>alert" not in page.text
+        exported = client.get("/guide/logs/" + public_job["id"] + ".json")
+        assert exported.status_code == 200
+        assert exported.json()["job"]["id"] == public_job["id"]
+        assert "secret-cookie" not in exported.text
+        assert settings.session_secret.get_secret_value() not in exported.text
+        assert settings.database_url.get_secret_value() not in exported.text
+        for key in (admin_job["id"], private_id, str(uuid4())):
+            assert client.get("/guide/logs/" + key).status_code == 404
+            assert client.get("/guide/logs/" + key + ".json").status_code == 404
+        assert "Открыть логи наполнения" in client.get("/guide/ivanovo").text
+        assert "Disallow: /guide/logs" in client.get("/guide/robots.txt").text
+    disabled = settings.model_copy(update={"public_fill_logs_enabled": False})
+    with TestClient(create_app(disabled)) as client:
+        assert client.get("/guide/logs").status_code == 404
+        assert client.get("/guide/logs/" + public_job["id"] + ".json").status_code == 404
