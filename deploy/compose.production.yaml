@@ -1,0 +1,56 @@
+# Pulled, digest-pinned images only. Never build on the production server.
+services:
+  web:
+    container_name: involta-guide
+    image: ${IMAGE_REF:?A digest-pinned IMAGE_REF is required}
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    env_file: ${DEPLOY_ROOT:?}/.env.production
+    environment:
+      RELEASE_SHA: ${RELEASE_SHA:?}
+      BASE_PATH: ${BASE_PATH:-/guide}
+    networks: [frontend]
+    volumes: ["audio:/app/var"]
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 30s
+    healthcheck:
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+  worker:
+    image: ${IMAGE_REF:?}
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    env_file: ${DEPLOY_ROOT:?}/.env.production
+    environment:
+      RELEASE_SHA: ${RELEASE_SHA:?}
+      BASE_PATH: ${BASE_PATH:-/guide}
+    networks: [frontend]
+    command: ["guide-worker"]
+    volumes: ["audio:/app/var"]
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 240s
+    healthcheck:
+      test: ["CMD", "guide", "worker-health"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  audio:
+    external: true
+    name: ${AUDIO_VOLUME:?Set the existing persistent audio volume}
+
+networks:
+  frontend:
+    external: true
+    name: ${NGINX_NETWORK:-involta-guide-frontend}

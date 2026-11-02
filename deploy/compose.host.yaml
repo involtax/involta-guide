@@ -1,0 +1,53 @@
+# Host nginx: no Docker bridge, NAT, published ports, or firewall changes.
+services:
+  web:
+    container_name: involta-guide
+    image: ${IMAGE_REF:?}
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    network_mode: host
+    env_file: ${DEPLOY_ROOT:?}/.env.production
+    environment:
+      RELEASE_SHA: ${RELEASE_SHA:?}
+      BASE_PATH: /guide
+    command: ["uvicorn", "involta_guide.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "3080", "--no-access-log", "--no-proxy-headers"]
+    volumes: ["audio:/app/var"]
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3080/guide/health/ready',timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+  worker:
+    image: ${IMAGE_REF:?}
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    network_mode: host
+    env_file: ${DEPLOY_ROOT:?}/.env.production
+    environment:
+      RELEASE_SHA: ${RELEASE_SHA:?}
+      BASE_PATH: /guide
+    command: ["guide-worker"]
+    volumes: ["audio:/app/var"]
+    read_only: true
+    tmpfs: ["/tmp:mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 240s
+    healthcheck:
+      test: ["CMD", "guide", "worker-health"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  audio:
+    external: true
+    name: ${AUDIO_VOLUME:?}

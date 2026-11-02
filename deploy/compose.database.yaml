@@ -1,0 +1,25 @@
+# Guide owns this project only; PostgreSQL is never exposed on the host.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Use a digest-pinned official PostgreSQL image}
+    container_name: involta-guide-postgres
+    labels:
+      com.involta.guide.owner: production
+    restart: unless-stopped
+    env_file: ${DEPLOY_ROOT:?}/.env.database
+    volumes: ["database:/var/lib/postgresql/data"]
+    networks: [frontend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guide -d guide"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  database:
+    external: true
+    name: involta-guide-postgres-data
+networks:
+  frontend:
+    external: true
+    name: ${NGINX_NETWORK:?}

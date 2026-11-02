@@ -1,0 +1,108 @@
+name: Bootstrap production
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full 40-character commit SHA already on main
+        required: true
+        type: string
+permissions:
+  contents: read
+# Shared across BOTH workflows; no production run is cancelled by another run.
+concurrency:
+  group: involta-guide-production
+  cancel-in-progress: false
+jobs:
+  approval-policy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      deployments: read
+    steps:
+      - name: Fail closed unless prod requires a human reviewer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            try {
+              const {data} = await github.rest.repos.getEnvironment({owner, repo, environment_name: 'prod'});
+              const rule = (data.protection_rules || []).find(r => r.type === 'required_reviewers');
+              if (!rule || !(rule.reviewers || []).length) {
+                core.setFailed('Configure Settings → Environments → prod → Required reviewers before bootstrap. No SSH or server changes performed.');
+              }
+            } catch (error) {
+              core.setFailed(`Cannot verify prod approval protection (${error.status || 'API error'}). No SSH or server changes performed.`);
+            }
+  build:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/ci.yml
+    with:
+      sha: ${{ inputs.sha }}
+  bootstrap:
+    needs: [approval-policy, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: prod
+      url: https://involta.ru/guide/
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TARGET_SHA: ${{ needs.build.outputs.sha }}
+      IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_ROOT: /opt/involta-guide
+      PUBLIC_URL: https://involta.ru/guide/
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Resolve official PostgreSQL image to immutable digest
+        id: postgres
+        run: |
+          set -euo pipefail
+          digest=$(docker buildx imagetools inspect postgres:17-bookworm --format '{{json .Manifest.Digest}}' | tr -d '"')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "image=postgres@$digest" >> "$GITHUB_OUTPUT"
+      - id: remote
+        name: Preflight and bootstrap over verified SSH
+        env:
+          POSTGRES_IMAGE: ${{ steps.postgres.outputs.image }}
+          BOOTSTRAP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+          BOOTSTRAP_ALEX_SECRET: ${{ secrets.ALEX_SECRET }}
+        run: bash deploy/ssh-release.sh bootstrap | tee bootstrap-output.log
+      - name: Verify HTTPS from outside the server
+        run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA"
+      - name: Roll back bootstrap if the external check fails
+        if: failure() && steps.remote.outcome == 'success'
+        env:
+          POSTGRES_IMAGE: ${{ steps.postgres.outputs.image }}
+        run: bash deploy/ssh-release.sh bootstrap-rollback | tee -a bootstrap-output.log
+      - name: Installation report
+        if: always()
+        run: |
+          echo '### Production bootstrap' >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: $TARGET_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: $IMAGE_REF" >> "$GITHUB_STEP_SUMMARY"
+          echo "Job: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only sanitized report output is attached; credentials are never included.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bootstrap-report-${{ github.run_id }}
+          path: bootstrap-output.log
+          if-no-files-found: ignore
+          retention-days: 14

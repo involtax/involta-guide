@@ -141,25 +141,27 @@ uv run pytest -q
 adoption, UUID/snapshots/FKs, конкурентные правки/worker, fake AI, сессии, CSRF, HTMX,
 микрофон, модерация, SEO и страницы без JS. Скриншоты: `var/screenshots`.
 
-## Деплой и rollback
+## Production
 
-Читайте [docs/MIGRATION.md](docs/MIGRATION.md) перед сменой старого приложения.
-Не запускайте миграции production без отдельного разрешения и backup.
+Полный автоматический процесс: [docs/DEPLOY.md](docs/DEPLOY.md).
 
-```sh
-docker compose build
-docker compose --profile release run --rm migrate
-docker compose up -d web worker
-```
+- `bootstrap-production.yml`: предварительные проверки, Docker из официального
+  репозитория, отдельный PostgreSQL Guide, миграции/seed новой БД, контейнеры Guide,
+  backup и проверенная настройка Nginx для `/guide/`, HTTPS checks и rollback.
+- `deploy-production.yml`: обновления только Guide по SHA/digest с rollback.
 
-`compose.yaml` использует **существующий PostgreSQL через DATABASE_URL**, не поднимает
-вторую production-БД. Подготовьте закрытый `.env.production` (не Git). Web и worker
-используют общий persistent audio volume. Health: `/guide/health/live`, `/guide/health/ready`.
-Nginx: [deploy/nginx-guide.conf](deploy/nginx-guide.conf), upstream имя приведите к своей сети.
-При nginx на хосте можно использовать опубликованный `127.0.0.1:3000`; если nginx в Docker,
-подключите web к его Docker-сети. Путь `/guide` не обрезается; корень перенаправляет 302 на слэш.
+Оба запускаются вручную из main; bootstrap требует Required reviewers в Environment
+`prod` и проверяет, что защита действительно настроена. PR/push production не меняют.
+Используются `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`.
+Дополнительные secrets приложения и поддерживаемые схемы Nginx описаны в документации.
 
-Alembic baseline проверяет legacy SHA-256 и не повторяет выполненные SQL-миграции. Новые
-изменения только additive. Автоматический destructive downgrade запрещён: для rollback
-остановите Python worker и верните старый image; дополнительные поля можно оставить.
-Восстановление backup — отдельное осознанное действие с учётом новых записей после cutover.
+Dockerfile — multi-stage build с frozen `uv.lock`, wheel install, отдельным runtime
+без uv/dev-инструментов, UID/GID **10001** и healthcheck. Образ подходит для web,
+worker и миграций; `ROOT_DIR=/app` задаёт путь к каталогу локаций и миграциям.
+Production filesystem read-only, аудио хранится в отдельном persistent volume.
+
+Для переноса **существующей** legacy БД сначала прочитайте
+[docs/MIGRATION.md](docs/MIGRATION.md): bootstrap создаёт отдельную новую БД,
+а не усыновляет неизвестные контейнеры и данные. Обновления не выполняют
+разрушительные миграции или downgrade. Локальная разработка — через `compose.yaml`
+и `compose.local.yaml`, отдельно от production.

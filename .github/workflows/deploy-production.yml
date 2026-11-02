@@ -1,0 +1,64 @@
+name: Deploy production
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full 40-character commit SHA already on main
+        required: true
+        type: string
+permissions:
+  contents: read
+# Shared across BOTH workflows; no production run is cancelled by another run.
+concurrency:
+  group: involta-guide-production
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/ci.yml
+    with:
+      sha: ${{ inputs.sha }}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: prod
+      url: https://involta.ru/guide/
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TARGET_SHA: ${{ needs.build.outputs.sha }}
+      IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_ROOT: /opt/involta-guide
+      PUBLIC_URL: https://involta.ru/guide/
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - id: remote
+        name: Update Guide only, with automatic rollback
+        run: bash deploy/ssh-release.sh deploy
+      - name: Verify HTTPS from outside the server
+        run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA"
+      - name: Restore previous image if the external check fails
+        if: failure() && steps.remote.outcome == 'success'
+        run: bash deploy/ssh-release.sh rollback
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo '### Guide production release' >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: $TARGET_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: $IMAGE_REF" >> "$GITHUB_STEP_SUMMARY"
+          echo "Job: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

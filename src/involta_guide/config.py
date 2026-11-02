@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     transcription_model: str = "gpt-4o-mini-transcribe"
     site_url: str = "http://localhost:3000/guide"
     base_path: str = "/guide"
+    release_sha: str = "development"
     cookie_secure: bool = False
     data_dir: Path = Path("var")
     audio_retention_days: int = 90
@@ -31,6 +32,15 @@ class Settings(BaseSettings):
     lease_seconds: int = 240
     max_job_attempts: int = 3
     root_dir: Path = Path(__file__).resolve().parents[2]
+
+    @field_validator("release_sha")
+    @classmethod
+    def release_valid(cls, value: str) -> str:
+        import re
+
+        if value != "development" and not re.fullmatch(r"[0-9a-f]{40}", value):
+            raise ValueError("RELEASE_SHA должен быть полным commit SHA")
+        return value
 
     @field_validator("base_path")
     @classmethod

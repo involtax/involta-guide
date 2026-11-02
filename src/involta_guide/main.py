@@ -73,7 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get(settings.path("/health/ready"))
     def ready() -> dict[str, str]:
         ctx.queries.health()
-        return {"status": "ready"}
+        return {"status": "ready", "revision": settings.release_sha}
 
     @app.exception_handler(RuleViolation)
     def business_error(request: Request, exc: RuleViolation) -> JSONResponse:
