@@ -7,6 +7,7 @@ Stdlib only; compatible with Python 3.10+. Never logs command output or credenti
 import base64
 import fcntl
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -199,7 +200,31 @@ def nginx_candidates():
     return command, target, original, proposed, frontend, container
 
 
+def runtime_options(request, frontend):
+    external = request.get("proxy_mode", "local") == "external"
+    return {
+        "AUDIO_VOLUME": "involta-guide-audio",
+        "GUIDE_HTTP_PORT": str(request.get("http_port", 3001) if external else 3080),
+        "GUIDE_BIND_ADDRESS": "0.0.0.0" if external else "127.0.0.1",
+        "BASE_PATH": "/guide",
+        "NGINX_NETWORK": frontend,
+        "NETWORK_MODE": "host" if frontend == "host" else "bridge",
+    }
+
+
 def validate_request(request):
+    if request.get("proxy_mode", "local") not in ("local", "external"):
+        raise Failure("Unknown proxy mode")
+    if request.get("proxy_mode") == "external":
+        port = request.get("http_port", 3001)
+        if type(port) is not int or not 0 < port < 65536:
+            raise Failure("Invalid backend HTTP port")
+        for peer in request.get("trusted_proxy_ips", "").split(","):
+            if peer:
+                try:
+                    ipaddress.ip_address(peer.strip())
+                except ValueError as exc:
+                    raise Failure("Invalid trusted proxy IP") from exc
     if not re.fullmatch(r"[0-9a-f]{40}", request.get("sha", "")):
         raise Failure("Expected full lowercase commit SHA")
     if not re.fullmatch(r"ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}", request.get("image", "")):
@@ -315,15 +340,27 @@ def preflight(request):
             )
         if DOCKER_KEY.exists() or DOCKER_SOURCE.exists():
             raise Failure("Guide Docker repository files already exist; refusing to overwrite them")
-    nginx = nginx_candidates()
+    if request.get("proxy_mode") == "external":
+        print(
+            f"External nginx mode: Guide listens on 0.0.0.0:{request.get('http_port', 3001)}; no local nginx changes",
+            flush=True,
+        )
+        nginx = (None, None, None, None, "host", None)
+    else:
+        nginx = nginx_candidates()
     # Host networking avoids Docker firewall/forwarding changes entirely.
     if nginx[4] == "host":
-        for port in (3080, 15432):
+        for port in (int(runtime_options(request, nginx[4])["GUIDE_HTTP_PORT"]), 15432):
             if port == 15432 and docker_present and owned("container", "involta-guide-postgres"):
                 continue
             with socket.socket() as probe:
                 try:
-                    probe.bind(("127.0.0.1", port))
+                    address = (
+                        runtime_options(request, nginx[4])["GUIDE_BIND_ADDRESS"]
+                        if port != 15432
+                        else "127.0.0.1"
+                    )
+                    probe.bind((address, port))
                 except OSError as exc:
                     raise Failure(
                         f"Required Guide loopback port {port} is occupied; no changes made"
@@ -503,11 +540,14 @@ def initialize(request, frontend, container=None):
             "BASE_PATH": "/guide",
             "COOKIE_SECURE": "true",
             "DATA_DIR": "/app/var",
-            "TRUSTED_PROXY_IPS": proxy_ip(frontend, container),
+            "TRUSTED_PROXY_IPS": request.get("trusted_proxy_ips", "")
+            if request.get("proxy_mode") == "external"
+            else proxy_ip(frontend, container),
         }
         write_private(app_env, "".join(f"{k}='{v}'\n" for k, v in values.items()))
     env_file = ROOT / "deploy.env"
-    contents = f"AUDIO_VOLUME=involta-guide-audio\nGUIDE_HTTP_PORT=3080\nBASE_PATH=/guide\nNGINX_NETWORK={frontend}\nNETWORK_MODE={'host' if frontend == 'host' else 'bridge'}\nPOSTGRES_IMAGE={request['postgres_image']}\n"
+    options = {**runtime_options(request, frontend), "POSTGRES_IMAGE": request["postgres_image"]}
+    contents = "".join(f"{key}={value}\n" for key, value in options.items())
     if env_file.exists() and env_file.read_text() != contents:
         raise Failure("Existing deployment options differ; refusing to overwrite them")
     if not env_file.exists():
@@ -525,11 +565,7 @@ def compose_env(request, frontend):
         "POSTGRES_IMAGE": request["postgres_image"],
         "IMAGE_REF": request["image"],
         "RELEASE_SHA": request["sha"],
-        "AUDIO_VOLUME": "involta-guide-audio",
-        "GUIDE_HTTP_PORT": "3080",
-        "BASE_PATH": "/guide",
-        "NGINX_NETWORK": frontend,
-        "NETWORK_MODE": "host" if frontend == "host" else "bridge",
+        **runtime_options(request, frontend),
     }
 
 
@@ -571,8 +607,12 @@ def bootstrap(request):
             report.update(
                 {
                     "os": release["PRETTY_NAME"],
-                    "nginx": "container" if container else "host/systemd",
-                    "nginx_config": str(target),
+                    "nginx": "external (unchanged)"
+                    if request.get("proxy_mode") == "external"
+                    else "container"
+                    if container
+                    else "host/systemd",
+                    "nginx_config": str(target) if target is not None else None,
                     "existing_services": run(
                         [
                             "systemctl",
@@ -688,33 +728,44 @@ def bootstrap(request):
                     timeout=1200,
                 )
                 deployed = True
-                report["stage"] = "backup/test/reload nginx"
-                if target.read_text() != original:
-                    raise Failure(
-                        "nginx configuration changed during provisioning; refusing to overwrite it"
-                    )
-                backup_dir = ROOT / "nginx-backups" / request["run_id"]
-                backup_dir.mkdir(parents=True, mode=0o700)
-                backup = backup_dir / "site.conf"
-                shutil.copy2(target, backup)
-                report["nginx_backup"] = str(backup)
+                external = request.get("proxy_mode") == "external"
                 state = {
                     "sha": request["sha"],
                     "image": request["image"],
                     "run_id": request["run_id"],
                     "frontend": frontend,
-                    "command": command,
-                    "target": str(target),
-                    "backup": str(backup),
-                    "candidate_hash": hashlib.sha256(proposed.encode()).hexdigest(),
                     "homepage": homepage,
+                    "proxy_mode": "external" if external else "local",
+                    "http_port": request.get("http_port", 3001),
+                    "trusted_proxy_ips": request.get("trusted_proxy_ips", ""),
                 }
+                if not external:
+                    report["stage"] = "backup/test/reload nginx"
+                    if target.read_text() != original:
+                        raise Failure(
+                            "nginx configuration changed during provisioning; refusing to overwrite it"
+                        )
+                    backup_dir = ROOT / "nginx-backups" / request["run_id"]
+                    backup_dir.mkdir(parents=True, mode=0o700)
+                    backup = backup_dir / "site.conf"
+                    shutil.copy2(target, backup)
+                    report["nginx_backup"] = str(backup)
+                    state.update(
+                        command=command,
+                        target=str(target),
+                        backup=str(backup),
+                        candidate_hash=hashlib.sha256(proposed.encode()).hexdigest(),
+                    )
                 write_private(ROOT / "bootstrap-rollback.json", json.dumps(state))
-                nginx_changed = True
-                # Preserve inode for single-file bind mounts. Original mode/owner are retained.
-                target.write_text(proposed)
-                run([*command, "-t"])
-                run([*command, "-s", "reload"])
+                if not external:
+                    nginx_changed = True
+                    target.write_text(proposed)
+                    run([*command, "-t"])
+                    run([*command, "-s", "reload"])
+                else:
+                    report["backend_listener"] = (
+                        f"0.0.0.0:{runtime_options(request, frontend)['GUIDE_HTTP_PORT']}"
+                    )
                 report["stage"] = "HTTPS and main site verification"
                 for attempt in range(6):
                     try:
@@ -734,7 +785,7 @@ def bootstrap(request):
                             raise
                         time.sleep(2)
                 report["checks"] = [
-                    "nginx -t",
+                    "external nginx unchanged" if external else "nginx -t",
                     "local HTTP readiness and SHA",
                     "HTTPS readiness and SHA",
                     "directory/admin routes",
@@ -807,13 +858,19 @@ def rollback_bootstrap(request):
             state["run_id"],
         ] != expected:
             raise Failure("Release changed; refusing to roll back another deployment")
-        target, backup = Path(state["target"]), Path(state["backup"])
-        if hashlib.sha256(target.read_bytes()).hexdigest() != state["candidate_hash"]:
-            raise Failure("nginx changed since bootstrap; refusing to overwrite another edit")
-        target.write_bytes(backup.read_bytes())
-        shutil.copystat(backup, target)
-        run([*state["command"], "-t"])
-        run([*state["command"], "-s", "reload"])
+        if state.get("proxy_mode", "local") != "external":
+            target, backup = Path(state["target"]), Path(state["backup"])
+            if hashlib.sha256(target.read_bytes()).hexdigest() != state["candidate_hash"]:
+                raise Failure("nginx changed since bootstrap; refusing to overwrite another edit")
+            target.write_bytes(backup.read_bytes())
+            shutil.copystat(backup, target)
+            run([*state["command"], "-t"])
+            run([*state["command"], "-s", "reload"])
+        request = {
+            **request,
+            "proxy_mode": state.get("proxy_mode", "local"),
+            "http_port": state.get("http_port", 3001),
+        }
         if baseline() != state["homepage"]:
             raise Failure("Main site did not return to baseline after nginx rollback")
         compose(request, state["frontend"], "stop", "--timeout", "240", "web", "worker")
@@ -822,7 +879,7 @@ def rollback_bootstrap(request):
         report = {
             "status": "rolled_back",
             "sha": request["sha"],
-            "reason": "External runner healthcheck failed; nginx restored; Guide containers removed; data retained",
+            "reason": "External runner healthcheck failed; nginx unchanged/restored; Guide containers removed; data retained",
         }
         save_report(report)
         print(json.dumps(report))

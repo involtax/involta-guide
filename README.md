@@ -145,6 +145,8 @@ adoption, UUID/snapshots/FKs, конкурентные правки/worker, fake
 ## Production
 
 Полный автоматический процесс: [docs/DEPLOY.md](docs/DEPLOY.md).
+Текущий backend — `http://45.12.67.102:3001`, внешний Nginx основного сайта
+проксирует на него `/guide/`. На сервере Guide Nginx не устанавливается.
 
 - `bootstrap-production.yml`: предварительные проверки, Docker из официального
   репозитория, отдельный PostgreSQL Guide, миграции/seed новой БД, контейнеры Guide,

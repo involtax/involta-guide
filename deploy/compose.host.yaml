@@ -1,4 +1,4 @@
-# Host nginx: no Docker bridge, NAT, published ports, or firewall changes.
+# Host networking: local or external nginx; no Docker bridge/NAT/firewall changes.
 services:
   web:
     container_name: involta-guide
@@ -11,7 +11,7 @@ services:
     environment:
       RELEASE_SHA: ${RELEASE_SHA:?}
       BASE_PATH: /guide
-    command: ["uvicorn", "involta_guide.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "3080", "--no-access-log", "--no-proxy-headers"]
+    command: ["uvicorn", "involta_guide.main:create_app", "--factory", "--host", "${GUIDE_BIND_ADDRESS:-127.0.0.1}", "--port", "${GUIDE_HTTP_PORT:-3080}", "--no-access-log", "--no-proxy-headers"]
     volumes: ["audio:/app/var"]
     read_only: true
     tmpfs: ["/tmp:mode=1777"]
@@ -19,7 +19,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     stop_grace_period: 30s
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3080/guide/health/ready',timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:${GUIDE_HTTP_PORT:-3080}/guide/health/ready',timeout=3)"]
       interval: 5s
       timeout: 5s
       start_period: 10s

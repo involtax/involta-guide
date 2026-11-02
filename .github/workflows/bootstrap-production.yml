@@ -63,6 +63,10 @@ jobs:
       contents: read
       packages: read
     env:
+      # Existing nginx on the main-site server forwards /guide/ to 45.12.67.102:3001.
+      BOOTSTRAP_PROXY_MODE: external
+      BOOTSTRAP_HTTP_PORT: "3001"
+      BOOTSTRAP_TRUSTED_PROXY_IPS: ${{ vars.TRUSTED_PROXY_IPS || '135.106.210.137' }}
       TARGET_SHA: ${{ needs.build.outputs.sha }}
       IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

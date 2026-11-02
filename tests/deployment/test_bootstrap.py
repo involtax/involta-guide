@@ -478,3 +478,99 @@ def test_official_repository_unavailable_fails_without_installing_packages(monke
         bootstrap.check_docker_repository({"ID": "ubuntu", "VERSION_CODENAME": "focal"})
     assert len(calls) == 1 and calls[0][0] == "curl"
     assert calls[0][-1] == "https://download.docker.com/linux/ubuntu/dists/focal/Release"
+
+
+def external_request(**updates):
+    return request(
+        proxy_mode="external", http_port=3001, trusted_proxy_ips="135.106.210.137", **updates
+    )
+
+
+def external_preflight(_):
+    return (
+        {"PRETTY_NAME": "Ubuntu 26.04.1 LTS"},
+        (None, None, None, None, "host", None),
+        "200 ",
+        True,
+        True,
+    )
+
+
+def test_external_proxy_starts_on_3001_without_touching_nginx(transaction, monkeypatch):
+    root, config, calls, _ = transaction
+    monkeypatch.setattr(bootstrap, "preflight", external_preflight)
+    bootstrap.bootstrap(external_request())
+    assert config.read_text() == SITE
+    assert not (root / "nginx-backups").exists()
+    assert not any(command[0] == "nginx" for command, _ in calls)
+    envs = [
+        kwargs["env"]
+        for command, kwargs in calls
+        if command[:2] == ["docker", "compose"] and "env" in kwargs
+    ]
+    assert envs and all(
+        env["GUIDE_HTTP_PORT"] == "3001"
+        and env["GUIDE_BIND_ADDRESS"] == "0.0.0.0"
+        and env["NETWORK_MODE"] == "host"
+        for env in envs
+    )
+    state = json.loads((root / "bootstrap-rollback.json").read_text())
+    assert state["proxy_mode"] == "external" and "backup" not in state
+    report = json.loads((root / "bootstrap-report.json").read_text())
+    assert report["nginx"] == "external (unchanged)"
+    assert report["backend_listener"] == "0.0.0.0:3001"
+
+
+def test_external_proxy_https_failure_removes_only_guide(transaction, monkeypatch):
+    root, config, calls, original_run = transaction
+    monkeypatch.setattr(bootstrap, "preflight", external_preflight)
+
+    def fail_public(args, **kwargs):
+        result = original_run(args, **kwargs)
+        if args[:2] == ["bash", str(DEPLOY / "check-release.sh")]:
+            raise bootstrap.Failure("External proxy is unreachable")
+        return result
+
+    monkeypatch.setattr(bootstrap, "run", fail_public)
+    with pytest.raises(bootstrap.Failure, match="External proxy"):
+        bootstrap.bootstrap(external_request())
+    assert config.read_text() == SITE
+    assert not (root / "current-release").exists()
+    assert not any(command[0] == "nginx" for command, _ in calls)
+    assert any("rm" in command and command[-2:] == ["web", "worker"] for command, _ in calls)
+
+
+def test_external_proxy_late_rollback_does_not_require_local_nginx(transaction, monkeypatch):
+    root, config, calls, _ = transaction
+    monkeypatch.setattr(bootstrap, "preflight", external_preflight)
+    bootstrap.bootstrap(external_request())
+    bootstrap.rollback_bootstrap(external_request())
+    assert config.read_text() == SITE
+    assert not (root / "current-release").exists()
+    assert not any(command[0] == "nginx" for command, _ in calls)
+
+
+def test_external_proxy_saved_options_match_application_binding(tmp_path, monkeypatch):
+    root = tmp_path / "guide"
+    root.mkdir()
+    monkeypatch.setattr(bootstrap, "ROOT", root)
+    monkeypatch.setattr(bootstrap, "owned", lambda *a: False)
+    monkeypatch.setattr(
+        bootstrap, "docker", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", "")
+    )
+    bootstrap.initialize(external_request(), "host")
+    options = dict(line.split("=", 1) for line in (root / "deploy.env").read_text().splitlines())
+    assert options["GUIDE_HTTP_PORT"] == "3001"
+    assert options["GUIDE_BIND_ADDRESS"] == "0.0.0.0"
+    assert options["NETWORK_MODE"] == "host"
+    from dotenv import dotenv_values
+
+    env = dotenv_values(root / ".env.production")
+    assert "127.0.0.1:15432" in env["DATABASE_URL"]
+    assert env["TRUSTED_PROXY_IPS"] == "135.106.210.137"
+
+
+@pytest.mark.parametrize("port", [0, 65536, "3001; command"])
+def test_external_port_is_validated_before_provisioning(port):
+    with pytest.raises(bootstrap.Failure, match="HTTP port"):
+        bootstrap.validate_request(request(proxy_mode="external", http_port=port))

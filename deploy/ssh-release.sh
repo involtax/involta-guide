@@ -59,6 +59,9 @@ if [[ "$mode" == bootstrap || "$mode" == bootstrap-rollback ]]; then
 import json, os
 print(json.dumps({
     "action": os.environ["BOOTSTRAP_ACTION"], "sha": os.environ["TARGET_SHA"],
+    "proxy_mode": os.environ.get("BOOTSTRAP_PROXY_MODE", "local"),
+    "http_port": int(os.environ.get("BOOTSTRAP_HTTP_PORT", "3080")),
+    "trusted_proxy_ips": os.environ.get("BOOTSTRAP_TRUSTED_PROXY_IPS", ""),
     "image": os.environ["IMAGE_REF"], "postgres_image": os.environ.get("POSTGRES_IMAGE", ""),
     "actor": os.environ["GITHUB_ACTOR"], "token": os.environ["GHCR_TOKEN"],
     "run_id": os.environ["DEPLOYMENT_ID"],
