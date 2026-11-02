@@ -402,4 +402,10 @@ def test_container_nginx_bind_mount_and_network_discovery(tmp_path, monkeypatch,
         assert original == SITE
         assert "http://involta-guide:3000" in proposed
         assert network == "site-network" and container == "abc123"
-        assert command == ["docker", "exec", "abc123", "nginx"]
+        assert command == [
+            "docker",
+            "--host=unix:///var/run/docker.sock",
+            "exec",
+            "abc123",
+            "nginx",
+        ]

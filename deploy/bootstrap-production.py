@@ -53,7 +53,7 @@ def run(args, *, data=None, check=True, timeout=300, env=None):
 
 
 def docker(*args, **kwargs):
-    return run(["docker", *args], **kwargs)
+    return run(["docker", "--host=unix:///var/run/docker.sock", *args], **kwargs)
 
 
 def owned(kind, name):
@@ -118,7 +118,18 @@ def nginx_candidates():
                     raise Failure(
                         "Container nginx uses custom -c/-p startup flags; safe default-config mapping is unavailable"
                     )
-                candidates.append((["docker", "exec", line.split()[0], "nginx"], line.split()[0]))
+                candidates.append(
+                    (
+                        [
+                            "docker",
+                            "--host=unix:///var/run/docker.sock",
+                            "exec",
+                            line.split()[0],
+                            "nginx",
+                        ],
+                        line.split()[0],
+                    )
+                )
     valid = []
     for command, container in candidates:
         dump = run([*command, "-T"], check=False)
