@@ -45,6 +45,7 @@ jobs:
       DEPLOY_ROOT: /opt/involta-guide
       PUBLIC_URL: https://involta.ru/guide/
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      # Empty or "-" temporarily disables host-key verification; a real pin enables strict checking.
       DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
       - uses: actions/checkout@v4

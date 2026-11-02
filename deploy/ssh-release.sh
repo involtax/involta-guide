@@ -6,7 +6,7 @@ mode=${1:-deploy}
 : "${DEPLOY_SSH_HOST:?Set repository secret DEPLOY_HOST}"
 : "${DEPLOY_SSH_USER:?Set repository secret DEPLOY_USER}"
 : "${DEPLOY_SSH_KEY:?Set repository secret DEPLOY_SSH_KEY}"
-: "${DEPLOY_SSH_KNOWN_HOSTS:?Set repository secret DEPLOY_KNOWN_HOSTS}"
+DEPLOY_SSH_KNOWN_HOSTS=${DEPLOY_SSH_KNOWN_HOSTS:-}
 : "${TARGET_SHA:?}" "${IMAGE_REF:?}" "${GHCR_TOKEN:?}" "${GITHUB_ACTOR:?}" "${GITHUB_RUN_ID:?}"
 DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT:-22}; DEPLOY_ROOT=${DEPLOY_ROOT:-/opt/involta-guide}
 PUBLIC_URL=${PUBLIC_URL:-https://involta.ru/guide/}
@@ -19,9 +19,16 @@ work=$(mktemp -d)
 remote_dir="/tmp/involta-guide-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
 remote="${DEPLOY_SSH_USER}@${DEPLOY_SSH_HOST}"
 printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > "$work/key"
-printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$work/known_hosts"
+opts=(-i "$work/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+if [[ -n "$DEPLOY_SSH_KNOWN_HOSTS" && "$DEPLOY_SSH_KNOWN_HOSTS" != - ]]; then
+  printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$work/known_hosts"
+  opts+=(-o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$work/known_hosts" -o GlobalKnownHostsFile=/dev/null)
+  echo 'SSH host-key verification: enabled (DEPLOY_KNOWN_HOSTS)' >&2
+else
+  opts+=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null)
+  echo 'SSH host-key verification: temporarily disabled' >&2
+fi
 unset DEPLOY_SSH_KEY DEPLOY_SSH_KNOWN_HOSTS
-opts=(-i "$work/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$work/known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
 cleanup() {
   ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "rm -rf -- '$remote_dir'" </dev/null >/dev/null 2>&1 || true
   rm -rf -- "$work"
