@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -34,6 +35,93 @@ class JobService:
         self.provider = provider
         self.storage = storage
         self.public_fill_enabled = public_fill_enabled
+
+    def generation_model(self) -> str:
+        with self.uow() as uow:
+            return uow.repo.setting("generation_model", self.provider.model)
+
+    @staticmethod
+    def _model(value: str) -> str:
+        value = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value):
+            raise RuleViolation("Укажите идентификатор модели OpenAI, например gpt-5")
+        return value
+
+    def set_generation_model(self, value: str) -> None:
+        value = self._model(value)
+        with self.uow() as uow:
+            uow.repo.set_setting("generation_model", value)
+            uow.repo.audit("generation_model", "generation", value)
+
+    @staticmethod
+    def generation_config(repo: Repository, job_id: str) -> Record:
+        rows = repo.rows("audit", {"action": "generation_run", "target": job_id}, limit=1)
+        return dict(json.loads(rows[0]["detail"])) if rows else {}
+
+    def _queue_generation(
+        self,
+        repo: Repository,
+        location: Record,
+        *,
+        model: str | None = None,
+        public_fill: bool = False,
+        previous_job: str | None = None,
+    ) -> str | None:
+        # The caller holds the location row lock. Assign numbers once, including old history.
+        history = sorted(
+            repo.rows("jobs", {"kind": "generate", "location_id": location["id"]}, limit=100000),
+            key=lambda row: (row["created_at"], row["id"]),
+        )
+        counter = 0
+        for old in history:
+            config = self.generation_config(repo, old["id"])
+            if config:
+                counter = max(counter, int(config["number"]))
+                continue
+            counter += 1
+            calls = repo.rows("ai_usage", {"job_id": old["id"]}, limit=1)
+            repo.audit(
+                "generation_run",
+                old["id"],
+                json.dumps(
+                    {
+                        "number": counter,
+                        "model": calls[0]["model"] if calls else self.provider.model,
+                        "public_log": self._is_public_fill(repo, old["id"]),
+                        "legacy": True,
+                    }
+                ),
+            )
+        counter_key = "generation_counter_" + location["id"]
+        counter = max(counter, int(repo.setting(counter_key, "0")))
+        chosen = self._model(model or repo.setting("generation_model", self.provider.model))
+        job_id = str(uuid4())
+        if not repo.queue(
+            {
+                "id": job_id,
+                "kind": "generate",
+                "location_id": location["id"],
+                "prompt": repo.setting("prompt"),
+            }
+        ):
+            return None
+        repo.audit(
+            "generation_run",
+            job_id,
+            json.dumps(
+                {
+                    "number": counter + 1,
+                    "model": chosen,
+                    "public_log": True,
+                    "previous_job": previous_job,
+                    "baseline_version": location["draft_version"],
+                }
+            ),
+        )
+        repo.set_setting(counter_key, str(counter + 1))
+        if public_fill:
+            repo.audit("temporary_public_fill", job_id, location["id"])
+        return job_id
 
     @staticmethod
     def _has_data(location: Record) -> bool:
@@ -96,52 +184,63 @@ class JobService:
             state = self._public_state(repo, location)
             if not state["can_start"]:
                 return state
-            job_id = str(uuid4())
-            if repo.queue(
-                {
-                    "id": job_id,
-                    "kind": "generate",
-                    "location_id": location_id,
-                    "prompt": repo.setting("prompt"),
-                }
-            ):
-                # This durable marker authorizes publication only for this manually clicked job.
-                # Existing jobs/schema are reused so deployment needs no production migration.
-                repo.audit("temporary_public_fill", job_id, location_id)
+            self._queue_generation(repo, location, public_fill=True)
             return self._public_state(repo, location)
 
-    def enqueue(self, location_id: str | None = None, scope: str = "empty") -> int:
+    def enqueue(
+        self, location_id: str | None = None, scope: str = "empty", *, model: str | None = None
+    ) -> int:
         if scope not in ("empty", "all"):
             raise RuleViolation("Выберите область наполнения")
         with self.uow() as uow:
             repo = uow.repo
-            prompt = repo.setting("prompt")
             rows = (
                 [require(repo, "locations", location_id)]
                 if location_id
                 else repo.rows("locations", {"active": 1}, limit=100000)
             )
             count = 0
-            for location in rows:
+            for location in sorted(rows, key=lambda row: row["id"]):
                 if not location_id and (
                     (not location["listed"] and not location["published_version"])
                     or (scope == "empty" and location["draft"])
                 ):
                     continue
-                count += repo.queue(
-                    {
-                        "id": str(uuid4()),
-                        "kind": "generate",
-                        "location_id": location["id"],
-                        "prompt": prompt,
-                    }
-                )
+                location = require(repo, "locations", location["id"], lock=True)
+                if not location_id and scope == "empty" and location["draft"]:
+                    continue
+                count += self._queue_generation(repo, location, model=model) is not None
             repo.audit(
                 "queue_generation", "all" if location_id is None else location_id, str(count)
             )
             return count
 
+    def regenerate(self, job_id: str, *, model: str | None = None) -> str:
+        with self.uow() as uow:
+            old = require(uow.repo, "jobs", job_id)
+            if old["kind"] != "generate":
+                raise RuleViolation("Новый запрос доступен только для наполнения")
+            location = require(uow.repo, "locations", old["location_id"], lock=True)
+            if not location["active"]:
+                raise RuleViolation("Локация отключена")
+            public_fill = (
+                self.public_fill_enabled
+                and not self._has_data(location)
+                and self._is_public_fill(uow.repo, job_id)
+            )
+            new_id = self._queue_generation(
+                uow.repo, location, model=model, public_fill=public_fill, previous_job=job_id
+            )
+            if not new_id:
+                raise Conflict("Для этой локации уже есть запрос в очереди или в работе")
+            return new_id
+
     def retry(self, job_id: str) -> None:
+        with self.uow() as uow:
+            row = require(uow.repo, "jobs", job_id)
+        if row["kind"] == "generate":
+            self.regenerate(job_id)
+            return
         with self.uow() as uow:
             row = require(uow.repo, "jobs", job_id, lock=True)
             if row["status"] != "failed":
@@ -194,6 +293,14 @@ class JobService:
             known = uow.repo.known(location["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
             review = require(uow.repo, "reviews", job["review_id"]) if job["review_id"] else None
+            config = self.generation_config(uow.repo, job["id"])
+            generation_model = config.get("model", self.provider.model)
+            if (
+                job["kind"] == "generate"
+                and "baseline_version" in config
+                and config["baseline_version"] != baseline
+            ):
+                raise Conflict("Черновик изменён после постановки запроса. Создайте новый запрос.")
         if job["kind"] == "generate":
             scope = (
                 location["coverage_note"]
@@ -243,7 +350,7 @@ class JobService:
                     baseline,
                     source="public_fill" if is_public else "ai",
                     prompt=prompt,
-                    model=self.provider.model,
+                    model=generation_model,
                     inherit=False,
                 )
                 if is_public:

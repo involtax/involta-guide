@@ -112,6 +112,8 @@ def routes(prefix: str) -> APIRouter:
         detail = store.detail(job_id, public_only=True) if job_id else None
         if job_id and detail is None:
             raise HTTPException(404, "Публичный журнал не найден")
+        if detail:
+            q = detail["job"]["location_slug"]
         return request.app.state.templates.TemplateResponse(
             request=request,
             name="public_logs.html",
@@ -132,16 +134,52 @@ def routes(prefix: str) -> APIRouter:
     def public_logs(request: Request, q: str = "", page: int = 1) -> Response:
         return log_page(request, None, q, page)
 
+    def numbered_detail(request: Request, slug: str, number: int) -> dict:
+        store = log_store(request)
+        job_id = store.resolve(slug, number, public_only=True) if number > 0 else None
+        detail = store.detail(job_id, public_only=True) if job_id else None
+        if detail is None:
+            raise HTTPException(404, "Версия журнала не найдена")
+        return detail
+
+    @router.get(prefix + "/logs/{slug}/{number}.json")
+    def numbered_json(request: Request, slug: str, number: int) -> Response:
+        detail = numbered_detail(request, slug, number)
+        return JSONResponse(detail, headers=log_headers)
+
+    @router.get(prefix + "/logs/{slug}/{number}")
+    def numbered_log(request: Request, slug: str, number: int, page: int = 1) -> Response:
+        detail = numbered_detail(request, slug, number)
+        canonical = context(request).settings.path(detail["job"]["log_path"])
+        if slug != detail["job"]["location_slug"]:
+            return RedirectResponse(canonical, status_code=308, headers=log_headers)
+        return log_page(request, detail["job"]["id"], slug, page)
+
     @router.get(prefix + "/logs/{job_id}.json")
     def public_log_json(request: Request, job_id: UUID) -> Response:
         detail = log_store(request).detail(str(job_id), public_only=True)
         if detail is None:
             raise HTTPException(404, "Публичный журнал не найден")
-        return JSONResponse(detail, headers=log_headers)
+        return RedirectResponse(
+            context(request).settings.path(detail["job"]["log_path"]) + ".json",
+            status_code=308,
+            headers=log_headers,
+        )
 
     @router.get(prefix + "/logs/{job_id}")
-    def public_log(request: Request, job_id: UUID, page: int = 1) -> Response:
-        return log_page(request, str(job_id), "", page)
+    def public_log(request: Request, job_id: str, page: int = 1) -> Response:
+        try:
+            identifier = str(UUID(job_id))
+        except ValueError:
+            return log_page(request, None, job_id, page)
+        detail = log_store(request).detail(identifier, public_only=True)
+        if detail is None:
+            raise HTTPException(404, "Публичный журнал не найден")
+        return RedirectResponse(
+            context(request).settings.path(detail["job"]["log_path"]),
+            status_code=308,
+            headers=log_headers,
+        )
 
     @router.post(prefix + "/api/locations/{slug}/fill")
     def public_fill(request: Request, slug: str) -> Response:

@@ -17,10 +17,18 @@
 {%if audit_detail%}
 {%set d=audit_detail%}
 <article class="panel">
-<h2>{{d.job.location_name}} · {{d.job.status}}</h2>
-<p>{{d.job.id}} · {{d.job.kind}} · попыток {{d.job.attempts}} · {{d.job.created_at}}</p>
+<h2>{{d.job.location_name}}{%if d.job.run_number%} / {{d.job.run_number}}{%endif%} · {{d.job.status}}</h2>
+<p>{{d.job.model_name}} · {{d.job.kind}} · попыток {{d.job.attempts}} · {{d.job.created_at}}</p>
 {%if d.job.error%}<p role="alert">{{d.job.error}}</p>{%endif%}
-<a href="{{settings.path('/logs/') if public_view else settings.path('/admin/ai-audit/')}}{{d.job.id}}.json" hx-boost="false">{{'Открыть полный JSON ↗' if public_view else 'Скачать полный аудит JSON ↗'}}</a>
+{%for v in d.versions%}<p>Результат запроса: версия страницы №{{v.number}}.</p>{%endfor%}
+{%if not d.versions and d.job.kind=='generate' and d.job.status=='failed'%}<p>Запрос завершился ошибкой. Новая версия страницы не создана.</p>{%endif%}
+<a href="{{settings.path(d.job.log_path)+'.json' if public_view else settings.path('/admin/ai-audit/')+d.job.id+'.json'}}" hx-boost="false">{{'Открыть полный JSON ↗' if public_view else 'Скачать полный аудит JSON ↗'}}</a>
+{%if not public_view and d.job.kind=='generate'%}
+<a href="{{settings.path(d.job.log_path)}}" hx-boost="false">Публичный лог {{d.job.location_slug}}/{{d.job.run_number}} ↗</a>
+<form method="post" action="{{settings.path('/admin/actions/regenerate')}}">{{csrf()}}<input type="hidden" name="job_id" value="{{d.job.id}}">
+<label>Модель нового запроса<input name="model" value="{{generation_model}}" required></label>
+<button {%if d.job.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button></form>
+{%endif%}
 {%if not d.trace_available%}<p class="notice">Старое задание: полные запросы и ответы тогда не сохранялись. Восстановить их нельзя. Ниже доступны сохранившиеся данные; новые попытки будут записаны полностью.</p>{%endif%}
 <details><summary>Данные задания и исходный промт</summary><pre class="audit-json">{{d.job|tojson(indent=2)}}</pre></details>
 {%if d.review%}
@@ -34,7 +42,7 @@
 <pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>
 {%else%}<p>Обращения к провайдеру не зарегистрированы.</p>{%endfor%}
 <h3>Хронология обработки</h3>
-{%set labels={'job_started':'Начало попытки','request':'Отправленный запрос','response':'Полный ответ OpenAI','provider_error':'Ошибка провайдера','job_failed':'Ошибка обработки: подробности и поля','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы'}%}
+{%set labels={'generation_run':'Номер запуска и выбранная модель','job_started':'Начало попытки','request':'Отправленный запрос','response':'Полный ответ OpenAI','provider_error':'Ошибка провайдера','job_failed':'Ошибка обработки: подробности и поля','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы'}%}
 {%for e in d.events%}
 <details open><summary>{{e.time}} · {{labels.get(e.payload.event, e.payload.event|default('Событие'))}}</summary>
 {%if e.response_body is defined%}
@@ -51,7 +59,8 @@
 <h3>Задания · {{audit_jobs.total}}</h3>
 {%for j in audit_jobs.rows%}
 <article class="panel">
-<a href="{{settings.path('/logs/'+j.id|string) if public_view else settings.path('/admin')+'?tab=ai-audit&job='+j.id|string}}"><strong>{{j.location_name}} · {{j.kind}} · {{j.status}}</strong></a>
+<a href="{{settings.path(j.log_path) if public_view else settings.path('/admin')+'?tab=ai-audit&job='+j.id|string}}"><strong>{{j.location_name}}{%if j.run_number%} / {{j.run_number}}{%endif%} · {{j.kind}} · {{j.status}}</strong></a>
+<p>{{j.model_name}}</p>
 <p>{{j.created_at}} · попыток {{j.attempts}} · обращений к API {{j.calls}}</p>
 {%if j.error%}<p>{{j.error}}</p>{%endif%}
 </article>

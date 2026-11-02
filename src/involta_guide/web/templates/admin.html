@@ -132,6 +132,7 @@ checked
 <a href="{{settings.path('/'+c.slug)}}" hx-boost="false" target="_blank">Открыть страницу ↗</a>
 <h2>Черновик страницы</h2>
 <form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
+<label>Модель наполнения<input name="model" value="{{generation_model}}" required></label>
 <button>Наполнить через GPT ↗</button>
 </form>
 <form method="post" action="{{settings.path('/admin/actions/content')}}" class="stack">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
@@ -238,11 +239,15 @@ checked
 <section class="panel">
 <h2>Наполнение</h2>
 <p>Пустых локаций: {{overview.empty}}</p>
+<form method="post" action="{{settings.path('/admin/actions/generation-model')}}" class="stack">{{csrf()}}
+<label>Модель для новых запросов наполнения<input name="model" value="{{generation_model}}" placeholder="Точный ID модели OpenAI" required></label>
+<p>Введи точное имя доступной твоему API-проекту модели. Настройка применяется к наполнению, включая публичную кнопку. Модели анализа отзывов и распознавания речи не меняются.</p>
+<button>Сохранить модель наполнения</button></form>
 <form method="post" action="{{settings.path('/admin/actions/prompt')}}" class="stack">{{csrf()}}<label>Промпт генерации<textarea name="prompt" rows="18">{{prompt}}</textarea>
 </label>
 <button>Сохранить промпт</button>
 </form>
-<form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<select name="scope">
+<form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="model" value="{{generation_model}}"><select name="scope">
 <option value="empty">Пустые локации</option>
 <option value="all">Все локации</option>
 </select>

@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 from playwright.sync_api import expect, sync_playwright
@@ -132,6 +133,12 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("heading", name="Рабочий стол.")).to_be_visible()
                 queries = Queries(lambda: PostgresUow(engine))
                 location = queries.directory(query="Иваново")["rows"][0]
+                page.goto(base + "/admin?tab=fill")
+                model_form = page.locator('form[action$="/generation-model"]')
+                model_form.get_by_label("Модель для новых запросов наполнения").fill("gpt-5")
+                model_form.get_by_role("button", name="Сохранить модель наполнения").click()
+                expect(page.get_by_role("status")).to_contain_text("Модель наполнения сохранена")
+                assert queries.setting("generation_model") == "gpt-5"
                 page.goto(base + "/admin?tab=locations&location=" + location["id"])
                 page.get_by_role("button", name="+ Ресторан", exact=True).click()
                 card = page.locator("[data-card]")
@@ -190,6 +197,30 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     page.get_by_role("link", name="Скачать полный аудит JSON ↗").click()
                 export = json.loads(Path(downloaded.value.path()).read_text())
                 assert export["job"]["id"] == job["id"]
+                failed_id = str(uuid4())
+                with PostgresUow(engine) as tx:
+                    tx.repo.queue(
+                        {
+                            "id": failed_id,
+                            "kind": "generate",
+                            "location_id": location["id"],
+                            "prompt": "old browser fixture prompt",
+                        }
+                    )
+                    tx.repo.change("jobs", failed_id, {"status": "failed", "error": "old failure"})
+                    tx.repo.audit("temporary_public_fill", failed_id, location["id"])
+                page.goto(base + "/admin?tab=fill")
+                repeat = page.locator('form[action$="/regenerate"]')
+                repeat.get_by_label("Модель нового запроса").fill("gpt-5")
+                repeat.get_by_role("button", name="Повторить новым запросом").click()
+                expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
+                new_job = queries.rows("jobs", {"kind": "generate", "status": "queued"})[0]
+                assert new_job["id"] != failed_id
+                page.goto(base + "/logs/ivanovo/2")
+                expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
+                expect(page.get_by_role("link", name="Открыть полный JSON ↗")).to_have_attribute(
+                    "href", "/guide/logs/ivanovo/2.json"
+                )
                 # Alex bootstrap is not a named parameter and is cleared from the URL.
                 alex = browser.new_context()
                 alex_page = alex.new_page()

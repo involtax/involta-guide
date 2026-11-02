@@ -199,10 +199,17 @@ class OpenAIProvider:
             raise ProviderUnavailable(message) from None
 
     def _structured(
-        self, prompt: str, schema: type[BaseModel], job_id: str, *, search: bool = False
+        self,
+        prompt: str,
+        schema: type[BaseModel],
+        job_id: str,
+        *,
+        search: bool = False,
+        model: str | None = None,
     ) -> Record:
+        selected_model = model or self.model
         body = {
-            "model": self.model,
+            "model": selected_model,
             "input": [
                 {
                     "role": "system",
@@ -222,7 +229,7 @@ class OpenAIProvider:
         }
         if search:
             body["tools"] = [{"type": "web_search_preview"}]
-        result = self._request("responses", job_id, self.model, body=body)
+        result = self._request("responses", job_id, selected_model, body=body)
         output = "".join(
             part.get("text", "")
             for item in result.get("output", [])
@@ -235,7 +242,15 @@ class OpenAIProvider:
             raise ProviderUnavailable("ИИ не вернул структурированный JSON") from None
 
     def generate(self, prompt: str, job_id: str) -> Record:
-        return self._structured(prompt, Generation, job_id, search=True)
+        with self.engine.connect() as conn:
+            config = conn.execute(
+                text(
+                    "SELECT detail FROM audit WHERE action='generation_run' AND target=:id LIMIT 1"
+                ),
+                {"id": job_id},
+            ).scalar_one_or_none()
+        model = json.loads(config).get("model", self.model) if config else self.model
+        return self._structured(prompt, Generation, job_id, search=True, model=model)
 
     def analyze(self, prompt: str, job_id: str, *, alex: bool = False) -> Record:
         return self._structured(prompt, AlexCommands if alex else Analysis, job_id)

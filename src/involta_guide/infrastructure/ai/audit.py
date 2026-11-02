@@ -11,6 +11,19 @@ from sqlalchemy import Engine, text
 
 from involta_guide.config import Settings
 
+HISTORY = """WITH numbered AS (
+ SELECT j.*,l.name location_name,l.slug location_slug,
+ row_number() OVER(PARTITION BY j.location_id,j.kind ORDER BY j.created_at,j.id) ordinal,
+ (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
+ (SELECT u.model FROM ai_usage u WHERE u.job_id=j.id ORDER BY u.created_at,u.id LIMIT 1) actual_model
+ FROM jobs j LEFT JOIN locations l ON l.id=j.location_id
+), history AS (
+ SELECT *,CASE WHEN kind='generate' THEN coalesce((generation_config->>'number')::bigint,ordinal) END run_number,
+ coalesce(generation_config->>'model',actual_model,'') model_name FROM numbered
+) """
+PUBLIC_GENERATION = """j.kind='generate' AND j.review_id IS NULL AND
+ (j.generation_config->>'public_log'='true' OR EXISTS(SELECT 1 FROM audit a WHERE a.action='temporary_public_fill' AND a.target=j.id::text))"""
+
 
 class AIAudit:
     def __init__(self, engine: Engine, settings: Settings) -> None:
@@ -75,16 +88,13 @@ class AIAudit:
     def listing(
         self, page: int, query: str = "", status: str = "", *, public_only: bool = False
     ) -> dict[str, Any]:
-        where = "WHERE (:q='' OR l.name ILIKE :search OR j.id::text=:q) AND (:status='' OR j.status=:status)"
+        where = "WHERE (:q='' OR j.location_name ILIKE :search OR j.location_slug=:q OR j.id::text=:q) AND (:status='' OR j.status=:status)"
         if public_only:
-            where += " AND j.kind='generate' AND j.review_id IS NULL AND EXISTS(SELECT 1 FROM audit a WHERE a.action='temporary_public_fill' AND a.target=j.id::text)"
+            where += " AND " + PUBLIC_GENERATION
         params = {"q": query, "search": "%" + query + "%", "status": status}
         with self.engine.connect() as conn:
             total = conn.execute(
-                text(
-                    "SELECT count(*) FROM jobs j LEFT JOIN locations l ON l.id=j.location_id "
-                    + where
-                ),
+                text(HISTORY + "SELECT count(*) FROM history j " + where),
                 params,
             ).scalar_one()
             pages = max(1, (total + 39) // 40)
@@ -92,8 +102,9 @@ class AIAudit:
             rows = (
                 conn.execute(
                     text(
-                        "SELECT j.*,l.name location_name,(SELECT count(*) FROM ai_usage u WHERE u.job_id=j.id) calls "
-                        "FROM jobs j LEFT JOIN locations l ON l.id=j.location_id "
+                        HISTORY
+                        + "SELECT j.*,(SELECT count(*) FROM ai_usage u WHERE u.job_id=j.id) calls "
+                        "FROM history j "
                         + where
                         + " ORDER BY j.created_at DESC,j.id DESC LIMIT 40 OFFSET :offset"
                     ),
@@ -103,16 +114,40 @@ class AIAudit:
                 .all()
             )
         return self.clean(
-            {"rows": [dict(r) for r in rows], "total": total, "page": page, "pages": pages}
+            {
+                "rows": [self._job(dict(r)) for r in rows],
+                "total": total,
+                "page": page,
+                "pages": pages,
+            }
         )
+
+    @staticmethod
+    def _job(job: dict[str, Any]) -> dict[str, Any]:
+        job["log_path"] = (
+            f"/logs/{job['location_slug']}/{job['run_number']}"
+            if job["kind"] == "generate"
+            else None
+        )
+        return job
+
+    def resolve(self, slug: str, number: int, *, public_only: bool = False) -> str | None:
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                text(
+                    HISTORY
+                    + "SELECT j.id FROM history j WHERE j.kind='generate' AND (j.location_slug=:slug OR j.location_id IN (SELECT location_id FROM location_slug_redirects WHERE slug=:slug)) AND j.run_number=:number"
+                    + (" AND " + PUBLIC_GENERATION if public_only else "")
+                ),
+                {"slug": slug, "number": number},
+            ).scalar_one_or_none()
+        return str(value) if value else None
 
     def detail(self, job_id: str, *, public_only: bool = False) -> dict[str, Any] | None:
         with self.engine.connect() as conn:
             job = (
                 conn.execute(
-                    text(
-                        "SELECT j.*,l.name location_name FROM jobs j LEFT JOIN locations l ON l.id=j.location_id WHERE j.id=:id"
-                    ),
+                    text(HISTORY + "SELECT j.* FROM history j WHERE j.id=:id"),
                     {"id": job_id},
                 )
                 .mappings()
@@ -123,12 +158,15 @@ class AIAudit:
             if public_only and (
                 job["kind"] != "generate"
                 or job["review_id"] is not None
-                or not conn.execute(
-                    text(
-                        "SELECT 1 FROM audit WHERE target=:id AND action='temporary_public_fill' LIMIT 1"
-                    ),
-                    {"id": job_id},
-                ).first()
+                or not (
+                    (job["generation_config"] or {}).get("public_log")
+                    or conn.execute(
+                        text(
+                            "SELECT 1 FROM audit WHERE target=:id AND action='temporary_public_fill' LIMIT 1"
+                        ),
+                        {"id": job_id},
+                    ).first()
+                )
             ):
                 return None
             calls = (
@@ -163,6 +201,8 @@ class AIAudit:
                     payload = json.loads(row["detail"])
                 except ValueError:
                     payload = {"event": row["action"], "data": row["detail"]}
+                if row["action"] == "generation_run":
+                    payload = {"event": "generation_run", "data": payload}
                 event = {"time": row["created_at"], "payload": payload}
                 if isinstance(payload, dict) and payload.get("event") == "response":
                     body = payload["data"].get("body", "")
@@ -191,7 +231,7 @@ class AIAudit:
             json.dumps(
                 self.clean(
                     {
-                        "job": dict(job),
+                        "job": self._job(dict(job)),
                         "calls": [dict(c) for c in calls],
                         "events": events,
                         "review": dict(review) if review else None,

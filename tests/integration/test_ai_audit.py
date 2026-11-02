@@ -51,13 +51,8 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     detail = store.detail(job["id"])
     assert detail["trace_available"]
     events = [e["payload"] for e in detail["events"]]
-    assert [e["event"] for e in events] == [
-        "temporary_public_fill",
-        "job_started",
-        "request",
-        "response",
-        "job_failed",
-    ]
+    assert {e["event"] for e in events[:2]} == {"temporary_public_fill", "generation_run"}
+    assert [e["event"] for e in events[2:]] == ["job_started", "request", "response", "job_failed"]
     request = next(e for e in events if e["event"] == "request")
     assert request["data"]["json"]["tools"] == [{"type": "web_search_preview"}]
     assert "Иваново" in request["data"]["json"]["input"][1]["content"]

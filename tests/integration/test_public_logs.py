@@ -13,7 +13,15 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
     service.enqueue_public_fill(location["id"])
     public_job = queries.rows("jobs")[0]
     other = queries.directory(query="Абрау-Дюрсо")["rows"][0]
-    service.enqueue(other["id"])
+    with uow() as tx:
+        tx.repo.queue(
+            {
+                "id": str(uuid4()),
+                "kind": "generate",
+                "location_id": other["id"],
+                "prompt": "private legacy prompt",
+            }
+        )
     admin_job = queries.rows("jobs", {"location_id": other["id"]})[0]
     private_id = str(uuid4())
     with uow() as tx:
@@ -51,7 +59,7 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
     with TestClient(create_app(settings)) as client:
         index = client.get("/guide/logs")
         assert index.status_code == 200
-        assert public_job["id"] in index.text and admin_job["id"] not in index.text
+        assert "/logs/ivanovo/1" in index.text and admin_job["id"] not in index.text
         assert private_id not in index.text
         assert "noindex" in index.headers["x-robots-tag"]
         page = client.get("/guide/logs/" + public_job["id"])

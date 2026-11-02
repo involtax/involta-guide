@@ -62,6 +62,7 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
             "kinds": KINDS,
             "factors": FACTORS,
             "factor_labels": FACTOR_LABELS,
+            "generation_model": ctx.jobs.generation_model(),
             **data,
         },
         headers={"Cache-Control": "private, no-store", "Vary": "HX-Request"},
@@ -134,7 +135,10 @@ def routes(prefix: str) -> APIRouter:
                 {"tab": "locations", "q": q, "status": status, "page": page}
             )
         elif tab == "fill":
-            data.update(prompt=ctx.queries.setting("prompt"), jobs=ctx.queries.rows("jobs"))
+            data.update(
+                prompt=ctx.queries.setting("prompt"),
+                jobs=AIAudit(ctx.engine, ctx.settings).listing(1)["rows"],
+            )
         elif tab == "reviews":
             moderation = params.get("moderation", "")
             data["moderation"] = moderation
@@ -233,7 +237,10 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix + "/admin/jobs")
     def job_list(request: Request) -> Response:
         require_admin(request)
-        return render(request, "jobs.html", {"jobs": context(request).queries.rows("jobs")})
+        ctx = context(request)
+        return render(
+            request, "jobs.html", {"jobs": AIAudit(ctx.engine, ctx.settings).listing(1)["rows"]}
+        )
 
     @router.get(prefix + "/admin/card")
     def card(request: Request) -> Response:
@@ -338,9 +345,28 @@ def routes(prefix: str) -> APIRouter:
             if action == "prompt":
                 ctx.jobs.set_prompt(key(form, "prompt"))
                 return redirect(request, "fill", "Промпт сохранён")
+            if action == "generation-model":
+                ctx.jobs.set_generation_model(key(form, "model"))
+                return redirect(
+                    request,
+                    "fill",
+                    "Модель наполнения сохранена. Новые запросы используют её; отзывы не затронуты.",
+                )
+            if action == "regenerate":
+                new_id = ctx.jobs.regenerate(
+                    uid(key(form, "job_id")), model=key(form, "model") or None
+                )
+                return redirect(
+                    request,
+                    "ai-audit",
+                    "Создан новый запрос с текущим промтом и выбранной моделью. Старый журнал сохранён.",
+                    job=new_id,
+                )
             if action == "generate":
                 count = ctx.jobs.enqueue(
-                    uid(location) if location else None, key(form, "scope") or "empty"
+                    uid(location) if location else None,
+                    key(form, "scope") or "empty",
+                    model=key(form, "model") or None,
                 )
                 return redirect(
                     request, "fill", f"Поставлено в очередь: {count}. Публикация отдельно."

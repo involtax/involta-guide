@@ -3,10 +3,16 @@
 <h2>Очередь</h2>
 {%for j in jobs%}
 <article class="panel">
-<strong>{{j.kind}} · {{j.status}}</strong>
-<p>{{j.location_id}} · попыток {{j.attempts}} · {{j.error or ''}}</p>
+<strong>{{j.location_name}}{%if j.run_number%} / {{j.run_number}}{%endif%} · {{j.status}}</strong>
+<p>{{j.model_name}} · попыток {{j.attempts}} · {{j.error or ''}}</p>
 <a href="{{settings.path('/admin')}}?tab=ai-audit&amp;job={{j.id}}">Запросы, ответы и подробный журнал ↗</a>
-{%if j.status=='failed'%}
+{%if j.kind=='generate'%}
+<a href="{{settings.path(j.log_path)}}" hx-boost="false">Открыть лог {{j.location_slug}}/{{j.run_number}} ↗</a>
+<form method="post" action="{{settings.path('/admin/actions/regenerate')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
+<label>Модель нового запроса<input name="model" value="{{generation_model}}" required></label>
+<button {%if j.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button>
+</form>
+{%elif j.status=='failed'%}
 <form method="post" action="{{settings.path('/admin/actions/retry')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
 <button>Повторить</button>
 </form>

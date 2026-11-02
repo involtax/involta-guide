@@ -111,7 +111,7 @@
 <button type="submit" {%if not temporary_fill.can_start%}disabled{%endif%}>Запарсить эти данные</button>
 </form>
 <p class="muted" role="status" aria-live="polite">{{temporary_fill.message}}</p>
-{%if settings.public_fill_logs_enabled%}<p><a href="{{settings.path('/logs')}}?q={{location.name|urlencode}}">Открыть логи наполнения ↗</a></p>{%endif%}
+{%if settings.public_fill_logs_enabled%}<p><a href="{{settings.path('/logs/'+location.slug)}}">Открыть логи наполнения ↗</a></p>{%endif%}
 <noscript><p>После запуска обновите страницу через несколько минут.</p></noscript>
 </section>
 {%endif%}

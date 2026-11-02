@@ -281,6 +281,7 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
             "ai_prices_json": '{"gpt-4.1":{"input":1,"output":2}}',
         }
     )
+    service.set_generation_model("gpt-4.1")
     service.enqueue(location["id"])
     job = queue.claim()
     provider = OpenAIProvider(
