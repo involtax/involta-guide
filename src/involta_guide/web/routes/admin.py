@@ -12,6 +12,13 @@ from involta_guide.application.commands.schemas import ContentInput, LocationInp
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.infrastructure.ai.catalog import (
+    GENERATION_MODEL_IDS,
+    GENERATION_MODELS,
+    MODELS_URL,
+    PRICES_CHECKED,
+    PRICING_URL,
+)
 from involta_guide.web.http import (
     admin_token,
     check_csrf,
@@ -63,6 +70,11 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
             "factors": FACTORS,
             "factor_labels": FACTOR_LABELS,
             "generation_model": ctx.jobs.generation_model(),
+            "generation_models": GENERATION_MODELS,
+            "generation_model_ids": GENERATION_MODEL_IDS,
+            "model_prices_checked": PRICES_CHECKED,
+            "model_pricing_url": PRICING_URL,
+            "model_catalog_url": MODELS_URL,
             **data,
         },
         headers={"Cache-Control": "private, no-store", "Vary": "HX-Request"},

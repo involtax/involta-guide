@@ -1,4 +1,4 @@
-{%from 'macros.html' import csrf with context%}
+{%from 'macros.html' import csrf,generation_model_picker with context%}
 <section id="job-list" hx-get="{{settings.path('/admin/jobs')}}" hx-trigger="every 15s" hx-target="this" hx-select="unset" hx-swap="outerHTML">
 <h2>Очередь</h2>
 {%for j in jobs%}
@@ -9,7 +9,8 @@
 {%if j.kind=='generate'%}
 <a href="{{settings.path(j.log_path)}}" hx-boost="false">Открыть лог {{j.location_slug}}/{{j.run_number}} ↗</a>
 <form method="post" action="{{settings.path('/admin/actions/regenerate')}}" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML">{{csrf()}}<input type="hidden" name="job_id" value="{{j.id}}">
-<label>Модель нового запроса<input name="model" value="{{generation_model}}" required></label>
+{{generation_model_picker('Модель нового запроса',generation_model)}}
+<small>* Цены — для примера со вкладки «Наполнение».</small>
 <button {%if j.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button>
 </form>
 {%elif j.status=='failed'%}

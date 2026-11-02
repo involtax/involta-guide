@@ -135,10 +135,15 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 location = queries.directory(query="Иваново")["rows"][0]
                 page.goto(base + "/admin?tab=fill")
                 model_form = page.locator('form[action$="/generation-model"]')
-                model_form.get_by_label("Модель для новых запросов наполнения").fill("gpt-5")
+                model_form.get_by_label("Модель для новых запросов наполнения").select_option(
+                    "gpt-6.1-sol"
+                )
+                expect(page.get_by_role("region", name="Сравнение моделей и цен")).to_contain_text(
+                    "$0.12"
+                )
                 model_form.get_by_role("button", name="Сохранить модель наполнения").click()
                 expect(page.get_by_role("status")).to_contain_text("Модель наполнения сохранена")
-                assert queries.setting("generation_model") == "gpt-5"
+                assert queries.setting("generation_model") == "gpt-6.1-sol"
                 page.goto(base + "/admin?tab=locations&location=" + location["id"])
                 page.get_by_role("button", name="+ Ресторан", exact=True).click()
                 card = page.locator("[data-card]")
@@ -211,11 +216,15 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     tx.repo.audit("temporary_public_fill", failed_id, location["id"])
                 page.goto(base + "/admin?tab=fill")
                 repeat = page.locator('form[action$="/regenerate"]')
-                repeat.get_by_label("Модель нового запроса").fill("gpt-5")
+                repeat.get_by_label("Модель нового запроса").select_option("gpt-6-astra")
                 repeat.get_by_role("button", name="Повторить новым запросом").click()
                 expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
                 new_job = queries.rows("jobs", {"kind": "generate", "status": "queued"})[0]
                 assert new_job["id"] != failed_id
+                config = queries.rows(
+                    "audit", {"action": "generation_run", "target": new_job["id"]}
+                )[0]
+                assert json.loads(config["detail"])["model"] == "gpt-6-astra"
                 page.goto(base + "/logs/ivanovo/2")
                 expect(page.get_by_role("heading", name="Иваново / 2", exact=False)).to_be_visible()
                 expect(page.get_by_role("link", name="Открыть полный JSON ↗")).to_have_attribute(

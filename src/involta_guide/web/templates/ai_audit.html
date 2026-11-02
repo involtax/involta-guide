@@ -26,7 +26,8 @@
 {%if not public_view and d.job.kind=='generate'%}
 <a href="{{settings.path(d.job.log_path)}}" hx-boost="false">Публичный лог {{d.job.location_slug}}/{{d.job.run_number}} ↗</a>
 <form method="post" action="{{settings.path('/admin/actions/regenerate')}}">{{csrf()}}<input type="hidden" name="job_id" value="{{d.job.id}}">
-<label>Модель нового запроса<input name="model" value="{{generation_model}}" required></label>
+{{generation_model_picker('Модель нового запроса',generation_model)}}
+<small>* Сравнить цены и модели можно на вкладке «Наполнение».</small>
 <button {%if d.job.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button></form>
 {%endif%}
 {%if not d.trace_available%}<p class="notice">Старое задание: полные запросы и ответы тогда не сохранялись. Восстановить их нельзя. Ниже доступны сохранившиеся данные; новые попытки будут записаны полностью.</p>{%endif%}

@@ -1,5 +1,5 @@
 {%extends 'fragment_base.html' if fragment else 'base.html'%}
-{%from 'macros.html' import csrf,restaurant with context%}
+{%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
 {%block body%}
 <main id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
 <header class="admin-header">
@@ -132,7 +132,8 @@ checked
 <a href="{{settings.path('/'+c.slug)}}" hx-boost="false" target="_blank">Открыть страницу ↗</a>
 <h2>Черновик страницы</h2>
 <form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<label>Модель наполнения<input name="model" value="{{generation_model}}" required></label>
+{{generation_model_picker('Модель наполнения',generation_model)}}
+<small>* Сравнительные цены и описание моделей — на вкладке «Наполнение».</small>
 <button>Наполнить через GPT ↗</button>
 </form>
 <form method="post" action="{{settings.path('/admin/actions/content')}}" class="stack">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
@@ -240,9 +241,10 @@ checked
 <h2>Наполнение</h2>
 <p>Пустых локаций: {{overview.empty}}</p>
 <form method="post" action="{{settings.path('/admin/actions/generation-model')}}" class="stack">{{csrf()}}
-<label>Модель для новых запросов наполнения<input name="model" value="{{generation_model}}" placeholder="Точный ID модели OpenAI" required></label>
-<p>Введи точное имя доступной твоему API-проекту модели. Настройка применяется к наполнению, включая публичную кнопку. Модели анализа отзывов и распознавания речи не меняются.</p>
+{{generation_model_picker('Модель для новых запросов наполнения',generation_model)}}
+<p>Выбери модель из списка и сохрани. Для баланса качества и цены рекомендую GPT-6.1 Sol. Настройка действует только на новые запросы наполнения, включая публичную кнопку.</p>
 <button>Сохранить модель наполнения</button></form>
+{%include 'model_prices.html'%}
 <form method="post" action="{{settings.path('/admin/actions/prompt')}}" class="stack">{{csrf()}}<label>Промпт генерации<textarea name="prompt" rows="18">{{prompt}}</textarea>
 </label>
 <button>Сохранить промпт</button>

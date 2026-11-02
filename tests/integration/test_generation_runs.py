@@ -93,6 +93,10 @@ def test_manual_repeat_creates_new_log_and_draft_without_replacing_published(dat
         login(client)
         page = client.get("/guide/admin?tab=fill")
         assert 'value="gpt-5"' in page.text and "Повторить новым запросом" in page.text
+        assert "Сохранённая модель: gpt-5" in page.text
+        assert 'value="gpt-6.1-sol"' in page.text
+        assert "GPT-6 Astra" in page.text and "$0.40" in page.text
+        assert "Точный ID модели OpenAI" not in page.text
 
 
 def test_legacy_numbers_remain_stable_when_backfilled_and_repeated(database):
