@@ -105,6 +105,15 @@
 <h2>{{'Стоит зайти' if content.restaurants else 'Подборка в работе'}}</h2>
 <span>{{'%02d'|format(content.restaurants|length)}} мест</span>
 </div>
+{%if temporary_fill%}
+<section data-public-fill data-status-url="{{settings.path('/api/locations/'+location.slug+'/fill/status')}}" data-pending="{{'true' if not temporary_fill.can_start else 'false'}}">
+<form method="post" action="{{settings.path('/api/locations/'+location.slug+'/fill')}}">
+<button type="submit" {%if not temporary_fill.can_start%}disabled{%endif%}>Запарсить эти данные</button>
+</form>
+<p class="muted" role="status" aria-live="polite">{{temporary_fill.message}}</p>
+<noscript><p>После запуска обновите страницу через несколько минут.</p></noscript>
+</section>
+{%endif%}
 {%for r in content.restaurants[:location.top_limit]%}
 {{card(r,loop.index0)}}
 {%endfor%}
@@ -136,6 +145,9 @@
 </main>
 {%endblock%}
 {%block scripts%}
+{%if temporary_fill%}
+<script defer src="{{settings.path('/assets/public-fill.js')}}"></script>
+{%endif%}
 <script type="module" src="{{settings.path('/assets/hours.js')}}">
 </script>
 <script defer src="{{settings.path('/widget.js')}}">

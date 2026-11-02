@@ -83,6 +83,40 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("heading", name="Подборка в работе")).to_be_visible()
                 assert "noindex" in page.locator("meta[name=robots]").get_attribute("content")
                 assert "/_next/" not in page.content()
+                # The temporary public button needs no login and shows async progress/errors.
+                fill = page.locator("[data-public-fill]")
+                fill_button = fill.get_by_role("button", name="Запарсить эти данные", exact=True)
+                expect(fill_button).to_be_visible()
+                submissions = []
+
+                def accept_fill(route):
+                    submissions.append(route.request.method)
+                    route.fulfill(
+                        status=202,
+                        json={"state": "queued", "can_start": False, "message": "Запрос принят"},
+                    )
+
+                page.route("**/api/locations/ivanovo/fill", accept_fill)
+                page.route(
+                    "**/api/locations/ivanovo/fill/status",
+                    lambda route: route.fulfill(
+                        status=200,
+                        json={
+                            "state": "failed",
+                            "can_start": True,
+                            "message": "Тестовая ошибка поиска",
+                        },
+                    ),
+                )
+                fill_button.click()
+                expect(fill_button).to_be_disabled()
+                expect(fill.get_by_role("status")).to_have_text(
+                    "Тестовая ошибка поиска", timeout=10000
+                )
+                expect(fill_button).to_be_enabled()
+                assert submissions == ["POST"]
+                page.unroute("**/api/locations/ivanovo/fill")
+                page.unroute("**/api/locations/ivanovo/fill/status")
                 page.goto(base + "/admin")
                 page.get_by_label("Пароль редакции").fill("test-password-123456")
                 page.get_by_role("button", name="Войти ↗").click()
@@ -110,6 +144,9 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     )
                 ).to_be_visible()
                 assert "tel:+74951234567" in page.content()
+                expect(
+                    page.get_by_role("button", name="Запарсить эти данные", exact=True)
+                ).to_have_count(0)
                 page.get_by_role("checkbox").check()
                 page.get_by_role("button", name="● Записать отзыв").click()
                 time.sleep(2.2)

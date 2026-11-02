@@ -18,14 +18,97 @@ from involta_guide.application.ports.repositories import (
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import rank
 
-from .editorial import EditorialService, draft, require, save
+from .editorial import EditorialService, draft, publish, require, save
 
 
 class JobService:
-    def __init__(self, uow: UowFactory, provider: AIProvider, storage: AudioStorage) -> None:
+    def __init__(
+        self,
+        uow: UowFactory,
+        provider: AIProvider,
+        storage: AudioStorage,
+        *,
+        public_fill_enabled: bool = True,
+    ) -> None:
         self.uow = uow
         self.provider = provider
         self.storage = storage
+        self.public_fill_enabled = public_fill_enabled
+
+    @staticmethod
+    def _has_data(location: Record) -> bool:
+        return bool(location["published_version"] or location["draft_version"] or location["draft"])
+
+    @staticmethod
+    def _is_public_fill(repo: Repository, job_id: str) -> bool:
+        return bool(
+            repo.rows("audit", {"action": "temporary_public_fill", "target": job_id}, limit=1)
+        )
+
+    def _public_state(self, repo: Repository, location: Record) -> Record:
+        if location["published_version"]:
+            return {"state": "ready", "can_start": False, "message": "Подборка готова."}
+        if self._has_data(location):
+            return {
+                "state": "existing",
+                "can_start": False,
+                "message": "Данные уже собраны и сохранены в редакции.",
+            }
+        filters = {"kind": "generate", "location_id": location["id"]}
+        for status, message in (
+            ("running", "Ищем и проверяем места. Это может занять несколько минут."),
+            ("queued", "Запрос принят. Результат появится на этой странице."),
+        ):
+            if repo.rows("jobs", {**filters, "status": status}, limit=1):
+                return {"state": status, "can_start": False, "message": message}
+        latest = repo.rows("jobs", filters, limit=1)
+        if (
+            latest
+            and latest[0]["status"] == "failed"
+            and self._is_public_fill(repo, latest[0]["id"])
+        ):
+            return {
+                "state": "failed",
+                "can_start": True,
+                "message": "Не удалось собрать подборку. "
+                + (latest[0]["error"] or "Попробуйте ещё раз.")[:500],
+            }
+        return {
+            "state": "empty",
+            "can_start": True,
+            "message": "Найдём места, которые стоит посетить. Поиск может занять несколько минут.",
+        }
+
+    def public_fill_state(self, location_id: str) -> Record:
+        with self.uow() as uow:
+            location = require(uow.repo, "locations", location_id)
+            return self._public_state(uow.repo, location)
+
+    def enqueue_public_fill(self, location_id: str) -> Record:
+        """TEMPORARY authless initial fill; never replace existing editorial data."""
+        if not self.public_fill_enabled:
+            raise RuleViolation("Временное наполнение отключено")
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", location_id, lock=True)
+            if not location["active"]:
+                raise RuleViolation("Локация отключена")
+            state = self._public_state(repo, location)
+            if not state["can_start"]:
+                return state
+            job_id = str(uuid4())
+            if repo.queue(
+                {
+                    "id": job_id,
+                    "kind": "generate",
+                    "location_id": location_id,
+                    "prompt": repo.setting("prompt"),
+                }
+            ):
+                # This durable marker authorizes publication only for this manually clicked job.
+                # Existing jobs/schema are reused so deployment needs no production migration.
+                repo.audit("temporary_public_fill", job_id, location_id)
+            return self._public_state(repo, location)
 
     def enqueue(self, location_id: str | None = None, scope: str = "empty") -> int:
         if scope not in ("empty", "all"):
@@ -97,6 +180,15 @@ class JobService:
     def process(self, job: Record) -> None:
         with self.uow() as uow:
             location = require(uow.repo, "locations", job["location_id"])
+            is_public = job["kind"] == "generate" and self._is_public_fill(uow.repo, job["id"])
+            job["_temporary_public_fill"] = is_public
+            if is_public:
+                if not self.public_fill_enabled:
+                    raise RuleViolation("Временное наполнение отключено")
+                if self._has_data(location):
+                    raise Conflict(
+                        "На странице уже появились данные; автоматическая перезапись отменена"
+                    )
             baseline = location["draft_version"]
             content = draft(uow.repo, location)
             known = uow.repo.known(location["id"])
@@ -138,16 +230,25 @@ class JobService:
                 repo = uow.repo
                 if not repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
-                save(
+                if is_public and self._has_data(
+                    require(repo, "locations", location["id"], lock=True)
+                ):
+                    raise Conflict(
+                        "На странице уже появились данные; автоматическая перезапись отменена"
+                    )
+                version_id = save(
                     repo,
                     location["id"],
                     result,
                     baseline,
-                    source="ai",
+                    source="public_fill" if is_public else "ai",
                     prompt=prompt,
                     model=self.provider.model,
                     inherit=False,
                 )
+                if is_public:
+                    publish(repo, location["id"], version_id, None)
+                    repo.audit("temporary_public_fill_published", location["id"], version_id)
                 if result.get("warnings"):
                     repo.audit("generation_warnings", location["id"], "\n".join(result["warnings"]))
                 self._done(repo, job)

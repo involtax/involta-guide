@@ -46,7 +46,7 @@ class Worker:
             )
             self.queue.fail(job, message, retry=False)
         except ProviderUnavailable as exc:
-            self.queue.fail(job, str(exc), retry=True)
+            self.queue.fail(job, str(exc), retry=not job.get("_temporary_public_fill", False))
         except Exception:
             self.queue.fail(
                 job, "Internal processing error; inspect server diagnostics", retry=True
@@ -70,7 +70,13 @@ def main() -> None:
     storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
     provider = OpenAIProvider(settings, engine, storage)
     worker = Worker(
-        JobQueue(engine, settings), JobService(lambda: PostgresUow(engine), provider, storage)
+        JobQueue(engine, settings),
+        JobService(
+            lambda: PostgresUow(engine),
+            provider,
+            storage,
+            public_fill_enabled=settings.temporary_public_fill_enabled,
+        ),
     )
 
     def shutdown(*args: Any) -> None:

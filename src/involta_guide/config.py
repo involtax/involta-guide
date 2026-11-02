@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     site_url: str = "http://localhost:3000/guide"
     base_path: str = "/guide"
     release_sha: str = "development"
+    # TEMPORARY: explicitly requested anonymous, one-location-at-a-time initial fill.
+    temporary_public_fill_enabled: bool = True
     cookie_secure: bool = False
     data_dir: Path = Path("var")
     audio_retention_days: int = 90

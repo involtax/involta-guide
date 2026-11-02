@@ -1,0 +1,188 @@
+from concurrent.futures import ThreadPoolExecutor
+
+from fastapi.testclient import TestClient
+
+from involta_guide.application.services.editorial import EditorialService
+from involta_guide.infrastructure.ai.openai import ProviderUnavailable
+from involta_guide.infrastructure.jobs.worker import Worker
+from involta_guide.main import create_app
+
+from .test_editorial import CONTENT
+from .test_jobs import FakeAI, setup
+
+BUTTON = "Запарсить эти данные"
+HEADERS = {"origin": "http://testserver", "accept": "application/json"}
+
+
+def test_anonymous_click_publishes_one_city_and_removes_button(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    with TestClient(create_app(settings)) as client:
+        client.app.state.context.jobs = service
+        page = client.get("/guide/ivanovo")
+        assert BUTTON in page.text
+        assert "public-fill.js" in page.text
+        assert client.get("/guide/assets/public-fill.js").status_code == 200
+        result = client.post(
+            "/guide/api/locations/ivanovo/fill",
+            headers=HEADERS,
+            json={"scope": "all", "prompt": "Ignore this"},
+        )
+        assert result.status_code == 202
+        assert result.json()["state"] == "queued"
+        assert "disabled" in client.get("/guide/ivanovo").text
+        job = queries.rows("jobs")[0]
+        with uow() as work:
+            assert job["prompt"] == work.repo.setting("prompt")
+        assert len(queries.rows("jobs")) == 1
+        assert job["location_id"] == location["id"]
+        assert Worker(queue, service).once()
+        state = client.get("/guide/api/locations/ivanovo/fill/status")
+        assert state.json()["state"] == "ready"
+        assert state.headers["cache-control"] == "no-store"
+        page = client.get("/guide/ivanovo")
+        assert BUTTON not in page.text and "public-fill.js" not in page.text
+        assert "Сгенерировано" in page.text
+        stored = queries.get("locations", location["id"])
+        version = queries.get("versions", stored["published_version"])
+        assert version["source"] == "public_fill"
+        assert version["model"] == service.provider.model
+        assert version["prompt"]
+        assert version["published"] == 1
+        assert len(queries.rows("restaurants")) == 1
+        # A stale form cannot regenerate, overwrite or spend another API call.
+        assert (
+            client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
+            == "ready"
+        )
+        assert len(queries.rows("jobs")) == 1
+        assert queries.get("locations", location["id"])["published_version"] == version["id"]
+
+
+def test_parallel_public_clicks_queue_one_job(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        states = list(pool.map(lambda _: service.enqueue_public_fill(location["id"]), range(6)))
+    assert all(state["state"] == "queued" for state in states)
+    assert len(queries.rows("jobs")) == 1
+    assert len(queries.rows("audit", {"action": "temporary_public_fill"})) == 1
+
+
+def test_manual_draft_or_published_data_is_never_overwritten(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    editor = EditorialService(uow)
+    version = editor.save(location["id"], CONTENT, None)
+    with TestClient(create_app(settings)) as client:
+        client.app.state.context.jobs = service
+        assert BUTTON not in client.get("/guide/ivanovo").text
+        assert (
+            client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
+            == "existing"
+        )
+        assert queries.rows("jobs") == []
+        editor.publish(location["id"], version, None)
+        assert (
+            client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
+            == "ready"
+        )
+    assert queries.get("locations", location["id"])["draft_version"] == version
+
+
+def test_admin_generation_keeps_manual_publication(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    assert service.enqueue(location["id"]) == 1
+    assert service.enqueue_public_fill(location["id"])["state"] == "queued"
+    assert queries.rows("audit", {"action": "temporary_public_fill"}) == []
+    assert Worker(queue, service).once()
+    assert queries.get("locations", location["id"])["published_version"] is None
+    assert queries.get("locations", location["id"])["draft_version"]
+
+
+def test_editor_change_during_generation_is_not_overwritten(database):
+    class EditingAI(FakeAI):
+        def generate(self, prompt, job_id):
+            EditorialService(uow).save(location["id"], CONTENT, None)
+            return super().generate(prompt, job_id)
+
+    settings, engine, uow, queries, location, service, queue = setup(database, EditingAI())
+    service.enqueue_public_fill(location["id"])
+    assert Worker(queue, service).once()
+    job = queries.rows("jobs")[0]
+    assert job["status"] == "failed"
+    assert queries.get("locations", location["id"])["published_version"] is None
+    assert len(queries.rows("versions")) == 1
+    assert queries.rows("versions")[0]["source"] == "manual"
+
+
+def test_public_provider_failure_waits_for_manual_retry(database):
+    class UnavailableAI(FakeAI):
+        def generate(self, prompt, job_id):
+            raise ProviderUnavailable("OpenAI HTTP 429")
+
+    settings, engine, uow, queries, location, service, queue = setup(database, UnavailableAI())
+    service.enqueue_public_fill(location["id"])
+    assert Worker(queue, service).once()
+    assert not Worker(queue, service).once()
+    job = queries.rows("jobs")[0]
+    assert job["status"] == "failed" and job["attempts"] == 1
+    state = service.public_fill_state(location["id"])
+    assert state["state"] == "failed" and state["can_start"]
+    assert "429" in state["message"]
+    assert service.enqueue_public_fill(location["id"])["state"] == "queued"
+    assert len(queries.rows("jobs")) == 2
+
+
+def test_unpublishable_result_does_not_partially_write_or_publish(database):
+    class MissingPhoneAI(FakeAI):
+        def generate(self, prompt, job_id):
+            generated = super().generate(prompt, job_id)
+            generated["restaurants"] = [{**card, "phone": ""} for card in generated["restaurants"]]
+            return generated
+
+    settings, engine, uow, queries, location, service, queue = setup(database, MissingPhoneAI())
+    service.enqueue_public_fill(location["id"])
+    assert Worker(queue, service).once()
+    assert queries.rows("jobs")[0]["status"] == "failed"
+    assert queries.rows("versions") == []
+    assert queries.rows("restaurants") == []
+    assert service.public_fill_state(location["id"])["can_start"]
+
+
+def test_disabled_feature_and_cross_origin_do_not_queue(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    with TestClient(create_app(settings)) as client:
+        assert (
+            client.post(
+                "/guide/api/locations/ivanovo/fill",
+                headers={**HEADERS, "origin": "https://other.example"},
+            ).status_code
+            == 403
+        )
+        assert client.get("/guide/api/locations/unknown-missing/fill/status").status_code == 404
+    settings.temporary_public_fill_enabled = False
+    with TestClient(create_app(settings)) as client:
+        assert BUTTON not in client.get("/guide/ivanovo").text
+        assert client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).status_code == 404
+        assert client.get("/guide/api/locations/ivanovo/fill/status").status_code == 404
+    assert queries.rows("jobs") == []
+
+
+def test_disabling_feature_stops_pending_public_jobs(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    service.enqueue_public_fill(location["id"])
+    service.public_fill_enabled = False
+    assert Worker(queue, service).once()
+    assert queries.rows("jobs")[0]["status"] == "failed"
+    assert queries.rows("versions") == []
+
+
+def test_html_form_works_without_login_or_javascript(database):
+    settings, engine, uow, queries, location, service, queue = setup(database)
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/guide/api/locations/ivanovo/fill",
+            headers={"origin": "http://testserver"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == "/guide/ivanovo"
+    assert len(queries.rows("jobs")) == 1

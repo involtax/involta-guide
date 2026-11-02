@@ -2,11 +2,11 @@ from urllib.parse import urlencode
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
 from involta_guide.domain.rules import KINDS
-from involta_guide.web.http import context
+from involta_guide.web.http import check_origin, context
 
 
 def routes(prefix: str) -> APIRouter:
@@ -92,6 +92,40 @@ def routes(prefix: str) -> APIRouter:
         )
         return Response(body, media_type="application/xml")
 
+    # TEMPORARY public test controls; explicitly no login or privileged session required.
+    @router.post(prefix + "/api/locations/{slug}/fill")
+    def public_fill(request: Request, slug: str) -> Response:
+        ctx = context(request)
+        if not ctx.settings.temporary_public_fill_enabled:
+            raise HTTPException(404, "Наполнение отключено")
+        check_origin(request)
+        data = ctx.queries.public(slug)
+        if data is None:
+            raise HTTPException(404, "Локация не найдена")
+        state = ctx.jobs.enqueue_public_fill(data["location"]["id"])
+        if "application/json" not in request.headers.get("accept", ""):
+            return RedirectResponse(
+                ctx.settings.path("/" + data["location"]["slug"]), status_code=303
+            )
+        return JSONResponse(
+            state,
+            status_code=202 if state["state"] in ("queued", "running") else 200,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.get(prefix + "/api/locations/{slug}/fill/status")
+    def public_fill_status(request: Request, slug: str) -> Response:
+        ctx = context(request)
+        if not ctx.settings.temporary_public_fill_enabled:
+            raise HTTPException(404, "Наполнение отключено")
+        data = ctx.queries.public(slug)
+        if data is None:
+            raise HTTPException(404, "Локация не найдена")
+        return JSONResponse(
+            ctx.jobs.public_fill_state(data["location"]["id"]),
+            headers={"Cache-Control": "no-store"},
+        )
+
     @router.get(prefix + "/{slug}")
     def location(request: Request, slug: str) -> Response:
         ctx = context(request)
@@ -172,6 +206,10 @@ def routes(prefix: str) -> APIRouter:
                 "opening_status": opening_status,
                 "alex": alex,
                 "voice_csrf": ctx.security.csrf(alex_token) if alex else "",
+                "temporary_fill": ctx.jobs.public_fill_state(c["id"])
+                if ctx.settings.temporary_public_fill_enabled
+                and not (c["published_version"] or c["draft_version"] or c["draft"])
+                else None,
                 "structured": structured,
             },
             headers={"Cache-Control": "private, no-store"},

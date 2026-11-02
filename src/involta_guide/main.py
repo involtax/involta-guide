@@ -38,7 +38,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         EditorialService(factory),
         LocationService(factory),
         ReviewService(factory, storage, settings.pending_review_limit),
-        JobService(factory, provider, storage),
+        JobService(
+            factory, provider, storage, public_fill_enabled=settings.temporary_public_fill_enabled
+        ),
         Security(settings, factory),
     )
 
