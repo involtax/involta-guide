@@ -20,13 +20,13 @@ if Path(sys.argv[0]).name=='ssh':
         sys.exit(255)
     if 'id -u' in command:
         print('root')
-    if 'remote-release.sh' in command or 'bootstrap-production.py' in command:
+    if 'remote-release.sh' in command or 'bootstrap-production.py' in command or 'sync-admin-password.py' in command:
         sys.stdin.read()
 """
 
 
 @pytest.mark.parametrize(
-    "mode", ["deploy", "rollback", "bootstrap", "bootstrap-rollback", "inspect"]
+    "mode", ["deploy", "rollback", "bootstrap", "bootstrap-rollback", "inspect", "admin-password"]
 )
 @pytest.mark.parametrize("pin", [None, "", "-", "example.test ssh-ed25519 test-public-key"])
 def test_host_pin_policy_applies_to_every_connection(tmp_path, mode, pin):
@@ -50,11 +50,12 @@ def test_host_pin_policy_applies_to_every_connection(tmp_path, mode, pin):
         "GITHUB_ACTOR": "test-actor",
         "GITHUB_RUN_ID": "123",
         "GITHUB_RUN_ATTEMPT": "1",
+        "SYNC_ADMIN_PASSWORD": "test-only-new-admin-password",
     }
     env.pop("DEPLOY_SSH_KNOWN_HOSTS", None)
     if pin is not None:
         env["DEPLOY_SSH_KNOWN_HOSTS"] = pin
-    if mode == "inspect":
+    if mode in ("inspect", "admin-password"):
         for field in ("TARGET_SHA", "IMAGE_REF", "GHCR_TOKEN", "GITHUB_ACTOR"):
             env.pop(field, None)
     result = subprocess.run(
@@ -78,4 +79,5 @@ def test_host_pin_policy_applies_to_every_connection(tmp_path, mode, pin):
         assert all("mkdir" not in args[-1] and "rm -rf" not in args[-1] for _, args in calls)
     assert "test-only-private-key" not in result.stdout + result.stderr
     assert "test-only-token" not in result.stdout + result.stderr
+    assert "test-only-new-admin-password" not in result.stdout + result.stderr
     assert ("enabled" if strict else "temporarily disabled") in result.stderr
