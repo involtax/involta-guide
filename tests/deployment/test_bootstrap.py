@@ -97,7 +97,6 @@ def test_container_upstream_and_repeated_bootstrap_guard():
         {"run_id": "../other"},
         {"admin_password": "injection\nSHELL=x"},
         {"admin_password": "short"},
-        {"alex_secret": "short"},
     ],
 )
 def test_invalid_metadata_and_secret_injection_rejected(changes):
@@ -409,3 +408,30 @@ def test_container_nginx_bind_mount_and_network_discovery(tmp_path, monkeypatch,
             "abc123",
             "nginx",
         ]
+
+
+@pytest.mark.parametrize("secret", ["x", "-", "секрет 🔑", "a'b\\c$=+&", "line one\nINJECTED=yes"])
+def test_arbitrary_alex_secret_survives_production_environment(tmp_path, monkeypatch, secret):
+    import base64
+
+    from dotenv import dotenv_values
+
+    from involta_guide.config import Settings
+
+    bootstrap.validate_request(request(alex_secret=secret))
+    root = tmp_path / "guide"
+    root.mkdir()
+    monkeypatch.setattr(bootstrap, "ROOT", root)
+    monkeypatch.setattr(bootstrap, "owned", lambda *a: False)
+    monkeypatch.setattr(
+        bootstrap, "docker", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", "")
+    )
+    monkeypatch.delenv("ALEX_SECRET", raising=False)
+    monkeypatch.delenv("ALEX_SECRET_BASE64", raising=False)
+    bootstrap.initialize(request(alex_secret=secret), "host")
+    values = dotenv_values(root / ".env.production")
+    assert "INJECTED" not in values
+    assert "ALEX_SECRET" not in values
+    assert base64.b64decode(values["ALEX_SECRET_BASE64"]).decode("utf-8") == secret
+    configured = Settings(_env_file=root / ".env.production")
+    assert configured.alex_secret.get_secret_value() == secret

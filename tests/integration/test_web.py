@@ -113,3 +113,41 @@ def test_upload_duration_signature_and_history(database):
         assert (
             client.get("/guide/api/my-reviews?location=" + location["id"]).json()[0]["fraud"] == 1
         )
+
+
+def test_alex_accepts_short_unicode_and_special_character_secrets(database):
+    import base64
+    from urllib.parse import quote
+
+    from pydantic import SecretStr
+
+    from involta_guide.config import Settings
+
+    settings, _ = database
+    for secret in ("x", "-", "page", "секрет 🔑", "a&b= c+?#/'\"\\$", "line one\nline two"):
+        values = settings.model_dump()
+        values.update(
+            alex_secret=SecretStr(""),
+            alex_secret_base64=SecretStr(base64.b64encode(secret.encode("utf-8")).decode("ascii")),
+        )
+        configured = Settings(**values)
+        with TestClient(create_app(configured)) as client:
+            wrong = client.get(
+                "/guide/?" + quote(secret + "-wrong", safe=""), follow_redirects=False
+            )
+            assert wrong.status_code == 200
+            assert "guide_alex" not in client.cookies
+            response = client.get("/guide/?" + quote(secret, safe=""), follow_redirects=False)
+            assert response.status_code == 302
+            assert response.headers["location"] == "/guide/"
+            token = client.cookies.get("guide_alex")
+            assert token
+            assert client.app.state.context.security.principal(token, alex=True) is not None
+    empty = settings.model_copy(
+        update={"alex_secret": SecretStr(""), "alex_secret_base64": SecretStr("")}
+    )
+    with TestClient(create_app(empty)) as client:
+        assert client.app.state.context.security.alex_login("") is None
+        assert client.get("/guide/?anything", follow_redirects=False).status_code == 200
+        assert "guide_alex" not in client.cookies
+        assert client.get("/guide/?page=not-a-number").status_code == 422

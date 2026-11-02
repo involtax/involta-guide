@@ -74,7 +74,9 @@ class Security:
 
     def alex_login(self, secret: str) -> str | None:
         expected = self.settings.alex_secret.get_secret_value()
-        if len(expected) < 32 or not hmac.compare_digest(secret, expected):
+        if not expected or not hmac.compare_digest(
+            secret.encode("utf-8"), expected.encode("utf-8")
+        ):
             return None
         token = secrets.token_hex(32)
         with self.uow() as uow:

@@ -1,3 +1,4 @@
+from base64 import b64decode
 from pathlib import Path
 
 from pydantic import SecretStr, field_validator, model_validator
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     admin_password: SecretStr = SecretStr("")
     admin_password_hash: SecretStr = SecretStr("")
     alex_secret: SecretStr = SecretStr("")
+    alex_secret_base64: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"
     transcription_model: str = "gpt-4o-mini-transcribe"
@@ -64,6 +66,12 @@ class Settings(BaseSettings):
     def validate_secrets(self) -> "Settings":
         from urllib.parse import urlsplit
 
+        encoded_alex = self.alex_secret_base64.get_secret_value()
+        if encoded_alex:
+            try:
+                self.alex_secret = SecretStr(b64decode(encoded_alex, validate=True).decode("utf-8"))
+            except ValueError as exc:
+                raise ValueError("Invalid ALEX_SECRET_BASE64 encoding") from exc
         if len(self.session_secret.get_secret_value()) < 32:
             raise ValueError("SESSION_SECRET должен содержать минимум 32 символа")
         if not self.database_url.get_secret_value().startswith(

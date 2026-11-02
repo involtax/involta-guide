@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
@@ -24,7 +24,7 @@ def routes(prefix: str) -> APIRouter:
         )
 
     @router.get(prefix + "/")
-    def directory(request: Request, q: str = "", kind: str = "", page: int = 1) -> Response:
+    def directory(request: Request, q: str = "", kind: str = "", page: str = "1") -> Response:
         ctx = context(request)
         pairs = list(request.query_params.multi_items())
         if len(pairs) == 1 and not pairs[0][1]:
@@ -45,8 +45,12 @@ def routes(prefix: str) -> APIRouter:
                     samesite="strict",
                 )
                 return response
+        try:
+            page_number = int(page)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid page number") from exc
         result = ctx.queries.directory(
-            query=q, kind=kind, page=page, status="active", roots_only=True, public_only=True
+            query=q, kind=kind, page=page_number, status="active", roots_only=True, public_only=True
         )
         return request.app.state.templates.TemplateResponse(
             request=request,
