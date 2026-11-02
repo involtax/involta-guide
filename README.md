@@ -151,6 +151,7 @@ adoption, UUID/snapshots/FKs, конкурентные правки/worker, fake
 - `deploy-production.yml`: обновления только Guide по SHA/digest с rollback.
 
 Оба запускаются вручную из main через Run workflow, без обязательных reviewers.
+Поле SHA необязательно: по умолчанию берётся версия main на момент запуска.
 Environment `prod` хранит secrets приложения. PR/push production не меняют.
 Используются `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`.
 Дополнительные secrets приложения и поддерживаемые схемы Nginx описаны в документации.

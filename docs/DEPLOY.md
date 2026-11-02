@@ -6,14 +6,17 @@
 - **Bootstrap production** (`bootstrap-production.yml`) — первоначальная установка.
 - **Deploy production** (`deploy-production.yml`) — обновление только Guide.
 
-Оба запускаются вручную через Actions → Run workflow, ветка **main**, полный
-40-символьный `sha` коммита из main. PR и push сами production не меняют.
+Оба запускаются вручную через Actions → Run workflow, ветка **main**. Поле `sha`
+можно оставить пустым: будет выбрана версия main на момент запуска. Для запуска
+конкретной прежней версии можно указать её полный 40-символьный commit SHA.
+Выбранный SHA автоматически фиксируется на весь build/deploy и показывается
+в Summary. PR и push сами production не меняют.
 До слияния PR и отдельного подтверждения запускать эти workflows не нужно.
 
 ## Однократная настройка GitHub
 
 Обязательные reviewers не нужны. Подтверждение запуска — нажатие **Run workflow**
-с выбранным SHA. После успешной сборки bootstrap продолжает настройку сервера
+для ветки main. После успешной сборки bootstrap продолжает настройку сервера
 без отдельного Approve deployment. Environment **prod** используется для secrets.
 Если в нём ранее включались Required reviewers или wait timer, отключите эти
 необязательные ограничения в Settings → Environments → prod: workflow не обходит

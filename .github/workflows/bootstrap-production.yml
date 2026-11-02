@@ -3,8 +3,8 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Full 40-character commit SHA already on main
-        required: true
+        description: "Optional commit SHA; leave empty to deploy current main"
+        required: false
         type: string
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/ci.yml
     with:
-      sha: ${{ inputs.sha }}
+      sha: ${{ inputs.sha || github.sha }}
   bootstrap:
     needs: build
     runs-on: ubuntu-latest
