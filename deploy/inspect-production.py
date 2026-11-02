@@ -53,6 +53,12 @@ def main():
     code, output, _ = run(
         ["systemctl", "list-units", "--type=service", "--state=running", "--no-legend", "--plain"]
     )
+    report["disk_opt"] = shutil.disk_usage("/opt")._asdict()
+    report["memory_cgroup"] = {
+        name: path.read_text().strip()
+        for name in ("memory.max", "memory.current")
+        if (path := Path("/sys/fs/cgroup") / name).is_file()
+    }
     report["running_services"] = [line.split()[0] for line in output.splitlines() if line.split()]
     code, output, _ = run(["ss", "-lntp"])
     report["listeners"] = output.splitlines()

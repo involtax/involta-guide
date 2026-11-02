@@ -305,6 +305,27 @@ def check_docker_repository(release):
         )
 
 
+def check_storage(request, docker_present):
+    free = shutil.disk_usage("/opt").free
+    cached = False
+    if docker_present:
+        repository = request["image"].split("@", 1)[0]
+        app = docker("image", "ls", "--quiet", repository, check=False)
+        database = docker(
+            "image", "inspect", "--format", "{{.Id}}", request["postgres_image"], check=False
+        )
+        cached = app.returncode == 0 and bool(app.stdout.strip()) and database.returncode == 0
+    reserve = 512 * 1024**2 if cached else 3 * 1024**3
+    print(
+        f"Storage preflight: {free // 1024**2} MiB free; {reserve // 1024**2} MiB required; images_cached={cached}",
+        flush=True,
+    )
+    if free < reserve:
+        raise Failure(
+            f"Insufficient storage: {free // 1024**2} MiB available, {reserve // 1024**2} MiB required; no package changes made"
+        )
+
+
 def preflight(request):
     validate_request(request)
     if os.geteuid() != 0:
@@ -333,6 +354,15 @@ def preflight(request):
     for path in (db_env, app_env, ROOT / "deploy.env"):
         if path.is_symlink():
             raise Failure("Symlinked secret/deployment files are not supported")
+    saved_options = ROOT / "deploy.env"
+    if saved_options.is_file():
+        options = dict(
+            line.split("=", 1) for line in saved_options.read_text().splitlines() if "=" in line
+        )
+        if "POSTGRES_IMAGE" in options:
+            if not re.fullmatch(r"postgres@sha256:[0-9a-f]{64}", options["POSTGRES_IMAGE"]):
+                raise Failure("Invalid recorded PostgreSQL image")
+            request["postgres_image"] = options["POSTGRES_IMAGE"]
     docker_present = shutil.which("docker") is not None
     if docker_present:
         docker("info")
@@ -394,8 +424,7 @@ def preflight(request):
                 raise Failure(
                     f"Existing {service} requires manual assessment; no runtime will be restarted"
                 )
-    if shutil.disk_usage("/opt").free < 3 * 1024**3:
-        raise Failure("Less than 3 GiB available in /opt")
+    check_storage(request, docker_present)
     home = baseline()
     # Detect distro/conflicting installs before apt is allowed to change anything.
     installed = run(["dpkg-query", "-W", "-f=${Package} ${Status}\n"], check=False).stdout

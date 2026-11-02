@@ -626,3 +626,27 @@ def test_failed_first_install_can_add_runtime_profile_without_changing_secrets(
     assert "GUIDE_APPARMOR_PROFILE=unconfined\n" in path.read_text()
     for name, before in secrets_before.items():
         assert (root / name).read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "cached,free_mib,success",
+    [(True, 700, True), (True, 300, False), (False, 700, False), (False, 4000, True)],
+)
+def test_storage_reserve_accounts_for_cached_images(monkeypatch, cached, free_mib, success):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        bootstrap.shutil, "disk_usage", lambda _: SimpleNamespace(free=free_mib * 1024**2)
+    )
+
+    def docker(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args, 0 if cached else 1, "cached-image-id" if cached else "", ""
+        )
+
+    monkeypatch.setattr(bootstrap, "docker", docker)
+    if success:
+        bootstrap.check_storage(request(), True)
+    else:
+        with pytest.raises(bootstrap.Failure, match="Insufficient storage"):
+            bootstrap.check_storage(request(), True)
