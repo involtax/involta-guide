@@ -1,0 +1,194 @@
+import json
+from typing import Any
+from uuid import uuid4
+
+from involta_guide.application.ports.repositories import Record, UowFactory
+from involta_guide.domain.entities import RuleViolation
+
+from .editorial import require
+
+
+class LocationService:
+    def __init__(self, uow: UowFactory) -> None:
+        self.uow = uow
+
+    def save(self, key: str | None, values: Record) -> str:
+        with self.uow() as uow:
+            repo = uow.repo
+            target = key or str(uuid4())
+            data = values.copy()
+            related = data.pop("related_ids", [])
+            if key:
+                require(repo, "locations", key, lock=True)
+            if data["parent_id"] == target or target in related:
+                raise RuleViolation("Локация не может ссылаться на себя")
+            if data["parent_id"]:
+                parent = require(repo, "locations", data["parent_id"])
+                if data["active"] and not parent["active"]:
+                    raise RuleViolation("Сначала включите родительскую локацию")
+                if target in {row["id"] for row in repo.tree(data["parent_id"], ancestors=True)}:
+                    raise RuleViolation("Нельзя создавать цикл")
+            children = [r for r in repo.tree(target)[1:] if r["active"]] if key else []
+            if not data["active"] and children:
+                raise RuleViolation("Сначала отключите дочерние локации")
+            data["is_hub"] = bool(data["is_hub"] or children)
+            if key:
+                repo.change("locations", target, data)
+            else:
+                repo.add("locations", {"id": target, **data})
+            if data["parent_id"]:
+                repo.change("locations", data["parent_id"], {"is_hub": True})
+            repo.replace_relations(target, related)
+            repo.audit("location", target, json.dumps(values, ensure_ascii=False))
+            return target
+
+    def attach(self, restaurant_id: str, location_id: str) -> None:
+        with self.uow() as uow:
+            require(uow.repo, "restaurants", restaurant_id)
+            require(uow.repo, "locations", location_id)
+            uow.repo.link(
+                "restaurant_locations", {"restaurant_id": restaurant_id, "location_id": location_id}
+            )
+            uow.repo.audit("restaurant_location", location_id, restaurant_id)
+
+
+class Queries:
+    def __init__(self, uow: UowFactory) -> None:
+        self.uow = uow
+
+    def health(self) -> None:
+        with self.uow() as uow:
+            uow.repo.health()
+
+    def directory(self, **options: Any) -> Record:
+        with self.uow() as uow:
+            return uow.repo.search_locations(**options)
+
+    def overview(self) -> Record:
+        with self.uow() as uow:
+            return uow.repo.summary()
+
+    def get(self, table: str, key: str) -> Record:
+        with self.uow() as uow:
+            return require(uow.repo, table, key)
+
+    def rows(self, table: str, filters: Record | None = None, *, limit: int = 200) -> list[Record]:
+        with self.uow() as uow:
+            return uow.repo.rows(table, filters, limit=limit)
+
+    def location(self, key: str) -> Record:
+        from .editorial import draft
+
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", key)
+            return {
+                "location": location,
+                "content": draft(repo, location),
+                "versions": repo.rows("versions", {"location_id": key}),
+                "available": repo.available(key),
+                "related_ids": [row["id"] for row in repo.related(key)],
+                "parents": repo.tree(key, ancestors=True),
+            }
+
+    def public(self, slug: str) -> Record | None:
+        with self.uow() as uow:
+            repo = uow.repo
+            found = repo.by_slug(slug)
+            if not found:
+                return None
+            location, redirect = found
+            tree = repo.tree(location["id"])
+            useful = {r["id"] for r in tree if r["published_version"]}
+            # Hidden locations are visible only if their subtree has published content.
+            for item in reversed(tree):
+                if item["id"] in useful and item["parent_id"]:
+                    useful.add(item["parent_id"])
+            children = [
+                r
+                for r in tree
+                if r["parent_id"] == location["id"]
+                and r["active"]
+                and (r["listed"] or r["id"] in useful)
+            ]
+            for child in children:
+                child["child_count"] = sum(
+                    r["parent_id"] == child["id"] and r["active"] for r in tree
+                )
+            version = (
+                repo.get("versions", location["published_version"])
+                if location["published_version"]
+                else None
+            )
+            related = [
+                r
+                for r in repo.related(location["id"])
+                if r["active"]
+                and (r["listed"] or any(item["published_version"] for item in repo.tree(r["id"])))
+            ]
+            return {
+                "location": location,
+                "redirect": redirect,
+                "parents": repo.tree(location["id"], ancestors=True),
+                "children": children,
+                "related": related,
+                "version": version,
+                "content": version["content"] if version else {"intro": "", "restaurants": []},
+                "indexable": bool(useful),
+            }
+
+    def sitemap(self) -> list[Record]:
+        with self.uow() as uow:
+            rows = uow.repo.rows("locations", {"active": 1}, limit=100000)
+            useful = {row["id"] for row in rows if row["published_version"]}
+            parents = {row["id"]: row["parent_id"] for row in rows}
+            for key in list(useful):
+                parent = parents.get(key)
+                while parent and parent not in useful:
+                    useful.add(parent)
+                    parent = parents.get(parent)
+            return [row for row in rows if row["id"] in useful]
+
+    def review(self, key: str) -> Record:
+        with self.uow() as uow:
+            repo = uow.repo
+            review = require(repo, "reviews", key)
+            proposals = repo.rows("proposals", {"review_id": key})
+            return {
+                "review": review,
+                "proposals": proposals,
+                "signals": repo.signals(review),
+                "location": require(repo, "locations", review["location_id"]),
+            }
+
+    def visitor(self, visitor: str, location_id: str) -> list[Record]:
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", location_id)
+            links = (
+                repo.rows("version_reviews", {"version_id": location["published_version"]})
+                if location["published_version"]
+                else []
+            )
+            published = {row["review_id"] for row in links}
+            return [
+                {key: review[key] for key in ("id", "moderation", "status", "fraud", "created_at")}
+                | {
+                    "proposals": [
+                        {"status": p["status"], "kind": p["kind"]}
+                        for p in repo.rows("proposals", {"review_id": review["id"]})
+                    ],
+                    "published": review["id"] in published,
+                }
+                for review in repo.rows(
+                    "reviews", {"visitor": visitor, "location_id": location_id}, limit=30
+                )
+            ]
+
+    def contacts(self) -> list[Record]:
+        with self.uow() as uow:
+            return uow.repo.phone_proposals()
+
+    def setting(self, key: str) -> str:
+        with self.uow() as uow:
+            return uow.repo.setting(key)

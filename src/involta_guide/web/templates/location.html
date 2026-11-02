@@ -1,0 +1,143 @@
+{%extends 'base.html'%}
+{%macro card(r,i)%}
+<article class="restaurant">
+<span class="rank">{{'%02d'|format(i+1)}}</span>
+<div>
+<p class="eyebrow">{{r.cuisine}}
+{%if r.locationId and r.locationId!=location.id%}
+ · {{r.locationName}}
+{%endif%}
+</p>
+<h2>{{r.name}}
+{%if r.alexStar%}
+<span title="Выбор Алекса" aria-label="Выбор Алекса">★</span>
+{%endif%}
+ <a href="{{r.mapsUrl}}" target="_blank" rel="noopener noreferrer" aria-label="{{r.name}} — Яндекс Карты" title="Яндекс Карты">↗</a>
+</h2>
+<p>{{r.description}}</p>
+{%if r.phone%}
+<p>
+<a href="tel:{{r.phone}}">{{r.phone}}</a>
+</p>
+{%endif%}
+{%if r.openingHours%}
+<details data-hours="{{r.openingHours|tojson|forceescape}}">
+<summary>{{opening_status(r.openingHours)}}</summary>
+<ul>
+{%for slots in r.openingHours.week%}
+<li>{{days[loop.index0]}}:
+{%for slot in slots%}
+{{slot|join('–')}}
+{%if not loop.last%}
+,
+{%endif%}
+{%else%}
+выходной
+{%endfor%}
+</li>
+{%endfor%}
+</ul>
+{%for date,slots in r.openingHours.get('exceptions',{}).items()%}
+<p>{{date}}:
+{%for slot in slots%}
+{{slot|join('–')}}
+{%else%}
+выходной
+{%endfor%}
+</p>
+{%endfor%}
+<small>Часовой пояс: {{r.openingHours.timezone}}</small>
+</details>
+{%else%}
+<p class="muted">Режим работы уточняется</p>
+{%endif%}
+</div>
+</article>
+{%endmacro%}
+{%block body%}
+<main>
+<nav class="breadcrumbs" aria-label="Навигационная цепочка">
+<a href="{{settings.path('/')}}">Все локации</a>
+{%for p in parents%}
+<span> / <a href="{{settings.path('/'+p.slug)}}">{{p.name}}</a>
+</span>
+{%endfor%}
+<span> / {{location.name}}</span>
+</nav>
+<section class="city-hero">
+<p class="eyebrow">ИНВОЛЬТА ГИД / {{kinds[location.kind]}} / {{location.region}}</p>
+<h1>Где поесть <br>
+<span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
+</h1>
+<p class="lead">{{content.intro or ('Выберите район или курорт ниже. Здесь появится общая редакционная подборка направления.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
+{%if location.coverage_note%}
+<p class="coverage">{{location.coverage_note}}</p>
+{%endif%}
+{%if version%}
+<p class="muted">Редакционная подборка · обновлено {{version.created_at.strftime('%d.%m.%Y')}}</p>
+{%endif%}
+</section>
+{%if children%}
+<section class="location-children">
+<div class="section-heading">
+<h2>Выберите район или место</h2>
+<span>{{children|length}} локаций</span>
+</div>
+<div class="city-grid">
+{%for c in children%}
+<a class="city-link" href="{{settings.path('/'+c.slug)}}">
+<span>
+<strong>{{c.name}}</strong>
+<small>{{kinds[c.kind]}}
+{%if c.child_count%}
+ · внутри {{c.child_count}}
+{%endif%}
+</small>
+</span>
+<span>→</span>
+</a>
+{%endfor%}
+</div>
+</section>
+{%endif%}
+<section class="restaurant-list">
+<div class="section-heading">
+<h2>{{'Стоит зайти' if content.restaurants else 'Подборка в работе'}}</h2>
+<span>{{'%02d'|format(content.restaurants|length)}} мест</span>
+</div>
+{%for r in content.restaurants[:location.top_limit]%}
+{{card(r,loop.index0)}}
+{%endfor%}
+{%if content.restaurants|length>location.top_limit%}
+<details class="more-restaurants">
+<summary>Ещё · {{content.restaurants|length-location.top_limit}}</summary>
+{%for r in content.restaurants[location.top_limit:]%}
+{{card(r,loop.index0+location.top_limit)}}
+{%endfor%}
+</details>
+{%endif%}
+</section>
+{%if related%}
+<section class="location-children">
+<h2>Рядом и также интересно</h2>
+<div class="button-row">
+{%for r in related%}
+<a href="{{settings.path('/'+r.slug)}}">{{r.name}} →</a>
+{%endfor%}
+</div>
+</section>
+{%endif%}
+{%if alex%}
+<p>Режим Алекса: голосовая команда изменит страницу сразу. <a href="{{settings.path('/alex')}}">Журнал ↗</a>
+</p>
+{%endif%}
+{%include 'voice.html'%}
+<script type="application/ld+json">{{structured|tojson}}</script>
+</main>
+{%endblock%}
+{%block scripts%}
+<script type="module" src="{{settings.path('/assets/hours.js')}}">
+</script>
+<script defer src="{{settings.path('/widget.js')}}">
+</script>
+{%endblock%}

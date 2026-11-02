@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block body %}
+<main>
+<section class="hero">
+<p class="eyebrow">ЕДА. МЕСТА. ЛИЧНЫЙ ОПЫТ.</p>
+<h1>Хорошие места.<br>
+<span class="serif">Без лишних слов.</span>
+</h1>
+<div class="hero-bottom">
+<p>Короткие подборки ресторанов в городах, районах и на курортах. Выбираем внимательно. Прислушиваемся к вам.</p>
+<span class="counter">{{ total }}<small>локаций в справочнике</small>
+</span>
+</div>
+</section>
+<section class="cities">
+<div class="section-heading">
+<h2>Куда отправимся?</h2>
+<span class="muted">01 / География</span>
+</div>
+<form class="search location-search" action="{{ settings.path('/') }}">
+<label class="sr-only" for="q">Город, район или курорт</label>
+<input id="q" name="q" value="{{ q }}" placeholder="Город, район или курорт">
+<select name="kind" aria-label="Тип локации">
+<option value="">Все типы</option>
+{% for key,label in kinds.items() %}
+<option value="{{key}}"
+{% if kind==key %}
+selected
+{%endif%}
+>{{label}}</option>
+{%endfor%}
+</select>
+<button>Найти ↗</button>
+</form>
+<p class="muted">
+{%if q or kind%}
+Найдено: {{ result.total }}
+{%else%}
+Города и направления · районы и курорты — внутри или через поиск
+{%endif%}
+</p>
+<div class="city-grid">
+{%for c in result.rows%}
+<a class="city-link" href="{{settings.path('/'+c.slug)}}">
+<span>
+<strong>{{c.name}}</strong>
+<small>{{kinds[c.kind]}} · {{c.parent_name or c.region}}
+{%if c.child_count%}
+ · внутри {{c.child_count}}
+{%endif%}
+</small>
+</span>
+<span>→</span>
+</a>
+{%endfor%}
+</div>
+{%if not result.total%}
+<p>Пока не нашли такую локацию. Попробуйте другое название.</p>
+{%endif%}
+<nav class="pagination" aria-label="Страницы справочника">
+{%if result.page>1%}
+<a href="?{{page_query(result.page-1)}}">← Назад</a>
+{%endif%}
+<span>{{result.page}} / {{result.pages}}</span>
+{%if result.page<result.pages%}
+<a href="?{{page_query(result.page+1)}}">Дальше →</a>
+{%endif%}
+</nav>
+</section>
+</main>
+{%endblock%}

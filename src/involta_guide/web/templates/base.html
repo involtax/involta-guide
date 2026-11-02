@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title|default('Инвольта гид — где поесть в России') }}</title>
+<meta name="description" content="{{ description|default('Короткие подборки ресторанов России') }}">
+<meta name="robots" content="{{ 'index' if indexable|default(false) else 'noindex' }}, follow">
+<link rel="canonical" href="{{ canonical|default(settings.url('/')) }}">
+<link rel="stylesheet" href="{{ settings.path('/assets/style.css') }}">
+{% if admin_ui|default(false) %}
+<script defer src="{{ settings.path('/assets/htmx.min.js') }}">
+</script>
+<script defer src="{{ settings.path('/assets/admin.js') }}">
+</script>
+{% endif %}
+</head>
+<body>
+<header class="header">
+<a href="{{ settings.path('/') }}" class="brand">инвольта<span>гид</span>
+<sup>Россия</sup>
+</a>
+<a href="{{ settings.path('/') }}" class="header-note">Места, ради которых стоит зайти.</a>
+</header>
+{% block body %}
+{% endblock %}
+<footer>
+<a href="{{ settings.path('/') }}">Инвольта гид</a>
+<span>Небольшие подборки. Личный опыт.</span>
+<a href="{{ settings.path('/admin') }}">Редакция ↗</a>
+</footer>
+{% block scripts %}
+{% endblock %}
+</body>
+</html>

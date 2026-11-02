@@ -1,0 +1,41 @@
+{%extends 'fragment_base.html' if fragment else 'base.html'%}
+{%from 'macros.html' import csrf with context%}
+{%block body%}
+<main id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
+<h1>Редактор Алекс</h1>
+{%if not alex and not admin%}
+<p>Для входа откройте персональную ссылку.</p>
+{%else%}
+<a href="{{settings.path('/')}}" hx-boost="false">Выбрать локацию ↗</a>
+{%if alex%}
+<form method="post" action="{{settings.path('/alex/logout')}}">{{csrf()}}<button>Выйти</button>
+</form>
+{%endif%}
+{%if admin%}
+<form method="post" action="{{settings.path('/admin/actions/revoke-alex')}}">{{csrf()}}<button>Завершить все сессии Алекса</button>
+</form>
+{%endif%}
+<h2>Сессии</h2>
+{%for s in sessions%}
+<p>{{s.id}} · {{s.created_at}} · {{'завершена' if s.revoked else s.expires_at}}</p>
+{%endfor%}
+<h2>Журнал голосовых правок</h2>
+{%for c in changes%}
+<article class="panel">
+<h3>{{c.location_id}} · {{c.status}}</h3>
+<p>{{c.created_at}} · {{c.detail}}</p>
+{%if c.review_id%}
+<p>{{transcripts.get(c.review_id,'')}}</p>
+<audio controls preload="none" src="{{settings.path('/api/alex/audio/'+c.review_id)}}">
+</audio>
+{%endif%}
+<details>
+<summary>Было / стало</summary>
+<pre>{{c.before_content|tojson(indent=2)}}</pre>
+<pre>{{c.after_content|tojson(indent=2)}}</pre>
+</details>
+</article>
+{%endfor%}
+{%endif%}
+</main>
+{%endblock%}

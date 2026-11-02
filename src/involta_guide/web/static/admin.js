@@ -1,0 +1,2 @@
+// Local list ordering only; business validation remains on the server.
+document.addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;const card=button.closest('[data-card]');if(!card)return;if(button.hasAttribute('data-remove'))card.remove();if(button.dataset.move==='-1'&&card.previousElementSibling)card.parentNode.insertBefore(card,card.previousElementSibling);if(button.dataset.move==='1'&&card.nextElementSibling)card.parentNode.insertBefore(card.nextElementSibling,card);});

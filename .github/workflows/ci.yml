@@ -1,22 +1,18 @@
-name: Checks
-
+name: Python checks
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -24,29 +20,30 @@ jobs:
           POSTGRES_USER: guide_test
           POSTGRES_PASSWORD: ci-only-ephemeral-password
           POSTGRES_DB: guide_test
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U guide_test -d guide_test"
           --health-interval 2s --health-timeout 3s --health-retries 30
     env:
-      NEXT_TELEMETRY_DISABLED: "1"
-      DATABASE_URL: postgresql://guide_test:ci-only-ephemeral-password@127.0.0.1:5432/guide_test
       TEST_DATABASE_URL: postgresql://guide_test:ci-only-ephemeral-password@127.0.0.1:5432/guide_test
+      DATABASE_URL: postgresql://guide_test:ci-only-ephemeral-password@127.0.0.1:5432/guide_test
+      SESSION_SECRET: ci-only-session-secret-with-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: astral-sh/setup-uv@v6
         with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run db:migrate
-      - run: npm run db:seed
-      - run: npm run check
-      - run: npm test
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+          version: "0.12.23"
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: uv run ruff check src tests migrations
+      - run: uv run ruff format --check src tests migrations
+      - run: uv run mypy
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest -q
+        env:
+          CHROMIUM_PATH: ""
+      - run: docker build -t involta-guide:ci .
       - uses: actions/upload-artifact@v4
         if: always()
         with:

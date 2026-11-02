@@ -20,3 +20,10 @@
 `location-phrases.json` — предварительно подготовленные предложные формы названий с ручными исключениями для ключевых направлений. При подготовке использовался pymorphy3, который не требуется при установке и запуске приложения. Формы доступны для ручного исправления в админке; автоматическая подготовка не гарантирует отсутствия лингвистических ошибок.
 
 Географические координаты и границы из этих файлов не выдумываются. Редактор может добавить проверенный центр и прямоугольник охвата вручную. Редакционные родительские связи не заменяют административную принадлежность.
+
+`location-catalog.json` — resolved geographic catalog exported read-only from the
+existing development PostgreSQL during the Python migration. It contains public
+location metadata, parent slugs, editorial relations and redirects, not reviews,
+restaurant content, user/session data or secrets. It preserves the results of the
+original city import, supplied additions and Moscow navigation decisions. Python
+seed reuses existing canonical slugs/identities and never replaces existing fields.

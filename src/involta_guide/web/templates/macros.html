@@ -1,0 +1,42 @@
+{%macro csrf()%}
+<input type="hidden" name="_csrf" value="{{csrf_token}}">
+{%endmacro%}
+{%macro restaurant(r,key)%}
+<fieldset data-card>
+<legend>{{r.name or 'Новый ресторан'}}</legend>
+<input type="hidden" name="card" value="{{key}}">
+<input type="hidden" name="{{key}}_id" value="{{r.id or ''}}">
+<input type="hidden" name="{{key}}_locationId" value="{{r.locationId or ''}}">
+<div class="button-row">
+<button type="button" data-move="-1">↑ Выше</button>
+<button type="button" data-move="1">↓ Ниже</button>
+<button type="button" data-remove>Убрать из топа</button>
+</div>
+{%for field,label in [('name','Название'),('cuisine','Кухня'),('phone','Телефон (обязателен для публикации)'),('mapsUrl','Яндекс Карты')]%}
+<label>{{label}}<input name="{{key}}_{{field}}" value="{{r.get(field,'')}}"
+{%if field in ['name','cuisine','mapsUrl']%}
+required
+{%endif%}
+{%if field=='mapsUrl'%}
+type="url"
+{%endif%}
+ maxlength="2000">
+</label>
+{%endfor%}
+<label>Почему стоит зайти<textarea name="{{key}}_description" rows="3" required maxlength="2000">{{r.description or ''}}</textarea>
+</label>
+<label>Режим работы (JSON: timezone, week Пн–Вс, exceptions)<textarea name="{{key}}_openingHours" rows="3">{{r.openingHours|tojson if r.openingHours else ''}}</textarea>
+</label>
+<label>Источники (одна HTTPS-ссылка на строку)<textarea name="{{key}}_sources">{{r.get('sources',[])|join('\n')}}</textarea>
+</label>
+<div class="map-coordinates">
+<label>Широта ресторана<input type="number" step="any" name="{{key}}_latitude" value="{{r.latitude if r.latitude is defined and r.latitude is not none else ''}}">
+</label>
+<label>Долгота ресторана<input type="number" step="any" name="{{key}}_longitude" value="{{r.longitude if r.longitude is defined and r.longitude is not none else ''}}">
+</label>
+</div>
+{%if r.alexStar%}
+<p>★ Выбор Алекса</p>
+{%endif%}
+</fieldset>
+{%endmacro%}

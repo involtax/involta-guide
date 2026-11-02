@@ -1,6 +1,0 @@
-node_modules/
-.next/
-var/
-.env*
-package-lock.json
-data/cities.json

@@ -1,0 +1,31 @@
+# Production uses the existing PostgreSQL supplied through DATABASE_URL.
+services:
+  web:
+    container_name: involta-guide
+    build: .
+    image: involta-guide:python
+    restart: unless-stopped
+    env_file: .env.production
+    ports: ["127.0.0.1:3000:3000"]
+    volumes: ["audio:/app/var"]
+    stop_grace_period: 30s
+  worker:
+    image: involta-guide:python
+    restart: unless-stopped
+    env_file: .env.production
+    command: ["guide-worker"]
+    volumes: ["audio:/app/var"]
+    stop_grace_period: 240s
+    healthcheck:
+      test: ["CMD", "guide", "worker-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  migrate:
+    image: involta-guide:python
+    profiles: ["release"]
+    env_file: .env.production
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+volumes:
+  audio:
