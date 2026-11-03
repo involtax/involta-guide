@@ -9,6 +9,113 @@
       uploading: ["accepted", "error"], accepted: ["permission_pending"],
       error: ["permission_pending", "uploading", "preview"],
     };
+    class Diagnostics {
+      constructor(root, { key, api, role = 'visitor', location = '' }) {
+        this.key = `${key}:${role}:${location}`; this.api = api; this.role = role;
+        this.report = { version: 1, browser: navigator.userAgent, role, location, events: [] };
+        this.panel = document.createElement('details'); this.panel.open = true;
+        const title = document.createElement('summary'); title.textContent = 'Диагностика записи · бета';
+        this.info = document.createElement('pre'); this.info.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:32em;overflow:auto';
+        this.raw = document.createElement('pre'); this.raw.style.cssText = this.info.style.cssText;
+        this.download = document.createElement('a'); this.download.textContent = 'Скачать аудио'; this.download.hidden = true;
+        const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Скопировать отчёт';
+        copy.onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(this.report, null, 2)); copy.textContent = 'Отчёт скопирован'; } catch { copy.textContent = 'Выделите и скопируйте отчёт ниже'; } };
+        const heading = document.createElement('p'); heading.textContent = 'Полный ответ сервера';
+        this.panel.append(title, this.download, copy, this.info, heading, this.raw); root.append(this.panel);
+        this.render();
+      }
+      clean(text) {
+        return text.replace(/("(?:csrf_token|_csrf|authorization|cookie|set-cookie|api_key|password)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi, '$1"[REDACTED]"');
+      }
+      render() { this.info.textContent = JSON.stringify(this.report, null, 2); }
+      async db() {
+        return await new Promise((resolve, reject) => {
+          const open = indexedDB.open('involta-voice-drafts', 1);
+          open.onupgradeneeded = () => open.result.createObjectStore('drafts', { keyPath: 'key' });
+          open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error);
+        });
+      }
+      async store(mode, value) {
+        const db = await this.db();
+        try { return await new Promise((resolve, reject) => {
+          const tx = db.transaction('drafts', mode === 'get' ? 'readonly' : 'readwrite');
+          const records = tx.objectStore('drafts');
+          const operation = mode === 'get' ? records.get(this.key) : mode === 'delete' ? records.delete(this.key) : records.put(value);
+          tx.oncomplete = () => resolve(operation.result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+        }); } finally { db.close(); }
+      }
+      async restore() {
+        try {
+          const saved = await this.store('get');
+          if (saved?.blob) { this.showAudio(saved.blob, saved.id); this.report.draft = { id: saved.id, bytes: saved.blob.size, mime: saved.blob.type, local_copy_saved: true }; this.render(); }
+          return saved;
+        } catch (e) { this.report.storage_error = e.message; this.render(); return null; }
+      }
+      showAudio(blob, id) {
+        if (this.audioURL) URL.revokeObjectURL(this.audioURL);
+        this.audioURL = URL.createObjectURL(blob); this.download.href = this.audioURL;
+        this.download.download = `voice-${id}.${blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`;
+        this.download.hidden = false;
+      }
+      async save(blob, id, seconds) {
+        this.showAudio(blob, id);
+        this.report.draft = { id, bytes: blob.size, mime: blob.type, seconds, local_copy_saved: false };
+        try { await this.store('put', { key: this.key, id, blob, seconds, role: this.role, updated: Date.now() }); this.report.draft.local_copy_saved = true; }
+        catch (e) { this.report.storage_error = e.message; }
+        this.render();
+      }
+      async clear() {
+        try { await this.store('delete'); } catch (e) { this.report.storage_error = e.message; }
+        if (this.audioURL) URL.revokeObjectURL(this.audioURL); this.audioURL = null;
+        this.download.hidden = true; this.report.draft = null; this.render();
+      }
+      begin() { this.id = crypto.randomUUID(); this.report.request_id = this.id; this.report.events = []; this.render(); }
+      async request(url, options = {}) {
+        const start = performance.now();
+        const entry = { request_id: this.id, url: url.toString(), method: options.method || 'GET', started: new Date().toISOString() };
+        this.report.events.push(entry); this.render();
+        const headers = new Headers(options.headers || {}); headers.set('X-Voice-Request-ID', this.id);
+        try {
+          const response = await fetch(url, { signal: AbortSignal.timeout(90000), ...options, headers });
+          const body = await response.text();
+          entry.elapsed_ms = Math.round(performance.now() - start); entry.status = response.status;
+          entry.status_text = response.statusText; entry.final_url = response.url;
+          entry.response_headers = Object.fromEntries([...response.headers].filter(([key]) => !/cookie|authorization|csrf/i.test(key)));
+          entry.response_body = this.clean(body); this.raw.textContent = entry.response_body; this.render();
+          let data;
+          try { data = JSON.parse(body); }
+          catch { throw new Error(`Сервер вернул неожиданный ответ (HTTP ${response.status}). Запись сохранена; полный ответ — в диагностике ниже.`); }
+          if (!response.ok) throw new Error((typeof data.error === 'string' ? data.error : data.error?.message) || (typeof data.detail === 'string' ? data.detail : `Не удалось отправить запись (HTTP ${response.status}).`));
+          return data;
+        } catch (error) {
+          entry.elapsed_ms = Math.round(performance.now() - start); entry.exception = { name: error.name, message: error.message };
+          this.render(); throw error;
+        }
+      }
+      async publish() {
+        if (!this.id) return;
+        try {
+          const response = await fetch(`${this.api}/debug/${this.id}`, {
+            method: 'POST', credentials: 'same-origin', signal: AbortSignal.timeout(5000), headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...this.report, server: undefined })
+          });
+          this.report.diagnostics_saved = response.ok;
+          this.report.diagnostics_status = response.status;
+        } catch (e) { this.report.diagnostics_saved = false; this.report.diagnostics_error = e.message; }
+        this.render();
+      }
+      async serverTrace() {
+        if (!this.id) return;
+        try {
+          const r = await fetch(`${this.api}/debug/${this.id}`, { credentials: 'same-origin', signal: AbortSignal.timeout(5000) });
+          if (r.ok) this.report.server = await r.json();
+          else this.report.server_trace_status = r.status;
+        } catch (e) { this.report.server_trace_error = e.message; }
+        this.render();
+      }
+      dispose() { if (this.audioURL) URL.revokeObjectURL(this.audioURL); this.panel.remove(); }
+    }
+
     class Machine {
       state = "idle";
       move(next) {
@@ -38,6 +145,7 @@
       const currentText = document.createElement("p");
       panel.append(heading, description, controls, status, error, currentText, history);
       root.replaceChildren(style, panel);
+      const diagnostics = new Diagnostics(panel, { key: 'voice', api: api.href, role: options.actor || 'visitor', location: options.location || '' });
       function button(label, action, disabled = false) {
         const b = document.createElement("button"); b.type = "button"; b.textContent = label;
         b.disabled = disabled; b.addEventListener("click", action); return b;
@@ -88,15 +196,16 @@
             if (disposed || !event.data.size) return;
             chunks.push(event.data); bytes += event.data.size;
             if (bytes > 10 * 1024 * 1024) {
-              recorder.onstop = () => {}; if (recorder.state !== "inactive") recorder.stop();
+              recorder.onstop = async () => {}; if (recorder.state !== "inactive") recorder.stop();
               release(); clearBlob(); fail("Запись больше 10 МБ. Запишите более короткий отзыв.");
             }
           };
           recorder.onerror = () => { release(); fail("Не удалось записать звук. Попробуйте ещё раз."); };
-          recorder.onstop = () => {
+          recorder.onstop = async () => {
             release(); if (disposed || machine.state !== "recording") return;
             blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-            key = crypto.randomUUID(); status.textContent = "Запись готова к прослушиванию."; transition("preview");
+            key = crypto.randomUUID(); await diagnostics.save(blob, key, Math.floor((performance.now() - started) / 1000));
+            status.textContent = diagnostics.report.draft?.local_copy_saved ? "Запись сохранена в браузере и готова к прослушиванию." : "Запись готова. Не удалось сохранить её в браузере — скачайте аудио перед закрытием страницы."; transition("preview");
           };
           recorder.start(250); started = performance.now(); transition("recording");
           timer = setInterval(() => {
@@ -112,23 +221,24 @@
       async function send() {
         if (!blob || !key) return;
         error.textContent = ""; transition("uploading");
-        const form = new FormData();
-        form.set("audio", blob, "recording"); form.set("location", options.location || "");
-        form.set("idempotency_key", key); form.set("language", navigator.language || "");
-        form.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+        diagnostics.begin();
+        const params = new URLSearchParams({ location: options.location || '', idempotency_key: key, language: navigator.language || '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '' });
         try {
-          // Establish ownership before upload: losing the later 202 must not lose the visitor cookie.
-          const identity = await fetch(api.href + "/identity", { method: "POST", credentials: "same-origin" });
-          if (!identity.ok) throw new Error("Не удалось подготовить отправку. Попробуйте ещё раз.");
-          const response = await fetch(api.href + "/submissions", { method: "POST", credentials: "same-origin", body: form });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error?.message || "Не удалось отправить запись.");
+          const identity = await diagnostics.request(api.href + "/identity", { method: "POST", credentials: "same-origin" });
+          if (!identity.ready) throw new Error("Не удалось подготовить отправку записи.");
+          if (identity.actor && identity.actor !== diagnostics.role) throw new Error("Режим входа изменился. Вернитесь в прежний режим — запись сохранена.");
+          const data = await diagnostics.request(api.href + "/submissions?" + params, {
+            method: "POST", credentials: "same-origin", body: blob,
+            headers: { 'Content-Type': blob.type || 'audio/webm', 'X-CSRF-Token': identity.csrf_token || '' }
+          });
+          if (!data.reference || typeof data.reference !== 'string') throw new Error('Сервер не подтвердил сохранение. Запись остаётся в браузере.');
           if (disposed) return;
-          reference = data.reference; clearBlob(); transition("accepted");
+          reference = data.reference; await diagnostics.publish(); await diagnostics.clear(); clearBlob(); transition("accepted");
           status.textContent = "Запись доставлена. Расшифровываем ваш отзыв."; delay = 2000;
           schedule();
         } catch (e) {
-          if (!disposed) fail(e.message || "Связь прервалась. Повторите отправку этой записи.");
+          if (!disposed) fail(e.name === 'TypeError' ? "Связь прервалась. Запись сохранена — повторите отправку." : e.message || "Не удалось отправить запись.");
+          await diagnostics.publish(); await diagnostics.serverTrace();
         }
       }
       const labels = { pending: "Ожидает редактора", approved: "Принято", rejected: "Отклонено", fraud: "Помечено как фрод", published: "Опубликовано" };
@@ -176,12 +286,19 @@
       }
       function unmount() {
         disposed = true; clearTimeout(poll); clearTimeout(historyPoll); if (recorder?.state === "recording") recorder.stop();
-        release(); clearBlob(); root.replaceChildren(); instances.delete(target);
+        release(); clearBlob(); diagnostics.dispose(); root.replaceChildren(); instances.delete(target);
       }
       const instance = { unmount, get state() { return machine.state; } };
-      instances.set(target, instance); render(); loadHistory(); return instance;
+      instances.set(target, instance); render(); loadHistory();
+      diagnostics.restore().then(saved => {
+        if (!disposed && saved?.blob && machine.state === 'idle') {
+          blob = saved.blob; key = saved.id; machine.state = 'preview';
+          status.textContent = 'Восстановлена неотправленная запись. Можно прослушать и отправить её.'; render();
+        }
+      });
+      return instance;
     }
     window.InvoltaVoice = { mount, unmount(target) { instances.get(typeof target === "string" ? document.getElementById(target) : target)?.unmount(); }, Machine };
   }
-  if (script?.dataset.target) window.InvoltaVoice.mount(script.dataset.target, { apiBase: script.dataset.apiBase, location: script.dataset.location });
+  if (script?.dataset.target) window.InvoltaVoice.mount(script.dataset.target, { apiBase: script.dataset.apiBase, location: script.dataset.location, actor: script.dataset.actor });
 })();

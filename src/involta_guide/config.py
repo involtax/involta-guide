@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     alex_secret_base64: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
     voice_enabled: bool = False
+    voice_debug_enabled: bool = True
     voice_url: str = "http://voice-api:3100"
     voice_service_secret: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"

@@ -1,8 +1,8 @@
 import hashlib
-from uuid import uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
-from involta_guide.application.ports.repositories import AudioStorage, UowFactory
-from involta_guide.domain.entities import RuleViolation
+from involta_guide.application.ports.repositories import AudioStorage, Repository, UowFactory
+from involta_guide.domain.entities import Conflict, RuleViolation
 
 from .editorial import require
 
@@ -23,8 +23,39 @@ class ReviewService:
         mime: str,
         alex_session: str | None = None,
         admin_session: str | None = None,
+        idempotency_key: str | None = None,
     ) -> str:
+        digest = hashlib.sha256(content).hexdigest()
+        key = (
+            str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "guide-voice-upload:" + visitor + ":" + str(UUID(idempotency_key)),
+                )
+            )
+            if idempotency_key
+            else str(uuid4())
+        )
+
+        def replay(repo: Repository) -> str | None:
+            old = repo.get("reviews", key) if idempotency_key else None
+            if old is None:
+                return None
+            if (
+                str(old["location_id"]) != str(location_id)
+                or old["visitor"] != visitor
+                or old["hash"] != digest
+                or old["mime"] != mime
+                or bool(old["alex_session_id"] or old["admin_session_id"])
+                != bool(alex_session or admin_session)
+            ):
+                raise Conflict("Ключ отправки уже использован для другой записи")
+            return key
+
         with self.uow() as uow:
+            previous = replay(uow.repo)
+            if previous:
+                return previous
             location = require(uow.repo, "locations", location_id)
             if not location["active"]:
                 raise RuleViolation("Локация не найдена")
@@ -34,8 +65,20 @@ class ReviewService:
         try:
             with self.uow() as uow:
                 repo = uow.repo
-                repo.guard_pending(self.pending_limit)
-                key = str(uuid4())
+                # guard_pending serializes intake. Recheck under that same lock so
+                # concurrent retries cannot enqueue the administrator command twice.
+                try:
+                    repo.guard_pending(self.pending_limit)
+                except RuleViolation:
+                    previous = replay(repo)
+                    if previous:
+                        self.storage.delete(name)
+                        return previous
+                    raise
+                previous = replay(repo)
+                if previous:
+                    self.storage.delete(name)
+                    return previous
                 repo.add(
                     "reviews",
                     {
@@ -44,7 +87,7 @@ class ReviewService:
                         "visitor": visitor,
                         "audio": name,
                         "mime": mime,
-                        "hash": hashlib.sha256(content).hexdigest(),
+                        "hash": digest,
                         "ip_hash": ip_hash,
                         "device": device[:500],
                         "duration_seconds": duration,

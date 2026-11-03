@@ -129,11 +129,7 @@
 <p>Режим Алекса: голосовая команда изменит страницу сразу. <a href="{{settings.path('/alex')}}">Журнал ↗</a>
 </p>
 {%endif%}
-{%if voice_v1%}
 <div id="guide-voice"></div>
-{%else%}
-{%include 'voice.html'%}
-{%endif%}
 <script type="application/ld+json">{{structured|tojson}}</script>
 </main>
 {%endblock%}
@@ -143,9 +139,5 @@
 {%endif%}
 <script type="module" src="{{settings.path('/assets/hours.js')}}">
 </script>
-{%if voice_v1%}
-<script defer src="{{settings.path('/voice/widget.v1.js')}}?v={{settings.release_sha}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}"></script>
-{%else%}
-<script defer src="{{settings.path('/widget.js')}}"></script>
-{%endif%}
+<script defer src="{{settings.path('/voice/widget.v1.js')}}?v={{settings.release_sha}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}" data-actor="{{'admin' if alex else 'visitor'}}"></script>
 {%endblock%}

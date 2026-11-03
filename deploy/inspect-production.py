@@ -176,7 +176,8 @@ from involta_guide.infrastructure.persistence.unit_of_work import create_databas
 e = create_database(Settings())
 with e.connect() as c:
     rows = c.execute(text("SELECT r.id,l.slug,r.status,r.admin_session_id IS NOT NULL OR r.alex_session_id IS NOT NULL AS trusted,r.transcript IS NOT NULL AS has_transcript,coalesce(v.reference,a.reference) AS asr_reference,v.number FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN voice_archives a ON a.source_review=r.id LEFT JOIN voice_links v ON v.review_id=r.id ORDER BY r.created_at DESC LIMIT 10")).mappings().all()
-print(json.dumps([dict(r) for r in rows],default=str))
+    debug = c.execute(text("SELECT target AS request_id,detail FROM audit WHERE action='voice_upload_http' ORDER BY created_at DESC LIMIT 20")).mappings().all()
+print(json.dumps({'recordings':[dict(r) for r in rows], 'upload_debug':[dict(r) for r in debug]},default=str))
 e.dispose()
 """
         code, output, _ = run(
@@ -192,49 +193,6 @@ e.dispose()
         )
         if code == 0:
             report["recent_voice_status"] = json.loads(output)
-    if report.get("docker_binary"):
-        transport_probe = """
-import json,time
-from pathlib import Path
-from uuid import uuid4
-from urllib.parse import urlsplit
-import httpx
-from sqlalchemy import text
-from involta_guide.config import Settings
-from involta_guide.infrastructure.persistence.unit_of_work import create_database
-s=Settings();e=create_database(s)
-with e.connect() as c: location=str(c.execute(text("SELECT id FROM locations WHERE slug='ivanovo'")).scalar_one())
-e.dispose()
-args=Path('/proc/1/cmdline').read_bytes().decode().split('\\0')
-port=args[args.index('--port')+1] if '--port' in args else '3001'
-site=urlsplit(s.site_url);origin=site.scheme+'://'+site.netloc
-results=[]
-for mode,base,sizes in [('local','http://127.0.0.1:'+port+s.base_path,[16384,131072]),('external',s.site_url.rstrip('/'),[16384])]:
- with httpx.Client(timeout=8,trust_env=(mode!='local'),headers={'Origin':origin,'User-Agent':'deployment-smoke/invalid-upload-probe'}) as client:
-  client.post(base+'/voice/api/v1/identity')
-  for endpoint in ['/api/reviews','/voice/api/v1/submissions']:
-   for size in sizes:
-    started=time.monotonic()
-    try:
-     r=client.post(base+endpoint,data={'locationId':location,'location':'ivanovo','idempotency_key':str(uuid4())},files={'audio':('invalid.webm',b'x'*size,'audio/webm')})
-     results.append({'mode':mode,'path':endpoint,'bytes':size,'status':r.status_code,'content_type':r.headers.get('content-type'),'body':r.text,'seconds':time.monotonic()-started})
-    except httpx.HTTPError as error: results.append({'mode':mode,'path':endpoint,'bytes':size,'exception':type(error).__name__,'seconds':time.monotonic()-started})
-print(json.dumps(results,ensure_ascii=False))
-"""
-        code, output, _ = run(
-            [
-                "docker",
-                "--host=unix:///var/run/docker.sock",
-                "exec",
-                "involta-guide",
-                "python",
-                "-c",
-                transport_probe,
-            ],
-            timeout=60,
-        )
-        if code == 0:
-            report["voice_invalid_upload_transport"] = json.loads(output)
     try:
         report["involta_ru_addresses"] = sorted(
             {item[4][0] for item in socket.getaddrinfo("involta.ru", 443)}

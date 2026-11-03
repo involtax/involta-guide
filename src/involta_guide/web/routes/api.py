@@ -1,10 +1,11 @@
+from io import BytesIO
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
-from starlette.datastructures import UploadFile
+from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request as StarletteRequest
 
 from involta_guide.web.http import (
@@ -37,8 +38,17 @@ def routes(prefix: str) -> APIRouter:
         async def receive() -> dict:
             return {"type": "http.request", "body": body, "more_body": False}
 
-        bounded = StarletteRequest(request.scope, receive)
-        form = await bounded.form(max_files=1, max_fields=10, max_part_size=limit)
+        if request.headers.get("content-type", "").lower().startswith("audio/"):
+            form = FormData(
+                [
+                    *request.query_params.multi_items(),
+                    ("_csrf", request.headers.get("x-csrf-token", "")),
+                    ("audio", UploadFile(BytesIO(body), filename="voice", headers=request.headers)),
+                ]
+            )
+        else:
+            bounded = StarletteRequest(request.scope, receive)
+            form = await bounded.form(max_files=1, max_fields=10, max_part_size=limit)
         try:
             audio = form.get("audio")
             location_id = str(UUID(str(form.get("locationId") or form.get("cityId") or "")))
@@ -69,6 +79,7 @@ def routes(prefix: str) -> APIRouter:
                 mime,
                 alex["id"] if alex and not admin else None,
                 admin["id"] if admin else None,
+                str(UUID(str(form["idempotency_key"]))) if form.get("idempotency_key") else None,
             )
             response = JSONResponse({"id": key}, status_code=201)
             response.set_cookie(
