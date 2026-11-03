@@ -57,6 +57,7 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
         state = "published"
     return {
         "reference": reference,
+        "location": {"id": str(location["id"]), "slug": location["slug"], "name": location["name"]},
         "transcript": text["original_text"] if text else review["transcript"],
         "moderation": review["moderation"],
         "editorial_state": state,
@@ -248,6 +249,8 @@ def routes(prefix: str) -> APIRouter:
                             "moderation": item["moderation"],
                             "editorial_state": "published"
                             if item["published"]
+                            and item["moderation"] == "approved"
+                            and not item["fraud"]
                             else "fraud"
                             if item["fraud"]
                             else item["moderation"],
