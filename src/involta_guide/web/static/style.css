@@ -576,21 +576,6 @@ legend {
 .publish small {
   margin-top: 10px;
 }
-.version-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.version-links a {
-  border: 1px solid var(--line);
-  padding: 6px 10px;
-  font-size: 11px;
-}
-.version-links a.selected {
-  background: var(--black);
-  color: white;
-}
 .compare {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -604,25 +589,6 @@ legend {
 .compare > form {
   border-left: 1px solid var(--line);
   padding-left: 25px;
-}
-.snapshot {
-  font-size: 12px;
-}
-.snapshot > div {
-  border-top: 1px solid var(--line);
-  padding: 15px 0;
-}
-.snapshot p {
-  margin: 10px 0;
-}
-.snapshot strong {
-  font-size: 15px;
-}
-.snapshot small {
-  margin: 5px 0;
-}
-.snapshot a {
-  font-size: 11px;
 }
 details {
   margin: 20px 0;

@@ -1,0 +1,150 @@
+"""Real pg_dump/cutover/pg_restore against disposable schemas and the production image.
+
+Requires TEST_DATABASE_URL (test owner), GUIDE_TEST_IMAGE (default involta-guide:ci).
+Docker uses host networking to reach the local test DB by default; override with
+GUIDE_TEST_NETWORK and GUIDE_CONTAINER_DATABASE_URL for a Compose database.
+No API calls, production URLs, persisted containers or database-wide DROP commands.
+"""
+
+import os
+import subprocess
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+from uuid import uuid4
+
+import psycopg
+from psycopg import sql
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def main() -> None:
+    url = os.environ["TEST_DATABASE_URL"]
+    container_url = os.getenv("GUIDE_CONTAINER_DATABASE_URL", url)
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k
+        not in {
+            "DOCKER_HOST",
+            "DOCKER_CONTEXT",
+            "DOCKER_TLS",
+            "DOCKER_TLS_VERIFY",
+            "DOCKER_CERT_PATH",
+        }
+    }
+    docker = ["docker", "--host=unix:///var/run/docker.sock"]
+    for previous in ["0007_voice_package", "0006_coverage"]:
+        schema = "test_release_" + uuid4().hex
+        with psycopg.connect(url, autocommit=True) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+        env.update(
+            DATABASE_URL=container_url,
+            DATABASE_SCHEMA=schema,
+            SESSION_SECRET="local-release-smoke-" + "x" * 40,
+        )
+        base = [
+            *docker,
+            "run",
+            "--rm",
+            "-i",
+            "--network",
+            os.getenv("GUIDE_TEST_NETWORK", "host"),
+            "--env",
+            "DATABASE_URL",
+            "--env",
+            "DATABASE_SCHEMA",
+            "--env",
+            "SESSION_SECRET",
+            os.getenv("GUIDE_TEST_IMAGE", "involta-guide:ci"),
+        ]
+
+        def call(command: list[str], data: bytes | None = None) -> bytes:
+            result = subprocess.run(
+                [*base, *command],
+                input=data,
+                env=env,
+                capture_output=True,
+                timeout=90,
+            )
+            if result.returncode:
+                error = result.stderr.decode(errors="replace")
+                for secret in (
+                    url,
+                    container_url,
+                    unquote(urlsplit(url).password or ""),
+                    unquote(urlsplit(container_url).password or ""),
+                ):
+                    if secret:
+                        error = error.replace(secret, "[redacted]")
+                raise RuntimeError(error)
+            return result.stdout
+
+        backup_command = ["python", "-m", "involta_guide.infrastructure.persistence.release_backup"]
+        try:
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                conn.execute((ROOT / "tests/fixtures/schema/pre_current_state.sql").read_text())
+                conn.execute("INSERT INTO alembic_version VALUES(%s)", (previous,))
+                conn.execute(
+                    "INSERT INTO locations(id,name,region,slug,intro) VALUES(%s,'Current city','Region','current-city','Current intro')",
+                    (str(uuid4()),),
+                )
+                conn.execute("INSERT INTO settings VALUES('test-marker','keep')")
+                conn.execute("CREATE TABLE unrelated_original(payload text)")
+                conn.execute("INSERT INTO unrelated_original VALUES('before')")
+                if previous == "0006_coverage":
+                    conn.execute(
+                        "DROP TABLE review_fragment_bindings,review_decisions,voice_archives,voice_inbox,voice_cursor,voice_consumer_health,voice_fragments,voice_proposals,voice_results,voice_links,review_texts,voice_candidate_proposals,voice_page_drafts"
+                    )
+                    conn.execute(
+                        "ALTER TABLE reviews DROP COLUMN admin_session_id; ALTER TABLE alex_changes DROP COLUMN admin_session_id"
+                    )
+            assert call([*backup_command, "needed"]).strip() == b"yes"
+            dump = call([*backup_command, "backup"])
+            assert dump.startswith(b"PGDMP")
+            call(["alembic", "upgrade", "head"])
+            assert call([*backup_command, "needed"]).strip() == b"no"
+            # A foreign object's dependency must make restore fail atomically, never CASCADE it.
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                conn.execute("UPDATE unrelated_original SET payload='changed independently'")
+                conn.execute(
+                    "CREATE TABLE unrelated_sentinel(location_id uuid REFERENCES locations(id))"
+                )
+            try:
+                call([*backup_command, "restore"], dump)
+            except RuntimeError as exc:
+                assert "depend" in str(exc)
+            else:
+                raise AssertionError("Restore should refuse a foreign dependency")
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                assert (
+                    conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+                    == "current_state"
+                )
+                conn.execute("DROP TABLE unrelated_sentinel")
+            call([*backup_command, "restore"], dump)
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                assert (
+                    conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+                    == previous
+                )
+                assert conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
+                assert (
+                    conn.execute("SELECT value FROM settings WHERE key='test-marker'").fetchone()[0]
+                    == "keep"
+                )
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                assert (
+                    conn.execute("SELECT payload FROM unrelated_original").fetchone()[0]
+                    == "changed independently"
+                )
+            print(
+                previous + ": real backup, cutover, atomic refusal and restore passed", flush=True
+            )
+        finally:
+            with psycopg.connect(url, autocommit=True) as conn:
+                conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+
+
+if __name__ == "__main__":
+    main()

@@ -3,10 +3,11 @@ from uuid import uuid4
 
 import pytest
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.application.services.locations import LocationService, Queries
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+
+from .editor_fixture import FixtureEditor as EditorialService
 
 CARD = {
     "name": "Тестовый ресторан",
@@ -28,28 +29,24 @@ def services(database):
     return EditorialService(factory), Queries(factory), factory
 
 
-def test_current_save_restore_provenance_and_conflicts(database):
+def test_current_state_diffs_and_conflicts(database):
     editor, queries, uow = services(database)
     location = queries.directory(query="Иваново")["rows"][0]
     key = location["id"]
     first = editor.save(key, CONTENT, None)
-    assert queries.get("locations", key)["published_version"] == first
-    editor.publish(key, first, None)
-    second = editor.save(key, {**CONTENT, "intro": "Новая редакция"}, first)
+    content = queries.location(key)["content"]
+    second = editor.save(key, {**content, "intro": "Новая редакция"}, first)
+    assert queries.get("locations", key)["revision"] == second
     assert queries.public(location["slug"])["content"]["intro"] == "Новая редакция"
+    change = queries.rows("reviews")[0]["changes"][0]
+    assert change["diff"] == [
+        {"path": ["intro"], "before": CONTENT["intro"], "after": "Новая редакция"}
+    ]
     with pytest.raises(Conflict):
         editor.save(key, CONTENT, first)
-    editor.publish(key, second, first)
-    with pytest.raises(Conflict):
-        editor.publish(key, first, first)
-    restored = editor.restore(key, first, second)
-    assert queries.get("locations", key)["published_version"] == restored
-    editor.publish(key, restored, second)
-    assert (
-        queries.public(location["slug"])["content"] == queries.get("versions", restored)["content"]
-    )
-    empty = editor.save(key, {"intro": "", "restaurants": []}, restored)
-    assert queries.get("locations", key)["published_version"] == empty
+    assert len(queries.rows("reviews")) == 2  # Failed change rolled back with its source.
+    empty = editor.save(key, {"intro": "", "restaurants": []}, second)
+    assert queries.get("locations", key)["revision"] == empty
     assert queries.public(location["slug"])["content"]["restaurants"] == []
 
 
@@ -66,7 +63,7 @@ def test_parallel_edit_one_wins_and_no_lost_updates(database):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(attempt, ["one", "two"]))
     assert results.count("conflict") == 1
-    assert len(queries.rows("versions", {"location_id": key})) == 1
+    assert len([r for r in queries.rows("reviews", {"location_id": key}) if r["changes"]]) == 1
 
 
 def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
@@ -74,13 +71,11 @@ def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
     first = queries.directory(query="Иваново")["rows"][0]
     second = queries.directory(query="Шуя")["rows"][0]
     version = editor.save(first["id"], CONTENT, None)
-    editor.publish(first["id"], version, None)
-    card = queries.get("versions", version)["content"]["restaurants"][0]
+    card = queries.location(first["id"])["content"]["restaurants"][0]
     with pytest.raises(RuleViolation):
         editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
     LocationService(uow).attach(card["id"], second["id"])
-    copy = editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
-    editor.publish(second["id"], copy, None)
+    editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
     new = {**card, "description": "Обновлённое описание"}
     editor.save(first["id"], {"intro": "", "restaurants": [new]}, version)
     assert (
@@ -93,8 +88,8 @@ def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
 def test_proposal_atomic_and_only_once(database):
     editor, queries, uow = services(database)
     key = queries.directory(query="Иваново")["rows"][0]["id"]
-    version = editor.save(key, CONTENT, None)
-    card = queries.get("versions", version)["content"]["restaurants"][0]
+    editor.save(key, CONTENT, None)
+    card = queries.location(key)["content"]["restaurants"][0]
     review_id, proposal_id = str(uuid4()), str(uuid4())
     with uow() as work:
         work.repo.add(
@@ -123,12 +118,18 @@ def test_proposal_atomic_and_only_once(database):
     with pytest.raises(RuleViolation):
         editor.proposal(proposal_id, {**card, "description": "Правка"})
     editor.moderate(review_id, "approved", "ok")
-    new = editor.proposal(proposal_id, {**card, "description": "Правка"})
-    assert queries.get("versions", new)["content"]["restaurants"][0]["description"] == "Правка"
+    editor.proposal(proposal_id, {**card, "description": "Правка"})
+    assert queries.location(key)["content"]["restaurants"][0]["description"] == "Правка"
     with pytest.raises(Conflict):
         editor.proposal(proposal_id, card)
     with uow() as work:
-        assert work.repo.rows("version_reviews", {"version_id": new})[0]["review_id"] == review_id
+        assert work.repo.get("reviews", review_id)["changes"][0]["diff"] == [
+            {
+                "path": ["restaurants", card["id"], "description"],
+                "before": "Описание",
+                "after": "Правка",
+            }
+        ]
 
 
 def test_location_alias_cycles_visibility_and_shared_direction(database):
@@ -164,14 +165,33 @@ def test_location_alias_cycles_visibility_and_shared_direction(database):
     changed["parent_id"] = key
     with pytest.raises((RuleViolation, IntegrityError)):
         service.save(moscow["id"], changed)
-    version = editor.save(key, CONTENT, None)
-    editor.publish(key, version, None)
+    editor.save(key, CONTENT, None)
     parent = queries.location(moscow["id"])
     assert any(r["name"] == CARD["name"] for r in parent["available"])
     snapshot = queries.location(key)["content"]["restaurants"][0]
-    parent_version = editor.save(
-        moscow["id"], {"intro": "Направление", "restaurants": [snapshot]}, None
-    )
-    editor.publish(moscow["id"], parent_version, None)
+    editor.save(moscow["id"], {"intro": "Направление", "restaurants": [snapshot]}, None)
     assert queries.get("restaurants", snapshot["id"])["location_id"] == key
     assert len(queries.rows("restaurants")) == 1
+
+
+def test_page_does_not_depend_on_its_source_log(database):
+    from sqlalchemy import text
+
+    editor, queries, factory = services(database)
+    city = queries.directory(query="Иваново")["rows"][0]
+    editor.save(city["id"], CONTENT, None)
+    before = queries.public(city["slug"])["content"]
+    with factory() as work:
+        work.session.execute(text("DELETE FROM reviews WHERE visitor='fixture-editor'"))
+    assert queries.rows("reviews") == []
+    assert queries.public(city["slug"])["content"] == before
+
+
+def test_application_requires_one_matching_source(database):
+    from involta_guide.application.services.editorial import save
+
+    _, queries, factory = services(database)
+    city = queries.directory(query="Иваново")["rows"][0]
+    with pytest.raises(RuleViolation), factory() as work:
+        save(work.repo, city["id"], CONTENT, None)
+    assert queries.get("locations", city["id"])["revision"] is None

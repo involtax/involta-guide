@@ -97,7 +97,7 @@ class JobService:
                     "previous_number": repo.log_reference(previous_job)["number"]
                     if previous_job
                     else None,
-                    "baseline_version": location["published_version"],
+                    "baseline_revision": location["revision"],
                 }
             ),
         )
@@ -107,10 +107,7 @@ class JobService:
 
     @staticmethod
     def _has_data(repo: Repository, location: Record) -> bool:
-        if location["published_version"]:
-            version = require(repo, "versions", location["published_version"])
-            return bool(version["content"]["restaurants"])
-        return bool(location["draft"])
+        return bool(location["page_data"].get("restaurants"))
 
     @staticmethod
     def _is_public_fill(repo: Repository, job_id: str) -> bool:
@@ -119,14 +116,8 @@ class JobService:
         )
 
     def _public_state(self, repo: Repository, location: Record) -> Record:
-        if location["published_version"] and self._has_data(repo, location):
-            return {"state": "ready", "can_start": False, "message": "Подборка готова."}
         if self._has_data(repo, location):
-            return {
-                "state": "existing",
-                "can_start": False,
-                "message": "Данные уже собраны и сохранены в редакции.",
-            }
+            return {"state": "ready", "can_start": False, "message": "Подборка готова."}
         filters = {"kind": "generate", "location_id": location["id"]}
         for status, message in (
             ("running", "Ищем и проверяем места. Это может занять несколько минут."),
@@ -187,7 +178,7 @@ class JobService:
             count = 0
             for location in sorted(rows, key=lambda row: row["id"]):
                 if not location_id and (
-                    (not location["listed"] and not location["published_version"])
+                    (not location["listed"] and not location["revision"])
                     or (scope == "empty" and self._has_data(repo, location))
                 ):
                     continue
@@ -281,16 +272,16 @@ class JobService:
                     raise Conflict(
                         "На странице уже появились данные; автоматическая перезапись отменена"
                     )
-            baseline = location["published_version"]
+            baseline = location["revision"]
             content = current_content(uow.repo, location)
             known = uow.repo.known(location["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
             review = require(uow.repo, "reviews", job["review_id"]) if job["review_id"] else None
-            generation_model = config.get("model", self.provider.model)
+            config.get("model", self.provider.model)
             baseline_changed = (
                 job["kind"] == "generate"
-                and "baseline_version" in config
-                and config["baseline_version"] != baseline
+                and "baseline_revision" in config
+                and config["baseline_revision"] != baseline
             )
             if baseline_changed and saved_prompt is None:
                 raise Conflict("Страница изменена после постановки запроса. Создайте новый запрос.")
@@ -337,28 +328,25 @@ class JobService:
             if is_public and not self.public_fill_enabled and not reprocess:
                 raise RuleViolation("Ответ сохранён; временное наполнение отключено")
             result = assess_coverage(rank(generated), normalization)
-            if reprocess:
-                for card in result["restaurants"]:
-                    existing = next(
-                        (
-                            r
-                            for r in content["restaurants"]
-                            if r["mapsUrl"] == card["mapsUrl"]
-                            and r["name"].casefold().strip() == card["name"].casefold().strip()
-                        ),
-                        None,
-                    )
-                    if existing:
-                        card["id"] = existing["id"]
-                        card["locationId"] = existing.get("locationId", location["id"])
-            with self.uow() as uow:
-                previous = uow.repo.get("versions", baseline) if baseline else None
-                if previous and previous["source"] == "intro":
-                    result["intro"] = content["intro"]
+            # Keep restaurant identities across manual reruns as well as revalidation.
+            for card in result["restaurants"]:
+                existing = next(
+                    (
+                        r
+                        for r in content["restaurants"]
+                        if r["mapsUrl"] == card["mapsUrl"]
+                        and r["name"].casefold().strip() == card["name"].casefold().strip()
+                    ),
+                    None,
+                )
+                if existing:
+                    card["id"] = existing["id"]
+                    card["locationId"] = existing.get("locationId", location["id"])
             ContentInput.model_validate(result)
             assert_publishable(result)
             with self.uow() as uow:
                 repo = uow.repo
+                repo.lock_locations()
                 if not repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
                 if (
@@ -369,18 +357,15 @@ class JobService:
                     raise Conflict(
                         "На странице уже появились данные; автоматическая перезапись отменена"
                     )
-                version_id = save(
+                revision = save(
                     repo,
                     location["id"],
                     result,
                     baseline,
-                    source="reprocess" if reprocess else "public_fill" if is_public else "ai",
-                    prompt=prompt,
-                    model=generation_model,
-                    inherit=False,
+                    job_id=job["id"],
                 )
                 if is_public:
-                    repo.audit("temporary_public_fill_published", location["id"], version_id)
+                    repo.audit("temporary_public_fill_published", location["id"], revision)
                 repo.audit(
                     "ai_trace", job["id"], json.dumps({"event": "response_validated", "data": {}})
                 )
@@ -388,7 +373,13 @@ class JobService:
                     "generation_quality",
                     job["id"],
                     json.dumps(
-                        {"event": "generation_quality", "data": result["qualityReport"]},
+                        {
+                            "event": "generation_quality",
+                            "data": {
+                                **result["qualityReport"],
+                                "candidateReview": result.get("candidateReview", []),
+                            },
+                        },
                         ensure_ascii=False,
                     ),
                 )
@@ -398,7 +389,7 @@ class JobService:
                     json.dumps(
                         {
                             "event": "result_saved",
-                            "data": {"version_id": version_id},
+                            "data": {"revision": revision},
                         }
                     ),
                 )
@@ -439,6 +430,7 @@ class JobService:
             for action in commands["actions"]:
                 action.setdefault("restaurantId", None)
             with self.uow() as uow:
+                uow.repo.lock_locations()
                 if not uow.repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
                 EditorialService(self.uow).apply_alex(uow.repo, review, commands, baseline)
@@ -454,6 +446,7 @@ class JobService:
                     entry["restaurantId"] = None
             with self.uow() as uow:
                 repo = uow.repo
+                repo.lock_locations()
                 if not repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
                 repo.change(

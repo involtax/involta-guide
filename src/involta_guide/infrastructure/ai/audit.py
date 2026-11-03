@@ -17,7 +17,7 @@ HISTORY = """WITH numbered AS (
  (g.response_json IS NOT NULL) has_saved_response,
  (SELECT a.detail::jsonb->'data' FROM audit a WHERE a.action='generation_quality' AND a.target=j.id::text ORDER BY a.created_at DESC,a.id DESC LIMIT 1) quality_report,
  EXISTS(SELECT 1 FROM audit published WHERE published.action='ai_result' AND published.target=j.id::text
-   AND published.detail::jsonb->'data'->>'version_id'=l.published_version::text) result_published,
+   AND published.detail::jsonb->'data'->>'revision'=l.revision::text) result_published,
  (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
  (SELECT u.model FROM ai_usage u WHERE u.job_id=j.id ORDER BY u.created_at,u.id LIMIT 1) actual_model
  FROM jobs j JOIN request_logs r ON r.job_id=j.id JOIN locations l ON l.slug=r.location_slug
@@ -143,7 +143,7 @@ class AIAudit:
                 job["stage_label"] = (
                     "Опубликовано"
                     if job.get("result_published")
-                    else "Результат сохранён в истории"
+                    else "Изменения применены; страница обновлялась позже"
                 )
             elif job["status"] != "cancelled" and state:
                 job["stage_label"] = {
@@ -263,7 +263,6 @@ class AIAudit:
                     .first()
                 )
             events = []
-            version_ids: set[str] = set()
             for row in rows:
                 try:
                     payload = json.loads(row["detail"])
@@ -283,18 +282,6 @@ class AIAudit:
                         k: v for k, v in payload["data"].items() if k != "body"
                     }
                 events.append(event)
-                if isinstance(payload, dict) and payload.get("event") == "job_completed":
-                    version_ids.update(v for v in payload.get("data", {}).get("versions", []) if v)
-                if isinstance(payload, dict) and payload.get("event") == "result_saved":
-                    version_ids.add(payload["data"]["version_id"])
-            versions = [
-                dict(row)
-                for version_id in version_ids
-                for row in conn.execute(
-                    text("SELECT * FROM versions WHERE id=:id"), {"id": version_id}
-                ).mappings()
-            ]
-        versions.sort(key=lambda version: version["number"], reverse=True)
         # Round-trip UUID/datetime/Decimal values to a portable downloadable JSON document.
         return json.loads(
             json.dumps(
@@ -304,7 +291,7 @@ class AIAudit:
                         "calls": [dict(c) for c in calls],
                         "events": events,
                         "review": dict(review) if review else None,
-                        "versions": versions,
+                        "changes": job["changes"],
                         "trace_available": any(r["action"] == "ai_trace" for r in rows),
                     }
                 ),

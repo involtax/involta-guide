@@ -143,23 +143,14 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("status")).to_contain_text("Модель наполнения сохранена")
                 assert queries.setting("generation_model") == "gpt-6.1-sol"
                 page.goto(base + "/admin?tab=locations&location=" + location["id"])
-                page.get_by_role("textbox", name="Вступление", exact=True).fill("Тестовая подборка")
-                page.get_by_role("button", name="Сохранить вступление", exact=True).click()
-                expect(page.get_by_role("status")).to_contain_text(
-                    "Вступление сохранено и обновлено на сайте"
-                )
-                page.get_by_role("button", name="+ Ресторан", exact=True).click()
-                card = page.locator("[data-card]")
-                expect(card).to_have_count(1)
-                card.get_by_label("Название", exact=True).fill("Тестовый ресторан")
-                card.get_by_label("Кухня", exact=True).fill("Русская")
-                card.get_by_label("Почему стоит зайти").fill("Карточка для проверки публикации")
-                card.get_by_label("Телефон").fill("+74951234567")
-                card.get_by_label("Яндекс Карты").fill("https://yandex.ru/maps/org/test/123/")
-                page.get_by_role("button", name="Сохранить рестораны", exact=True).click()
-                expect(page.get_by_role("status")).to_contain_text(
-                    "Данные сохранены и обновлены на сайте"
-                )
+                # Current content is applied by generation/review services, not direct snapshot forms.
+                from integration.editor_fixture import FixtureEditor
+                from integration.test_editorial import CONTENT
+
+                FixtureEditor(lambda: PostgresUow(engine)).save(location["id"], CONTENT, None)
+                page.reload()
+                expect(page.get_by_role("button", name="Наполнить через GPT ↗")).to_be_visible()
+                expect(page.get_by_role("button", name="Сохранить вступление")).to_have_count(0)
                 page.goto(base + "/ivanovo")
                 expect(
                     page.get_by_role(

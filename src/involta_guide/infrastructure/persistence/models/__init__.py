@@ -21,9 +21,9 @@ class LocationRow(Base):
     population: Mapped[int | None] = mapped_column(Integer)
     active: Mapped[int] = mapped_column(Integer)
     intro: Mapped[str] = mapped_column(Text)
-    draft: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
-    published_version: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
-    draft_version: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    page_data: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    revision: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     kind: Mapped[str] = mapped_column(Text)
     parent_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     is_hub: Mapped[bool] = mapped_column(Boolean)
@@ -59,21 +59,9 @@ class RestaurantRow(Base):
     alex_star: Mapped[bool] = mapped_column(Boolean)
 
 
-class VersionRow(Base):
-    __tablename__ = "versions"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
-    number: Mapped[int] = mapped_column(Integer)
-    content: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    prompt: Mapped[str | None] = mapped_column(Text)
-    model: Mapped[str | None] = mapped_column(Text)
-    source: Mapped[str] = mapped_column(Text)
-    published: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
 class ReviewRow(Base):
     __tablename__ = "reviews"
+    changes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
     visitor: Mapped[str] = mapped_column(Text)
@@ -139,6 +127,7 @@ class VoiceProposalRow(Base):
 
 class JobRow(Base):
     __tablename__ = "jobs"
+    changes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     kind: Mapped[str] = mapped_column(Text)
     location_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
@@ -186,12 +175,6 @@ class LoginAttemptRow(Base):
     reset_at: Mapped[int] = mapped_column(BigInteger)
 
 
-class VersionReviewRow(Base):
-    __tablename__ = "version_reviews"
-    version_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-    review_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-
-
 class RestaurantLocationRow(Base):
     __tablename__ = "restaurant_locations"
     restaurant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
@@ -226,9 +209,6 @@ class AlexChangeRow(Base):
     admin_session_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     review_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     location_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
-    version_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
-    before_content: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    after_content: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(Text)
     detail: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

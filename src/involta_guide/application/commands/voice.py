@@ -24,5 +24,3 @@ class Decision(BaseModel):
     affected_revisions: dict[str, str | None] = Field(default_factory=dict)
     run: int | None = None
     fragment_number: int | None = Field(default=None, ge=0)
-    version_id: UUID | None = None
-    published_revision: UUID | None = None

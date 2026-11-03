@@ -7,7 +7,7 @@ Guide baseline: `67c77c0`; no changes to city generation or Alex commands.
 
 Voice has its own database/role, migrations, audio volume, queue and worker.
 It must not import Guide runtime code or query Guide tables. Guide supplies a
-versioned location/restaurant snapshot. Voice cannot publish or moderate Guide.
+location/restaurant context with an optimistic concurrency token. Voice cannot publish or moderate Guide.
 Alex submissions continue through the existing Guide executor in this release.
 
 The first durable result is the original transcript. A committed
@@ -101,7 +101,8 @@ transaction as transcription completion; analysis is never a dependency.
 
 The routing flag affects new visitor uploads only. Old jobs and Alex stay with
 Guide. Both old and Voice history/audio remain readable with the flag disabled.
-No migration deletes old rows, audio, request-log identities or versions. Archive
+Current page state is preserved by the cutover described in CURRENT_STATE.md; obsolete
+page snapshots and old generation logs are discarded. Archive
 copy is opt-in, repeatable, SHA-checked, and defaults to dry-run. Voice audio has
 no automatic retention expiry.
 
@@ -126,4 +127,4 @@ The current-city editor is preserved. Review approval applies all remaining
 proposals atomically and immediately. `review_revision` is the package revision;
 proposal edit/exclusion and newly imported analysis invalidate stale decisions.
 `page_revision` and `affected_revisions` fence current and shared-card city data.
-No proposals means no empty page version. See VOICE_REVIEW_REPORT.md.
+No proposals means no page mutation. See VOICE_REVIEW_REPORT.md.

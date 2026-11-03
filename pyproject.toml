@@ -24,7 +24,7 @@ build-backend = "hatchling.build"
 packages = ["src/involta_guide", "src/involta_voice"]
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
-markers = ["integration: PostgreSQL integration", "e2e: browser tests", "legacy: adopt existing legacy schema"]
+markers = ["integration: PostgreSQL integration", "e2e: browser tests"]
 [tool.ruff]
 target-version = "py313"
 line-length = 100

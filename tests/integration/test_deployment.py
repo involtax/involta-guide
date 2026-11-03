@@ -53,6 +53,12 @@ if args[0]=='inspect':
  sys.exit(0)
 if args[0]=='compose':
  command=next(x for x in args if x in ('up','ps','stop','rm','logs','run'))
+ if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
+  operation=args[-1]
+  if operation=='needed':print(os.getenv('FAKE_CUTOVER','no'))
+  elif operation=='backup':print('test-dump')
+  elif operation=='restore':sys.stdin.read()
+  sys.exit(0)
  if command=='run' and 'alembic' in args and os.getenv('FAKE_MIGRATION_FAIL')=='1':sys.exit(1)
  if command=='up':
   services=[s for s in ('web','worker') if s in args]
@@ -309,3 +315,22 @@ def test_backend_redirect_still_requires_302_and_query(tmp_path):
     )
     assert result.returncode != 0
     assert "Expected backend /guide" in result.stderr
+
+
+def test_cutover_dump_precedes_migration_and_restores_before_old_image(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    result = deploy(root, {**env, "FAKE_CUTOVER": "yes", "FAKE_FAIL_SHA": B}, B, "2-1")
+    assert result.returncode != 0
+    backup = root / "releases" / B / "pre-cutover.2-1.dump"
+    assert backup.read_text().strip() == "test-dump"
+    assert backup.stat().st_mode & 0o077 == 0
+    commands = [json.loads(line)[1] for line in Path(str(state) + ".log").read_text().splitlines()]
+    backup_pos = next(i for i, cmd in enumerate(commands) if cmd[-1:] == ["backup"])
+    migration = next(i for i, cmd in enumerate(commands) if i > backup_pos and "alembic" in cmd)
+    restore = next(i for i, cmd in enumerate(commands) if cmd[-1:] == ["restore"])
+    restored_web = next(
+        i for i, cmd in enumerate(commands) if i > restore and "up" in cmd and cmd[-1:] == ["web"]
+    )
+    assert backup_pos < migration < restore < restored_web
+    assert (root / "current-release").read_text().split()[0] == A

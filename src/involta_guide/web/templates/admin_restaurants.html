@@ -22,7 +22,7 @@
 {%if restaurant_city%}
 <header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{restaurant_cards|length}} ресторанов в базе</p></div><a href="{{settings.path('/admin')}}?tab=locations&amp;location={{restaurant_city.id}}">Редактировать подборку ↗</a></header>
 {%set quality_report=generation_quality%}{%include 'generation_quality.html'%}
-<p class="restaurant-sort-note">По убыванию оценки по 8 критериям текущей версии. При равенстве или отсутствии оценки — по оценке одобренных отзывов, затем звезде Алекса и названию. Отсутствующие оценки не считаются нулём.</p>
+<p class="restaurant-sort-note">По убыванию оценки по 8 критериям текущей подборки. При равенстве или отсутствии оценки — по оценке одобренных отзывов, затем звезде Алекса и названию. Отсутствующие оценки не считаются нулём.</p>
 {%for r in restaurant_cards%}
 <article class="restaurant-record">
 <header class="restaurant-record-heading"><span class="restaurant-position">{{'%02d'|format(loop.index)}}</span><div><h3>{{r.name}}</h3><p>{{r.cuisine or 'Кухня не указана'}} · {{r.location_name}}</p><div class="restaurant-badges"><span>{{'Активен' if r.active else 'Неактивен'}}</span>{%if r.alex_star%}<span>★ Звезда Алекса</span>{%endif%}</div></div><div class="restaurant-score"><strong>{{'%.2f'|format(r.score) if r.score is not none else '—'}}</strong><span>/ 10 · 8 критериев</span></div></header>
@@ -43,12 +43,11 @@
 <details><summary>Обоснования оценок и источники</summary>
 {%for item in r.ranking.evidence%}<div class="restaurant-evidence"><strong>{%for key,label in factors if key==item.factor%}{{label}}{%endfor%}</strong><p>{{item.reason or 'Обоснование не сохранено.'}}</p><p class="restaurant-muted">Уверенность: {{ {'high':'высокая','medium':'средняя','low':'низкая'}.get(item.confidence,item.confidence) }}</p>{%for url in item.sources or []%}{%if url.startswith('https://')%}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url}} ↗</a>{%else%}<span>{{url}}</span>{%endif%}{%endfor%}</div>{%endfor%}
 <details><summary>Исходные данные обоснований</summary><pre class="audit-json">{{r.ranking.evidence|tojson(indent=2)}}</pre></details></details>
-{%else%}<p class="restaurant-muted">В текущей версии нет оценок для этого ресторана.</p>{%endif%}
+{%else%}<p class="restaurant-muted">В текущей подборки нет оценок для этого ресторана.</p>{%endif%}
 </section>
 <section class="restaurant-detail-section"><h4>Источники</h4><ul class="restaurant-sources">{%for url in r.sources%}<li>{%if url.startswith('https://') or url.startswith('http://')%}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url}}</a>{%else%}{{url}}{%endif%}</li>{%else%}<li class="restaurant-muted">Не сохранены.</li>{%endfor%}</ul></section>
 {%if r.reviews%}<details class="restaurant-detail-section"><summary>Отзывы и оценки · {{r.reviews|length}}</summary>{%for review in r.reviews%}<section><p><a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{review.id}}">{{review.created_at}} ↗</a> · {{review.moderation}}{{' · фрод' if review.fraud}}</p><p>{{review.transcript or 'Нет расшифровки'}}</p><pre class="audit-json">{{review.entries|tojson(indent=2)}}</pre></section>{%endfor%}</details>{%endif%}
-<details class="restaurant-detail-section"><summary>Сохранённые версии · {{r.snapshots|length}}</summary><pre class="audit-json">{{r.snapshots|tojson(indent=2)}}</pre></details>
-<details class="restaurant-detail-section"><summary>Все поля записи в базе</summary><pre class="audit-json">{%for key,value in r.items() if key not in ['snapshots','reviews','ranking','score','review_scores','review_count']%}{{key}}: {{value|tojson}}
+<details class="restaurant-detail-section"><summary>Все поля записи в базе</summary><pre class="audit-json">{%for key,value in r.items() if key not in ['reviews','ranking','score','review_scores','review_count']%}{{key}}: {{value|tojson}}
 {%endfor%}</pre></details>
 </article>
 {%endfor%}
