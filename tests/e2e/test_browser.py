@@ -294,6 +294,8 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     lambda r: r.request.method == "POST" and r.url.endswith("/revoke-alex")
                 ):
                     page.get_by_role("button", name="Завершить все сессии Алекса").click()
+                # Wait for the HTMX redirect before inspecting another session.
+                expect(page.get_by_text("Для входа откройте персональную ссылку.")).to_be_visible()
                 alex_page.goto(base + "/alex")
                 expect(
                     alex_page.get_by_text("Для входа откройте персональную ссылку.")

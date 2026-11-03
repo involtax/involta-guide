@@ -1,0 +1,241 @@
+"""Visual acceptance matrix, including real templates with deterministic Voice responses."""
+
+import os
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from playwright.sync_api import sync_playwright
+from pydantic import SecretStr
+
+from involta_guide.main import create_app
+
+from .editor_fixture import FixtureEditor
+from .test_editorial import CONTENT
+from .test_voice_editorial import imported
+from .test_web import login
+
+
+def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, monkeypatch):
+    settings, _, factory, queries, city, ref, event = imported(database)
+    FixtureEditor(factory).save(city["id"], CONTENT, None)
+    restaurant = queries.rows("restaurants")[0]
+    from involta_guide.infrastructure.voice.client import VoiceClient
+    from involta_guide.infrastructure.voice.consumer import Consumer
+    from involta_voice.contracts import RestaurantContext
+
+    event["metadata"]["location"]["restaurants"] = [
+        RestaurantContext(id=restaurant["id"], name=restaurant["name"]).model_dump(mode="json")
+    ]
+    event.update(
+        event_id=str(uuid4()),
+        sequence=2,
+        kind="analysis_ready",
+        analysis={
+            "outcome": "review",
+            "entries": [],
+            "suggestions": [
+                {
+                    "kind": "edit",
+                    "restaurantId": restaurant["id"],
+                    "quote": "Телефон другой.",
+                    "reason": "Проверить телефон",
+                    "changes": {"phone": "+74951234568"},
+                }
+            ],
+        },
+    )
+    Consumer(database[1], VoiceClient(settings)).import_event(event)
+    pending_ref = str(uuid4())
+    pending = {
+        "reference": pending_ref,
+        "location": {"name": city["name"]},
+        "state": "transcript_ready",
+        "transcript": "Текст ещё не доставлен в Guide",
+        "error": "",
+        "stages": [{"run": 1}],
+    }
+    comparison = {
+        "runs": [
+            {
+                "run": 1,
+                "source_engine": "gigaam",
+                "digest": "fixture",
+                "evaluation": None,
+                "candidates": [
+                    {
+                        "name": name,
+                        "engine": engine,
+                        "state": "done",
+                        "revision": "fixture-v1",
+                        "text": "Распознанный текст " + name,
+                        "error": "",
+                        "seconds": 1.2,
+                        "rtf": 0.6,
+                        "wer": None,
+                        "cer": None,
+                    }
+                    for name, engine in [("GigaAM", "gigaam"), ("Parakeet", "parakeet")]
+                ],
+            }
+        ]
+    }
+
+    class FakeVoice:
+        def json(self, method, path, **kwargs):
+            if path == "/admin/settings":
+                return {
+                    "models": {"transcription": ["gigaam"], "analysis": ["gpt-5"]},
+                    "transcription_model": "gigaam",
+                    "analysis_model": "gpt-5",
+                    "prices": {},
+                    "prices_checked": "fixture",
+                    "prompt": "Промпт анализа",
+                }
+            if path == "/admin/submissions":
+                return {"rows": [pending]}
+            if path.endswith("/asr"):
+                return comparison
+            return pending
+
+    from involta_guide.web.routes import voice_admin
+
+    monkeypatch.setattr(voice_admin, "voice_client", lambda request: FakeVoice())
+    settings = settings.model_copy(
+        update={"voice_service_secret": SecretStr("fixture-voice-secret-" + "x" * 32)}
+    )
+    # An intentionally long saved response checks wrapping and the single document scroll in logs.
+    with factory() as tx:
+        job = {
+            "id": str(uuid4()),
+            "kind": "generate",
+            "location_id": city["id"],
+            "status": "failed",
+            "error": "Тестовая ошибка",
+        }
+        tx.repo.queue(job)
+        tx.repo.audit("generation_run", job["id"], '{"public_log": true}')
+        from involta_guide.infrastructure.ai.audit import AIAudit
+
+        log = tx.repo.log_reference(job["id"])
+    AIAudit(database[1], settings).record(job["id"], "response", {"body": "длинныйответ" * 150})
+    routes = {
+        "overview": "/admin",
+        "locations": "/admin/locations",
+        "city": "/admin/locations/ivanovo",
+        "new-city": "/admin/locations/new",
+        "restaurants": "/admin/restaurants?location=ivanovo",
+        "restaurant": "/admin/restaurants/" + str(restaurant["number"]),
+        "filling": "/admin/settings/filling",
+        "voice": "/admin/voice",
+        "voice-review": "/admin/voice/ivanovo/1",
+        "voice-run": "/admin/voice/ivanovo/1/runs/1",
+        "voice-pending": "/admin/voice/submission/" + pending_ref,
+        "reviews": "/admin?tab=reviews",
+        "review": "/admin?tab=reviews&review=" + ref,
+        "ratings": "/admin?tab=ratings",
+        "contacts": "/admin?tab=contacts",
+        "sessions": "/admin/sessions",
+        "logs": "/logs",
+        "city-logs": "/logs/ivanovo",
+        "log": log["path"],
+        "alex": "/alex",
+    }
+    from pathlib import Path
+
+    shots = Path("var/screenshots/admin-design")
+    shots.mkdir(parents=True, exist_ok=True)
+    with TestClient(create_app(settings)) as client, sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        busy_actions = []
+
+        def respond(route):
+            headers = {
+                key: value
+                for key, value in route.request.headers.items()
+                if key.lower()
+                in ("hx-request", "hx-history-restore-request", "origin", "content-type")
+            }
+            if route.request.method == "POST":
+                busy_actions.append(page.locator('button[aria-busy="true"]:disabled').count())
+            response = client.request(
+                route.request.method,
+                route.request.url,
+                headers=headers,
+                content=route.request.post_data,
+            )
+            route.fulfill(
+                status=response.status_code, body=response.content, headers=dict(response.headers)
+            )
+
+        page.route("**/*", respond)
+        page.goto("http://testserver/guide/admin")
+        assert page.locator(".admin-workspace").count() == 1
+        assert page.locator(".admin-tabs").count() == 0
+        page.screenshot(path=str(shots / "login.png"), full_page=True)
+        page.goto("http://testserver/guide/logs")
+        assert page.get_by_role("heading", name="Логи", exact=True).count() == 1
+        assert page.locator(".admin-tabs").count() == 0
+        assert "admin.css" not in client.get("/guide/ivanovo").text
+        login(client)
+        baseline = None
+        for width in [1440, 768, 390]:
+            page.set_viewport_size({"width": width, "height": 1000})
+            for name, path in routes.items():
+                response = client.get("/guide" + path)
+                assert response.status_code == 200, (name, response.text[:200])
+                page.goto("http://testserver/guide" + path, wait_until="networkidle")
+                if name == "voice":
+                    page.locator(".admin-settings > summary").click()
+                if name == "voice-review":
+                    page.get_by_text("Редактировать расписание", exact=True).click()
+                assert page.locator(".admin-workspace").count() == 1, name
+                assert page.locator(".admin-tabs").count() == 1, name
+                assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), (
+                    name,
+                    width,
+                )
+                box = page.locator(".admin-header").bounding_box()
+                if name == "overview":
+                    baseline = box
+                assert (
+                    abs(box["x"] - baseline["x"]) < 1 and abs(box["width"] - baseline["width"]) < 1
+                ), (name, width)
+                assert page.locator("h1").inner_text() == "Рабочий стол.", name
+                if width != 768:
+                    page.screenshot(path=str(shots / f"{name}-{width}.png"), full_page=True)
+                if name == "voice-review":
+                    assert (
+                        page.get_by_role("heading", name="Применённые изменения страницы").count()
+                        == 1
+                    )
+                    assert page.locator(".admin-list-item.selected").count() == 1
+                if name == "log":
+                    assert (
+                        page.locator(".logs-content").evaluate(
+                            "(el)=>getComputedStyle(el).overflowY"
+                        )
+                        == "visible"
+                    )
+        assert not errors
+        # The stylesheet must survive both fragment navigation and history reloads.
+        page.goto("http://testserver/guide/admin")
+        page.get_by_role("link", name="Настройки наполнения", exact=True).click()
+        page.wait_for_url("**/admin/settings/filling")
+        assert page.locator(".admin-workspace").count() == 1
+        page.get_by_role("button", name="Сохранить настройки наполнения", exact=True).click()
+        page.wait_for_url("**/admin/settings/filling?message=**")
+        assert busy_actions == [1]
+        assert page.locator('button[aria-busy="true"]').count() == 0
+        page.goto("http://testserver/guide/admin")
+        page.get_by_role("link", name="Настройки наполнения", exact=True).click()
+        page.wait_for_url("**/admin/settings/filling")
+        page.go_back()
+        page.wait_for_url("**/admin")
+        assert page.locator(".admin-workspace").count() == 1
+        browser.close()

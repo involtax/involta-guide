@@ -1,0 +1,1 @@
+{%macro status_label(value)%}{{{'pending':'На проверке','approved':'Одобрено','rejected':'Отклонено','processed':'Обработано','failed':'Ошибка','queued':'В очереди','running':'В работе','done':'Готово','cancelled':'Отменено','accepted':'Принято','transcript_ready':'Текст сохранён','analysis_ready':'Анализ готов'}.get(value,value)}}{%endmacro%}

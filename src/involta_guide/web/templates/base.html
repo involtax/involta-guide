@@ -8,6 +8,9 @@
 <meta name="robots" content="{{ 'index' if indexable|default(false) else 'noindex' }}, follow">
 <link rel="canonical" href="{{ canonical|default(settings.url('/')) }}">
 <link rel="stylesheet" href="{{ settings.path('/assets/style.css') }}">
+{% if admin_ui|default(false) or audit_public is defined %}
+<link rel="stylesheet" href="{{ settings.path('/assets/admin.css') }}">
+{% endif %}
 {% if admin_ui|default(false) %}
 <script defer src="{{ settings.path('/assets/htmx.min.js') }}">
 </script>

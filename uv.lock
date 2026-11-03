@@ -660,7 +660,9 @@ voice-local = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "av" },
     { name = "mypy" },
+    { name = "numpy" },
     { name = "playwright" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -689,7 +691,9 @@ provides-extras = ["voice-local"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "av", specifier = ">=14,<16" },
     { name = "mypy", specifier = ">=1.15" },
+    { name = "numpy", specifier = ">=2,<3" },
     { name = "playwright", specifier = ">=1.50" },
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-cov", specifier = ">=6" },

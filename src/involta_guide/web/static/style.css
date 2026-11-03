@@ -932,7 +932,6 @@ pre.audit-json {
   align-items: start;
 }
 .logs-sidebar, .logs-content { min-width: 0; }
-#logs-main .admin-tabs { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
 #logs-main input, #logs-main select { min-width: 0; max-width: 100%; }
 .log-request {
   display: block;
@@ -1008,31 +1007,9 @@ pre.audit-json {
 .restaurant-empty { padding: 24px 0; font-size: 14px; color: #777; }
 @media (max-width: 900px) { .restaurant-browser { grid-template-columns: 230px minmax(0,1fr); gap: 20px; } .restaurant-record { padding: 20px; } .restaurant-factor-grid, .restaurant-hours { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 650px) { .restaurant-browser { display: block; } .restaurant-sidebar { position: static; max-height: 360px; margin-bottom: 28px; } .restaurant-results-heading { flex-wrap: wrap; gap: 0; } .restaurant-results-heading > a { margin: 0 0 14px; } .restaurant-results-heading h2 { font-size: 34px; } .restaurant-record { padding: 16px; } .restaurant-record-heading { gap: 10px; flex-wrap: wrap; } .restaurant-record-heading h3 { font-size: 22px; } .restaurant-facts { grid-template-columns: 1fr; } .restaurant-score strong { font-size: 25px; } }
-.restaurant-admin { max-width: 1440px; padding-top: 32px; padding-bottom: 64px; }
-.restaurant-admin .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; gap: 20px; }
-.restaurant-admin .admin-header h1 { font-size: 42px; letter-spacing: -2px; margin: 0; }
-.restaurant-admin .admin-header button { padding: 8px 14px; font-size: 12px; background: white; color: var(--black); border-color: var(--line); }
-.restaurant-admin .admin-tabs { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-.restaurant-admin .admin-tabs a { font-size: 13px; padding-bottom: 6px; }
-.restaurant-admin .admin-tabs a.selected { border-bottom: 2px solid var(--black); }
 .restaurant-evidence { padding: 16px 0; font-size: 12px; }
 .restaurant-evidence p { margin: 8px 0; }
 .restaurant-evidence a { display: block; font-size: 11px; }
-@media (max-width: 650px) { .restaurant-admin .admin-header h1 { font-size: 30px; letter-spacing: -1px; } }
-.voice-admin-layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(0, 2.5fr);
-  gap: 32px;
-  align-items: start;
-}
-.voice-admin-layout > * { min-width: 0; }
-.voice-admin-layout article { overflow-wrap: anywhere; margin: 20px 0; }
-.voice-admin-layout audio, .voice-admin-layout textarea { max-width: 100%; width: 100%; }
-.voice-admin-layout blockquote { white-space: pre-wrap; overflow-wrap: anywhere; }
-.voice-admin-layout input, .voice-admin-layout select { max-width: 100%; }
-@media (max-width: 760px) {
-  .voice-admin-layout { grid-template-columns: minmax(0, 1fr); }
-}
 .location-sidebar-actions { display: grid; gap: 12px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 12px; }
 .location-editor .panel { border: 1px solid var(--line); padding: 24px; margin-top: 24px; min-width: 0; }
 .location-editor .stack input:not([type=checkbox]), .location-editor .stack select, .location-editor textarea { width: 100%; min-width: 0; max-width: 100%; }

@@ -316,6 +316,7 @@ def routes(prefix: str) -> APIRouter:
         admin = ctx.security.principal(admin_token(request))
         changes = ctx.queries.rows("alex_changes") if principal or admin else []
         for change in changes:
+            change["location_name"] = ctx.queries.get("locations", change["location_id"])["name"]
             change["changes"] = (
                 ctx.queries.get("reviews", change["review_id"])["changes"]
                 if change["review_id"]
