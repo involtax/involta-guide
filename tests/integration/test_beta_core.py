@@ -442,3 +442,20 @@ def test_late_guide_result_and_debug_are_fenced_after_reset(database, voice_data
     assert len(queries.rows("jobs")) == 1
     assert all(a["target"] != oldjob["id"] for a in queries.rows("audit"))
     assert queries.rows("audit", {"action": "voice_upload_http"}) == []
+
+
+def test_expired_reset_worker_cannot_write_error_over_current_lease(database):
+    settings, engine, queries, city, jobs, queue = core(database)
+    reset = BetaReset(engine, settings, jobs)
+    reset.begin(city["id"], str(uuid4()), 1, city["name"])
+    old = queue.claim()
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE jobs SET lease_until=now()-interval '1 second' WHERE id=:id"),
+            {"id": old["id"]},
+        )
+    current = queue.claim()
+    assert current["lease_owner"] != old["lease_owner"]
+    queue.fail(old, "late failed worker")
+    assert queries.get("locations", city["id"])["reset_error"] is None
+    assert queries.get("jobs", current["id"])["status"] == "running"

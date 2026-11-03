@@ -81,7 +81,13 @@ class JobQueue:
 
     def fail(self, job: Record, message: str, *, retry: bool = True) -> None:
         with self.engine.begin() as conn:
-            (
+            if job["kind"] == "reset":
+                # Use the same owner -> job order as reset application.
+                conn.execute(
+                    text("SELECT id FROM locations WHERE id=:id FOR UPDATE"),
+                    {"id": job["location_id"]},
+                )
+            updated = (
                 conn.execute(
                     text(
                         "UPDATE jobs SET status=CASE WHEN :retry AND attempts<:max THEN 'queued' ELSE 'failed' END,error=:message,finished_at=now(),lease_until=NULL,lease_owner=NULL,available_at=now()+make_interval(secs=>least(60,attempts*5)) WHERE id=:id AND lease_owner=:owner AND status='running' RETURNING status"
@@ -97,6 +103,8 @@ class JobQueue:
                 .mappings()
                 .first()
             )
+            if updated is None:
+                return
             if job["kind"] == "reset":
                 conn.execute(
                     text(
