@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 A = "a" * 40
 B = "b" * 40
@@ -33,7 +35,8 @@ if Path(sys.argv[0]).name=='curl':
    print(os.environ['FAKE_PUBLIC_REDIRECT']+' '+os.getenv('FAKE_REDIRECT_TARGET',url.split('?',1)[0]+'/'))
   else:print(os.getenv('FAKE_LOCAL_REDIRECT','302')+' '+url.replace('?probe=','/?probe='))
  elif '--write-out' in args:
-  mime='text/css' if url.endswith('.css') else 'application/javascript' if url.endswith('.js') else 'text/html'
+  types={'.css':'text/css','.js':'application/javascript','.mjs':'application/javascript','.wasm':'application/wasm','.onnx':'application/octet-stream'}
+  mime=next((value for extension,value in types.items() if url.endswith(extension)),'text/html')
   if url.endswith(os.getenv('FAKE_BAD_ASSET','__never__')) and sha==os.getenv('FAKE_BAD_ASSET_SHA'):mime='text/html'
   print('200 '+mime)
  sys.exit(0)
@@ -263,10 +266,19 @@ def test_foreign_container_collision_is_not_recreated(tmp_path):
     assert json.loads(state.read_text())["services"]["web"]["sha"] == A
 
 
-def test_wrong_asset_response_triggers_rollback(tmp_path):
+@pytest.mark.parametrize(
+    "asset",
+    [
+        "style.css",
+        "ort-wasm-simd-threaded.mjs",
+        "ort-wasm-simd-threaded.wasm",
+        "silero_vad_v5.onnx",
+    ],
+)
+def test_wrong_asset_response_triggers_rollback(tmp_path, asset):
     root, state, env = harness(tmp_path)
     assert deploy(root, env, A).returncode == 0
-    result = deploy(root, {**env, "FAKE_BAD_ASSET": "style.css", "FAKE_BAD_ASSET_SHA": B}, B, "2-1")
+    result = deploy(root, {**env, "FAKE_BAD_ASSET": asset, "FAKE_BAD_ASSET_SHA": B}, B, "2-1")
     assert result.returncode != 0
     assert json.loads(state.read_text())["services"]["web"]["sha"] == A
 

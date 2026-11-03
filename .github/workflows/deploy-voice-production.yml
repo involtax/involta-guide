@@ -100,3 +100,8 @@ jobs:
         run: bash deploy/ssh-release.sh voice-backfill
       - name: Report health and beta progress
         run: bash deploy/ssh-release.sh voice-report
+      - name: Verify authenticated pages and revoke the test session
+        if: inputs.operation == 'release'
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: python3 deploy/check-admin.py
