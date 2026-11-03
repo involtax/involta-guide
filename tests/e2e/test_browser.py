@@ -82,6 +82,19 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                 expect(page.get_by_role("heading", name="Подборка в работе")).to_be_visible()
                 assert "noindex" in page.locator("meta[name=robots]").get_attribute("content")
                 assert "/_next/" not in page.content()
+                # Exercise the real same-origin WASM/model delivery, not a mocked VAD.
+                widget = page.locator("#guide-voice")
+                widget.get_by_role("button", name="Записать отзыв", exact=True).click()
+                expect(widget).to_have_attribute("data-voice-state", "recording")
+                page.wait_for_function(
+                    """() => {
+                      const report = document.querySelector('#guide-voice').shadowRoot.querySelector('details pre');
+                      return report && JSON.parse(report.textContent).vad?.state === 'ready';
+                    }""",
+                    timeout=15000,
+                )
+                widget.get_by_role("button", name="Отменить", exact=True).click()
+                expect(widget).to_have_attribute("data-voice-state", "idle")
                 # The temporary public button needs no login and shows async progress/errors.
                 fill = page.locator("[data-public-fill]")
                 fill_button = fill.get_by_role("button", name="Запарсить эти данные", exact=True)

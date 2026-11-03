@@ -12,12 +12,17 @@ base_url=${base_url%/}
 body=$(curl --retry 2 --retry-delay 2 --retry-all-errors --fail --silent --show-error --connect-timeout 10 --max-time 20 \
   --header 'Cache-Control: no-cache' --url "$base_url/health/ready?revision=$expected_sha")
 printf '%s' "$body" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("status")=="ready" and data.get("revision")==sys.argv[1], "Unexpected running release"' "$expected_sha"
-for path in / /widget.js /assets/style.css /assets/htmx.min.js /admin; do
+for path in / /widget.js /assets/style.css /assets/htmx.min.js /admin \
+  /voice/widget.v1.js /voice/vad/ort.wasm.min.js /voice/vad/bundle.min.js \
+  /voice/vad/vad.worklet.bundle.min.js /voice/vad/ort-wasm-simd-threaded.mjs \
+  /voice/vad/ort-wasm-simd-threaded.wasm /voice/vad/silero_vad_v5.onnx; do
   metadata=$(curl --retry 2 --retry-delay 2 --retry-all-errors --fail --silent --show-error --connect-timeout 10 --max-time 20 \
     --output /dev/null --write-out '%{http_code} %{content_type}' --url "$base_url$path")
   case "$path" in
     *.css) [[ "$metadata" == '200 text/css'* ]] ;;
-    *.js) [[ "$metadata" == '200 application/javascript'* || "$metadata" == '200 text/javascript'* ]] ;;
+    *.js|*.mjs) [[ "$metadata" == '200 application/javascript'* || "$metadata" == '200 text/javascript'* ]] ;;
+    *.wasm) [[ "$metadata" == '200 application/wasm'* ]] ;;
+    *.onnx) [[ "$metadata" == '200 application/octet-stream'* ]] ;;
     *) [[ "$metadata" == '200 text/html'* ]] ;;
   esac || { echo "Unexpected status/content type at $path: $metadata" >&2; exit 1; }
 done

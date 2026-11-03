@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
+import involta_voice
 from involta_guide.application.services.jobs import JobService
 from involta_guide.application.services.locations import LocationService, Queries
 from involta_guide.config import Settings
@@ -93,16 +94,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.templates = Jinja2Templates(directory=directory / "templates")
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
     app.mount(settings.path("/assets"), StaticFiles(directory=directory / "static"), name="assets")
+    assert involta_voice.__file__ is not None
+    voice_assets = Path(involta_voice.__file__).parent / "static"
+    app.mount(
+        settings.path("/voice/vad"), StaticFiles(directory=voice_assets / "vad"), name="voice-vad"
+    )
 
     @app.get(settings.path("/widget.js"))
     def widget() -> object:
         from fastapi.responses import FileResponse
 
-        import involta_voice
-
-        assert involta_voice.__file__ is not None
         return FileResponse(
-            Path(involta_voice.__file__).parent / "static/widget.v1.js",
+            voice_assets / "widget.v1.js",
             media_type="text/javascript",
             headers={"Cache-Control": "public,max-age=300"},
         )

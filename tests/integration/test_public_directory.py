@@ -1,3 +1,7 @@
+import hashlib
+import json
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from involta_guide.main import create_app
@@ -44,3 +48,19 @@ def test_city_page_omits_removed_metadata_and_review_controls(database):
         assert "Тестовый ресторан" in page.text
         assert page.text.count('data-target="guide-voice"') == 1
         assert "Записать отзыв" in client.get("/guide/voice/widget.v1.js").text
+
+
+def test_guide_serves_the_complete_pinned_vad_bundle_without_voice_service(database):
+    settings, _ = database
+    root = Path(__file__).parents[2] / "src/involta_voice/static/vad"
+    manifest = json.loads((root / "manifest.json").read_text())
+    with TestClient(create_app(settings)) as client:
+        for name, expected in manifest["files"].items():
+            response = client.get("/guide/voice/vad/" + name)
+            assert response.status_code == 200, name
+            assert hashlib.sha256(response.content).hexdigest() == expected["sha256"], name
+            if name.endswith(".wasm"):
+                assert response.headers["content-type"] == "application/wasm"
+            elif name.endswith((".js", ".mjs")):
+                assert "javascript" in response.headers["content-type"]
+        assert client.get("/guide/voice/vad/%2e%2e%2fwidget.v1.js").status_code == 404
