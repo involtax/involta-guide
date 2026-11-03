@@ -17,9 +17,9 @@ from involta_guide.application.ports.repositories import (
     UowFactory,
 )
 from involta_guide.domain.entities import Conflict, RuleViolation
-from involta_guide.domain.rules import rank
+from involta_guide.domain.rules import assert_publishable, rank
 
-from .editorial import EditorialService, draft, publish, require, save
+from .editorial import EditorialService, current_content, require, save
 
 
 class JobService:
@@ -91,7 +91,7 @@ class JobService:
                     "previous_number": repo.log_reference(previous_job)["number"]
                     if previous_job
                     else None,
-                    "baseline_version": location["draft_version"],
+                    "baseline_version": location["published_version"],
                 }
             ),
         )
@@ -100,8 +100,11 @@ class JobService:
         return job_id
 
     @staticmethod
-    def _has_data(location: Record) -> bool:
-        return bool(location["published_version"] or location["draft_version"] or location["draft"])
+    def _has_data(repo: Repository, location: Record) -> bool:
+        if location["published_version"]:
+            version = require(repo, "versions", location["published_version"])
+            return bool(version["content"]["restaurants"])
+        return bool(location["draft"])
 
     @staticmethod
     def _is_public_fill(repo: Repository, job_id: str) -> bool:
@@ -110,9 +113,9 @@ class JobService:
         )
 
     def _public_state(self, repo: Repository, location: Record) -> Record:
-        if location["published_version"]:
+        if location["published_version"] and self._has_data(repo, location):
             return {"state": "ready", "can_start": False, "message": "Подборка готова."}
-        if self._has_data(location):
+        if self._has_data(repo, location):
             return {
                 "state": "existing",
                 "can_start": False,
@@ -179,11 +182,11 @@ class JobService:
             for location in sorted(rows, key=lambda row: row["id"]):
                 if not location_id and (
                     (not location["listed"] and not location["published_version"])
-                    or (scope == "empty" and self._has_data(location))
+                    or (scope == "empty" and self._has_data(repo, location))
                 ):
                     continue
                 location = require(repo, "locations", location["id"], lock=True)
-                if not location_id and scope == "empty" and self._has_data(location):
+                if not location_id and scope == "empty" and self._has_data(repo, location):
                     continue
                 count += self._queue_generation(repo, location, model=model) is not None
             repo.audit(
@@ -201,7 +204,7 @@ class JobService:
                 raise RuleViolation("Локация отключена")
             public_fill = (
                 self.public_fill_enabled
-                and not self._has_data(location)
+                and not self._has_data(uow.repo, location)
                 and self._is_public_fill(uow.repo, job_id)
             )
             new_id = self._queue_generation(
@@ -266,12 +269,12 @@ class JobService:
             if is_public and saved_prompt is None:
                 if not self.public_fill_enabled:
                     raise RuleViolation("Временное наполнение отключено")
-                if self._has_data(location):
+                if self._has_data(uow.repo, location):
                     raise Conflict(
                         "На странице уже появились данные; автоматическая перезапись отменена"
                     )
-            baseline = location["draft_version"]
-            content = draft(uow.repo, location)
+            baseline = location["published_version"]
+            content = current_content(uow.repo, location)
             known = uow.repo.known(location["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
             review = require(uow.repo, "reviews", job["review_id"]) if job["review_id"] else None
@@ -283,7 +286,7 @@ class JobService:
                 and config["baseline_version"] != baseline
             )
             if baseline_changed and saved_prompt is None:
-                raise Conflict("Черновик изменён после постановки запроса. Создайте новый запрос.")
+                raise Conflict("Страница изменена после постановки запроса. Создайте новый запрос.")
         if job["kind"] == "generate":
             scope = (
                 location["coverage_note"]
@@ -320,18 +323,23 @@ class JobService:
             # Save it for audit, but never overwrite the editor's new version.
             if baseline_changed:
                 raise Conflict(
-                    "Ответ сохранён, но черновик изменён после постановки запроса. Автоматическое применение отменено."
+                    "Ответ сохранён, но страница изменена после постановки запроса. Автоматическое применение отменено."
                 )
             if is_public and not self.public_fill_enabled:
                 raise RuleViolation("Ответ сохранён; временное наполнение отключено")
             result = rank(generated, location["top_limit"])
+            with self.uow() as uow:
+                previous = uow.repo.get("versions", baseline) if baseline else None
+                if previous and previous["source"] == "intro":
+                    result["intro"] = content["intro"]
             ContentInput.model_validate(result)
+            assert_publishable(result)
             with self.uow() as uow:
                 repo = uow.repo
                 if not repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
                 if is_public and self._has_data(
-                    require(repo, "locations", location["id"], lock=True)
+                    repo, require(repo, "locations", location["id"], lock=True)
                 ):
                     raise Conflict(
                         "На странице уже появились данные; автоматическая перезапись отменена"
@@ -346,7 +354,6 @@ class JobService:
                     model=generation_model,
                     inherit=False,
                 )
-                publish(repo, location["id"], version_id, location["published_version"])
                 if is_public:
                     repo.audit("temporary_public_fill_published", location["id"], version_id)
                 repo.audit(

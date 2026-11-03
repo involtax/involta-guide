@@ -23,7 +23,7 @@
 <button type="button" data-move="1">↓ Ниже</button>
 <button type="button" data-remove>Убрать из топа</button>
 </div>
-{%for field,label in [('name','Название'),('cuisine','Кухня'),('phone','Телефон (обязателен для публикации)'),('mapsUrl','Яндекс Карты')]%}
+{%for field,label in [('name','Название'),('cuisine','Кухня'),('phone','Телефон'),('mapsUrl','Яндекс Карты')]%}
 <label>{{label}}<input name="{{key}}_{{field}}" value="{{r.get(field,'')}}"
 {%if field in ['name','cuisine','mapsUrl']%}
 required

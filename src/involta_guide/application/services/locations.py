@@ -5,7 +5,7 @@ from uuid import uuid4
 from involta_guide.application.ports.repositories import Record, UowFactory
 from involta_guide.domain.entities import RuleViolation
 
-from .editorial import require
+from .editorial import current_content, require
 
 
 class LocationService:
@@ -77,14 +77,14 @@ class Queries:
             return uow.repo.rows(table, filters, limit=limit)
 
     def location(self, key: str) -> Record:
-        from .editorial import draft
+        from .editorial import current_content
 
         with self.uow() as uow:
             repo = uow.repo
             location = require(repo, "locations", key)
             return {
                 "location": location,
-                "content": draft(repo, location),
+                "content": current_content(repo, location),
                 "published_intro": (
                     require(repo, "versions", location["published_version"])["content"]["intro"]
                     if location["published_version"]
@@ -120,7 +120,7 @@ class Queries:
             cards = repo.city_restaurants(selected["id"])
             versions = repo.rows("versions", {"location_id": selected["id"]}, limit=100000)
             location = require(repo, "locations", selected["id"])
-            current = next((v for v in versions if v["id"] == location["draft_version"]), None)
+            current = next((v for v in versions if v["id"] == location["published_version"]), None)
             report = (current["content"] if current else {}).get("rankingReport") or []
 
             def normalize(name: str) -> str:
@@ -157,7 +157,7 @@ class Queries:
                         "source": v["source"],
                         "model": v["model"],
                         "published": v["id"] == location["published_version"],
-                        "current": v["id"] == location["draft_version"],
+                        "current": v["id"] == location["published_version"],
                         "restaurant": r,
                         "ranking": next(
                             (
@@ -229,7 +229,7 @@ class Queries:
                 "children": children,
                 "related": related,
                 "version": version,
-                "content": version["content"] if version else {"intro": "", "restaurants": []},
+                "content": current_content(repo, location),
                 "indexable": bool(useful),
             }
 

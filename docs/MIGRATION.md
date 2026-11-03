@@ -37,16 +37,10 @@ to their own versions through composite FKs. Reviews/proposals/jobs retain FKs.
 Active generation/review jobs have partial unique indexes. All relation tables
 have composite primary keys. Existing tree-cycle and slug/alias triggers remain.
 
-Lock the location row for version numbering, draft and publication. Every edit
-from the UI carries expected draft version. Publication carries expected published
-version. AI captures draft version before network work and checks it afterwards.
-An approved proposal is applied at most once under row locks; review must be
-approved and not fraudulent. Restaurant must belong to the location, a descendant,
-or an explicit relationship. Draft never publishes implicitly. Historical content
-is not overlaid with mutable restaurant data (fixes old star overlay).
-Alex may authorize immediate changes, but ordinary AI cannot publish. Unpublished
-editorial drafts block immediate Alex commands; revoked sessions block queued
-commands. All changes are atomic and auditable.
+Lock the location row for version numbering and current-page updates. Every edit
+carries the expected current revision. Saving updates the public page atomically.
+AI captures this revision before network work and checks it afterwards. Historical
+snapshots remain immutable and are restored by creating a new current snapshot.
 
 ## Safe transition to Alembic
 

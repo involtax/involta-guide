@@ -128,7 +128,7 @@ selected
 {%endfor%}
 <label>Режим работы (JSON)<textarea name="openingHours">{{payload.openingHours|tojson if payload.openingHours else (proposal_before.get(p.id) or {}).get('openingHours')|tojson}}</textarea>
 </label>
-<button name="decision" value="approve">В черновик</button>
+<button name="decision" value="approve">Применить на сайте</button>
 <button name="decision" value="reject">Отклонить</button>
 </form>
 </section>

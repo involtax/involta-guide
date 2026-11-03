@@ -314,7 +314,7 @@ def routes(prefix: str) -> APIRouter:
                 )
                 return redirect(request, "locations", "Локация сохранена", location=location)
             if action == "intro":
-                updated = ctx.editorial.save_intro(
+                ctx.editorial.save_intro(
                     uid(location),
                     key(form, "intro"),
                     expected,
@@ -325,9 +325,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(
                     request,
                     "locations",
-                    "Вступление сохранено и обновлено на сайте."
-                    if updated
-                    else "Вступление сохранено в черновик. Оно появится на сайте после публикации подборки.",
+                    "Вступление сохранено и обновлено на сайте.",
                     location=location,
                 )
             if action == "content":
@@ -347,7 +345,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(
                     request,
                     "locations",
-                    "Черновик сохранён. Публикация выполняется отдельно.",
+                    "Данные сохранены и обновлены на сайте.",
                     location=location,
                 )
             if action == "publish":
@@ -356,7 +354,10 @@ def routes(prefix: str) -> APIRouter:
             if action == "restore":
                 ctx.editorial.restore(uid(location), uid(key(form, "version_id")), expected)
                 return redirect(
-                    request, "locations", "Версия восстановлена в черновик", location=location
+                    request,
+                    "locations",
+                    "Данные восстановлены и обновлены на сайте",
+                    location=location,
                 )
             if action == "attach":
                 ctx.locations.attach(uid(key(form, "restaurant_id")), uid(location))
@@ -377,7 +378,7 @@ def routes(prefix: str) -> APIRouter:
                 content["restaurants"].append(item)
                 ctx.editorial.save(location, content, expected)
                 return redirect(
-                    request, "locations", "Ресторан добавлен в черновик", location=location
+                    request, "locations", "Ресторан добавлен на страницу", location=location
                 )
             if action == "prompt":
                 ctx.jobs.set_prompt(key(form, "prompt"))
@@ -438,7 +439,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(
                     request,
                     "reviews",
-                    "Решение сохранено; изменения находятся в черновике",
+                    "Решение сохранено; принятые изменения применены на сайте",
                     review=key(form, "review_id"),
                 )
             if action == "revoke-admin":

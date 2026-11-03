@@ -143,6 +143,9 @@ def routes(prefix: str) -> APIRouter:
                 "logs_admin": admin,
                 "audit_public": not admin,
                 "audit_detail": detail,
+                "log_location": ctx.queries.location(detail["job"]["location_id"])["location"]
+                if admin and detail
+                else None,
                 "audit_jobs": listing,
                 "q": q,
                 "status": status,
@@ -167,6 +170,20 @@ def routes(prefix: str) -> APIRouter:
         if detail is None:
             raise HTTPException(404, "Версия журнала не найдена")
         return detail
+
+    @router.get(prefix + "/logs/history/{location_id}")
+    def page_history(request: Request, location_id: UUID) -> Response:
+        require_admin(request)
+        selected = context(request).queries.location(str(location_id))
+        return render(
+            request,
+            "page_history.html",
+            {
+                "selected": selected,
+                "tab": "logs",
+                "title": "История данных города",
+            },
+        )
 
     @router.get(prefix + "/logs/{slug}/{number}.json")
     def numbered_json(request: Request, slug: str, number: int) -> Response:
