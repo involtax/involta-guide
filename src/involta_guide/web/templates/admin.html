@@ -1,7 +1,7 @@
 {%extends 'fragment_base.html' if fragment else 'base.html'%}
 {%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
 {%block body%}
-<main class="{{'restaurant-admin' if tab in ['restaurants','locations'] else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
+<main class="{{'restaurant-admin' if tab in ['restaurants','locations'] else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML settle:0" hx-history="false">
 <header class="admin-header">
 <h1>Рабочий стол.</h1>
 <form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button>
