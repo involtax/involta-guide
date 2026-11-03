@@ -35,8 +35,8 @@ def routes(prefix: str) -> APIRouter:
         try:
             audio = form.get("audio")
             location_id = str(UUID(str(form.get("locationId") or form.get("cityId") or "")))
-            if form.get("consent") != "yes" or not isinstance(audio, UploadFile):
-                raise HTTPException(400, "Нужна запись и согласие")
+            if not isinstance(audio, UploadFile):
+                raise HTTPException(400, "Нужна запись")
             visitor = request.cookies.get("guide_visitor", "")
             try:
                 UUID(visitor)

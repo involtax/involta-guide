@@ -8,7 +8,7 @@
 </h1>
 <div class="hero-bottom">
 <p>Короткие подборки ресторанов в городах, районах и на курортах. Выбираем внимательно. Прислушиваемся к вам.</p>
-<span class="counter">{{ total }}<small>локаций в справочнике</small>
+<span class="counter">{{ total }}<small>городов с подборками</small>
 </span>
 </div>
 </section>
@@ -20,23 +20,13 @@
 <form class="search location-search" action="{{ settings.path('/') }}">
 <label class="sr-only" for="q">Город, район или курорт</label>
 <input id="q" name="q" value="{{ q }}" placeholder="Город, район или курорт">
-<select name="kind" aria-label="Тип локации">
-<option value="">Все типы</option>
-{% for key,label in kinds.items() %}
-<option value="{{key}}"
-{% if kind==key %}
-selected
-{%endif%}
->{{label}}</option>
-{%endfor%}
-</select>
 <button>Найти ↗</button>
 </form>
 <p class="muted">
-{%if q or kind%}
+{%if q%}
 Найдено: {{ result.total }}
 {%else%}
-Города и направления · районы и курорты — внутри или через поиск
+Города с готовыми подборками
 {%endif%}
 </p>
 <div class="city-grid">

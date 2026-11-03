@@ -122,7 +122,7 @@ def test_upload_duration_signature_and_history(database):
             audio.setsampwidth(2)
             audio.setframerate(8000)
             audio.writeframes(b"\0\0" * 16000)
-        form = {"locationId": location["id"], "consent": "yes", "duration": "9999"}
+        form = {"locationId": location["id"], "duration": "9999"}
         response = client.post(
             "/guide/api/reviews",
             data=form,

@@ -166,7 +166,7 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(
                     page.get_by_role("button", name="Запарсить эти данные", exact=True)
                 ).to_have_count(0)
-                page.get_by_role("checkbox").check()
+                expect(page.locator("[data-consent]")).to_have_count(0)
                 page.get_by_role("button", name="● Записать отзыв").click()
                 time.sleep(2.2)
                 page.get_by_role("button", name="Остановить", exact=False).click()

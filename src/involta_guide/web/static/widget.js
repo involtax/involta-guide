@@ -6,7 +6,6 @@
     const base = root.dataset.apiBase;
     const locationId = root.dataset.locationId;
     const controls = root.querySelector("[data-controls]");
-    const consent = root.querySelector("[data-consent]");
     const error = root.querySelector("[data-error]");
     const history = root.querySelector("[data-history]");
     let recorder,
@@ -40,7 +39,6 @@
     }
     function render() {
       controls.replaceChildren();
-      consent.disabled = state !== "idle";
       if (state === "idle")
         controls.append(button("● Записать отзыв", start, "record-button"));
       else if (state === "recording")
@@ -133,10 +131,6 @@
     }
     async function start() {
       showError();
-      if (!consent.checked) {
-        showError("Подтвердите согласие на обработку записи.");
-        return;
-      }
       if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
         showError(
           "Запись недоступна. Откройте сайт по HTTPS в современном браузере.",
@@ -213,7 +207,6 @@
         form.set("audio", blob, "voice");
         form.set("locationId", locationId);
         form.set("duration", String(seconds));
-        form.set("consent", "yes");
         if(root.dataset.csrf)form.set("_csrf",root.dataset.csrf);
         const response = await fetch(`${base}/reviews`, {
           method: "POST",

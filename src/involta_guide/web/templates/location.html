@@ -56,25 +56,13 @@
 {%endmacro%}
 {%block body%}
 <main>
-<nav class="breadcrumbs" aria-label="Навигационная цепочка">
-<a href="{{settings.path('/')}}">Все локации</a>
-{%for p in parents%}
-<span> / <a href="{{settings.path('/'+p.slug)}}">{{p.name}}</a>
-</span>
-{%endfor%}
-<span> / {{location.name}}</span>
-</nav>
 <section class="city-hero">
-<p class="eyebrow">ИНВОЛЬТА ГИД / {{kinds[location.kind]}} / {{location.region}}</p>
 <h1>Где поесть <br>
 <span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
 </h1>
 <p class="lead">{{content.intro or ('Выберите район или курорт ниже. Здесь появится общая редакционная подборка направления.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
 {%if location.coverage_note%}
 <p class="coverage">{{location.coverage_note}}</p>
-{%endif%}
-{%if version%}
-<p class="muted">Редакционная подборка · обновлено {{version.created_at.strftime('%d.%m.%Y')}}</p>
 {%endif%}
 </section>
 {%if children%}
@@ -103,7 +91,6 @@
 <section class="restaurant-list">
 <div class="section-heading">
 <h2>{{'Стоит зайти' if content.restaurants else 'Подборка в работе'}}</h2>
-<span>{{'%02d'|format(content.restaurants|length)}} мест</span>
 </div>
 {%if temporary_fill%}
 <section data-public-fill data-status-url="{{settings.path('/api/locations/'+location.slug+'/fill/status')}}" data-pending="{{'true' if not temporary_fill.can_start else 'false'}}">

@@ -139,6 +139,11 @@ class PostgresRepository:
         kind = options.get("kind", "")
         if options.get("public_only"):
             clauses.append(PUBLIC)
+        if options.get("filled_only"):
+            clauses.append(
+                "EXISTS (SELECT 1 FROM versions v WHERE v.id=l.published_version "
+                "AND jsonb_array_length(v.content->'restaurants')>0)"
+            )
         if status in ("active", "inactive"):
             clauses.append("l.active=:active")
             params["active"] = int(status == "active")

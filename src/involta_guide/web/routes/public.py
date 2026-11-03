@@ -27,7 +27,7 @@ def routes(prefix: str) -> APIRouter:
         )
 
     @router.get(prefix + "/")
-    def directory(request: Request, q: str = "", kind: str = "", page: str = "1") -> Response:
+    def directory(request: Request, q: str = "", page: str = "1") -> Response:
         ctx = context(request)
         pairs = list(request.query_params.multi_items())
         if len(pairs) == 1 and not pairs[0][1]:
@@ -52,8 +52,21 @@ def routes(prefix: str) -> APIRouter:
             page_number = int(page)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid page number") from exc
+        searching = bool(q.strip())
         result = ctx.queries.directory(
-            query=q, kind=kind, page=page_number, status="active", roots_only=True, public_only=True
+            query=q,
+            kind="" if searching else "city",
+            page=page_number,
+            status="active",
+            filled_only=not searching,
+            public_only=True,
+        )
+        total = (
+            ctx.queries.directory(kind="city", status="active", filled_only=True, public_only=True)[
+                "total"
+            ]
+            if searching
+            else result["total"]
         )
         return request.app.state.templates.TemplateResponse(
             request=request,
@@ -61,12 +74,11 @@ def routes(prefix: str) -> APIRouter:
             context={
                 "settings": ctx.settings,
                 "q": q,
-                "kind": kind,
                 "result": result,
-                "total": ctx.queries.overview()["total"],
+                "total": total,
                 "kinds": KINDS,
                 "indexable": True,
-                "page_query": lambda n: urlencode({"q": q, "kind": kind, "page": n}),
+                "page_query": lambda n: urlencode({"q": q, "page": n}),
             },
         )
 
