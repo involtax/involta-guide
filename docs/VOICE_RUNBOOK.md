@@ -170,7 +170,7 @@ uv run python -m involta_guide.infrastructure.voice.archive --limit 1000 --execu
 ```
 
 The limit is a deterministic prefix of history, not an offset; choose it large
- enough to cover the intended history and compare totals. Active/trusted/deleted
+enough to cover the intended history and compare totals. Active/trusted/deleted
 records are skipped. Old IDs, ownership, jobs and Guide files remain unchanged.
 Archive entries never enter the processing queue or Guide outbox.
 

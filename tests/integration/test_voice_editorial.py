@@ -195,6 +195,28 @@ def test_proposal_partial_acceptance_detects_page_conflict_and_preserves_other_a
         == "pending"
     )
     assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
+    from starlette.requests import Request
+
+    from involta_guide.web.routes.voice import editorial_status
+
+    app = create_app(settings)
+    request = Request({"type": "http", "app": app, "headers": []})
+    try:
+        assert (
+            editorial_status(request, ref, event["metadata"]["visitor"])["editorial_state"]
+            == "published"
+        )
+        service.decide(
+            ref,
+            Decision(idempotency_key=uuid4(), review_revision=4, processing_run=1, action="reject"),
+            principal["id"],
+        )
+        assert (
+            editorial_status(request, ref, event["metadata"]["visitor"])["editorial_state"]
+            == "rejected"
+        )
+    finally:
+        app.state.context.engine.dispose()
 
 
 def test_admin_cookie_marks_trusted_voice_and_shortcut_sets_same_admin_cookie(database):

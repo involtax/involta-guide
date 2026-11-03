@@ -33,6 +33,16 @@ current main and complete validation. No production deployment or merge.
    until explicit publication. Launch, backup and rollback commands are in
    [VOICE_RUNBOOK.md](VOICE_RUNBOOK.md); temporary paths in LEGACY_REMOVAL.md.
 
+## Automated results
+
+Local full regression: **222 passed** (250 seconds), including city generation,
+current-page editing, old reviews/Alex, deployment tests and Chromium. Additional
+checks after the final author-status fix: **3 editor tests passed**. A new legacy
+archive CLI integration test also passed: dry-run writes nothing, two executions
+produce one SHA-matched archive, source review/audio remain identical and no
+processing/outbox is created. Ruff, formatting and mypy pass. Real nginx syntax
+checks passed for both supported upstream modes.
+
 ## Runtime validation
 
 Standalone Docker Compose was run locally with its own Postgres, API, worker,

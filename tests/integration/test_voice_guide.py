@@ -206,3 +206,54 @@ def test_ack_loss_after_commit_and_concurrent_replay_create_one_review(database,
     assert len(queries.rows("reviews")) == 1
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM voice_inbox")).scalar_one() == 1
+
+
+def test_legacy_archive_cli_dry_run_and_repeat_keep_source_unchanged(
+    database, voice_database, monkeypatch, capsys
+):
+    import hashlib
+
+    from involta_guide.application.services.reviews import ReviewService
+    from involta_guide.infrastructure.storage.audio import FileAudioStorage
+    from involta_guide.infrastructure.voice import archive
+
+    settings, engine, uow, queries, city, _, _ = setup(database)
+    voice_settings, voice_engine = voice_database
+    settings = settings.model_copy(update={"voice_service_secret": voice_settings.service_secret})
+    storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
+    ref = ReviewService(uow, storage, settings.pending_review_limit).submit(
+        city["id"], "legacy-owner", "i" * 64, "legacy-browser", recording(), "audio/wav"
+    )
+    with uow() as tx:
+        tx.repo.change("reviews", ref, {"status": "processed", "transcript": "Старый отзыв"})
+        tx.repo.add(
+            "review_texts",
+            {"review_id": ref, "original_text": "Старый отзыв", "editorial_text": "Старый отзыв"},
+        )
+        tx.repo.session.execute(
+            text("UPDATE jobs SET status='done' WHERE review_id=:id"), {"id": ref}
+        )
+    source = queries.get("reviews", ref)
+    remote = client_for(settings, voice_settings)
+    monkeypatch.setattr(archive, "Settings", lambda: settings)
+    monkeypatch.setattr(archive, "VoiceClient", lambda _: remote)
+    monkeypatch.setattr(archive, "create_database", lambda _: engine)
+    monkeypatch.setattr("sys.argv", ["archive", "--limit", "1000"])
+    archive.main()
+    report = json.loads(capsys.readouterr().out)
+    assert report["checked"] == 1 and report["copied"] == 0
+    with voice_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM submissions")).scalar_one() == 0
+    for _ in range(2):
+        monkeypatch.setattr("sys.argv", ["archive", "--execute"])
+        archive.main()
+        report = json.loads(capsys.readouterr().out)
+        assert report["copied"] == 1 and report["sha_mismatch"] == 0
+    assert queries.get("reviews", ref) == source
+    assert hashlib.sha256(storage.read(source["audio"])).hexdigest() == source["hash"]
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM voice_archives")).scalar_one() == 1
+    with voice_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM submissions")).scalar_one() == 1
+        assert conn.execute(text("SELECT count(*) FROM stages")).scalar_one() == 0
+        assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 0

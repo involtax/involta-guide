@@ -99,6 +99,15 @@ class VoiceReadModel:
             raise NotFound("Отзыв не найден")
         return str(item["review_id"]), item["slug"]
 
+    def page_candidate(self, location_id: str) -> str | None:
+        with self.engine.connect() as conn:
+            candidate = row(
+                conn,
+                "SELECT version_id FROM voice_page_drafts WHERE location_id=:id",
+                id=location_id,
+            )
+        return str(candidate["version_id"]) if candidate else None
+
     def detail(self, review_id: str) -> dict[str, Any]:
         with self.engine.connect() as conn:
             review = row(conn, "SELECT * FROM reviews WHERE id=:id", id=review_id)
