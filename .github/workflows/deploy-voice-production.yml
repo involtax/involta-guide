@@ -44,7 +44,7 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
           git merge-base --is-ancestor "$sha" origin/main
           verified=''
-          for attempt in $(seq 1 75); do
+          for _ in $(seq 1 75); do
             verified=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --event push --status success --json databaseId --jq '.[0].databaseId // empty')
             [[ -z "$verified" ]] || break
             sleep 10
