@@ -141,7 +141,7 @@ class AIAudit:
                 job["stage_label"] = (
                     "Опубликовано"
                     if job.get("result_published")
-                    else "Черновик создан; ещё не опубликован"
+                    else "Результат сохранён в истории"
                 )
             elif job["status"] != "cancelled" and state:
                 job["stage_label"] = {

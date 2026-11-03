@@ -69,7 +69,7 @@ def test_parallel_public_clicks_queue_one_job(database):
     assert len(queries.rows("audit", {"action": "temporary_public_fill"})) == 1
 
 
-def test_manual_draft_or_published_data_is_never_overwritten(database):
+def test_current_manual_data_is_never_overwritten(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     editor = EditorialService(uow)
     version = editor.save(location["id"], CONTENT, None)
@@ -78,7 +78,7 @@ def test_manual_draft_or_published_data_is_never_overwritten(database):
         assert BUTTON not in client.get("/guide/ivanovo").text
         assert (
             client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
-            == "existing"
+            == "ready"
         )
         assert queries.rows("jobs") == []
         editor.publish(location["id"], version, None)
@@ -128,7 +128,7 @@ def test_editor_change_during_generation_is_not_overwritten(database):
     assert Worker(queue, service).once()
     job = queries.rows("jobs")[0]
     assert job["status"] == "failed"
-    assert queries.get("locations", location["id"])["published_version"] is None
+    assert queries.get("locations", location["id"])["published_version"] is not None
     assert len(queries.rows("versions")) == 1
     assert queries.rows("versions")[0]["source"] == "manual"
 

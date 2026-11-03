@@ -14,7 +14,7 @@ def test_home_shows_only_filled_cities_and_search_covers_all_types(database):
     with TestClient(create_app(settings)) as client:
         assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
         draft = editor.save(city["id"], CONTENT, None)
-        assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
+        assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
         editor.publish(city["id"], draft, None)
         resort_version = editor.save(other["id"], CONTENT, None)
         editor.publish(other["id"], resort_version, None)

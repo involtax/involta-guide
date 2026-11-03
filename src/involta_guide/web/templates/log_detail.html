@@ -50,3 +50,12 @@
 </details>
 {%endfor%}
 {%for v in d.versions%}<details><summary>Версия страницы №{{v.number}}</summary><pre class="audit-json">{{v|tojson(indent=2)}}</pre></details>{%endfor%}
+
+{%if logs_admin and log_location%}
+<p><a href="{{settings.path('/logs/history/'+log_location.id)}}">История данных и восстановление города ↗</a></p>
+{%for v in d.versions%}<form method="post" action="{{settings.path('/admin/actions/restore')}}">{{csrf()}}
+<input type="hidden" name="location_id" value="{{log_location.id}}">
+<input type="hidden" name="version_id" value="{{v.id}}">
+<input type="hidden" name="expected" value="{{log_location.published_version or ''}}">
+<button>Восстановить данные из этого лога</button></form>{%endfor%}
+{%endif%}

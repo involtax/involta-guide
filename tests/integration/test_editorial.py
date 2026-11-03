@@ -28,29 +28,29 @@ def services(database):
     return EditorialService(factory), Queries(factory), factory
 
 
-def test_draft_publish_restore_provenance_and_conflicts(database):
+def test_current_save_restore_provenance_and_conflicts(database):
     editor, queries, uow = services(database)
     location = queries.directory(query="Иваново")["rows"][0]
     key = location["id"]
     first = editor.save(key, CONTENT, None)
-    assert queries.get("locations", key)["published_version"] is None
+    assert queries.get("locations", key)["published_version"] == first
     editor.publish(key, first, None)
     second = editor.save(key, {**CONTENT, "intro": "Новая редакция"}, first)
-    assert queries.public(location["slug"])["content"]["intro"] == "Подборка"
+    assert queries.public(location["slug"])["content"]["intro"] == "Новая редакция"
     with pytest.raises(Conflict):
         editor.save(key, CONTENT, first)
     editor.publish(key, second, first)
     with pytest.raises(Conflict):
         editor.publish(key, first, first)
     restored = editor.restore(key, first, second)
-    assert queries.get("locations", key)["published_version"] == second
+    assert queries.get("locations", key)["published_version"] == restored
     editor.publish(key, restored, second)
     assert (
         queries.public(location["slug"])["content"] == queries.get("versions", restored)["content"]
     )
     empty = editor.save(key, {"intro": "", "restaurants": []}, restored)
-    with pytest.raises(RuleViolation):
-        editor.publish(key, empty, restored)
+    assert queries.get("locations", key)["published_version"] == empty
+    assert queries.public(location["slug"])["content"]["restaurants"] == []
 
 
 def test_parallel_edit_one_wins_and_no_lost_updates(database):
@@ -69,7 +69,7 @@ def test_parallel_edit_one_wins_and_no_lost_updates(database):
     assert len(queries.rows("versions", {"location_id": key})) == 1
 
 
-def test_shared_restaurants_do_not_leak_drafts_or_allow_foreign_ids(database):
+def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
     editor, queries, uow = services(database)
     first = queries.directory(query="Иваново")["rows"][0]
     second = queries.directory(query="Шуя")["rows"][0]
@@ -81,9 +81,12 @@ def test_shared_restaurants_do_not_leak_drafts_or_allow_foreign_ids(database):
     LocationService(uow).attach(card["id"], second["id"])
     copy = editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
     editor.publish(second["id"], copy, None)
-    new = {**card, "description": "Секретный черновик"}
+    new = {**card, "description": "Обновлённое описание"}
     editor.save(first["id"], {"intro": "", "restaurants": [new]}, version)
-    assert queries.public(second["slug"])["content"]["restaurants"][0]["description"] == "Описание"
+    assert (
+        queries.public(second["slug"])["content"]["restaurants"][0]["description"]
+        == "Обновлённое описание"
+    )
     assert queries.get("restaurants", card["id"])["location_id"] == first["id"]
 
 

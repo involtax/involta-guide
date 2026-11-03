@@ -154,19 +154,16 @@ def routes(prefix: str) -> APIRouter:
             "add_card": params.get("add") == "1",
         }
         if tab == "locations":
-            data["locations"] = ctx.queries.directory(
-                query=q, status=status, page=int(params.get("page", "1"))
-            )
+            data["location_cities"] = ctx.queries.ready_locations(q)
             location = params.get("location") or params.get("city")
+            if not location and data["location_cities"]:
+                location = data["location_cities"][0]["id"]
             if location:
                 data["selected"] = (
                     {"location": None, "related_ids": []}
                     if location == "new"
                     else ctx.queries.location(uid(location))
                 )
-            data["admin_page"] = lambda page: urlencode(
-                {"tab": "locations", "q": q, "status": status, "page": page}
-            )
         elif tab == "fill":
             data.update(
                 prompt=ctx.queries.setting("prompt"),
@@ -316,9 +313,24 @@ def routes(prefix: str) -> APIRouter:
                     uid(key(form, "id")) if key(form, "id") else None, validated
                 )
                 return redirect(request, "locations", "Локация сохранена", location=location)
+            if action == "intro":
+                ctx.editorial.save_intro(
+                    uid(location),
+                    key(form, "intro"),
+                    expected,
+                    uid(key(form, "expected_published"))
+                    if key(form, "expected_published")
+                    else None,
+                )
+                return redirect(
+                    request,
+                    "locations",
+                    "Вступление сохранено и обновлено на сайте.",
+                    location=location,
+                )
             if action == "content":
                 content = {
-                    "intro": key(form, "intro"),
+                    "intro": ctx.queries.location(uid(location))["content"]["intro"],
                     "restaurants": [
                         card_from_form(form, str(k) + "_") for k in form.getlist("card")
                     ],
@@ -333,7 +345,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(
                     request,
                     "locations",
-                    "Черновик сохранён. Публикация выполняется отдельно.",
+                    "Данные сохранены и обновлены на сайте.",
                     location=location,
                 )
             if action == "publish":
@@ -342,7 +354,10 @@ def routes(prefix: str) -> APIRouter:
             if action == "restore":
                 ctx.editorial.restore(uid(location), uid(key(form, "version_id")), expected)
                 return redirect(
-                    request, "locations", "Версия восстановлена в черновик", location=location
+                    request,
+                    "locations",
+                    "Данные восстановлены и обновлены на сайте",
+                    location=location,
                 )
             if action == "attach":
                 ctx.locations.attach(uid(key(form, "restaurant_id")), uid(location))
@@ -363,7 +378,7 @@ def routes(prefix: str) -> APIRouter:
                 content["restaurants"].append(item)
                 ctx.editorial.save(location, content, expected)
                 return redirect(
-                    request, "locations", "Ресторан добавлен в черновик", location=location
+                    request, "locations", "Ресторан добавлен на страницу", location=location
                 )
             if action == "prompt":
                 ctx.jobs.set_prompt(key(form, "prompt"))
@@ -424,7 +439,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(
                     request,
                     "reviews",
-                    "Решение сохранено; изменения находятся в черновике",
+                    "Решение сохранено; принятые изменения применены на сайте",
                     review=key(form, "review_id"),
                 )
             if action == "revoke-admin":
@@ -438,6 +453,23 @@ def routes(prefix: str) -> APIRouter:
             message = (
                 str(exc) if isinstance(exc, RuleViolation) else "Проверьте поля формы и формат JSON"
             )
+            if action == "intro" and location:
+                selected = ctx.queries.location(uid(location))
+                selected["content"]["intro"] = key(form, "intro")
+                return render(
+                    request,
+                    "admin.html",
+                    {
+                        "tab": "locations",
+                        "selected": selected,
+                        "q": "",
+                        "add_card": False,
+                        "location_cities": ctx.queries.ready_locations(),
+                        "message": "Вступление не сохранено. "
+                        + message
+                        + " Ваш текст оставлен в поле редактора.",
+                    },
+                )
             return redirect(
                 request,
                 "locations" if location else "overview",

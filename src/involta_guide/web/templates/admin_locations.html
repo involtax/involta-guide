@@ -1,0 +1,172 @@
+<section class="restaurant-browser location-browser" aria-label="Редактор городов">
+<aside class="restaurant-sidebar">
+<div class="restaurant-sidebar-heading"><h2>Готовые города</h2><span>{{location_cities|length}}</span></div>
+<form method="get" action="{{settings.path('/admin')}}" class="restaurant-search" role="search">
+<input type="hidden" name="tab" value="locations">
+<label for="location-city-search">Поиск города</label>
+<input id="location-city-search" type="search" name="q" value="{{q}}" placeholder="Название или регион" hx-get="{{settings.path('/admin')}}" hx-trigger="input changed delay:350ms, search" hx-include="closest form">
+<button>Найти</button>
+</form>
+<p class="restaurant-muted">Опубликованные подборки · сначала свежие</p>
+<nav class="restaurant-city-list" aria-label="Готовые города">
+{%for city in location_cities%}
+<a class="restaurant-city {{'selected' if selected and selected.location and city.id==selected.location.id else ''}}" href="{{settings.path('/admin')}}?tab=locations&amp;location={{city.id}}&amp;q={{q|urlencode}}" {%if selected and selected.location and city.id==selected.location.id%}aria-current="page"{%endif%}>
+<strong>{{city.name}}</strong><span>{{city.restaurant_count}} рест.</span><small>{{city.region}}</small>
+<small>{%if city.filled_at%}Обновлено {{city.filled_at.strftime('%d.%m.%Y %H:%M')}} UTC{%endif%}</small>
+</a>
+{%else%}<p class="restaurant-empty">{%if q%}Готовых городов по этому запросу нет.{%else%}Пока нет опубликованных подборок.{%endif%}</p>{%endfor%}
+</nav>
+<div class="location-sidebar-actions"><a href="{{settings.path('/admin')}}?tab=locations&amp;location=new">+ Локация</a><a href="{{settings.path('/admin/api/locations-export')}}" hx-boost="false">Экспорт локаций ↗</a></div>
+</aside>
+<div class="restaurant-results location-editor">
+{%if selected is not none%}
+{%set c=selected.location%}
+{%if c%}
+<header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">Данные города / {{c.region}}</p><h2>{{c.name}}</h2></div><a href="{{settings.path('/'+c.slug)}}" hx-boost="false" target="_blank" rel="noopener">Открыть страницу ↗</a></header>
+<section class="panel location-intro-panel" aria-labelledby="location-intro-heading">
+<h3 id="location-intro-heading">Вступление</h3>
+<p class="restaurant-muted">Изменения сразу появятся на сайте.</p>
+<form method="post" action="{{settings.path('/admin/actions/intro')}}" class="stack" id="location-intro-form">{{csrf()}}
+<input type="hidden" name="location_id" value="{{c.id}}">
+<input type="hidden" name="expected" value="{{c.published_version or ''}}">
+<input type="hidden" name="expected_published" value="{{c.published_version or ''}}">
+<label for="location-intro">Вступление</label><textarea id="location-intro" name="intro" rows="6" maxlength="4000">{{selected.content.intro}}</textarea>
+<button>Сохранить вступление</button>
+</form>
+</section>
+{%endif%}
+<section class="panel">
+<h2>{{'Новая локация' if not c else 'Настройки города'}}</h2>
+<form method="post" action="{{settings.path('/admin/actions/location')}}" class="stack">{{csrf()}}<input type="hidden" name="id" value="{{c.id if c else ''}}">
+{%for field,label in [('name','Название локации'),('region','Регион'),('slug','URL'),('in_phrase','Фраза «где поесть»'),('parent_id','Родительская локация (UUID)')]%}
+<label>{{label}}<input name="{{field}}" value="{{c[field] if c and c[field] is not none else ''}}"
+{%if field not in ['parent_id']%}
+required
+{%endif%}
+>
+</label>
+{%endfor%}
+<label>Тип локации<select name="kind">
+{%for key,label in kinds.items()%}
+<option value="{{key}}"
+{%if c and c.kind==key%}
+selected
+{%endif%}
+>{{label}}</option>
+{%endfor%}
+</select>
+</label>
+<label>Приоритет<select name="priority">
+{%for value in ['high','medium','low']%}
+<option
+{%if (c.priority if c else 'medium')==value%}
+selected
+{%endif%}
+>{{value}}</option>
+{%endfor%}
+</select>
+</label>
+<label>Размер топа<input name="top_limit" type="number" min="1" max="10" value="{{c.top_limit if c else 3}}">
+</label>
+<label>Другие названия<input name="aliases" value="{{c.aliases|join(', ') if c else ''}}">
+</label>
+{%for field,label,default in [('active','Активна',true),('listed','Показывать в справочнике',true),('is_hub','Надлокация',false),('population_verified','Население подтверждено',false)]%}
+<label>
+<input type="checkbox" name="{{field}}"
+{%if (c[field] if c else default)%}
+checked
+{%endif%}
+> {{label}}</label>
+{%endfor%}
+{%for field,label in [('population','Постоянное население'),('latitude','Широта'),('longitude','Долгота')]%}
+<label>{{label}}<input name="{{field}}" type="number" step="any" value="{{c[field] if c and c[field] is not none else ''}}">
+</label>
+{%endfor%}
+<label>Охват<textarea name="coverage_note">{{c.coverage_note if c else ''}}</textarea>
+</label>
+<label>Границы (JSON)<textarea name="bounds">{{c.bounds|tojson if c and c.bounds else ''}}</textarea>
+</label>
+<label>Связанные локации (UUID через запятую)<input name="related_ids" value="{{selected.related_ids|join(', ')}}">
+</label>
+<button>Сохранить локацию</button>
+</form>
+</section>
+{%if c%}
+<section class="panel">
+<h2>Актуальные данные страницы</h2>
+<form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
+{{generation_model_picker('Модель наполнения',generation_model)}}
+<small>* Сравнительные цены и описание моделей — на вкладке «Наполнение».</small>
+<button>Наполнить через GPT ↗</button>
+</form>
+<form method="post" action="{{settings.path('/admin/actions/content')}}" class="stack">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
+<input type="hidden" name="expected" value="{{c.published_version or ''}}">
+<input type="hidden" name="rankingReport" value="{{selected.content.get('rankingReport')|tojson}}">
+
+<div id="cards">
+{%for r in selected.content.restaurants%}
+{{restaurant(r,'r'~loop.index)}}
+{%endfor%}
+{%if add_card%}
+{{restaurant({},'new')}}
+{%endif%}
+</div>
+<button type="button" hx-get="{{settings.path('/admin/card')}}" hx-target="#cards" hx-select="unset" hx-swap="beforeend">+ Ресторан</button>
+<noscript>
+<a href="?tab=locations&amp;location={{c.id}}&amp;add=1">Добавить ресторан</a>
+</noscript>
+<button>Сохранить рестораны</button>
+</form>
+{%if selected.available%}
+<h3>Из других локаций направления</h3>
+<form method="post" action="{{settings.path('/admin/actions/select-restaurant')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
+<input type="hidden" name="expected" value="{{c.published_version or ''}}">
+<select name="restaurant_id" aria-label="Ресторан из дочерних локаций">
+{%for r in selected.available%}
+<option value="{{r.id}}">{{r.name}}</option>
+{%endfor%}
+</select>
+<button>Добавить на страницу</button>
+</form>
+{%endif%}
+<form method="post" action="{{settings.path('/admin/actions/attach')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
+<label>Связать ресторан (UUID)<input name="restaurant_id" required>
+</label>
+<button>Связать</button>
+</form>
+{%if selected.content.rankingReport%}
+<h3>Рейтинг кандидатов</h3>
+<table>
+<thead>
+<tr>
+<th>Ресторан</th>
+{%for label in factor_labels%}
+<th>{{label}}</th>
+{%endfor%}
+<th>Итог</th>
+</tr>
+</thead>
+<tbody>
+{%for r in selected.content.rankingReport%}
+<tr>
+<td>{{r.name}}</td>
+{%for key in factors%}
+<td>{{r.scores.get(key,'—')}}</td>
+{%endfor%}
+<td>{{r.totalScore}}</td>
+</tr>
+{%endfor%}
+</tbody>
+</table>
+<details>
+<summary>Обоснования и источники</summary>
+<pre>{{selected.content.rankingReport|tojson(indent=2)}}</pre>
+</details>
+{%endif%}
+</section>
+<p><a href="{{settings.path('/logs/history/'+c.id)}}" hx-boost="false">Логи и восстановление данных города ↗</a></p>
+{%endif%}
+{%endif%}
+{%if selected is none%}<section class="restaurant-empty"><h2>Выберите город</h2><p>В списке слева — города с опубликованными подборками.</p></section>{%endif%}
+</div>
+</section>
