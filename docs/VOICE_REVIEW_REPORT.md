@@ -45,3 +45,9 @@ rollback for an invalid new restaurant, audited repair/exclusion, stale package
 and page conflict, and identical replay without another version/decision.
 `proposal_edits` and `excluded_proposals` may also be supplied in the approval
 DTO itself; their changes share the same approval transaction and audit.
+
+Additional local checks: 10 focused cases passed, including edits to a shared
+restaurant across two cities: both receive immutable versions, while previous
+snapshots retain their original phone. Production Compose contracts validate
+host and bridge modes, immutable application/DB image references, private API,
+all seven service definitions, healthchecks and the shared OpenAI variable.

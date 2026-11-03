@@ -204,6 +204,13 @@ def routes(prefix: str) -> APIRouter:
             from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 
             with PostgresUow(ctx.engine) as uow:
+                if action == "new-run":
+                    from sqlalchemy import text
+
+                    uow.session.execute(
+                        text("UPDATE review_texts SET revision=revision+1 WHERE review_id=:id"),
+                        {"id": str(review_id)},
+                    )
                 uow.repo.audit(
                     "voice_" + action,
                     str(review_id),

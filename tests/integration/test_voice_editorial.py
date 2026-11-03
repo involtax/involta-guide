@@ -87,15 +87,29 @@ def test_admin_ui_moderates_text_without_analysis_and_guards_stale_screen(databa
         assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 3
 
 
+@pytest.mark.parametrize("shared", [False, True])
 @pytest.mark.parametrize("repair", [False, True])
 def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_application(
-    database, repair
+    database, repair, shared
 ):
     settings, engine, uow, queries, city, ref, event = imported(database)
     editor = EditorialService(uow)
     version = editor.save(city["id"], CONTENT, None)
     editor.publish(city["id"], version, None)
     card = queries.location(city["id"])["content"]["restaurants"][0]
+    affected = {}
+    other = None
+    if shared:
+        other = queries.directory(query="Шуя")["rows"][0]
+        with uow() as tx:
+            tx.repo.link(
+                "restaurant_locations", {"restaurant_id": card["id"], "location_id": other["id"]}
+            )
+        other_version = editor.save(
+            other["id"], {"intro": "Shared card", "restaurants": [card]}, None
+        )
+        affected[other["id"]] = other_version
+
     from involta_voice.contracts import RestaurantContext
 
     event["metadata"]["location"]["restaurants"] = [
@@ -140,6 +154,7 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
         processing_run=1,
         action="approve",
         page_revision=version,
+        affected_revisions=affected,
     )
     from pydantic import ValidationError
 
@@ -182,6 +197,14 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
     result = service.decide(ref, command, principal["id"])
     assert service.decide(ref, command, principal["id"]) == result
     assert len(queries.location(city["id"])["content"]["restaurants"]) == (2 if repair else 1)
+    if other:
+        assert queries.get("locations", other["id"])["published_version"] != other_version
+        assert (
+            queries.get("versions", other_version)["content"]["restaurants"][0]["phone"]
+            != "+74951234568"
+        )
+        assert queries.location(other["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
+
     assert queries.get("locations", city["id"])["published_version"] != newer
     assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
     assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
