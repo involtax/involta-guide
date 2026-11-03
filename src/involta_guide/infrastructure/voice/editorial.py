@@ -270,11 +270,23 @@ class VoiceEditorial:
             ).mappings()
         ]
         expected = str(command.page_revision) if command.page_revision else None
-        if proposals and expected != location["published_version"]:
+        if expected != location["published_version"]:
             raise Conflict("Страница изменилась. Обновите сравнение.")
         content = current_content(repo, location)
         before["content"] = copy.deepcopy(content)
         before["package"] = copy.deepcopy(proposals)
+        ids = {str(p["id"]) for p in proposals}
+        excluded = {str(value) for value in command.excluded_proposals}
+        if not set(command.proposal_edits).issubset(ids) or not excluded.issubset(ids):
+            raise Conflict("Состав пакета изменился")
+        for proposal in proposals:
+            identity = str(proposal["id"])
+            if identity in command.proposal_edits:
+                proposal["payload"]["changes"] = command.proposal_edits[identity]
+                repo.change("proposals", identity, {"payload": proposal["payload"]})
+            if identity in excluded:
+                repo.change("proposals", identity, {"status": "rejected"})
+        proposals = [p for p in proposals if str(p["id"]) not in excluded]
         changed_ids = set()
         for proposal in proposals:
             payload = proposal["payload"]

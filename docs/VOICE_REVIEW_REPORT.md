@@ -37,3 +37,11 @@ See VOICE_RUNBOOK.md for production preparation and rollback. No merge or
 production deployment was performed. Autoapproval remains disabled. Native
 Safari/iOS microphone recording, production backup restoration, real model
 availability/tariffs and sustained load require separate operational acceptance.
+
+Validation so far: full local regression 243 passed before the extra diagnostic,
+key/config and composition cases; targeted package/config/consumer checks passed.
+The added whole-package scenarios verify two valid changes together, atomic
+rollback for an invalid new restaurant, audited repair/exclusion, stale package
+and page conflict, and identical replay without another version/decision.
+`proposal_edits` and `excluded_proposals` may also be supplied in the approval
+DTO itself; their changes share the same approval transaction and audit.

@@ -7,6 +7,7 @@ mode=${1:?deploy or rollback}; DEPLOY_ROOT=${2:?}; target_sha=${3:?}; target_ima
 deployment_id=${5:?}; public_url=${6:?}; registry_user=${7:?}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 [[ "$mode" == deploy || "$mode" == rollback ]] || exit 2
+[[ "$mode" != rollback ]] || export VOICE_INTAKE=false
 [[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || { echo 'Unsafe deployment directory' >&2; exit 2; }
 [[ "$target_sha" =~ ^[0-9a-f]{40}$ && "$deployment_id" =~ ^[0-9]+-[0-9]+$ ]] || exit 2
 [[ "$target_image" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo 'Only digest-pinned GHCR images are allowed' >&2; exit 2; }
@@ -167,6 +168,9 @@ fi
 timeout 300 docker pull "$target_image" >/dev/null
 revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$target_image")
 [[ "$revision" == "$target_sha" ]] || { echo 'Image revision does not match requested SHA' >&2; exit 1; }
+if [[ "$mode" == rollback && -n "$previous_sha" && -f "$DEPLOY_ROOT/releases/$previous_sha/compose.voice.yaml" ]]; then
+  docker run --rm --entrypoint python "$target_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Cannot roll back Voice references to an incompatible image' >&2; exit 2; }
+fi
 docker volume inspect "$AUDIO_VOLUME" >/dev/null
 # Schema upgrades must be additive and image rollback compatible. Never seed/drop data here.
 changed=0
