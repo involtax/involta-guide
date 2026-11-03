@@ -199,8 +199,16 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 )
                 review = queries.rows("reviews")[0]
                 page.goto(base + "/admin?tab=reviews&review=" + review["id"])
-                page.get_by_role("button", name="Одобрить отзыв", exact=True).click()
-                expect(page.get_by_role("status")).to_contain_text("Решение сохранено")
+                expect(page).to_have_url(base + "/admin/reviews/ivanovo/" + str(review["number"]))
+                expect(
+                    page.get_by_text(
+                        "Команда выполняется существующим обработчиком Алекса;", exact=False
+                    )
+                ).to_be_visible()
+                expect(page.get_by_role("region", name="Сравнение распознавания")).to_be_visible()
+                expect(
+                    page.get_by_role("button", name="Одобрить весь пакет", exact=True)
+                ).to_have_count(0)
                 page.get_by_role("link", name="Настройки наполнения", exact=True).click()
                 expect(
                     page.get_by_role("heading", name="Настройки наполнения", exact=True)

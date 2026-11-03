@@ -18,7 +18,8 @@ from involta_guide.web.routes.voice import voice_client
 
 def routes(prefix: str) -> APIRouter:
     router = APIRouter()
-    base = prefix + "/admin/voice"
+    base = prefix + "/admin/reviews"
+    old_base = prefix + "/admin/voice"
 
     def show(request: Request, review_id: str | None = None, run: int | None = None) -> Response:
         require_admin(request)
@@ -49,10 +50,6 @@ def routes(prefix: str) -> APIRouter:
                         remote = voice_client(request).json(
                             "GET", f"/admin/submissions/{ref}/runs/{run}"
                         )
-                if detail and detail["asr_reference"]:
-                    asr_comparison = voice_client(request).json(
-                        "GET", "/admin/submissions/" + detail["asr_reference"] + "/asr"
-                    )
                 if not detail:
                     remote_rows = voice_client(request).json(
                         "GET", "/admin/submissions", params={"page": listing["page"]}
@@ -61,19 +58,25 @@ def routes(prefix: str) -> APIRouter:
                     pending = [r for r in remote_rows if r["reference"] not in local]
             except VoiceUnavailable as exc:
                 unavailable = str(exc)
+        # Settings availability must not hide already saved recognition results.
+        if detail and detail["asr_reference"]:
+            try:
+                asr_comparison = voice_client(request).json(
+                    "GET", "/admin/submissions/" + detail["asr_reference"] + "/asr"
+                )
+            except VoiceUnavailable as exc:
+                unavailable = str(exc)
         return render(
             request,
             "voice_admin.html",
             {
-                "tab": "voice",
+                "tab": "reviews",
                 "queue": listing,
                 "consumer_health": read.consumer_health(),
                 "v": detail,
                 "remote": remote,
                 "asr_comparison": asr_comparison,
-                "asr_action": ctx.settings.path("/admin/voice/decision/" + review_id)
-                if review_id
-                else "",
+                "asr_action": ctx.settings.path(detail["path"] + "/actions") if detail else "",
                 "run_log": run is not None,
                 "pending_voice": pending,
                 "voice_settings": remote_settings,
@@ -93,9 +96,31 @@ def routes(prefix: str) -> APIRouter:
     def index(request: Request) -> Response:
         return show(request)
 
-    @router.get(base + "/legacy/{review_id}")
+    @router.get(old_base)
+    def old_index(request: Request) -> Response:
+        require_admin(request)
+        query = "?" + str(request.query_params) if request.query_params else ""
+        return RedirectResponse(base + query, status_code=308)
+
+    @router.get(old_base + "/{slug}/{number:int}")
+    @router.get(old_base + "/{slug}/{number:int}/runs/{run}")
+    def old_numbered(request: Request, slug: str, number: int, run: int | None = None) -> Response:
+        require_admin(request)
+        path = VoiceReadModel(context(request).engine).imported_path(slug, number)
+        if run is not None:
+            path += "/runs/" + str(run)
+        return RedirectResponse(context(request).settings.path(path), status_code=308)
+
+    @router.get(old_base + "/legacy/{review_id}")
     def legacy(request: Request, review_id: UUID) -> Response:
-        return show(request, str(review_id))
+        require_admin(request)
+        path = VoiceReadModel(context(request).engine).path(str(review_id))
+        return RedirectResponse(context(request).settings.path(path), status_code=308)
+
+    @router.get(old_base + "/submission/{reference}")
+    def old_pending(request: Request, reference: UUID) -> Response:
+        require_admin(request)
+        return RedirectResponse(base + "/submission/" + str(reference), status_code=308)
 
     @router.get(base + "/submission/{reference}")
     def unimported(request: Request, reference: UUID) -> Response:
@@ -108,12 +133,12 @@ def routes(prefix: str) -> APIRouter:
             request,
             "voice_pending.html",
             {
-                "tab": "voice",
+                "tab": "reviews",
                 "pending": data,
                 "asr_comparison": comparison,
                 "new_key": lambda: str(uuid4()),
                 "asr_action": context(request).settings.path(
-                    "/admin/voice/submission/" + str(reference)
+                    "/admin/reviews/submission/" + str(reference)
                 ),
             },
         )
@@ -137,6 +162,7 @@ def routes(prefix: str) -> APIRouter:
             payload["force"] = form.get("force") == "yes"
         voice_client(request).json("POST", path, json=payload, actor_session=session)
 
+    @router.post(old_base + "/submission/{reference}")
     @router.post(base + "/submission/{reference}")
     def unimported_action(
         request: Request, reference: UUID, form: FormData = Depends(form_data)
@@ -146,22 +172,19 @@ def routes(prefix: str) -> APIRouter:
         asr_action(request, str(reference), form, principal["id"])
         return RedirectResponse(base + "/submission/" + str(reference), status_code=303)
 
-    @router.get(base + "/{slug}/{number}")
+    @router.get(base + "/{slug}/{number:int}")
     def numbered(request: Request, slug: str, number: int) -> Response:
         require_admin(request)
-        key, canonical = VoiceReadModel(context(request).engine).resolve(slug, number)
-        if slug != canonical:
-            return RedirectResponse(base + "/" + canonical + "/" + str(number), status_code=308)
+        key, _ = VoiceReadModel(context(request).engine).resolve(slug, number)
         return show(request, key)
 
-    @router.get(base + "/{slug}/{number}/runs/{run}")
+    @router.get(base + "/{slug}/{number:int}/runs/{run}")
     def run(request: Request, slug: str, number: int, run: int) -> Response:
         require_admin(request)
-        key, canonical = VoiceReadModel(context(request).engine).resolve(slug, number)
-        if slug != canonical:
-            return RedirectResponse(base + f"/{canonical}/{number}/runs/{run}", status_code=308)
+        key, _ = VoiceReadModel(context(request).engine).resolve(slug, number)
         return show(request, key, run)
 
+    @router.get(old_base + "/media/audio/{reference}")
     @router.get(base + "/media/audio/{reference}")
     def audio(request: Request, reference: UUID) -> Response:
         require_admin(request)
@@ -175,6 +198,7 @@ def routes(prefix: str) -> APIRouter:
             headers={"Cache-Control": "private,no-store"},
         )
 
+    @router.post(old_base + "/settings")
     @router.post(base + "/settings")
     def settings(request: Request, form: FormData = Depends(form_data)) -> Response:
         principal = require_admin(request)
@@ -205,7 +229,34 @@ def routes(prefix: str) -> APIRouter:
             )
         return RedirectResponse(base + "?message=" + "Настройки+сохранены", status_code=303)
 
-    @router.post(base + "/decision/{review_id}")
+    @router.post(base + "/{slug}/{number:int}/actions")
+    def numbered_action(
+        request: Request, slug: str, number: int, form: FormData = Depends(form_data)
+    ) -> Response:
+        require_admin(request)
+        review_id, _ = VoiceReadModel(context(request).engine).resolve(slug, number)
+        return decision(request, UUID(review_id), form)
+
+    @router.get(base + "/{slug}/{number:int}/audio")
+    def review_audio(request: Request, slug: str, number: int) -> Response:
+        require_admin(request)
+        ctx = context(request)
+        review_id, _ = VoiceReadModel(ctx.engine).resolve(slug, number)
+        review = ctx.queries.get("reviews", review_id)
+        if review["audio"].startswith("voice:"):
+            remote = voice_client(request).request(
+                "GET", "/admin/submissions/" + review_id + "/audio"
+            )
+            return Response(
+                remote.content,
+                status_code=remote.status_code,
+                media_type=remote.headers.get("content-type", "application/octet-stream"),
+                headers={"Cache-Control": "private,no-store"},
+            )
+        content, mime = ctx.reviews.audio(review_id)
+        return Response(content, media_type=mime, headers={"Cache-Control": "private,no-store"})
+
+    @router.post(old_base + "/decision/{review_id}")
     def decision(
         request: Request, review_id: UUID, form: FormData = Depends(form_data)
     ) -> Response:

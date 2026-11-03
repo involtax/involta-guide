@@ -64,6 +64,7 @@ class ReviewRow(Base):
     __tablename__ = "reviews"
     changes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
     location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
     visitor: Mapped[str] = mapped_column(Text)
     audio: Mapped[str] = mapped_column(Text)

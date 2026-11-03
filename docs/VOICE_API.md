@@ -189,3 +189,16 @@ Private bearer-authenticated endpoints:
 Guide exposes those operations only behind its existing admin cookie + CSRF;
 new beta routes do not grant admin privileges. See ASR_BETA.md for inventory,
 aggregate reporting, pinned models and the eventual single-model switch.
+
+
+## Administrative review URLs
+
+All Guide reviews share `/guide/admin/reviews/{slug}/{number}`, including trusted
+administrator recordings processed by the Alex executor. `reviews.number` is a
+permanent globally unique positive identity; UUIDs remain internal. Queue, card,
+`/audio`, `/actions` and `/runs/{run}` links share that canonical route. Old review
+query URLs and Voice card URLs redirect; the duplicate legacy review UI/menu is removed.
+The card inherits PR17's common admin shell and always shows the GigaAM/Parakeet
+comparison immediately after audio, with explicit waiting/unavailable states.
+Settings failures cannot hide saved ASR results. GETs do not queue recognition,
+copy recordings, moderate reviews or replay commands.

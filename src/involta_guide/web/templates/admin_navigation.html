@@ -1,8 +1,7 @@
 <nav class="admin-tabs" aria-label="Администрирование">
-<a href="{{settings.path('/admin/voice')}}" class="{{'selected' if tab=='voice' else ''}}" {%if tab=='voice'%}aria-current="page"{%endif%}>Голосовые отзывы</a>
 {%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Настройки наполнения'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
-{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions'}.get(key)%}
-<a href="{{settings.path(route) if route else settings.path('/admin')+'?tab='+key}}" class="{{'selected' if tab==key else ''}}" {%if tab==key%}aria-current="page"{%endif%}>{{label}}</a>
+{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions','reviews':'/admin/reviews','ratings':'/admin/ratings','contacts':'/admin/contacts'}.get(key)%}
+<a href="{{settings.path(route)}}" class="{{'selected' if tab==key else ''}}" {%if tab==key%}aria-current="page"{%endif%}>{{label}}</a>
 {%endfor%}
 <a href="{{settings.path('/logs')}}" hx-boost="false" class="{{'selected' if tab=='logs' else ''}}" {%if tab=='logs'%}aria-current="page"{%endif%}>Логи</a>
 <a href="{{settings.path('/alex')}}" class="{{'selected' if tab=='alex' else ''}}" {%if tab=='alex'%}aria-current="page"{%endif%} hx-boost="false">Алекс ↗</a>

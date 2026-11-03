@@ -34,85 +34,6 @@
 <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
 </section>
 {%endif%}
-{%if tab=='reviews'%}
-<div class="admin-browser"><aside class="admin-sidebar">
-<h2>Голосовые отзывы</h2>
-<form method="get">
-<input type="hidden" name="tab" value="reviews">
-<label>Модерация<select name="moderation">
-<option value="">Все</option>
-{%for m in ['pending','approved','rejected']%}
-<option
-{%if moderation==m%}
-selected
-{%endif%}
- value="{{m}}">{{status_label(m)}}</option>
-{%endfor%}
-</select>
-</label>
-<button>Фильтр</button>
-</form>
-{%for r in reviews%}
-<article class="admin-list-item {{'selected' if review_detail and r.id==review_detail.review.id else ''}}"><a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{r.id}}"><strong>{{r.created_at}}</strong><p>{{status_label(r.status)}} · {{status_label(r.moderation)}}</p><p>{{r.transcript or 'Ожидает расшифровки'}}</p></a></article>
-{%else%}<p class="admin-muted">Отзывов по выбранным условиям нет.</p>{%endfor%}
-</aside><div class="admin-detail">
-{%if review_detail%}
-{%set r=review_detail.review%}
-<section class="panel">
-<h2>{{review_detail.location.name}}</h2>
-<audio controls preload="none" src="{{settings.path('/api/admin/audio/'+r.id)}}">
-</audio>
-<p>{{r.transcript or 'Ожидает расшифровки'}}</p>
-<p class="error">{{r.error or ''}}</p>
-<form method="post" action="{{settings.path('/admin/actions/moderate')}}">{{csrf()}}<input type="hidden" name="review_id" value="{{r.id}}">
-<label>Причина<textarea name="reason">{{r.reason}}</textarea>
-</label>
-<div class="button-row">
-{%for key,label in [('approved','Одобрить отзыв'),('rejected','Не одобрять'),('fraud','Пометить фродом'),('reset','Вернуть на проверку')]%}
-<button name="decision" value="{{key}}">{{label}}</button>
-{%endfor%}
-</div>
-</form>
-<h3>Разбор ИИ</h3>
-<pre>{{r.result|tojson(indent=2)}}</pre>
-<details>
-<summary>Технические признаки</summary>
-<p>Cookie: {{r.visitor}}</p>
-<p>Хеш аудио: {{r.hash}}</p>
-<p>Хеш IP: {{r.ip_hash}}</p>
-<p>Браузер: {{r.device}}</p>
-</details>
-<h3>Сигналы повторов</h3>
-{%for s in review_detail.signals%}
-<p>
-<a href="?tab=reviews&amp;review={{s.id}}">{{s.id}}</a> · сходство {{'%.0f'|format(s.similarity*100)}}% · аудио {{s.sameAudio}} · браузер {{s.sameVisitor}} · сеть {{s.sameIp}}</p>
-{%endfor%}
-<p>Сходство и отрицательное мнение сами по себе не доказывают фрод.</p>
-</section>
-{%for p in review_detail.proposals%}
-{%set payload=p.payload%}
-<section class="panel">
-<h3>Предложение: {{p.kind}} · {{status_label(p.status)}}</h3>
-<p>{{payload.reason}}</p>
-<details>
-<summary>Было</summary>
-<pre>{{proposal_before.get(p.id)|tojson(indent=2)}}</pre>
-</details>
-<form method="post" action="{{settings.path('/admin/actions/proposal')}}" class="stack">{{csrf()}}<input type="hidden" name="proposal_id" value="{{p.id}}">
-<input type="hidden" name="review_id" value="{{r.id}}">
-{%for key,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Яндекс Карты'),('phone','Телефон')]%}
-<label>{{label}}<textarea name="{{key}}">{{payload.get(key) or (proposal_before.get(p.id) or {}).get(key,'')}}</textarea>
-</label>
-{%endfor%}
-<label>Режим работы (JSON)<textarea name="openingHours">{{payload.openingHours|tojson if payload.openingHours else (proposal_before.get(p.id) or {}).get('openingHours')|tojson}}</textarea>
-</label>
-<button name="decision" value="approve">Применить на сайте</button>
-<button name="decision" value="reject">Отклонить</button>
-</form>
-</section>
-{%endfor%}
-{%else%}<div class="admin-empty"><h2>Выберите отзыв</h2><p>Слева — поиск и список отзывов.</p></div>{%endif%}
-</div></div>{%endif%}
 {%if tab=='restaurants'%}
 {%include 'admin_restaurants.html'%}
 {%endif%}
@@ -132,7 +53,7 @@ selected
 <p>Сообщений {{g.messages}} · браузеров {{g.visitors}} · сетей {{g.networks}} · одобрено {{g.approved}} · фрод {{g.fraud}}</p>
 {%for r in g.evidence%}
 <p>
-<a href="?tab=reviews&amp;review={{r.reviewId}}">{{r.date}} · {{status_label(r.status)}}</a> {{r.reason}}</p>
+<a href="{{review_path(r.reviewId)}}">{{r.date}} · {{status_label(r.status)}}</a> {{r.reason}}</p>
 {%endfor%}
 </article>
 {%else%}<p class="admin-empty">Предложений телефонов пока нет.</p>{%endfor%}

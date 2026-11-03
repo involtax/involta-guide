@@ -46,7 +46,7 @@
 {%else%}<p class="restaurant-muted">В текущей подборки нет оценок для этого ресторана.</p>{%endif%}
 </section>
 <section class="restaurant-detail-section"><h4>Источники</h4><ul class="restaurant-sources">{%for url in r.sources%}<li>{%if url.startswith('https://') or url.startswith('http://')%}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url}}</a>{%else%}{{url}}{%endif%}</li>{%else%}<li class="restaurant-muted">Не сохранены.</li>{%endfor%}</ul></section>
-{%if r.reviews%}<details class="restaurant-detail-section"><summary>Отзывы и оценки · {{r.reviews|length}}</summary>{%for review in r.reviews%}<section><p><a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{review.id}}">{{review.created_at}} ↗</a> · {{review.moderation}}{{' · фрод' if review.fraud}}</p><p>{{review.transcript or 'Нет расшифровки'}}</p><pre class="audit-json">{{review.entries|tojson(indent=2)}}</pre></section>{%endfor%}</details>{%endif%}
+{%if r.reviews%}<details class="restaurant-detail-section"><summary>Отзывы и оценки · {{r.reviews|length}}</summary>{%for review in r.reviews%}<section><p><a href="{{review_path(review.id)}}">{{review.created_at}} ↗</a> · {{review.moderation}}{{' · фрод' if review.fraud}}</p><p>{{review.transcript or 'Нет расшифровки'}}</p><pre class="audit-json">{{review.entries|tojson(indent=2)}}</pre></section>{%endfor%}</details>{%endif%}
 <details class="restaurant-detail-section"><summary>Поля записи в базе</summary><pre class="audit-json">{%for key,value in r.items() if key not in ['id','location_id','reviews','ranking','score','review_scores','review_count','collections']%}{{key}}: {{value|tojson}}
 {%endfor%}</pre></details>
 </article>
