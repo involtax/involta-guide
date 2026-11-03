@@ -21,6 +21,7 @@
 <div class="restaurant-results">
 {%if restaurant_city%}
 <header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{restaurant_cards|length}} ресторанов в базе</p></div><a href="{{settings.path('/admin')}}?tab=locations&amp;location={{restaurant_city.id}}">Редактировать подборку ↗</a></header>
+{%set quality_report=generation_quality%}{%include 'generation_quality.html'%}
 <p class="restaurant-sort-note">По убыванию оценки по 8 критериям текущей версии. При равенстве или отсутствии оценки — по оценке одобренных отзывов, затем звезде Алекса и названию. Отсутствующие оценки не считаются нулём.</p>
 {%for r in restaurant_cards%}
 <article class="restaurant-record">

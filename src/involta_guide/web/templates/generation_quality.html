@@ -1,0 +1,14 @@
+{%if quality_report%}
+<section class="generation-quality {{quality_report.status}}" aria-label="Полнота поиска">
+<h3>{{'Поиск неполный' if quality_report.status=='partial' else 'Проверка поиска завершена'}}</h3>
+<p>Учтено мест: <strong>{{quality_report.discovered}}</strong> · Проверено: {{quality_report.verified}} · Исключено: {{quality_report.excluded}} · Требуют проверки: {{quality_report.needsVerification}}</p>
+{%if not quality_report.structuredCoverage%}<p>Старый ответ не содержит полного структурированного отчёта. Упоминания сохранены как кандидаты, полнота поиска не подтверждена.</p>{%endif%}
+{%if quality_report.cleanedTexts%}<p>Текст очищен от ссылочной разметки. Источники и исходный ответ сохранены.</p>{%endif%}
+{%if candidate_review%}<details><summary>Все кандидаты и причины · {{candidate_review|length}}</summary>
+{%for item in candidate_review%}<article class="candidate-review"><strong>{{item.name}}</strong><span>{{{'verified':'Проверено','excluded':'Исключено','needs_verification':'Нужно проверить'}[item.status]}}</span><p>{{item.reason}}</p>
+{%if item.mapsUrl%}<a href="{{item.mapsUrl}}" target="_blank" rel="noopener noreferrer">Карточка на карте ↗</a>{%endif%}
+{%for source in item.sources%}<a href="{{source}}" target="_blank" rel="noopener noreferrer">{{source}}</a>{%endfor%}</article>{%endfor%}
+</details>{%endif%}
+{%if quality_report.issues%}<details><summary>Ограничения проверки</summary><ul>{%for issue in quality_report.issues%}<li>{{issue}}</li>{%endfor%}</ul></details>{%endif%}
+</section>
+{%endif%}

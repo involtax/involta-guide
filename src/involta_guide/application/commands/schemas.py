@@ -63,7 +63,7 @@ class RestaurantInput(BaseModel):
     cuisine: str = Field(min_length=1, max_length=300)
     description: str = Field(min_length=1, max_length=2000)
     mapsUrl: str = Field(max_length=2000)
-    sources: list[str] = Field(default_factory=list, max_length=20)
+    sources: list[str] = Field(default_factory=list, max_length=50)
     phone: str = ""
     openingHours: Hours | None = None
     alexStar: bool = False
@@ -130,10 +130,43 @@ class RankingCandidate(BaseModel):
         return self
 
 
+class CandidateReview(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    mapsUrl: str | None = None
+    status: Literal["verified", "excluded", "needs_verification"]
+    reason: str = Field(min_length=1, max_length=2000)
+    exclusionCode: Literal["outside_area", "closed", "not_restaurant", "duplicate"] | None = None
+    sources: list[str] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def decision(self) -> "CandidateReview":
+        if not self.reason.strip():
+            raise ValueError("Укажите конкретную причину решения")
+        if self.status == "excluded" and not self.exclusionCode:
+            raise ValueError(
+                "Исключение требует причины: outside_area, closed, not_restaurant или duplicate"
+            )
+        if self.status != "excluded" and self.exclusionCode is not None:
+            raise ValueError("exclusionCode применим только к исключённому кандидату")
+        return self
+
+    @field_validator("mapsUrl")
+    @classmethod
+    def maps_valid(cls, value: str | None) -> str | None:
+        return RestaurantInput.maps(value) if value is not None else None
+
+    @field_validator("sources")
+    @classmethod
+    def sources_valid(cls, value: list[str]) -> list[str]:
+        return RestaurantInput.sources_valid(value)
+
+
 class ContentInput(BaseModel):
     intro: str = Field(max_length=4000)
     restaurants: list[RestaurantInput] = Field(max_length=50)
     rankingReport: list[RankingCandidate] | None = Field(default=None, max_length=10)
+    candidateReview: list[CandidateReview] | None = Field(default=None, max_length=100)
+    qualityReport: dict[str, Any] | None = None
 
 
 class Generation(ContentInput):

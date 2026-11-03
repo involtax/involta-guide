@@ -122,6 +122,12 @@ class Queries:
             location = require(repo, "locations", selected["id"])
             current = next((v for v in versions if v["id"] == location["published_version"]), None)
             report = (current["content"] if current else {}).get("rankingReport") or []
+            result["generation_quality"] = (current["content"] if current else {}).get(
+                "qualityReport"
+            )
+            result["candidate_review"] = (current["content"] if current else {}).get(
+                "candidateReview"
+            )
 
             def normalize(name: str) -> str:
                 return " ".join(name.casefold().split())

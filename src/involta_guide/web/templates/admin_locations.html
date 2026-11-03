@@ -23,6 +23,7 @@
 {%set c=selected.location%}
 {%if c%}
 <header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">Данные города / {{c.region}}</p><h2>{{c.name}}</h2></div><a href="{{settings.path('/'+c.slug)}}" hx-boost="false" target="_blank" rel="noopener">Открыть страницу ↗</a></header>
+{%set quality_report=selected.content.get('qualityReport')%}{%set candidate_review=selected.content.get('candidateReview')%}{%include 'generation_quality.html'%}
 <section class="panel location-intro-panel" aria-labelledby="location-intro-heading">
 <h3 id="location-intro-heading">Вступление</h3>
 <p class="restaurant-muted">Изменения сразу появятся на сайте.</p>
@@ -66,7 +67,7 @@ selected
 {%endfor%}
 </select>
 </label>
-<label>Размер топа<input name="top_limit" type="number" min="1" max="10" value="{{c.top_limit if c else 3}}">
+<label>Карточек показывать сразу<input name="top_limit" type="number" min="1" max="10" value="{{c.top_limit if c else 3}}">
 </label>
 <label>Другие названия<input name="aliases" value="{{c.aliases|join(', ') if c else ''}}">
 </label>
@@ -151,9 +152,9 @@ checked
 <tr>
 <td>{{r.name}}</td>
 {%for key in factors%}
-<td>{{r.scores.get(key,'—')}}</td>
+<td>{{r.scores.get(key) if r.scores.get(key) is not none else '—'}}</td>
 {%endfor%}
-<td>{{r.totalScore}}</td>
+<td>{{r.totalScore if r.totalScore is not none else 'Не рассчитан'}}</td>
 </tr>
 {%endfor%}
 </tbody>
