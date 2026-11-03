@@ -7,7 +7,8 @@ import unicodedata
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from rapidfuzz.distance import Levenshtein
 from sqlalchemy import Engine, text
 
 from .asr import MODELS
@@ -44,10 +45,34 @@ def save_candidate(
     )
 
 
+class AsrRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: UUID
+    force: StrictBool = False
+
+
 def queue_evaluation(
     engine: Engine, settings: Any, reference: str, key: str, force: bool = False
 ) -> dict[str, Any]:
     with engine.begin() as conn:
+        execute(conn, "SELECT pg_advisory_xact_lock(hashtext(:key))", key=key)
+        accepted = row(conn, "SELECT * FROM asr_run_requests WHERE id=:key", key=key)
+        if accepted:
+            if str(accepted["submission"]) != reference or accepted["force"] != force:
+                raise VoiceError("Ключ уже использован", "conflict", 409)
+            return {"reference": reference, "run": accepted["run"], "reused": True}
+
+        def remember(number: int, reused: bool) -> dict[str, Any]:
+            execute(
+                conn,
+                "INSERT INTO asr_run_requests(id,submission,run,force) VALUES(:key,:id,:n,:force)",
+                key=key,
+                id=reference,
+                n=number,
+                force=force,
+            )
+            return {"reference": reference, "run": number, "reused": reused}
+
         submission = row(
             conn, "SELECT * FROM submissions WHERE reference=:id FOR UPDATE", id=reference
         )
@@ -62,7 +87,7 @@ def queue_evaluation(
         if old:
             if not old["snapshot"].get("asr_evaluation_only"):
                 raise VoiceError("Ключ уже использован", "conflict", 409)
-            return {"reference": reference, "run": old["number"]}
+            return remember(old["number"], True)
         frozen = snapshot(conn, settings)
         frozen.update(asr_evaluation_only=True, location=submission["metadata"]["location"])
         ordinal = row(
@@ -92,7 +117,7 @@ def queue_evaluation(
                     {"transcription", "comparison"} <= kinds
                     or {"evaluate_gigaam", "evaluate_parakeet"} <= kinds
                 ):
-                    return {"reference": reference, "run": previous["number"], "reused": True}
+                    return remember(previous["number"], True)
         number = ordinal["n"]
         execute(
             conn,
@@ -111,7 +136,7 @@ def queue_evaluation(
                 kind="evaluate_" + name,
             )
         # active_run / transcript / moderation / published data remain untouched.
-        return {"reference": reference, "run": number}
+        return remember(number, False)
 
 
 def normalize(value: str) -> str:
@@ -121,13 +146,7 @@ def normalize(value: str) -> str:
 
 
 def distance(a: Any, b: Any) -> int:
-    previous = list(range(len(b) + 1))
-    for i, x in enumerate(a, 1):
-        current = [i]
-        for j, y in enumerate(b, 1):
-            current.append(min(current[-1] + 1, previous[j] + 1, previous[j - 1] + (x != y)))
-        previous = current
-    return previous[-1]
+    return int(Levenshtein.distance(a, b))
 
 
 def metrics(hypothesis: str, reference: str | None) -> dict[str, Any]:
@@ -284,7 +303,14 @@ def evaluate(
             if old["request_hash"] != request_hash:
                 raise VoiceError("Ключ уже использован", "conflict", 409)
             return old["after_data"]
-        row(conn, "SELECT reference FROM submissions WHERE reference=:id FOR UPDATE", id=reference)
+        if not row(
+            conn, "SELECT reference FROM submissions WHERE reference=:id FOR UPDATE", id=reference
+        ):
+            raise VoiceError("Запись не найдена", "not_found", 404)
+        if not row(
+            conn, "SELECT 1 FROM runs WHERE submission=:id AND number=:n", id=reference, n=number
+        ):
+            raise VoiceError("Прогон не найден", "not_found", 404)
         current = row(
             conn,
             "SELECT * FROM asr_evaluations WHERE submission=:id AND run=:n",
@@ -328,6 +354,8 @@ def evaluate(
             "reference_text": command.reference_text,
             "note": command.note,
             "revision": command.revision + 1,
+            "candidates_digest": digest,
+            "models": {c["engine"]: c["revision"] for c in candidates},
         }
         execute(
             conn,
@@ -347,6 +375,12 @@ def evaluate(
             session=str(UUID(session)),
             hash=request_hash,
             before=encoded(current or {}),
-            after=encoded(after),
+            after=encoded(
+                {
+                    **after,
+                    "candidates_digest": digest,
+                    "models": {c["engine"]: c["revision"] for c in candidates},
+                }
+            ),
         )
         return after

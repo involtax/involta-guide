@@ -19,6 +19,7 @@ from .config import Settings
 from .contracts import LocationContext, SubmissionMetadata, SubmissionStatus
 from .db import database, encoded, execute, row, snapshot
 from .errors import VoiceError
+from .evaluation import AsrRun, Evaluation
 from .service import VoiceService
 from .worker import Worker
 
@@ -367,15 +368,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=dependencies,
         status_code=202,
     )
-    def asr_run(request: Request, reference: UUID, body: dict[str, Any]) -> Any:
+    def asr_run(request: Request, reference: UUID, body: AsrRun) -> Any:
         from .evaluation import queue_evaluation
 
         result = queue_evaluation(
             engine,
             settings,
             str(reference),
-            str(UUID(str(body.get("idempotency_key") or ""))),
-            bool(body.get("force", False)),
+            str(body.idempotency_key),
+            body.force,
         )
         audit_admin(request, "asr-evaluation-run", {"reference": str(reference)}, result)
         return result
@@ -384,15 +385,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         "/internal/v1/admin/submissions/{reference}/asr-runs/{number}/evaluation",
         dependencies=dependencies,
     )
-    def asr_vote(request: Request, reference: UUID, number: int, body: dict[str, Any]) -> Any:
-        from .evaluation import Evaluation, evaluate
+    def asr_vote(request: Request, reference: UUID, number: int, body: Evaluation) -> Any:
+        from .evaluation import evaluate
 
         session = request.headers.get("x-guide-session")
         if not session:
             raise HTTPException(403, "Требуется сессия редактора")
-        return evaluate(
-            engine, str(reference), number, Evaluation.model_validate(body), str(UUID(session))
-        )
+        return evaluate(engine, str(reference), number, body, str(UUID(session)))
 
     @app.get("/internal/v1/admin/settings", dependencies=dependencies)
     def get_settings() -> Any:

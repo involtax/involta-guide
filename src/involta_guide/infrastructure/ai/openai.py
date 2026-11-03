@@ -330,7 +330,7 @@ class OpenAIProvider:
         self.audit.record(
             job_id,
             "local_transcription_queued",
-            {"reference": reference, "provider": "local-whisper"},
+            {"reference": reference, "provider": "local-asr"},
         )
         deadline = time.monotonic() + 900
         while True:
@@ -341,7 +341,7 @@ class OpenAIProvider:
                     {
                         "reference": reference,
                         "text": result["transcript"],
-                        "provider": "local-whisper",
+                        "provider": "local-asr",
                     },
                 )
                 return str(result["transcript"])
@@ -349,7 +349,7 @@ class OpenAIProvider:
                 raise ProviderUnavailable("Локальное распознавание: " + str(result["error"]))
             if time.monotonic() > deadline:
                 raise ProviderUnavailable(
-                    "Whisper ещё обрабатывает запись; повтор использует то же задание"
+                    "Локальное ASR ещё обрабатывает запись; повтор использует то же задание"
                 )
             time.sleep(2)
             result = client.json(

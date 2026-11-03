@@ -71,6 +71,7 @@ def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
         "transcription": options(settings.model_copy(update={"transcription_model": selected})),
         "asr_models": {e: options(settings, e) for e in MODELS},
         "asr_beta": settings.asr_beta_enabled,
+        "fake_provider": settings.fake_provider,
         "schema_version": 1,
         "transcription_model": selected,
         "analysis_model": saved.get("analysis_model", settings.analysis_model),

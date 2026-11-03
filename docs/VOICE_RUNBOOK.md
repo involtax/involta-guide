@@ -13,7 +13,8 @@ flowchart LR
   VoiceAPI --> Audio[(Voice audio volume)]
   VoiceWorker --> VoiceDB
   VoiceWorker --> Audio
-  VoiceWorker --> OpenAI
+  VoiceWorker --> ASR[Local GigaAM + Parakeet]
+  VoiceWorker -->|optional text analysis| OpenAI
   Consumer -->|read events, ack after Guide commit| VoiceAPI
   Consumer --> GuideDB[(Guide reviews + inbox + decisions)]
 ```
@@ -30,7 +31,7 @@ port through the public site's nginx; the Guide gateway is the public boundary.
 Requirements: Python 3.13, uv, PostgreSQL 17, ffprobe. Docker is optional.
 
 ```bash
-uv sync --frozen
+uv sync --frozen --extra voice-local
 cp .env.voice.example .env.voice
 ```
 
@@ -46,11 +47,14 @@ curl --fail http://127.0.0.1:3100/health/ready
 
 For local fake processing set `VOICE_FAKE_PROVIDER=true` in `.env.voice` before
 starting. This mode explicitly returns test text and makes no OpenAI requests.
-For real processing set it to false and provide `OPENAI_API_KEY`.
+For real speech set it to false and prepare local models. `OPENAI_API_KEY` is
+required only for optional text analysis / trusted command interpretation.
+See [ASR_BETA.md](ASR_BETA.md) for pinned weights, two-model operation and hardware.
 Host-run processes instead use a separately provisioned PostgreSQL DB URL:
 
 ```bash
 uv run voice migrate
+uv run voice prepare-model
 uv run uvicorn involta_voice.main:create_app --factory --host 127.0.0.1 --port 3100 --no-access-log
 # Another terminal:
 uv run voice-worker
@@ -232,3 +236,14 @@ It provisions/removes only its uniquely named schema/Compose project/volumes,
 uses a fake provider and leaves generated temporary env files private for diagnosis.
 Free ports 33080, 13100 and 55439 first. If the runtime injects an HTTP proxy,
 include local/private service addresses in NO_PROXY.
+
+
+## GigaAM / Parakeet beta
+
+[ASR_BETA.md](ASR_BETA.md) supersedes the earlier Whisper proposal. Use both
+models for every new recording, including trusted admin speech, and explicitly
+backfill both Guide and Voice inventories. Human annotations and aggregate
+reporting are independent of package approval. This branch does not deploy or
+process production audio; synthetic inference is not real-voice acceptance.
+Model preparation must complete before the real worker starts. Full production
+rollout, inventory verification and live beta require a separate authorized run.

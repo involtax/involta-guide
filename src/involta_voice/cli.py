@@ -10,7 +10,16 @@ from .main import create_app, worker_health
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "command", choices=["migrate", "worker-health", "openapi", "orphan-audio", "prepare-model"]
+        "command",
+        choices=[
+            "migrate",
+            "worker-health",
+            "openapi",
+            "orphan-audio",
+            "prepare-model",
+            "asr-backfill",
+            "asr-report",
+        ],
     )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -30,6 +39,17 @@ def main() -> None:
     try:
         if args.command == "migrate":
             migrate(engine)
+        elif args.command in ("asr-backfill", "asr-report"):
+            from .beta import backfill, summary
+
+            result = (
+                backfill(engine, settings, args.execute)
+                if args.command == "asr-backfill"
+                else summary(engine, settings)
+            )
+            print(json.dumps(result, ensure_ascii=False, default=str))
+            if result.get("errors"):
+                raise SystemExit(1)
         else:
             # Intake holds this lock until commit; never remove a referenced/young file.
             from .db import execute

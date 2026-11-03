@@ -154,7 +154,7 @@ def main() -> None:
                 except Exception as exc:
                     report["errors"].append({"review_id": identity, "type": type(exc).__name__})
         print(json.dumps(report, ensure_ascii=False))
-        if report["errors"] or report["sha_mismatch"]:
+        if report["errors"] or report["sha_mismatch"] or report["missing_audio"]:
             raise SystemExit(1)
     finally:
         engine.dispose()

@@ -18,10 +18,10 @@ def test_transcription_survives_missing_analysis_key_without_audio_network(
     settings = settings.model_copy(
         update={"fake_provider": False, "openai_api_key": SecretStr(""), "daily_budget_usd": 0.01}
     )
-    from involta_voice.whisper import LocalWhisper
+    from involta_voice.asr import LocalAsr
 
     monkeypatch.setattr(
-        LocalWhisper,
+        LocalAsr,
         "call",
         lambda self, request, audio: {
             "status_code": 200,
@@ -69,7 +69,7 @@ def test_interrupted_local_inference_retries_without_cloud_unknown(voice_databas
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE stages SET request='{\"engine\":\"faster-whisper\"}'::jsonb,lease_until=now()-interval '1 second'"
+                "UPDATE stages SET request='{\"engine\":\"onnx-asr\"}'::jsonb,lease_until=now()-interval '1 second'"
             )
         )
     assert worker.once()

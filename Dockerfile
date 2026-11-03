@@ -27,7 +27,6 @@ FROM base AS runtime
 # ffprobe is required to measure uploaded audio; no compiler or uv in this stage.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates libgomp1 postgresql-client \
-
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 guide \
     && useradd --uid 10001 --gid 10001 --create-home --no-log-init \
@@ -38,7 +37,7 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 RUN chmod -R a+rX /app/.venv /app/data /app/migrations \
     && chmod a+r /app/alembic.ini \
-    && mkdir -p /app/var/audio /app/var/voice/audio /app/var/voice-models \
+    && mkdir -p /app/var/audio /app/var/voice/audio /app/var/asr-models \
     && chown -R guide:guide /app/var
 ENV PATH="/app/.venv/bin:$PATH" \
     ROOT_DIR=/app \

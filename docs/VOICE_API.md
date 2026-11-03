@@ -131,7 +131,7 @@ No proposals means no empty page version. See VOICE_REVIEW_REPORT.md.
 
 ## Local ASR and trusted Guide speech
 
-Speech is local faster-whisper; OpenAI receives text for optional analysis only.
+Speech is local GigaAM / Parakeet through ONNX Runtime; OpenAI receives text for optional analysis only.
 POST `/internal/v1/guide-transcriptions` is an authenticated internal multipart
 endpoint with `audio` + `SubmissionMetadata` JSON, returning the same status DTO.
 Its purpose is forced server-side. Guide/admin tasks use the single Voice worker,
@@ -139,5 +139,38 @@ have no analysis stage/outbox event, and never create a second imported review.
 They are hidden from visitor/admin review listings; original Guide session roles
 and command decisions stay in Guide. Actor `admin` is accepted only on this
 internal Guide route; ordinary submission routes still require actor `visitor`.
-See LOCAL_WHISPER.md for pinned weights, preparation and measured limits.
+See ASR_BETA.md for pinned weights, preparation and measured limits.
 No proposals means no page mutation. See VOICE_REVIEW_REPORT.md.
+
+
+## ASR beta contract
+
+New transcription runs schedule a primary `transcription` and independent
+`comparison` when `VOICE_ASR_BETA_ENABLED=true`. The primary defaults to GigaAM;
+failed primary can use Parakeet. Only one transcript/analysis event chain is
+emitted. Comparison errors are private stage diagnostics and never emit Guide
+processing_failed events. Admin Guide speech follows the same two-model protocol,
+without review import or another command execution. Migration 003 adds comparison
+results/annotations; existing transcripts/audio/raw logs remain intact.
+
+Private bearer-authenticated endpoints:
+
+* GET `/admin/submissions/{reference}/asr`: all ASR runs, two candidate states,
+  text/error, pinned revision, elapsed seconds, RTF, source engine, audio SHA,
+  candidate digest, human evaluation revision and WER/CER (null without reference).
+* POST `/admin/submissions/{reference}/asr-runs`:
+  `{"idempotency_key":"UUID","force":false}`. Default reuses a matching pair;
+  explicit force creates another retained comparison-only run. No active_run,
+  original transcript, analysis, moderation or command mutation. Same key with
+  different submission/force returns 409. Strict boolean, no unknown fields.
+* POST `/admin/submissions/{reference}/asr-runs/{number}/evaluation` requires
+  `X-Guide-Session: UUID` and `{idempotency_key, revision, candidates_digest,
+  preferred_engine:null|gigaam|parakeet, reference_text:null|string, note:string}`.
+  Stale revision/digest or changed idempotent payload returns 409. Preferred model
+  must have a successful candidate. Reference ≤30000 chars; note ≤2000. Stores
+  actor session, before/after, exact candidate digest/revisions separately from
+  review moderation. Does not apply or approve content.
+
+Guide exposes those operations only behind its existing admin cookie + CSRF;
+new beta routes do not grant admin privileges. See ASR_BETA.md for inventory,
+aggregate reporting, pinned models and the eventual single-model switch.

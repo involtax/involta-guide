@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from involta_voice.asr import MODELS, VAD, LocalAsr, model_path, options
 from involta_voice.config import Settings
 from involta_voice.provider import OpenAIProvider, ProviderFailure
-from involta_voice.whisper import LocalWhisper, model_path, options
 
 
 def settings(tmp_path):
@@ -14,7 +14,7 @@ def settings(tmp_path):
         _env_file=None,
         database_url="postgresql://test:test@localhost/test",
         service_secret="x" * 40,
-        whisper_models_dir=tmp_path,
+        asr_models_dir=tmp_path,
     )
 
 
@@ -27,49 +27,48 @@ def test_cloud_provider_refuses_audio_before_http(tmp_path):
 
     provider.client = httpx.Client(transport=httpx.MockTransport(deny))
     try:
-        with pytest.raises(ProviderFailure, match="локальным Whisper"):
+        with pytest.raises(ProviderFailure, match="локальным ASR"):
             provider.call("transcription", {}, b"private-audio", "audio/wav")
     finally:
         provider.close()
 
 
-def test_whisper_is_offline_russian_vad_and_empty_speech_is_not_invented(tmp_path):
-    config = settings(tmp_path)
+@pytest.mark.parametrize("engine", ["gigaam", "parakeet"])
+def test_asr_same_protocol_and_empty_speech_is_not_invented(tmp_path, monkeypatch, engine):
+    import numpy as np
+
+    from involta_voice import asr
+
+    config = settings(tmp_path).model_copy(update={"transcription_model": engine})
+    request = options(config)
     path = model_path(config)
-    path.mkdir(parents=True)
-    (path / "READY.json").write_text("{}")
-    local = LocalWhisper(config)
+    vad = config.asr_models_dir / "vad" / VAD["revision"]
+    for directory in (path, vad):
+        directory.mkdir(parents=True)
+        (directory / "READY.json").write_text("{}")
+    local = LocalAsr(config)
+    monkeypatch.setattr(asr, "decode", lambda audio: np.zeros(16000, dtype=np.float32))
 
     class Model:
         speech = True
 
-        def transcribe(self, audio, **kwargs):
-            assert kwargs["language"] == "ru" and kwargs["vad_filter"]
-            assert not kwargs["condition_on_previous_text"]
-            segment = SimpleNamespace(
-                start=0, end=1, text=" Было вкусно.", avg_logprob=-0.1, no_speech_prob=0.01
-            )
-            return iter([segment] if self.speech else []), SimpleNamespace(
-                language="ru", duration=2
-            )
+        def recognize(self, audio, **kwargs):
+            assert kwargs["sample_rate"] == 16000
+            return [SimpleNamespace(start=0, end=1, text=" Было вкусно.")] if self.speech else []
 
     local._model = Model()
-    local._signature = (
-        config.transcription_model,
-        options(config)["revision"],
-        "cpu",
-        "int8",
-        config.whisper_cpu_threads,
-    )
-    result = local.call(options(config), b"fixture")
-    assert json.loads(result["body"])["text"] == "Было вкусно."
+    local._signature = (engine, request["revision"], config.asr_cpu_threads)
+    result = json.loads(local.call(request, b"fixture")["body"])
+    assert result["text"] == "Было вкусно."
+    assert result["revision"] == MODELS[engine]["revision"]
+    assert result["pcm_sha256"] and result["audio_sha256"]
     local._model.speech = False
     with pytest.raises(ProviderFailure, match="Речь не обнаружена"):
-        local.call(options(config), b"fixture")
+        local.call(request, b"fixture")
 
 
 def test_model_is_prepared_explicitly_never_downloaded_during_upload(tmp_path):
-    local = LocalWhisper(settings(tmp_path))
+    local = LocalAsr(settings(tmp_path))
     with pytest.raises(ProviderFailure, match="prepare-model"):
         local.call(options(local.settings), b"fixture")
 
@@ -83,7 +82,7 @@ def test_real_browser_container_decoding_without_model_or_network(tmp_path, exte
     import subprocess
     import wave
 
-    from faster_whisper.audio import decode_audio
+    from involta_voice.asr import decode
 
     stream = io.BytesIO()
     with wave.open(stream, "wb") as wav:
@@ -98,5 +97,5 @@ def test_real_browser_container_decoding_without_model_or_network(tmp_path, exte
         capture_output=True,
         check=True,
     )
-    decoded = decode_audio(io.BytesIO(target.read_bytes()), sampling_rate=16000)
+    decoded = decode(target.read_bytes())
     assert 1.9 <= len(decoded) / 16000 <= 2.2

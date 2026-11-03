@@ -430,7 +430,7 @@ class Worker:
                 kind=stage["kind"],
                 token=stage["lease_token"],
             )
-            if updated and state in ("failed", "unknown"):
+            if updated and stage["kind"] == "analysis" and state in ("failed", "unknown"):
                 submission = row(
                     conn,
                     "SELECT transcript FROM submissions WHERE reference=:id",
@@ -496,11 +496,24 @@ class Worker:
                 )
                 execute(
                     conn,
-                    "UPDATE runs SET transcript=:text WHERE submission=:id AND number=:n",
+                    "UPDATE runs SET transcript=:text,transcription_engine=:engine WHERE submission=:id AND number=:n",
+                    engine=run["snapshot"].get("transcription_model"),
                     id=reference,
                     n=number,
                     text=transcript,
                 )
+                from .evaluation import save_candidate
+
+                saved_request = stage["request"] or run["snapshot"].get("transcription", {})
+                if saved_request.get("model") in ("gigaam", "parakeet"):
+                    save_candidate(
+                        conn,
+                        reference,
+                        number,
+                        saved_request,
+                        {**json.loads(raw["body"]), "is_fake": self.settings.fake_provider},
+                        submission,
+                    )
                 self.complete(conn, stage)
                 if submission["purpose"] == "guide_transcription":
                     return

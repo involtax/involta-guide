@@ -71,6 +71,9 @@ def routes(prefix: str) -> APIRouter:
                 "v": detail,
                 "remote": remote,
                 "asr_comparison": asr_comparison,
+                "asr_action": ctx.settings.path("/admin/voice/decision/" + review_id)
+                if review_id
+                else "",
                 "run_log": run is not None,
                 "pending_voice": pending,
                 "voice_settings": remote_settings,
@@ -98,7 +101,50 @@ def routes(prefix: str) -> APIRouter:
     def unimported(request: Request, reference: UUID) -> Response:
         require_admin(request)
         data = voice_client(request).json("GET", "/admin/submissions/" + str(reference))
-        return render(request, "voice_pending.html", {"tab": "voice", "pending": data})
+        comparison = voice_client(request).json(
+            "GET", "/admin/submissions/" + str(reference) + "/asr"
+        )
+        return render(
+            request,
+            "voice_pending.html",
+            {
+                "tab": "voice",
+                "pending": data,
+                "asr_comparison": comparison,
+                "new_key": lambda: str(uuid4()),
+                "asr_action": context(request).settings.path(
+                    "/admin/voice/submission/" + str(reference)
+                ),
+            },
+        )
+
+    def asr_action(request: Request, reference: str, form: FormData, session: Any) -> None:
+        action = str(form.get("action") or "")
+        if action not in ("asr-run", "asr-evaluate"):
+            raise HTTPException(400, "Неизвестное действие сравнения")
+        path = "/admin/submissions/" + reference + "/asr-runs"
+        payload: dict[str, Any] = {"idempotency_key": str(UUID(str(form.get("idempotency_key"))))}
+        if action == "asr-evaluate":
+            path += "/" + str(int(str(form.get("asr_run")))) + "/evaluation"
+            payload.update(
+                revision=int(str(form.get("asr_revision"))),
+                candidates_digest=str(form.get("candidates_digest") or ""),
+                preferred_engine=str(form.get("preferred_engine") or "") or None,
+                reference_text=str(form.get("reference_text") or "").strip() or None,
+                note=str(form.get("note") or ""),
+            )
+        else:
+            payload["force"] = form.get("force") == "yes"
+        voice_client(request).json("POST", path, json=payload, actor_session=session)
+
+    @router.post(base + "/submission/{reference}")
+    def unimported_action(
+        request: Request, reference: UUID, form: FormData = Depends(form_data)
+    ) -> Response:
+        principal = require_admin(request)
+        check_csrf(request, form)
+        asr_action(request, str(reference), form, principal["id"])
+        return RedirectResponse(base + "/submission/" + str(reference), status_code=303)
 
     @router.get(base + "/{slug}/{number}")
     def numbered(request: Request, slug: str, number: int) -> Response:
@@ -177,24 +223,7 @@ def routes(prefix: str) -> APIRouter:
                 reference = ensure_copy(
                     ctx.settings, ctx.engine, str(review_id), voice_client(request)
                 )
-            base_path = "/admin/submissions/" + reference + "/asr-runs"
-            payload: dict[str, Any] = {
-                "idempotency_key": str(UUID(str(form.get("idempotency_key"))))
-            }
-            if action == "asr-evaluate":
-                base_path += "/" + str(int(str(form.get("asr_run")))) + "/evaluation"
-                payload.update(
-                    revision=int(str(form.get("asr_revision"))),
-                    candidates_digest=str(form.get("candidates_digest") or ""),
-                    preferred_engine=str(form.get("preferred_engine") or "") or None,
-                    reference_text=str(form.get("reference_text") or "").strip() or None,
-                    note=str(form.get("note") or ""),
-                )
-            else:
-                payload["force"] = form.get("force") == "yes"
-            voice_client(request).json(
-                "POST", base_path, json=payload, actor_session=principal["id"]
-            )
+            asr_action(request, reference, form, principal["id"])
             return RedirectResponse(ctx.settings.path(detail["path"]), status_code=303)
         if action in ("new-run", "revalidate"):
             if not detail["link"]:

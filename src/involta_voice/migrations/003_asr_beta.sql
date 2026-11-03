@@ -19,3 +19,7 @@ CREATE TABLE asr_evaluation_events (
  created_at timestamptz NOT NULL DEFAULT now(),FOREIGN KEY(submission,run) REFERENCES runs(submission,number)
 );
 INSERT INTO voice_schema_versions VALUES(3);
+CREATE TABLE asr_run_requests (
+ id uuid PRIMARY KEY, submission uuid NOT NULL, run integer NOT NULL, force boolean NOT NULL,
+ FOREIGN KEY(submission,run) REFERENCES runs(submission,number)
+);

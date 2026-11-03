@@ -25,6 +25,8 @@ MODELS: dict[str, dict[str, Any]] = {
             "v3_e2e_rnnt_decoder.int8.onnx",
             "v3_e2e_rnnt_joint.int8.onnx",
             "v3_e2e_rnnt_vocab.txt",
+            "README.md",
+            "LICENSE.txt",
         ],
     },
     "parakeet": {
@@ -38,13 +40,14 @@ MODELS: dict[str, dict[str, Any]] = {
             "encoder-model.int8.onnx",
             "decoder_joint-model.int8.onnx",
             "vocab.txt",
+            "README.md",
         ],
     },
 }
 VAD = {
     "repository": "istupakov/silero-vad-onnx",
     "revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
-    "files": ["config.json", "silero_vad.onnx"],
+    "files": ["config.json", "silero_vad.onnx", "README.md", "LICENSE.txt"],
 }
 
 

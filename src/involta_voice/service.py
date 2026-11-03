@@ -204,8 +204,9 @@ class VoiceService:
                 return {"reference": reference, "run": previous["number"], "state": "accepted"}
             active = row(
                 conn,
-                "SELECT 1 FROM stages WHERE submission=:id AND kind IN ('transcription','analysis') AND state IN ('queued','running')",
+                "SELECT 1 FROM stages WHERE submission=:id AND (kind IN ('transcription','analysis') OR (:need_text AND kind='comparison')) AND state IN ('queued','running')",
                 id=reference,
+                need_text=submission["transcript"] is None,
             )
             if active:
                 raise VoiceError("Обработка уже выполняется", "conflict", 409)
@@ -258,6 +259,14 @@ class VoiceService:
             ),
             None,
         )
+        fallback_pending = any(
+            s["run"] == submission["active_run"]
+            and s["kind"] == "comparison"
+            and s["state"] in ("queued", "running")
+            for s in stages
+        )
+        if failed and failed["kind"] == "transcription" and fallback_pending:
+            failed = None
         if archived:
             state = "archived"
         elif failed:
