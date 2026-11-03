@@ -236,3 +236,19 @@ def test_transition_adopts_last_saved_state_without_deleting_history(database):
     assert row["published_version"] == row["draft_version"] == last
     assert queries.get("versions", first)["content"]["intro"] == CONTENT["intro"]
     assert queries.public(city["slug"])["content"]["intro"] == "Последний сохранённый текст"
+
+
+def test_history_restore_recovers_star_in_current_restaurant_record(database):
+    editor, queries, factory = services(database)
+    city = queries.directory(query="Иваново")["rows"][0]
+    original = editor.save(city["id"], deepcopy(CONTENT), None)
+    card = queries.location(city["id"])["content"]["restaurants"][0]
+    with factory() as uow:
+        uow.repo.change("restaurants", card["id"], {"alex_star": True})
+    changed = editor.save(city["id"], queries.location(city["id"])["content"], original)
+    assert queries.public(city["slug"])["content"]["restaurants"][0]["alexStar"]
+    restored = editor.restore(city["id"], original, changed)
+    assert queries.get("locations", city["id"])["published_version"] == restored
+    assert not queries.get("restaurants", card["id"])["alex_star"]
+    assert not queries.public(city["slug"])["content"]["restaurants"][0]["alexStar"]
+    assert queries.get("versions", changed)["content"]["restaurants"][0]["alexStar"]
