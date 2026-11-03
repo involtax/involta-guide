@@ -135,9 +135,10 @@ It pauses the Guide consumer during conversion/restore, preserving the separate 
 outbox and database. See CURRENT_STATE.md. The steps below describe feature rollback
 within a compatible Guide schema.
 
-1. Disable `VOICE_ENABLED` and restart Guide web. This only routes new uploads
-   back to the compatible widget; do not stop Voice worker/consumer for already
-   accepted submissions.
+1. Disable `VOICE_ENABLED` and restart Guide web to pause new visitor submissions.
+   The same widget shows an explicit unavailable response and retains unsent audio;
+   administrator commands continue in Guide. Do not stop Voice worker/consumer for
+   already accepted submissions.
 2. Keep the service URL/secret configured so new imported history/audio remains
    readable. Additive tables/fields remain; do not downgrade/drop migrations.
 3. Old queued/running Guide reviews stay with guide-worker; Voice submissions
@@ -247,3 +248,24 @@ reporting are independent of package approval. This branch does not deploy or
 process production audio; synthetic inference is not real-voice acceptance.
 Model preparation must complete before the real worker starts. Full production
 rollout, inventory verification and live beta require a separate authorized run.
+
+
+## Beta upload diagnostics (one widget)
+
+The city page renders one Voice widget for both visitors and administrators. Its beta
+panel shows request ID, timing, HTTP status/headers and the full response body, including
+HTML proxy errors. The browser keeps unsent audio in IndexedDB and offers a download;
+refreshing restores the same recording/key. Retry does not execute an admin command twice.
+
+`VOICE_DEBUG_ENABLED=true` (beta default) records server receive/response events in the
+existing Guide audit table. The widget also uploads its transport report to that same
+journal, so a proxy HTML response is observable even when upload never reached Guide.
+A debug delivery failure is displayed locally and does not turn an accepted upload into
+failure. No new database or log entity is introduced; audio and credentials are excluded.
+
+Read `GET /guide/voice/api/v1/debug/{request_id}` with the owner/admin cookie, or run the
+protected existing production inspection workflow (`inspect_only`) to read recent upload
+audit entries. Reports submitted by browsers are marked `stage=browser` and are untrusted.
+Do not use a real visitor recording as a deployment probe: it queues paid optional analysis.
+Use deliberately invalid audio bytes to verify transport/400 JSON; isolated tests exercise
+successful saves, both roles, lost responses, concurrent retries and retained audio.
