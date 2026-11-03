@@ -62,6 +62,7 @@ def routes(prefix: str) -> APIRouter:
             {
                 "tab": "voice",
                 "queue": listing,
+                "consumer_health": read.consumer_health(),
                 "v": detail,
                 "remote": remote,
                 "run_log": run is not None,
@@ -220,7 +221,7 @@ def routes(prefix: str) -> APIRouter:
                 ctx.settings.path(detail["path"]) + "?message=Обработка+запрошена", status_code=303
             )
         changes: dict[str, Any] = {}
-        if action == "approve-proposal":
+        if action == "edit-proposal":
             for name in ("name", "cuisine", "description", "mapsUrl", "phone"):
                 if name in form:
                     changes[name] = str(form.get(name) or "").strip()
@@ -285,6 +286,7 @@ def routes(prefix: str) -> APIRouter:
             if form.get("page_revision")
             else None,
             changes=changes,
+            affected_revisions=json.loads(str(form.get("affected_revisions") or "{}")),
             run=int(str(form.get("run"))) if form.get("run") else None,
             fragment_number=int(str(form.get("fragment_number")))
             if form.get("fragment_number") is not None

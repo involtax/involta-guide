@@ -1,0 +1,221 @@
+{
+  "services": {
+    "voice-db": {
+      "image": "${VOICE_POSTGRES_IMAGE:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "network_mode": "host",
+      "environment": {
+        "POSTGRES_USER": "voice",
+        "POSTGRES_DB": "voice",
+        "POSTGRES_PASSWORD": "${VOICE_POSTGRES_PASSWORD:?}"
+      },
+      "volumes": [
+        "voice-postgres:/var/lib/postgresql/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 55439 -U voice -d voice"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 30
+      },
+      "restart": "unless-stopped",
+      "command": [
+        "postgres",
+        "-p",
+        "55439",
+        "-c",
+        "listen_addresses=127.0.0.1"
+      ]
+    },
+    "voice-migrate": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "no",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "network_mode": "host",
+      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice"
+      },
+      "volumes": [
+        "voice-audio:/app/var/voice"
+      ],
+      "command": [
+        "voice",
+        "migrate"
+      ],
+      "depends_on": {
+        "voice-db": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "voice-api": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "unless-stopped",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "network_mode": "host",
+      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice"
+      },
+      "volumes": [
+        "voice-audio:/app/var/voice"
+      ],
+      "command": [
+        "uvicorn",
+        "involta_voice.main:create_app",
+        "--factory",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "13100",
+        "--no-access-log",
+        "--no-proxy-headers"
+      ],
+      "depends_on": {
+        "voice-migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:13100/health/ready',timeout=3)"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 12
+      }
+    },
+    "voice-worker": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "unless-stopped",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "network_mode": "host",
+      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice"
+      },
+      "volumes": [
+        "voice-audio:/app/var/voice"
+      ],
+      "command": [
+        "voice-worker"
+      ],
+      "stop_grace_period": "120s",
+      "depends_on": {
+        "voice-migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "voice",
+          "worker-health"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 4
+      }
+    },
+    "voice-consumer": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "unless-stopped",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "network_mode": "host",
+      "env_file": "${DEPLOY_ROOT:?}/.env.production",
+      "environment": {
+        "VOICE_URL": "http://127.0.0.1:13100"
+      },
+      "command": [
+        "guide-voice-consumer"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "guide",
+          "voice-consumer-health"
+        ],
+        "interval": "15s",
+        "timeout": "5s",
+        "retries": 4
+      },
+      "depends_on": {
+        "voice-api": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "web": {
+      "environment": {
+        "VOICE_URL": "http://127.0.0.1:13100"
+      }
+    }
+  },
+  "volumes": {
+    "voice-postgres": {},
+    "voice-audio": {}
+  }
+}

@@ -2,36 +2,17 @@ import copy
 import hashlib
 import json
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Engine
 from sqlalchemy import text as sql_text
 
 from involta_guide.application.commands.schemas import RestaurantInput
+from involta_guide.application.commands.voice import Decision as Decision
 from involta_guide.application.services.editorial import current_content, require, save
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_voice.db import encoded, execute, row
-
-
-class Decision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    idempotency_key: UUID
-    review_revision: int = Field(ge=1)
-    processing_run: int = Field(ge=0)
-    action: str
-    reason: str = Field(default="", max_length=2000)
-    text: str | None = Field(default=None, max_length=30000)
-    restaurant_id: UUID | None = None
-    proposal_id: UUID | None = None
-    proposal_revision: int | None = None
-    page_revision: UUID | None = None
-    changes: dict[str, Any] = Field(default_factory=dict)
-    run: int | None = None
-    fragment_number: int | None = Field(default=None, ge=0)
-    version_id: UUID | None = None
-    published_revision: UUID | None = None
 
 
 class VoiceEditorial:
@@ -68,6 +49,7 @@ class VoiceEditorial:
             review = require(repo, "reviews", review_id)
             if review["alex_session_id"] or review.get("admin_session_id"):
                 raise RuleViolation("Редакторская голосовая команда обрабатывается отдельно")
+            execute(conn, "SELECT id FROM locations ORDER BY id FOR UPDATE")
             location = require(repo, "locations", review["location_id"], lock=True)
             review = require(repo, "reviews", review_id, lock=True)
             text = require(repo, "review_texts", review_id, lock=True)
@@ -75,12 +57,7 @@ class VoiceEditorial:
             active = link["active_run"] if link else 0
             if command.review_revision != text["revision"] or command.processing_run != active:
                 raise Conflict("Отзыв или выбранная обработка изменились. Обновите сравнение.")
-            candidate = row(
-                conn, "SELECT * FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
-            )
-            page_revision = (
-                str(candidate["version_id"]) if candidate else location["published_version"]
-            )
+            page_revision = location["published_version"]
             before = {
                 "text": copy.deepcopy(text),
                 "moderation": review["moderation"],
@@ -168,87 +145,16 @@ class VoiceEditorial:
                                 if binding_row["restaurant_id"]
                                 else None
                             )
+                if command.action == "approve":
+                    if review["moderation"] != "pending":
+                        raise Conflict("Пакет уже рассмотрен")
+                    result.update(
+                        self.apply_package(repo, conn, review_id, location, active, command, before)
+                    )
+                    repo.change("review_texts", review_id, {"public": True})
                 repo.change("reviews", review_id, values)
                 if command.action != "approve":
                     repo.change("review_texts", review_id, {"public": False})
-            elif command.action == "publish-text":
-                if review["moderation"] != "approved" or review["fraud"]:
-                    raise RuleViolation("Сначала примите отзыв")
-                repo.change("review_texts", review_id, {"public": True})
-            elif command.action == "hide-text":
-                repo.change("review_texts", review_id, {"public": False})
-            elif command.action == "publish-page":
-                if review["moderation"] != "approved" or review["fraud"]:
-                    raise RuleViolation("Сначала примите отзыв")
-                target = str(command.version_id) if command.version_id else None
-                expected_page = str(command.page_revision) if command.page_revision else None
-                expected_published = (
-                    str(command.published_revision) if command.published_revision else None
-                )
-                if not candidate or expected_page != page_revision or target != expected_page:
-                    raise Conflict("Черновик изменился. Обновите сравнение.")
-                if not any(
-                    r["version_id"] == target
-                    for r in repo.rows("version_reviews", {"review_id": review_id})
-                ):
-                    raise RuleViolation("Версия не связана с этим отзывом")
-                before["published_content"] = (
-                    require(repo, "versions", location["published_version"])["content"]
-                    if location["published_version"]
-                    else None
-                )
-                assert target is not None
-                base = str(candidate["base_version"]) if candidate["base_version"] else None
-                if (
-                    expected_published != location["published_version"]
-                    or base != expected_published
-                ):
-                    raise Conflict(
-                        "Страница изменилась после подготовки правок. Сбросьте черновик и проверьте предложения заново."
-                    )
-                if row(
-                    conn,
-                    "SELECT 1 FROM version_reviews v JOIN reviews r ON r.id=v.review_id WHERE v.version_id=:version AND (r.moderation<>'approved' OR r.fraud<>0)",
-                    version=target,
-                ):
-                    raise RuleViolation(
-                        "Один из отзывов черновика отклонён или помечен фродом; сбросьте правки"
-                    )
-                content = require(repo, "versions", target)["content"]
-                published = save(repo, location["id"], content, expected_published, source="review")
-                repo.inherit_reviews(target, published)
-                execute(
-                    conn, "DELETE FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
-                )
-                result.update(published_version=published, published_content=content)
-            elif command.action == "discard-page":
-                expected = str(command.page_revision) if command.page_revision else None
-                if not candidate or expected != page_revision:
-                    raise Conflict("Черновик изменился")
-                before["candidate"] = require(repo, "versions", page_revision)["content"]
-                execute(
-                    conn, "DELETE FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
-                )
-                before["candidate_proposals"] = [
-                    dict(r)
-                    for r in conn.execute(
-                        sql_text(
-                            "SELECT p.id,p.status FROM proposals p JOIN voice_candidate_proposals v ON v.proposal_id=p.id WHERE v.version_id=:version"
-                        ),
-                        {"version": page_revision},
-                    ).mappings()
-                ]
-                execute(
-                    conn,
-                    "UPDATE voice_proposals SET revision=revision+1 WHERE proposal_id IN (SELECT proposal_id FROM voice_candidate_proposals WHERE version_id=:version)",
-                    version=page_revision,
-                )
-                # Keep snapshots/journal, but permit a fresh comparison of discarded proposals.
-                execute(
-                    conn,
-                    "UPDATE proposals SET status='pending' WHERE id IN (SELECT proposal_id FROM voice_candidate_proposals WHERE version_id=:version) AND status='approved'",
-                    version=page_revision,
-                )
             elif command.action == "activate-run":
                 if (
                     not link
@@ -263,131 +169,35 @@ class VoiceEditorial:
                     raise RuleViolation("Нет результата выбранной обработки")
                 repo.change("voice_links", review_id, {"active_run": command.run})
                 result["active_run"] = command.run
-            elif command.action in ("approve-proposal", "reject-proposal"):
-                if command.proposal_id is None:
-                    raise RuleViolation("Выберите предложение")
+            elif command.action in ("edit-proposal", "exclude-proposal"):
+                if review["moderation"] != "pending":
+                    raise Conflict("Решение уже принято; результат не редактируется")
                 proposal = require(repo, "proposals", str(command.proposal_id), lock=True)
                 info = repo.get("voice_proposals", str(command.proposal_id), lock=True)
-                if info is None:
-                    if link or proposal["review_id"] != review_id:
-                        raise Conflict("Предложение не относится к выбранной обработке")
-                    ordinal = row(
-                        conn,
-                        "SELECT coalesce(max(number),-1)+1 n FROM voice_proposals WHERE review_id=:id AND run=0",
-                        id=review_id,
-                    )
-                    info = repo.add(
-                        "voice_proposals",
-                        {
-                            "proposal_id": proposal["id"],
-                            "review_id": review_id,
-                            "run": 0,
-                            "number": ordinal["n"] if ordinal else 0,
-                        },
-                    )
-                if (
-                    proposal["review_id"] != review_id
-                    or info["run"] != active
-                    or info["revision"] != command.proposal_revision
-                    or proposal["status"] != "pending"
+                if proposal["review_id"] != review_id or (
+                    info
+                    and (info["run"] != active or info["revision"] != command.proposal_revision)
                 ):
-                    raise Conflict("Предложение изменилось или относится к другой обработке")
-                before["proposal"] = {
-                    "proposal": copy.deepcopy(proposal),
-                    "revision": info["revision"],
-                }
-                if command.action == "approve-proposal":
-                    if review["moderation"] != "approved" or review["fraud"]:
-                        raise RuleViolation("Сначала примите отзыв; фрод не применяется")
-                    expected = str(command.page_revision) if command.page_revision else None
-                    if expected != page_revision:
-                        raise Conflict("Страница изменилась. Обновите сравнение.")
-                    allowed = {"name", "cuisine", "description", "mapsUrl", "phone", "openingHours"}
-                    changes = command.changes
-                    if set(changes) - allowed:
-                        raise RuleViolation("Неизвестное поле изменения")
-                    payload = proposal["payload"]
-                    target = (
-                        str(command.restaurant_id)
-                        if command.restaurant_id
-                        else payload.get("restaurantId")
-                    )
-                    if (
-                        candidate
-                        and (str(candidate["base_version"]) if candidate["base_version"] else None)
-                        != location["published_version"]
-                    ):
-                        raise Conflict(
-                            "Страница изменилась после подготовки правок. Сначала сбросьте черновик."
-                        )
-                    content = (
-                        copy.deepcopy(require(repo, "versions", page_revision)["content"])
-                        if candidate
-                        else current_content(repo, location)
-                    )
-                    current = next(
-                        (r for r in content["restaurants"] if r.get("id") == target), None
-                    )
-                    if proposal["kind"] == "edit" and current is None:
-                        raise RuleViolation("Выберите ресторан текущей страницы для правки")
-                    original = {
-                        k: v
-                        for k, v in (current or {}).items()
-                        if k in RestaurantInput.model_fields
-                    }
-                    final = {**original, **changes}
-                    if final.get("phone") is None:
-                        final["phone"] = ""
-                    validated = RestaurantInput.model_validate(final).model_dump(mode="json")
-                    if current is None:
-                        if not validated["phone"]:
-                            raise RuleViolation(
-                                "Заполните телефон; предложение остаётся сохранённым"
-                            )
-                        content["restaurants"].append(validated)
-                    else:
-                        current.update(validated)
-                    version = str(uuid4())
-                    repo.add(
-                        "versions",
-                        {
-                            "id": version,
-                            "location_id": location["id"],
-                            "content": content,
-                            "source": "voice_candidate",
-                            "number": repo.next_version(location["id"]),
-                            "published": 0,
-                        },
-                    )
-                    if candidate:
-                        repo.inherit_reviews(page_revision, version)
-                        execute(
-                            conn,
-                            "INSERT INTO voice_candidate_proposals(version_id,proposal_id) SELECT :version,proposal_id FROM voice_candidate_proposals WHERE version_id=:previous",
-                            version=version,
-                            previous=page_revision,
-                        )
-                    execute(
-                        conn,
-                        "INSERT INTO voice_candidate_proposals(version_id,proposal_id) VALUES(:version,:proposal)",
-                        version=version,
-                        proposal=proposal["id"],
-                    )
-                    execute(
-                        conn,
-                        "INSERT INTO voice_page_drafts(location_id,version_id,base_version) VALUES(:id,:version,:base) ON CONFLICT(location_id) DO UPDATE SET version_id=excluded.version_id",
-                        id=location["id"],
-                        version=version,
-                        base=location["published_version"],
-                    )
-                    repo.link("version_reviews", {"version_id": version, "review_id": review_id})
-                    result.update(version_id=version, changes=changes)
+                    raise Conflict("Пакет изменился")
+                before["proposal"] = copy.deepcopy(proposal)
+                payload = copy.deepcopy(proposal["payload"])
+                if command.action == "edit-proposal":
+                    payload["changes"] = command.changes
+                    if command.restaurant_id:
+                        payload["restaurantId"] = str(command.restaurant_id)
                 repo.change(
                     "proposals",
                     proposal["id"],
-                    {"status": "approved" if command.action == "approve-proposal" else "rejected"},
+                    {
+                        "payload": payload,
+                        "status": "rejected" if command.action == "exclude-proposal" else "pending",
+                    },
                 )
-                repo.change("voice_proposals", proposal["id"], {"revision": info["revision"] + 1})
+                if info:
+                    repo.change(
+                        "voice_proposals", proposal["id"], {"revision": info["revision"] + 1}
+                    )
+                result["proposal_after"] = repo.get("proposals", proposal["id"])
             else:
                 raise RuleViolation("Неизвестное действие")
             repo.change("review_texts", review_id, {"revision": text["revision"] + 1})
@@ -438,4 +248,98 @@ class VoiceEditorial:
                 result=encoded(result),
                 reason=command.reason,
             )
-            return result
+            return json.loads(encoded(result))
+
+    def apply_package(
+        self,
+        repo: Any,
+        conn: Any,
+        review_id: str,
+        location: dict[str, Any],
+        active: int,
+        command: Decision,
+        before: dict[str, Any],
+    ) -> dict[str, Any]:
+        proposals = [
+            dict(p)
+            for p in conn.execute(
+                sql_text(
+                    "SELECT p.* FROM proposals p LEFT JOIN voice_proposals v ON v.proposal_id=p.id WHERE p.review_id=:id AND p.status='pending' AND coalesce(v.run,0)=:run ORDER BY p.id FOR UPDATE OF p"
+                ),
+                {"id": review_id, "run": active},
+            ).mappings()
+        ]
+        expected = str(command.page_revision) if command.page_revision else None
+        if proposals and expected != location["published_version"]:
+            raise Conflict("Страница изменилась. Обновите сравнение.")
+        content = current_content(repo, location)
+        before["content"] = copy.deepcopy(content)
+        before["package"] = copy.deepcopy(proposals)
+        changed_ids = set()
+        for proposal in proposals:
+            payload = proposal["payload"]
+            changes = payload.get("changes", {})
+            if set(changes) - {
+                "name",
+                "cuisine",
+                "description",
+                "mapsUrl",
+                "phone",
+                "openingHours",
+            }:
+                raise RuleViolation("Недопустимое поле пакета")
+            target = payload.get("restaurantId")
+            current = next((r for r in content["restaurants"] if r.get("id") == target), None)
+            if proposal["kind"] == "edit" and current is None:
+                raise RuleViolation("Ресторан правки не найден")
+            original = {
+                k: v for k, v in (current or {}).items() if k in RestaurantInput.model_fields
+            }
+            final = {**original, **changes}
+            if final.get("phone") is None:
+                final["phone"] = ""
+            validated = RestaurantInput.model_validate(final).model_dump(mode="json")
+            if current is None:
+                if not validated["phone"]:
+                    raise RuleViolation("Для нового ресторана нужен телефон")
+                content["restaurants"].append(validated)
+            else:
+                changed_ids.add(current["id"])
+                current.update(validated)
+        # Shared cards affect all linked cities. Lock and snapshot every affected page
+        # before writing global restaurant fields; history is never overlaid at read time.
+        affected = [
+            dict(r)
+            for r in conn.execute(
+                sql_text(
+                    "SELECT DISTINCT l.* FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE x.restaurant_id = ANY(CAST(:ids AS uuid[])) AND l.id<>:id ORDER BY l.id"
+                ),
+                {"ids": list(changed_ids), "id": location["id"]},
+            ).mappings()
+        ]
+        if affected and {
+            str(item["id"]): str(item["published_version"]) if item["published_version"] else None
+            for item in affected
+        } != {
+            str(item["id"]): command.affected_revisions.get(str(item["id"])) for item in affected
+        }:
+            raise Conflict("Связанные страницы изменились. Обновите сравнение.")
+        before["affected"] = {str(item["id"]): current_content(repo, item) for item in affected}
+        versions = {}
+        if content != before["content"]:
+            version = save(repo, location["id"], content, expected, source="review")
+            repo.link("version_reviews", {"version_id": version, "review_id": review_id})
+            versions[location["id"]] = version
+            for other in affected:
+                version = save(
+                    repo,
+                    str(other["id"]),
+                    current_content(repo, other),
+                    str(other["published_version"]) if other["published_version"] else None,
+                    source="review",
+                )
+                repo.link("version_reviews", {"version_id": version, "review_id": review_id})
+                versions[str(other["id"])] = version
+        for proposal in proposals:
+            repo.change("proposals", proposal["id"], {"status": "approved"})
+        return {"versions": versions, "applied_package": proposals, "content_after": content}

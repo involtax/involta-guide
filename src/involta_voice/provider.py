@@ -21,7 +21,7 @@ class OpenAIProvider:
     def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
         key = self.settings.openai_api_key.get_secret_value()
         if not key:
-            raise ProviderFailure("VOICE_OPENAI_API_KEY не настроен")
+            raise ProviderFailure("OPENAI_API_KEY не настроен")
         headers = {"Authorization": "Bearer " + key}
         try:
             if kind == "transcription":

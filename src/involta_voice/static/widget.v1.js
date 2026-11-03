@@ -131,7 +131,7 @@
           if (!disposed) fail(e.message || "Связь прервалась. Повторите отправку этой записи.");
         }
       }
-      const labels = { pending: "Ожидает редактора", approved: "Принято", rejected: "Отклонено", fraud: "Помечено как фрод", draft: "Изменения в черновике", published: "Опубликовано" };
+      const labels = { pending: "Ожидает редактора", approved: "Принято", rejected: "Отклонено", fraud: "Помечено как фрод", published: "Опубликовано" };
       function schedule() { clearTimeout(poll); if (!disposed) poll = setTimeout(pollStatus, delay); }
       async function pollStatus() {
         if (disposed) return;

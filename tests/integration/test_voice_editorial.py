@@ -1,5 +1,5 @@
 import hashlib
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -77,19 +77,20 @@ def test_admin_ui_moderates_text_without_analysis_and_guards_stale_screen(databa
         assert decide("edit-text", 1, text="Редакторская пунктуация.").status_code == 200
         assert decide("approve", 1).status_code == 409
         assert decide("approve", 2).status_code == 200
-        assert "Редакторская пунктуация." not in client.get("/guide/ivanovo").text
-        assert decide("publish-text", 3).status_code == 200
         assert "Редакторская пунктуация." in client.get("/guide/ivanovo").text
-        assert decide("reject", 4).status_code == 200
+        assert decide("reject", 3).status_code == 200
         assert "Редакторская пунктуация." not in client.get("/guide/ivanovo").text
         assert client.get("/guide/logs/" + ref).status_code == 404
     assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
     assert queries.get("reviews", ref)["moderation"] == "rejected"
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 4
+        assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 3
 
 
-def test_proposal_partial_acceptance_detects_page_conflict_and_preserves_other_actions(database):
+@pytest.mark.parametrize("repair", [False, True])
+def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_application(
+    database, repair
+):
     settings, engine, uow, queries, city, ref, event = imported(database)
     editor = EditorialService(uow)
     version = editor.save(city["id"], CONTENT, None)
@@ -132,91 +133,65 @@ def test_proposal_partial_acceptance_detects_page_conflict_and_preserves_other_a
         Security(settings, uow).login("test-password-123456", "test")
     )
     service = VoiceEditorial(engine)
-    service.decide(
-        ref,
-        Decision(idempotency_key=uuid4(), review_revision=1, processing_run=1, action="approve"),
-        principal["id"],
-    )
     proposals = queries.rows("proposals", {"review_id": ref})
-    proposal = next(p for p in proposals if p["kind"] == "edit")
-    stale = Decision(
+    command = Decision(
         idempotency_key=uuid4(),
         review_revision=2,
         processing_run=1,
-        action="approve-proposal",
-        proposal_id=proposal["id"],
-        proposal_revision=1,
+        action="approve",
         page_revision=version,
-        changes={"phone": "+74951234568"},
     )
-    newer = editor.save(city["id"], queries.location(city["id"])["content"], version)
-    with pytest.raises(Conflict):
-        service.decide(ref, stale, principal["id"])
-    assert queries.get("proposals", proposal["id"])["status"] == "pending"
-    result = service.decide(
-        ref,
-        stale.model_copy(update={"idempotency_key": uuid4(), "page_revision": UUID(newer)}),
-        principal["id"],
-    )
-    assert result["version_id"] != version
-    assert queries.get("locations", city["id"])["published_version"] == newer
-    assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] != "+74951234568"
-    assert (
-        queries.get("versions", result["version_id"])["content"]["restaurants"][0]["phone"]
-        == "+74951234568"
-    )
-    published = service.decide(
+    from pydantic import ValidationError
+
+    with pytest.raises((ValidationError, ValueError)):
+        service.decide(ref, command, principal["id"])
+    assert queries.get("locations", city["id"])["published_version"] == version
+    assert all(p["status"] == "pending" for p in queries.rows("proposals"))
+    assert queries.get("reviews", ref)["moderation"] == "pending"
+    invalid = next(p for p in proposals if p["kind"] == "restaurant")
+    service.decide(
         ref,
         Decision(
             idempotency_key=uuid4(),
-            review_revision=3,
+            review_revision=2,
             processing_run=1,
-            action="publish-page",
-            page_revision=result["version_id"],
-            version_id=result["version_id"],
-            published_revision=newer,
+            action="edit-proposal" if repair else "exclude-proposal",
+            changes={
+                **{
+                    k: v
+                    for k, v in CONTENT["restaurants"][0].items()
+                    if k in {"name", "cuisine", "description", "mapsUrl", "phone", "openingHours"}
+                },
+                "name": "Новое место",
+                "phone": "+74951234569",
+            }
+            if repair
+            else {},
+            proposal_id=invalid["id"],
+            proposal_revision=1,
         ),
         principal["id"],
     )
-    assert (
-        queries.get("locations", city["id"])["published_version"] == published["published_version"]
-    )
+    with pytest.raises(Conflict):
+        service.decide(ref, command, principal["id"])
+    newer = editor.save(city["id"], queries.location(city["id"])["content"], version)
+    command = command.model_copy(update={"review_revision": 3})
+    with pytest.raises(Conflict):
+        service.decide(ref, command, principal["id"])
+    command = command.model_copy(update={"page_revision": __import__("uuid").UUID(newer)})
+    result = service.decide(ref, command, principal["id"])
+    assert service.decide(ref, command, principal["id"]) == result
+    assert len(queries.location(city["id"])["content"]["restaurants"]) == (2 if repair else 1)
+    assert queries.get("locations", city["id"])["published_version"] != newer
     assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
+    assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM voice_page_drafts")).scalar_one() == 0
         assert (
             conn.execute(
-                text("SELECT count(*) FROM review_decisions WHERE action='publish-page'")
+                text("SELECT count(*) FROM review_decisions WHERE action='approve'")
             ).scalar_one()
             == 1
         )
-    assert (
-        next(p for p in queries.rows("proposals") if p["kind"] == "restaurant")["status"]
-        == "pending"
-    )
-    assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
-    from starlette.requests import Request
-
-    from involta_guide.web.routes.voice import editorial_status
-
-    app = create_app(settings)
-    request = Request({"type": "http", "app": app, "headers": []})
-    try:
-        assert (
-            editorial_status(request, ref, event["metadata"]["visitor"])["editorial_state"]
-            == "published"
-        )
-        service.decide(
-            ref,
-            Decision(idempotency_key=uuid4(), review_revision=4, processing_run=1, action="reject"),
-            principal["id"],
-        )
-        assert (
-            editorial_status(request, ref, event["metadata"]["visitor"])["editorial_state"]
-            == "rejected"
-        )
-    finally:
-        app.state.context.engine.dispose()
 
 
 def test_admin_cookie_marks_trusted_voice_and_shortcut_sets_same_admin_cookie(database):
@@ -242,3 +217,45 @@ def test_admin_cookie_marks_trusted_voice_and_shortcut_sets_same_admin_cookie(da
             ).status_code
             == 403
         )
+
+
+def test_consumer_diagnostics_blocked_event_and_recovery(database, caplog):
+    settings, engine, _, _, _, ref, event = imported(database)
+    from involta_guide.infrastructure.voice.client import VoiceUnavailable
+    from involta_guide.infrastructure.voice.consumer import Consumer
+    from involta_guide.infrastructure.voice.read_model import VoiceReadModel
+
+    event = {**event, "sequence": 2, "event_id": str(uuid4())}
+
+    class Source:
+        mode = "outage"
+
+        def json(self, method, path, **kwargs):
+            if self.mode == "outage":
+                raise VoiceUnavailable("Private diagnostic must not appear in logs")
+            if path == "/events/ack":
+                return {"acknowledged": True}
+            return {"events": [{**event, "transcript": ""} if self.mode == "invalid" else event]}
+
+    source = Source()
+    consumer = Consumer(engine, source)
+    with pytest.raises(VoiceUnavailable):
+        consumer.once()
+    assert VoiceReadModel(engine).consumer_health()["error_type"] == "VoiceUnavailable"
+    source.mode = "invalid"
+    with pytest.raises(ValueError):
+        consumer.once()
+    diagnostic = VoiceReadModel(engine).consumer_health()
+    assert diagnostic["sequence"] == 2 and not diagnostic["healthy"]
+    assert "Private diagnostic" not in caplog.text
+    with engine.connect() as conn:
+        assert (
+            conn.execute(
+                text("SELECT sequence FROM voice_cursor WHERE consumer='voice'")
+            ).scalar_one()
+            == 1
+        )
+    source.mode = "valid"
+    assert consumer.once() == 1
+    assert VoiceReadModel(engine).consumer_health()["healthy"]
+    assert consumer.once() == 0

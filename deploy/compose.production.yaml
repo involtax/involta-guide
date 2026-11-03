@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     env_file: ${DEPLOY_ROOT:?}/.env.production
     environment:
+      VOICE_ENABLED: ${VOICE_INTAKE:-${VOICE_ENABLED:-false}}
       RELEASE_SHA: ${RELEASE_SHA:?}
       BASE_PATH: ${BASE_PATH:-/guide}
     networks: [frontend]

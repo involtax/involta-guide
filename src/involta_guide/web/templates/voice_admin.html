@@ -5,6 +5,7 @@
 <input type="hidden" name="action" value="{{action}}">
 <input type="hidden" name="review_revision" value="{{v.text.revision}}">
 <input type="hidden" name="processing_run" value="{{v.link.active_run if v.link else 0}}">
+<input type="hidden" name="affected_revisions" value='{{v.affected_revisions|tojson}}'>
 <input type="hidden" name="page_revision" value="{{v.location.draft_version or ''}}">
 {%if proposal%}<input type="hidden" name="proposal_id" value="{{proposal.id}}"><input type="hidden" name="proposal_revision" value="{{proposal.revision}}">{%endif%}
 {%endmacro%}
@@ -13,6 +14,7 @@
 <h1>Голосовые отзывы</h1>{%include 'admin_navigation.html'%}
 {%if message%}<p role="status">{{message}}</p>{%endif%}
 {%if voice_unavailable%}<p role="alert">{{voice_unavailable}}. Сохранённые отзывы доступны ниже.</p>{%endif%}
+<details><summary>Доставка Voice: {{"работает" if consumer_health.healthy else "нет подтверждения / ошибка"}}</summary><pre>{{consumer_health|tojson(indent=2)}}</pre></details>
 <div class="voice-admin-layout">
 <aside aria-label="Очередь отзывов">
 <h2>Очередь · {{queue.total}}</h2>
@@ -40,7 +42,7 @@
 <label>Редакционная версия текста<textarea name="text" rows="5" required>{{v.text.editorial_text}}</textarea></label><button>Сохранить текст</button></form>
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('bind')}}
 <label>Привязать отзыв к ресторану<select name="restaurant_id"><option value="">Ресторан пока не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id==v.text.restaurant_id%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку</button></form>
-<div class="button-row">{%for key,label in [('approve','Принять отзыв'),('reject','Отклонить отзыв'),('fraud','Пометить фродом'),('reset','Вернуть на проверку'),('publish-text','Показать текст посетителям'),('hide-text','Скрыть текст от посетителей')]%}
+<div class="button-row">{%for key,label in [('approve','Одобрить весь пакет'),('reject','Отклонить отзыв'),('fraud','Пометить фродом'),('reset','Вернуть на проверку')]%}
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields(key)}}<label>Причина<input name="reason" maxlength="2000"></label><button>{{label}}</button></form>{%endfor%}</div>
 <h3>Распознанные фрагменты и показатели</h3>
 {%for entry in (v.analysis or {}).get('entries',[])%}
@@ -50,15 +52,11 @@
 {%if v.link%}<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('bind-fragment')}}<input type="hidden" name="fragment_number" value="{{loop.index0}}"><label>Ресторан этого фрагмента<select name="restaurant_id"><option value="">Не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id|string==entry.restaurantId%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку фрагмента</button></form>{%endif%}</article>
 {%else%}<p>Дополнительный анализ не содержит показателей. Текст отзыва сохранён и доступен для модерации.</p>{%endfor%}
 <h3>Необязательные предложения</h3>
-{%if v.location.draft_version|string in v.version_ids and v.location.draft_version!=v.location.published_version%}
-<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('publish-page')}}<input type="hidden" name="version_id" value="{{v.location.draft_version}}"><input type="hidden" name="published_revision" value="{{v.location.published_version or ''}}"><p>Черновик содержит изменения из этого отзыва. Публикация заменит публичную страницу.</p><button>Опубликовать проверенную версию страницы</button></form>
-<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('discard-page')}}<button>Сбросить подготовленные правки и проверить заново</button></form>
-{%endif%}
 {%for p in v.proposals%}
 <article class="panel"><h4>{{'Новое заведение' if p.kind=='restaurant' else 'Правка карточки'}} · {{p.status}} · обработка {{p.run}}</h4><p>{{p.payload.reason}}</p><blockquote>{{p.payload.quote or ''}}</blockquote>
 <dl>{%for field,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Ссылка на карту'),('phone','Телефон')]%}<dt>{{label}}: было</dt><dd>{{p.before.get('maps_url' if field=='mapsUrl' else field) or 'Не указано'}}</dd><dt>Предлагается</dt><dd>{{p.final.get(field) if p.final.get(field) is not none else 'Удалить значение'}}</dd>{%endfor%}</dl>
 {%if p.status=='pending' and (not v.link or p.run==v.link.active_run)%}
-<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}" class="stack">{{decision_fields('approve-proposal',p)}}
+<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}" class="stack">{{decision_fields('edit-proposal',p)}}
 <label>Ресторан для правки<select name="restaurant_id"><option value="">{{'Создать новое заведение' if p.kind=='restaurant' else 'Выберите ресторан'}}</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id|string==p.payload.restaurantId%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label>
 {%for field,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Ссылка на карту'),('phone','Телефон')]%}<label>{{label}} — конечное значение{%if field=='description'%}<textarea name="{{field}}">{{p.final.get(field) or ''}}</textarea>{%else%}<input name="{{field}}" value="{{p.final.get(field) or ''}}">{%endif%}</label>{%endfor%}
 <details><summary>Редактировать расписание</summary>
@@ -69,8 +67,8 @@
 <details><summary>Исключения по датам</summary>{%set exceptions=hours.get('exceptions',{}).items()|list%}
 {%for index in range([exceptions|length+1,11]|min)%}{%set date=exceptions[index][0] if index<exceptions|length else ''%}{%set pairs=exceptions[index][1] if index<exceptions|length else []%}
 <fieldset><legend>{{date or 'Добавить исключение'}}</legend><input type="hidden" name="exception_{{index}}_original" value="{{date}}"><label>Дата<input type="date" name="exception_{{index}}_date" value="{{date}}"></label><label><input type="checkbox" name="exception_{{index}}_remove" value="yes">Удалить исключение</label>{%for slot in range(4)%}<label>Начало<input type="time" name="exception_{{index}}_{{slot}}_start" value="{{pairs[slot][0] if pairs|length>slot else ''}}"></label><label>Конец<input type="time" name="exception_{{index}}_{{slot}}_end" value="{{pairs[slot][1] if pairs|length>slot else ''}}"></label>{%endfor%}</fieldset>{%endfor%}<p>Для применения исключений включите «Применить интервалы ниже» в расписании.</p></details>
-<label>Причина<input name="reason"></label><p>Изменится черновик страницы {{v.location.name}}. Публикация выполняется отдельно.</p><button>Принять правку в черновик</button></form>
-<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('reject-proposal',p)}}<button>Отклонить эту правку</button></form>
+<label>Причина<input name="reason"></label><p>Редактируется пакет отзыва. Одобрение всего пакета сразу обновит страницу.</p><button>Сохранить правку пакета</button></form>
+<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('exclude-proposal',p)}}<button>Убрать ошибочную правку из пакета</button></form>
 {%endif%}</article>{%else%}<p>Предложений нет. Это не мешает принять сам отзыв.</p>{%endfor%}
 {%endif%}
 {%if v.link and v.text%}

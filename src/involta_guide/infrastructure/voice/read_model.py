@@ -10,6 +10,19 @@ class VoiceReadModel:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
 
+    def consumer_health(self) -> dict[str, Any]:
+        import time
+
+        with self.engine.connect() as conn:
+            result = row(conn, "SELECT state FROM voice_consumer_health WHERE id=1")
+        status = result["state"] if result else {}
+        return {
+            **status,
+            "healthy": bool(status)
+            and time.time() - status.get("heartbeat", 0) < 120
+            and not status.get("error_type"),
+        }
+
     def public_texts(self, location_id: str) -> list[dict[str, Any]]:
         with self.engine.connect() as conn:
             return [
@@ -99,15 +112,6 @@ class VoiceReadModel:
             raise NotFound("Отзыв не найден")
         return str(item["review_id"]), item["slug"]
 
-    def page_candidate(self, location_id: str) -> str | None:
-        with self.engine.connect() as conn:
-            candidate = row(
-                conn,
-                "SELECT version_id FROM voice_page_drafts WHERE location_id=:id",
-                id=location_id,
-            )
-        return str(candidate["version_id"]) if candidate else None
-
     def detail(self, review_id: str) -> dict[str, Any]:
         with self.engine.connect() as conn:
             review = row(conn, "SELECT * FROM reviews WHERE id=:id", id=review_id)
@@ -115,14 +119,6 @@ class VoiceReadModel:
                 raise NotFound("Отзыв не найден")
             location = row(conn, "SELECT * FROM locations WHERE id=:id", id=review["location_id"])
             assert location is not None
-            candidate = row(
-                conn,
-                "SELECT * FROM voice_page_drafts WHERE location_id=:id",
-                id=review["location_id"],
-            )
-            # A Voice-only candidate never replaces Guide's current page pointer.
-            if candidate:
-                location["draft_version"] = candidate["version_id"]
             link = row(conn, "SELECT * FROM voice_links WHERE review_id=:id", id=review_id)
             text_review = row(conn, "SELECT * FROM review_texts WHERE review_id=:id", id=review_id)
             proposals = [
@@ -208,7 +204,19 @@ class VoiceReadModel:
             }
             p["revision"] = p["revision"] or 1
             p["run"] = p["run"] or 0
+        with self.engine.connect() as conn:
+            shared = conn.execute(
+                text(
+                    "SELECT DISTINCT l.id,l.published_version FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE l.id<>:id AND x.restaurant_id IN (SELECT restaurant_id FROM restaurant_locations WHERE location_id=:id)"
+                ),
+                {"id": review["location_id"]},
+            ).mappings()
+            affected_revisions = {
+                str(r["id"]): str(r["published_version"]) if r["published_version"] else None
+                for r in shared
+            }
         return {
+            "affected_revisions": affected_revisions,
             "review": review,
             "text": text_review,
             "location": location,

@@ -21,10 +21,12 @@ fi
 exec 9>"$DEPLOY_ROOT/deploy.lock"
 flock --wait 300 9 || { echo 'Another server deployment holds the lock' >&2; exit 1; }
 # Parse only non-secret deployment options, never source an env file as shell code.
+VOICE_STACK=0
 AUDIO_VOLUME=''; GUIDE_HTTP_PORT=3000; BASE_PATH=/guide; NGINX_NETWORK=involta-guide-frontend; NETWORK_MODE=bridge; GUIDE_BIND_ADDRESS=127.0.0.1; GUIDE_APPARMOR_PROFILE=docker-default
 while IFS='=' read -r key value || [[ -n "$key" ]]; do
   [[ -z "$key" || "$key" == \#* ]] && continue
   case "$key" in
+    VOICE_STACK) [[ "$value" == 0 || "$value" == 1 ]] || exit 2; VOICE_STACK=$value ;;
     AUDIO_VOLUME) AUDIO_VOLUME=$value ;;
     GUIDE_HTTP_PORT) GUIDE_HTTP_PORT=$value ;;
     GUIDE_BIND_ADDRESS) GUIDE_BIND_ADDRESS=$value ;;
@@ -65,8 +67,10 @@ read_state() {
 }
 compose() {
   local sha=$1 image=$2; shift 2
+  local extra=() voice_env=()
+  if [[ -f "$DEPLOY_ROOT/releases/$sha/compose.voice.yaml" ]]; then extra=(-f "$DEPLOY_ROOT/releases/$sha/compose.voice.yaml"); voice_env=(--env-file "$DEPLOY_ROOT/.env.voice"); fi
   RELEASE_SHA="$sha" IMAGE_REF="$image" docker compose --project-name involta-guide-production \
-    --env-file "$DEPLOY_ROOT/.env.production" --file "$DEPLOY_ROOT/releases/$sha/compose.yaml" "$@"
+    --env-file "$DEPLOY_ROOT/.env.production" "${voice_env[@]}" --file "$DEPLOY_ROOT/releases/$sha/compose.yaml" "${extra[@]}" "$@"
 }
 wait_health() {
   local sha=$1 image=$2 service=$3 id state
@@ -100,6 +104,7 @@ write_state() {
   mv -f -- "$file.tmp" "$file"
 }
 restore_previous() {
+  export VOICE_INTAKE=false
   [[ -n "$previous_sha" ]] || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
@@ -143,6 +148,22 @@ mkdir -p "$release_dir"
 template=compose.production.yaml
 [[ "$NETWORK_MODE" != host ]] || template=compose.host.yaml
 if [[ ! -f "$release_dir/compose.yaml" ]]; then install -m 600 "$script_dir/$template" "$release_dir/compose.yaml"; fi
+if [[ "$VOICE_STACK" == 1 ]]; then
+  [[ "$mode" != rollback ]] || export VOICE_INTAKE=false
+  voice_postgres_image=''
+  while IFS='=' read -r key value; do
+    if [[ "$key" == VOICE_POSTGRES_IMAGE ]]; then voice_postgres_image=$value; fi
+  done < "$DEPLOY_ROOT/.env.voice"
+  [[ "$voice_postgres_image" =~ ^postgres@sha256:[0-9a-f]{64}$ ]] || { echo 'Voice PostgreSQL image must be digest-pinned' >&2; exit 2; }
+  [[ -f "$DEPLOY_ROOT/.env.voice" ]] || { echo 'Provision .env.voice first' >&2; exit 2; }
+  voice_template=compose.voice.yaml
+  [[ "$NETWORK_MODE" != host ]] || voice_template=compose.voice.host.yaml
+  install -m 600 "$script_dir/$voice_template" "$release_dir/compose.voice.yaml"
+  # An automatic rollback to a pre-Voice image would break persisted voice: references.
+  if [[ -n "$previous_sha" ]]; then
+    docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Rollback image must support Voice before enabling the stack' >&2; exit 2; }
+  fi
+fi
 timeout 300 docker pull "$target_image" >/dev/null
 revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$target_image")
 [[ "$revision" == "$target_sha" ]] || { echo 'Image revision does not match requested SHA' >&2; exit 1; }
@@ -174,6 +195,14 @@ trap 'failed 130' INT
 changed=1
 if [[ -n "$previous_sha" ]]; then compose "$previous_sha" "$previous_image" stop --timeout 240 worker web; fi
 compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
+if [[ "$VOICE_STACK" == 1 ]]; then
+  compose "$target_sha" "$target_image" up -d --no-build voice-db
+  compose "$target_sha" "$target_image" run --rm voice-migrate
+  compose "$target_sha" "$target_image" up -d --no-build voice-api voice-worker voice-consumer
+  wait_health "$target_sha" "$target_image" voice-api
+  wait_health "$target_sha" "$target_image" voice-worker
+  wait_health "$target_sha" "$target_image" voice-consumer
+fi
 compose "$target_sha" "$target_image" up -d --no-build web
 wait_health "$target_sha" "$target_image" web
 check_local "$target_sha"

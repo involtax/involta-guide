@@ -329,8 +329,11 @@ def routes(prefix: str) -> APIRouter:
                     location=location,
                 )
             if action == "content":
+                existing_content = ctx.queries.location(uid(location))["content"]
                 content = {
-                    "intro": ctx.queries.location(uid(location))["content"]["intro"],
+                    "intro": existing_content["intro"],
+                    "candidateReview": existing_content.get("candidateReview"),
+                    "qualityReport": existing_content.get("qualityReport"),
                     "restaurants": [
                         card_from_form(form, str(k) + "_") for k in form.getlist("card")
                     ],

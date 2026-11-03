@@ -86,11 +86,10 @@ ranges and non-overlapping attributed fragments. Entire original text survives.
 
 Guide actions require its administrator session + CSRF. Every decision supplies
 idempotency key, review revision, processing run, proposal revision and expected
-page draft revision where applicable. 409 means refresh the comparison. Review
+current page revision where applicable. 409 means refresh the comparison. Review
 text, binding and moderation and proposal decisions have atomic append-only
 events with stable actor `guide-editor`, non-token session ID, before/after,
-expected/result revisions, run and correlation key. Ordinary decisions never
-publish; applying a proposal creates a draft via existing Guide rules.
+expected/result revisions, run and correlation key. Approval atomically applies the entire corrected review package to the current page; there is no separate publication.
 
 ## Recovery and rollout
 
@@ -123,6 +122,8 @@ Alex's GET shortcut now establishes the same administrator cookie as login.
 Guide retains the trusted executor and stores `admin_session_id`; existing Alex
 sessions remain compatible. Voice receives ordinary visitor submissions only.
 
-The parallel current-city editor is preserved. Voice proposal candidates have a
-separate private pointer and never replace current Guide content before explicit
-publication. Publish checks the candidate base against the current city version.
+The current-city editor is preserved. Review approval applies all remaining
+proposals atomically and immediately. `review_revision` is the package revision;
+proposal edit/exclusion and newly imported analysis invalidate stale decisions.
+`page_revision` and `affected_revisions` fence current and shared-card city data.
+No proposals means no empty page version. See VOICE_REVIEW_REPORT.md.

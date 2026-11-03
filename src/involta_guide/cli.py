@@ -17,7 +17,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["seed", "schema-audit", "hash-password", "retain-audio", "worker-health"],
+        choices=[
+            "seed",
+            "schema-audit",
+            "hash-password",
+            "retain-audio",
+            "worker-health",
+            "voice-consumer-health",
+        ],
     )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -25,6 +32,11 @@ def main() -> None:
         print(PasswordHasher().hash(getpass.getpass("Password: ")))
         return
     settings = Settings()
+    if args.command == "voice-consumer-health":
+        from involta_guide.infrastructure.voice.diagnostics import health
+
+        health()
+        return
     if args.command == "worker-health":
         import time
 

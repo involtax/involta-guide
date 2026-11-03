@@ -15,6 +15,7 @@ HISTORY = """WITH numbered AS (
  SELECT j.*,l.name location_name,r.location_slug,r.number ordinal,r.path log_path,
  g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
  (g.response_json IS NOT NULL) has_saved_response,
+ (SELECT a.detail::jsonb->'data' FROM audit a WHERE a.action='generation_quality' AND a.target=j.id::text ORDER BY a.created_at DESC,a.id DESC LIMIT 1) quality_report,
  EXISTS(SELECT 1 FROM audit published WHERE published.action='ai_result' AND published.target=j.id::text
    AND published.detail::jsonb->'data'->>'version_id'=l.published_version::text) result_published,
  (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
@@ -161,6 +162,8 @@ class AIAudit:
                 }.get(state, job["stage_label"])
                 if job["status"] == "failed" and state in ("queued", "in_progress"):
                     job["stage_label"] = "Обработка остановлена; запрос OpenAI сохранён"
+        if job["status"] == "done" and (job.get("quality_report") or {}).get("status") == "partial":
+            job["stage_label"] = "Поиск неполный"
         job["can_reprocess"] = (
             job["kind"] == "generate"
             and job["status"] in ("done", "failed", "cancelled")
@@ -291,6 +294,7 @@ class AIAudit:
                     text("SELECT * FROM versions WHERE id=:id"), {"id": version_id}
                 ).mappings()
             ]
+        versions.sort(key=lambda version: version["number"], reverse=True)
         # Round-trip UUID/datetime/Decimal values to a portable downloadable JSON document.
         return json.loads(
             json.dumps(

@@ -5,10 +5,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VOICE_", env_file=".env.voice", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="VOICE_", env_file=".env.voice", extra="ignore", populate_by_name=True
+    )
     database_url: SecretStr
     service_secret: SecretStr
-    openai_api_key: SecretStr = SecretStr("")
+    openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
     data_dir: Path = Path("var/voice")
     transcription_model: str = "gpt-4o-mini-transcribe"
     analysis_model: str = "gpt-4.1"

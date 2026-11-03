@@ -1,0 +1,333 @@
+{
+  "intro": "В подборке — два ресторана Переславля-Залесского: рыбный ресторан с петровской тематикой и гриль-ресторан с железнодорожным антуражем. Это редакционная оценка открытых источников, а не результат личной дегустации.",
+  "restaurants": [
+    {
+      "name": "Сельдь царский посол",
+      "cuisine": "Русская и европейская, рыбные специалитеты",
+      "description": "Сюда стоит зайти ради разных способов приготовления сельди и знакомства с гастрономической историей переславской ряпушки. Подойдёт любителям рыбы и тематических ресторанов; отзывы об исполнении блюд неоднородны, а в загруженные часы возможна очередь. ([welcome-pereslavl.com](https://welcome-pereslavl.com/restoran/))",
+      "mapsUrl": "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/",
+      "sources": [
+        "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/",
+        "https://welcome-pereslavl.com/restoran/",
+        "https://tourismpereslavl.ru/turisticheskaya-infrastruktura/restorany-i-kafe/restoran-/",
+        "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html",
+        "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/reviews/?page=2"
+      ],
+      "phone": "+79201099400",
+      "openingHours": {
+        "timezone": "Europe/Moscow",
+        "week": [
+          [["08:00", "21:00"]],
+          [["08:00", "21:00"]],
+          [["08:00", "21:00"]],
+          [["08:00", "21:00"]],
+          [["08:00", "23:00"]],
+          [["08:00", "23:00"]],
+          [["08:00", "21:00"]]
+        ],
+        "exceptions": {}
+      }
+    },
+    {
+      "name": "Мясоедъ",
+      "cuisine": "Русская и европейская, мясо на гриле, бургеры",
+      "description": "Гриль-ресторан на Кардовского, 35 объединяет мясное меню с залами в железнодорожной и ретротематике. Подойдёт для семейного обеда или неспешного ужина; при плотной посадке стоит учитывать встречающиеся жалобы на ожидание и ошибки подачи. ([mjasoed.clients.site](https://mjasoed.clients.site/))",
+      "mapsUrl": "https://yandex.com/maps/org/myasoyed/49552737587/",
+      "sources": [
+        "https://yandex.com/maps/org/myasoyed/49552737587/",
+        "https://mjasoed.clients.site/",
+        "https://yandex.com/maps/org/myasoyed/49552737587/reviews/",
+        "https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533",
+        "https://yandex.md/maps/user/mz36htaw9f3pvrwe9fk0nejg7g"
+      ],
+      "phone": "+79051313535",
+      "openingHours": null
+    }
+  ],
+  "rankingReport": [
+    {
+      "name": "Сельдь царский посол",
+      "mapsUrl": "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/",
+      "scores": {
+        "food": 7,
+        "consistency": 6,
+        "identity": 9,
+        "localConnection": 9,
+        "atmosphere": 6,
+        "service": 7,
+        "value": 6,
+        "destination": 8
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Есть конкретные положительные свидетельства о сельди с картофелем, треске и жареной ряпушке. Однако отзыв о посещении 1 августа 2025 года описывает пересоленную уху и чрезмерно копчёную ряпушку: основания для сильной, но не выдающейся оценки. ([yandex.com](https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/reviews/?page=2&utm_source=openai))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/reviews/?page=2",
+            "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "На Tripadvisor есть положительный рассказ повторного гостя о посещении в январе 2025 года, но также отрицательные впечатления за июнь и август 2025 года; отзыв за март 2026 года оценивает кухню умеренно положительно. История наблюдений есть, однако одинаково убедительное исполнение не подтверждается. ([tripadvisor.ru](https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html))",
+          "confidence": "medium",
+          "sources": [
+            "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html"
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Сельдь определяет не только название: в меню есть селёдочное масло, голландский бутерброд, запечённая сельдь и мороженое из сельди. Голландская кухмистерская петровских времён образует содержательную связку с этим меню, а не служит отдельной декорацией. ([welcome-pereslavl.com](https://welcome-pereslavl.com/restoran/))",
+          "confidence": "high",
+          "sources": [
+            "https://welcome-pereslavl.com/restoran/"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Переславская ряпушка и её исторический статус составляют основу заявленной концепции; наличие блюд из ряпушки подтверждено меню и городским туристическим порталом. Это не подтверждает происхождение каждой поданной рыбы из Плещеева озера, поэтому такое происхождение не заявляется. ([welcome-pereslavl.com](https://welcome-pereslavl.com/))",
+          "confidence": "high",
+          "sources": [
+            "https://welcome-pereslavl.com/",
+            "https://welcome-pereslavl.com/restoran/",
+            "https://tourismpereslavl.ru/turisticheskaya-infrastruktura/restorany-i-kafe/restoran-/"
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Гости отмечают изразцовую печь, антикварные предметы и интересные детали небольшого зала. Но отзыв о посещении в марте 2026 года конкретно критикует освещение; декоративная насыщенность не гарантирует комфорт каждому гостю. ([yandex.com](https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/",
+            "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Есть содержательные похвалы рекомендациям по меню и организации очереди: один автор описывает два случая посадки быстрее первоначального прогноза. Встречается и противоположное свидетельство о незнании меню сотрудниками, поэтому устойчиво высокий профессиональный уровень не доказан. ([yandex.com](https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/",
+            "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/reviews/?page=2",
+            "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Официальная страница позволяет проверить цены и выход фирменных блюд; часть гостей считает расходы приемлемыми. Разногласия о порциях и качестве исполнения не дают оснований говорить, что впечатление регулярно превосходит ожидания от расходов. ([welcome-pereslavl.com](https://welcome-pereslavl.com/restoran/))",
+          "confidence": "medium",
+          "sources": [
+            "https://welcome-pereslavl.com/restoran/",
+            "https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/reviews/?page=5",
+            "https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Редакционное суждение: несколько способов приготовления сельди, ряпушка и историческая рамка дают понятную причину специально выбрать ресторан в поездке. Это рекомендация ради совокупного опыта, а не обещание кухни, безусловно оправдывающей отдельное путешествие. ([welcome-pereslavl.com](https://welcome-pereslavl.com/restoran/))",
+          "confidence": "medium",
+          "sources": [
+            "https://welcome-pereslavl.com/restoran/",
+            "https://tourismpereslavl.ru/turisticheskaya-infrastruktura/restorany-i-kafe/restoran-/"
+          ]
+        }
+      ],
+      "totalScore": 7.25
+    },
+    {
+      "name": "Мясоедъ",
+      "mapsUrl": "https://yandex.com/maps/org/myasoyed/49552737587/",
+      "scores": {
+        "food": 7,
+        "consistency": 6,
+        "identity": 7,
+        "localConnection": 4,
+        "atmosphere": 8,
+        "service": 6,
+        "value": 7,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Гости конкретно хвалят сочность мясного ассорти, бургеры и сезонный жюльен; отдельный автор Restaurant Guru положительно оценивает мясо и птицу. Вместе с этим найдены претензии к кислой солянке и жёстким купатам, поэтому оценка не поднимается выше 7. ([yandex.ru](https://yandex.ru/maps/org/myasoyed/49552737587/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/myasoyed/49552737587/",
+            "https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533",
+            "https://yandex.md/maps/org/myasoyed/49552737587/reviews/"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Положительные рассказы разных авторов соседствуют с конкретными неудачами; в обновлении от 6 июня 2025 года повторный гость описывает существенное ухудшение организации заказа. Свежие положительные свидетельства не позволяют считать этот эпизод текущей нормой, но и безусловная повторяемость качества не доказана. ([yandex.com](https://yandex.com/maps/org/myasoyed/49552737587/reviews/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/myasoyed/49552737587/reviews/",
+            "https://yandex.md/maps/user/mz36htaw9f3pvrwe9fk0nejg7g",
+            "https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533"
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Открытый огонь сочетается с оформлением под вагон-ресторан и зал ожидания, тематическими зонами и железнодорожными деталями. Характер различим, но само предложение гриля и бургеров широко распространено и не даёт оснований для исключительной оценки. ([mjasoed.clients.site](https://mjasoed.clients.site/))",
+          "confidence": "high",
+          "sources": [
+            "https://mjasoed.clients.site/",
+            "https://yandex.com/maps/org/myasoyed/49552737587/"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "В оформлении заявлены культурные отсылки к Коровину, Шаляпину и Пришвину, а в меню есть позиция «Переславский баловень». Однако опубликованная концепция строится прежде всего вокруг гриля и ретропутешествия, а не региональных рецептов; происхождение продуктов не подтверждено. ([mjasoed.clients.site](https://mjasoed.clients.site/))",
+          "confidence": "medium",
+          "sources": [
+            "https://mjasoed.clients.site/",
+            "https://yandex.com/maps/org/myasoyed/49552737587/"
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Несколько гостей содержательно описывают разные зоны посадки, негромкую музыку, домашний характер залов и необычные железнодорожные детали; есть летняя терраса. Найдена и конкретная жалоба на состояние мягкой мебели и темноту в уборной, поэтому 9–10 не оправданы. ([yandex.ru](https://yandex.ru/maps/org/myasoyed/49552737587/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/myasoyed/49552737587/",
+            "https://yandex.com/maps/org/myasoyed/49552737587/reviews/"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Приветливость официантов и помощь с выбором подтверждаются разными авторами, включая самостоятельный отзыв на Restaurant Guru. Организация слабее гостеприимства: встречаются рассказы о перепутанных заказах, забытых приборах и затянувшемся ожидании. ([restaurantguru.ru](https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533))",
+          "confidence": "medium",
+          "sources": [
+            "https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533",
+            "https://yandex.com/maps/org/myasoyed/49552737587/reviews/"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "В карточке доступны цены отдельных блюд, а автор отзыва, опубликованного в августе 2026 года, прямо считает расходы приемлемыми относительно сервиса и еды. Это поддерживает оценку выше обычного соответствия, но смешанные отзывы об исполнении ограничивают её. ([yandex.ru](https://yandex.ru/maps/org/myasoyed/49552737587/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/myasoyed/49552737587/",
+            "https://yandex.md/maps/user/mz36htaw9f3pvrwe9fk0nejg7g",
+            "https://yandex.md/maps/org/myasoyed/49552737587/reviews/"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Редакционное суждение: сочетание гриля и подробно разработанной железнодорожной среды оправдывает заранее запланированный семейный визит. Для значительного изменения маршрута именно ради кухни доказательств меньше: отзывы о мясных блюдах неоднородны. ([mjasoed.clients.site](https://mjasoed.clients.site/))",
+          "confidence": "medium",
+          "sources": [
+            "https://mjasoed.clients.site/",
+            "https://yandex.com/maps/org/myasoyed/49552737587/",
+            "https://yandex.md/maps/org/myasoyed/49552737587/reviews/"
+          ]
+        }
+      ],
+      "totalScore": 6.5
+    },
+    {
+      "name": "Гастробар 1152",
+      "mapsUrl": "https://yandex.com/maps/org/gastrobar_1152/67097145705/",
+      "scores": {
+        "food": 8,
+        "consistency": null,
+        "identity": 6,
+        "localConnection": 5,
+        "atmosphere": 7,
+        "service": 6,
+        "value": 6,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "В отзывах под нынешним названием конкретно хвалят судака, салат «Ерундопель» и утиную грудку; эти позиции согласуются с опубликованным меню. Есть и претензии к исполнению, поэтому убедительных оснований для 9 нет. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/",
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/",
+            "https://restaurantguru.ru/Sitiy-ezhik-Pereslavl-Zalessky/menu"
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Карточка объединяет отзывы о «Гастробаре 1152» и прежнем «Сытом ёжике»; среди последних есть явно указанное посещение 5 января 2026 года. Не установлены дата переименования и преемственность команды, поэтому временной ряд нельзя уверенно приписать нынешней концепции.",
+          "confidence": "low",
+          "sources": []
+        },
+        {
+          "factor": "identity",
+          "reason": "Рыбный салат «Ерундопель», региональные обозначения в меню и сочетание гастробара с лофтовым пространством создают несколько узнаваемых деталей. При этом предложение остаётся широким — от пасты до бургеров — и не складывается в столь же цельную специализацию, как у рыбного ресторана. ([restaurantguru.ru](https://restaurantguru.ru/Sitiy-ezhik-Pereslavl-Zalessky/menu))",
+          "confidence": "medium",
+          "sources": [
+            "https://restaurantguru.ru/Sitiy-ezhik-Pereslavl-Zalessky/menu",
+            "https://hutorzalesye.ru/food"
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "В меню указаны рыбинский судак и котлета по-переславски — это конкретные региональные акценты, а не только городской адрес. Однако обозначение продукта в меню не равно проверке поставщика, и местная кухня не определяет всё предложение. ([restaurantguru.ru](https://restaurantguru.ru/Sitiy-ezhik-Pereslavl-Zalessky/menu?utm_source=openai))",
+          "confidence": "medium",
+          "sources": [
+            "https://restaurantguru.ru/Sitiy-ezhik-Pereslavl-Zalessky/menu",
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/"
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Описаны небольшой зал, кирпичные стены, неяркий свет и вид на Симеоновскую церковь; гости отмечают чистоту и комфорт. Ограничение — камерность пространства и полная посадка в востребованные часы. ([hutorzalesye.ru](https://hutorzalesye.ru/food))",
+          "confidence": "medium",
+          "sources": [
+            "https://hutorzalesye.ru/food",
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/"
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Есть конкретная похвала согласованной подаче заказа компании и вежливости сотрудников. Но другие авторы сообщают о забытом напитке и длительном ожидании кофе: приветливость не означает одинаково хорошую организацию. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/"
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Цены отдельных блюд опубликованы, но ценовые впечатления гостей расходятся: от приемлемых расходов до претензий к небольшим порциям и дорогой винной карте. Поэтому соответствие цены и результата выглядит скорее умеренно положительным, чем выдающимся. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/))",
+          "confidence": "medium",
+          "sources": [
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/",
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/"
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Редакционное суждение: конкретные положительные отзывы о рыбных блюдах дают основания специально выбрать гастробар для ужина. Для рекомендации существенно менять маршрут пока не хватает независимой проверки нынешнего этапа работы. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/))",
+          "confidence": "low",
+          "sources": [
+            "https://yandex.com/maps/org/gastrobar_1152/67097145705/",
+            "https://hutorzalesye.ru/food"
+          ]
+        }
+      ],
+      "totalScore": null
+    }
+  ],
+  "warnings": [
+    "Черновик подготовлен по открытым источникам на 3 ноября 2026 года. Личной дегустации, контрольного звонка и очной проверки обслуживания не было; решение о публикации принимает редактор.",
+    "Широкий поиск включал «Бояре», «Высоко», «Альбицкий сад», «Дом», «Лобиани», «Монпансье», «Мясоедъ», «Сельдь царский посол» и «Гастробар 1152». Полная факторная проверка выполнена для трёх кандидатов, а не для всех обнаруженных мест; результат нельзя представлять как исчерпывающий рейтинг ресторанов города. ([restaurantguru.ru](https://restaurantguru.ru/Pereslavl-Zalessky?utm_source=openai))",
+    "В публичный список включены два кандидата с полными оценками — в соответствии с topLimit=2. Третий кандидат оставлен только в редакционном отчёте с totalScore=null; дополнительных карточек для кнопки «Ещё» в этом черновике нет.",
+    "«Гастробар 1152»: подтверждены конкретная карточка и адрес Ростовская, 15. История карточки содержит прежнее название «Сытый ёжик», однако дата перехода и сохранение команды не установлены; consistency=null, численное место не присвоено. Это ограничение проверки, а не вывод о плохой стабильности. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/))",
+    "Для «Гастробара 1152» не получено двух независимых содержательных подтверждений качества нынешней концепции: основная база — отзывы Яндекс Карт, меню и рекомендательная страница средства размещения. Перепечатанное меню не считалось независимым свидетельством вкуса. ([yandex.com](https://yandex.com/maps/org/gastrobar_1152/67097145705/reviews/))",
+    "«Попов луг» не включён: в найденном справочнике указан адрес в деревне Веслево, вне заданного охвата «только Переславль-Залесский». Наличие заведения в туристическом списке города не подтверждает нахождение в самом городе. ([mirstat.ru](https://mirstat.ru/pereslavl-zalesskiy/restaurant.html?utm_source=openai))",
+    "Для «Сельди царского посола» использована ресторанная карточка 151880901305. Карточка комплекса/гостиницы 1494650538 не объединялась с ней; отзыв о посещении соседнего филиала исключён из оценки еды конкретного ресторана. ([yandex.com](https://yandex.com/maps/org/seld_tsarskiy_posol/151880901305/))",
+    "Телефон «Сельди царского посола» +79201099400 отдельно обозначен как ресторанный на городском туристическом портале и присутствует на официальном сайте. Телефон «Мясоедъ» +79051313535 совпадает на официальной странице и карточке Яндекса. ([tourismpereslavl.ru](https://tourismpereslavl.ru/turisticheskaya-infrastruktura/restorany-i-kafe/restoran-/))",
+    "Расписание «Сельди царского посола» взято с городского туристического портала: вс–чт 08:00–21:00, пт–сб 08:00–23:00. Дата обновления расписания не указана; подтверждённых исключений нет, а пустой exceptions не гарантирует обычную работу в праздники. Перед публикацией желательно подтвердить часы звонком. ([tourismpereslavl.ru](https://tourismpereslavl.ru/turisticheskaya-infrastruktura/restorany-i-kafe/restoran-/))",
+    "«Мясоедъ»: openingHours=null. Restaurant Guru показывает недельное расписание с закрытием в 22:00 в большинство дней и в 23:00 по пятницам и субботам, тогда как просмотренные версии карточки Яндекса показывают разные текущие времена закрытия; надёжно согласованное недельное расписание не установлено. ([restaurantguru.ru](https://restaurantguru.ru/Myasoyed-Pereslavl-Zalessky?com=1555533))",
+    "Даты публикаций отзывов не принимались за даты посещений. У многих отзывов Яндекса год в отображаемой дате отсутствует; относительные даты Restaurant Guru также не превращались в точные даты визита. Отзывы на сайте «Мясоедъ», подтянутые из Яндекса, не считались дополнительным независимым источником. ([tripadvisor.ru](https://www.tripadvisor.ru/Restaurant_Review-g1572253-d8713131-Reviews-Fish_Herbjerg_Herring_Tsar_s_Ambassador-Pereslavl_Zalessky_Yaroslavl_Oblast_Cent.html))",
+    "Все восемь факторов имеют одинаковый вес 12,5%. Сумма «Сельди царского посола» — 58, итог 7,25; сумма «Мясоедъ» — 52, итог 6,50. У «Гастробара 1152» один фактор не установлен, поэтому среднее не рассчитывалось.",
+    "alexStar не передан: редакционная звезда не присваивалась. Поле отсутствует намеренно; наличие или отсутствие звезды не использовалось при ранжировании."
+  ]
+}

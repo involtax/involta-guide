@@ -17,19 +17,44 @@ class Consumer:
         self.engine, self.client = engine, client
 
     def once(self) -> int:
+        try:
+            return self._once()
+        except Exception as exc:
+            if not getattr(exc, "voice_diagnosed", False):
+                from .diagnostics import failure
+
+                failure(exc, engine=self.engine)
+            raise
+
+    def _once(self) -> int:
         with self.engine.connect() as conn:
             cursor = row(conn, "SELECT sequence FROM voice_cursor WHERE consumer='voice'")
+        from .diagnostics import failure, state
+
+        state(self.engine, last_attempt=time.time())
         events = self.client.json(
             "GET", "/events", params={"after": cursor["sequence"] if cursor else 0}
         )["events"]
         imported = 0
         for event in events:
-            imported += self.import_event(event)
+            try:
+                imported += self.import_event(event)
+            except Exception as exc:
+                failure(exc, event, self.engine)
+                setattr(exc, "voice_diagnosed", True)
+                raise
         # Ack only after Guide's transaction has committed. Lost ack is harmless.
         with self.engine.connect() as conn:
             committed = row(conn, "SELECT sequence FROM voice_cursor WHERE consumer='voice'")
         if committed:
             self.client.json("POST", "/events/ack", json={"sequence": committed["sequence"]})
+        state(
+            self.engine,
+            error_type=None,
+            status="idle" if not events else "progress",
+            last_success=time.time(),
+            cursor=committed["sequence"] if committed else 0,
+        )
         return imported
 
     def import_event(self, event: dict[str, Any]) -> int:
@@ -185,6 +210,11 @@ class Consumer:
                             restaurant=next(iter(ids)),
                             id=reference,
                         )
+                execute(
+                    conn,
+                    "UPDATE review_texts SET revision=revision+1 WHERE review_id=:id AND EXISTS (SELECT 1 FROM reviews WHERE id=:id AND moderation='pending')",
+                    id=reference,
+                )
             elif event["kind"] == "processing_failed" and link["active_run"] == number:
                 execute(
                     conn,
@@ -213,13 +243,20 @@ def main() -> None:
     settings = Settings()
     engine = create_database(settings)
     consumer = Consumer(engine, VoiceClient(settings))
+    backoff = 3
     try:
         while True:
             try:
                 worked = consumer.once()
-            except Exception:
+                backoff = 3
+            except Exception as exc:
+                from .diagnostics import failure
+
+                if not getattr(exc, "voice_diagnosed", False):
+                    failure(exc, engine=engine)
                 worked = 0
+                backoff = min(60, backoff * 2)
             if not worked:
-                time.sleep(3)
+                time.sleep(backoff)
     finally:
         engine.dispose()

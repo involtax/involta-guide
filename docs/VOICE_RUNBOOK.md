@@ -46,7 +46,7 @@ curl --fail http://127.0.0.1:3100/health/ready
 
 For local fake processing set `VOICE_FAKE_PROVIDER=true` in `.env.voice` before
 starting. This mode explicitly returns test text and makes no OpenAI requests.
-For real processing set it to false and provide `VOICE_OPENAI_API_KEY`.
+For real processing set it to false and provide `OPENAI_API_KEY`.
 Host-run processes instead use a separately provisioned PostgreSQL DB URL:
 
 ```bash
@@ -87,8 +87,8 @@ Open `/guide/admin/voice` after administrator login. The queue includes existing
 Guide history and imported Voice reviews; accepted Voice audio waiting for a
 transcript is visible while the service is reachable. Original transcript and
 editable text are separate. Rejection/fraud never delete either text or audio.
-Publishing the text is a separate action from accepting it. Proposal acceptance
-creates a draft; publishing the page remains a separate Guide action.
+Approval makes the text visible and applies the entire checked package immediately.
+Edit or exclude mistaken candidates before approval; there is no separate publication.
 
 Use `/guide/admin/voice/{slug}/{number}` and its `/runs/{run}` link. Numbers and
 run identities are persisted. Renamed slugs redirect to the current canonical
@@ -174,12 +174,43 @@ enough to cover the intended history and compare totals. Active/trusted/deleted
 records are skipped. Old IDs, ownership, jobs and Guide files remain unchanged.
 Archive entries never enter the processing queue or Guide outbox.
 
-## Compatibility with the current-page editor
+## Production preparation (no deployment performed)
 
-Main now saves city edits directly to its single current page. Voice does not
-change that behavior. Its reviewed proposal candidates live in
-`voice_page_drafts`, pointing at retained unpublished version snapshots, and do
-not modify restaurant rows or Guide's current version. Explicit publication
-checks both the candidate and its base current revision, then uses Guide's
-current save rules. A conflicting city edit returns 409. Discard the prepared
-Voice candidate and compare again; snapshots and the decision journal remain.
+The accepted release mechanism is `deploy/remote-release.sh`. Set `VOICE_STACK=1`
+in deploy.env only after deploying this gateway-compatible image with the stack
+still disabled and selecting it as a tested rollback target. The release copies
+`compose.voice.yaml` or `compose.voice.host.yaml` alongside the ordinary Compose.
+It rejects pre-Voice rollback images and non-digest Voice PostgreSQL images.
+Application images use the existing immutable IMAGE_REF; no server build occurs.
+
+Server variables (names only): OPENAI_API_KEY, DATABASE_URL, DATABASE_SCHEMA,
+SESSION_SECRET, VOICE_SERVICE_SECRET, VOICE_ENABLED, VOICE_URL,
+VOICE_POSTGRES_IMAGE, VOICE_POSTGRES_PASSWORD. Existing deployment metadata:
+IMAGE_REF, RELEASE_SHA, DEPLOY_ROOT, AUDIO_VOLUME, NETWORK_MODE, NGINX_NETWORK,
+GUIDE_HTTP_PORT. The private `.env.voice` supplies VOICE_DATABASE_URL, VOICE_POSTGRES_PASSWORD,
+VOICE_POSTGRES_IMAGE and desired
+VOICE_* budgets/models/storage settings; it contains no Guide DB credentials. Do not put Voice DB credentials in
+.env.production (passed to Guide); Compose uses the private Voice file for interpolation.
+OPENAI_API_KEY and service authentication are forwarded from .env.production.
+Use postgres@sha256 for VOICE_POSTGRES_IMAGE. Keep both env files private.
+
+Bridge Voice DB resolves as voice-db:5432; host mode binds PostgreSQL exclusively
+to 127.0.0.1:55439 and Voice API to 127.0.0.1:13100. Set VOICE_DATABASE_URL for the
+chosen mode. No public nginx route or TLS/firewall/DNS change is required.
+
+Order: back up DBs/audio; keep VOICE_ENABLED=false; apply Guide migrations;
+start Voice DB; apply Voice migrations; start API/worker/consumer; wait for all
+healthchecks (including `guide voice-consumer-health`); verify transcript delivery
+and whole-package approval with a controlled recording. Only then explicitly set
+VOICE_ENABLED=true and recreate web. Autoapproval stays off.
+
+Rollback: disable VOICE_ENABLED (release rollback also forces VOICE_INTAKE=false),
+retain API/worker/consumer and volumes to finish accepted submissions, use only
+the gateway-compatible rollback image and retain URL/secret access for audio and
+history. Never downgrade schemas or reset outbox/inbox. The first rollout needs
+a separately reviewed feature-off gateway release as the rollback baseline.
+Keep current Voice processes running if the baseline did not yet include them.
+
+Production Compose validation is included in CI for both network modes. Local
+isolated stack checks use generated test credentials and a fake provider; real
+keys and production data are not used. Remaining limits: VOICE_REVIEW_REPORT.md.

@@ -1,0 +1,26 @@
+"""Versioned whole-review package decisions shared by manual and future automatic moderation."""
+
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Decision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: UUID
+    review_revision: int = Field(ge=1)
+    processing_run: int = Field(ge=0)
+    action: str
+    reason: str = Field(default="", max_length=2000)
+    text: str | None = Field(default=None, max_length=30000)
+    restaurant_id: UUID | None = None
+    proposal_id: UUID | None = None
+    proposal_revision: int | None = None
+    page_revision: UUID | None = None
+    changes: dict[str, Any] = Field(default_factory=dict)
+    affected_revisions: dict[str, str | None] = Field(default_factory=dict)
+    run: int | None = None
+    fragment_number: int | None = Field(default=None, ge=0)
+    version_id: UUID | None = None
+    published_revision: UUID | None = None

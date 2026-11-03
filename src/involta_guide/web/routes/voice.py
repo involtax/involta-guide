@@ -46,13 +46,9 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
     state = "fraud" if review["fraud"] else review["moderation"]
     versions = ctx.queries.rows("version_reviews", {"review_id": reference})
     if versions and review["moderation"] == "approved" and not review["fraud"]:
-        from involta_guide.infrastructure.voice.read_model import VoiceReadModel
-
         linked = {v["version_id"] for v in versions}
         if location and location["published_version"] in linked:
             state = "published"
-        elif location and VoiceReadModel(ctx.engine).page_candidate(str(location["id"])) in linked:
-            state = "draft"
     if text and text["public"] and review["moderation"] == "approved" and not review["fraud"]:
         state = "published"
     return {

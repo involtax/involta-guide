@@ -188,7 +188,7 @@ def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_modera
     )
     VoiceEditorial(engine).decide(
         ref,
-        Decision(idempotency_key=uuid4(), review_revision=1, processing_run=1, action="approve"),
+        Decision(idempotency_key=uuid4(), review_revision=2, processing_run=1, action="approve"),
         principal["id"],
     )
     service.new_run(ref)
@@ -196,7 +196,7 @@ def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_modera
     assert consumer.once() == 1
     assert queries.get("reviews", ref)["moderation"] == "approved"
     assert queries.get("voice_links", ref)["active_run"] == 1
-    assert queries.get("review_texts", ref)["revision"] == 2
+    assert queries.get("review_texts", ref)["revision"] == 3
 
 
 def test_ack_loss_after_commit_and_concurrent_replay_create_one_review(database, voice_database):
