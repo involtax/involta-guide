@@ -20,7 +20,7 @@ class OpenAIProvider:
 
     def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
         if kind != "analysis":
-            raise ProviderFailure("Аудио распознаётся только локальным Whisper")
+            raise ProviderFailure("Аудио распознаётся только локальным ASR")
         key = self.settings.openai_api_key.get_secret_value()
         if not key:
             raise ProviderFailure("OPENAI_API_KEY не настроен")
@@ -80,14 +80,14 @@ class FakeProvider:
 
 class VoiceProvider:
     def __init__(self, settings: Settings) -> None:
-        from .whisper import LocalWhisper
+        from .asr import LocalAsr
 
-        self.whisper = LocalWhisper(settings)
+        self.asr = LocalAsr(settings)
         self.analysis = OpenAIProvider(settings)
 
     def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
         if kind == "transcription":
-            return self.whisper.call(request, audio)
+            return self.asr.call(request, audio)
         return self.analysis.call(kind, request, b"", mime)
 
     def close(self) -> None:

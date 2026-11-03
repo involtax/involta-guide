@@ -38,6 +38,7 @@ def routes(prefix: str) -> APIRouter:
         remote = None
         unavailable = ""
         pending = []
+        asr_comparison = None
         if ctx.settings.voice_service_secret.get_secret_value():
             try:
                 remote_settings = voice_client(request).json("GET", "/admin/settings")
@@ -48,6 +49,10 @@ def routes(prefix: str) -> APIRouter:
                         remote = voice_client(request).json(
                             "GET", f"/admin/submissions/{ref}/runs/{run}"
                         )
+                if detail and detail["asr_reference"]:
+                    asr_comparison = voice_client(request).json(
+                        "GET", "/admin/submissions/" + detail["asr_reference"] + "/asr"
+                    )
                 if not detail:
                     remote_rows = voice_client(request).json(
                         "GET", "/admin/submissions", params={"page": listing["page"]}
@@ -65,6 +70,7 @@ def routes(prefix: str) -> APIRouter:
                 "consumer_health": read.consumer_health(),
                 "v": detail,
                 "remote": remote,
+                "asr_comparison": asr_comparison,
                 "run_log": run is not None,
                 "pending_voice": pending,
                 "voice_settings": remote_settings,
@@ -163,6 +169,33 @@ def routes(prefix: str) -> APIRouter:
         read = VoiceReadModel(ctx.engine)
         detail = read.detail(str(review_id))
         action = str(form.get("action") or "")
+        if action in ("asr-run", "asr-evaluate"):
+            reference = detail["asr_reference"]
+            if not reference:
+                from involta_guide.infrastructure.voice.backfill import ensure_copy
+
+                reference = ensure_copy(
+                    ctx.settings, ctx.engine, str(review_id), voice_client(request)
+                )
+            base_path = "/admin/submissions/" + reference + "/asr-runs"
+            payload: dict[str, Any] = {
+                "idempotency_key": str(UUID(str(form.get("idempotency_key"))))
+            }
+            if action == "asr-evaluate":
+                base_path += "/" + str(int(str(form.get("asr_run")))) + "/evaluation"
+                payload.update(
+                    revision=int(str(form.get("asr_revision"))),
+                    candidates_digest=str(form.get("candidates_digest") or ""),
+                    preferred_engine=str(form.get("preferred_engine") or "") or None,
+                    reference_text=str(form.get("reference_text") or "").strip() or None,
+                    note=str(form.get("note") or ""),
+                )
+            else:
+                payload["force"] = form.get("force") == "yes"
+            voice_client(request).json(
+                "POST", base_path, json=payload, actor_session=principal["id"]
+            )
+            return RedirectResponse(ctx.settings.path(detail["path"]), status_code=303)
         if action in ("new-run", "revalidate"):
             if not detail["link"]:
                 raise HTTPException(409, "Старая запись обрабатывается прежним исполнителем")

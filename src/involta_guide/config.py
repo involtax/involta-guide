@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     voice_url: str = "http://voice-api:3100"
     voice_service_secret: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"
-    transcription_model: str = "large-v3"
+    transcription_model: str = "gigaam"
     site_url: str = "http://localhost:3000/guide"
     base_path: str = "/guide"
     release_sha: str = "development"

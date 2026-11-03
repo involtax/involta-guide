@@ -23,7 +23,7 @@ from .service import VoiceService
 from .worker import Worker
 
 MODELS = {
-    "transcription": ["large-v3-russian", "large-v3"],
+    "transcription": ["gigaam", "parakeet"],
     "analysis": ["gpt-4.1-mini", "gpt-4.1", "gpt-6.1-sol"],
 }
 
@@ -355,6 +355,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         after = service.status(str(reference), admin=True)
         audit_admin(request, "revalidate", {"reference": str(reference), "run": number}, after)
         return after
+
+    @app.get("/internal/v1/admin/submissions/{reference}/asr", dependencies=dependencies)
+    def asr_report(reference: UUID) -> Any:
+        from .evaluation import report
+
+        return report(engine, str(reference))
+
+    @app.post(
+        "/internal/v1/admin/submissions/{reference}/asr-runs",
+        dependencies=dependencies,
+        status_code=202,
+    )
+    def asr_run(request: Request, reference: UUID, body: dict[str, Any]) -> Any:
+        from .evaluation import queue_evaluation
+
+        result = queue_evaluation(
+            engine,
+            settings,
+            str(reference),
+            str(UUID(str(body.get("idempotency_key") or ""))),
+            bool(body.get("force", False)),
+        )
+        audit_admin(request, "asr-evaluation-run", {"reference": str(reference)}, result)
+        return result
+
+    @app.post(
+        "/internal/v1/admin/submissions/{reference}/asr-runs/{number}/evaluation",
+        dependencies=dependencies,
+    )
+    def asr_vote(request: Request, reference: UUID, number: int, body: dict[str, Any]) -> Any:
+        from .evaluation import Evaluation, evaluate
+
+        session = request.headers.get("x-guide-session")
+        if not session:
+            raise HTTPException(403, "Требуется сессия редактора")
+        return evaluate(
+            engine, str(reference), number, Evaluation.model_validate(body), str(UUID(session))
+        )
 
     @app.get("/internal/v1/admin/settings", dependencies=dependencies)
     def get_settings() -> Any:

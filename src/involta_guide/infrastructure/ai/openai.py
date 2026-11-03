@@ -315,6 +315,18 @@ class OpenAIProvider:
             files={"audio": ("recording", self.storage.read(path), mime)},
         )
         reference = result["reference"]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO voice_archives(source_review,reference,sha256) VALUES(:source,:reference,:sha) ON CONFLICT(source_review) DO NOTHING"
+                ),
+                {
+                    "source": str(source["review_id"]),
+                    "reference": reference,
+                    "sha": hashlib.sha256(self.storage.read(path)).hexdigest(),
+                },
+            )
+
         self.audit.record(
             job_id,
             "local_transcription_queued",

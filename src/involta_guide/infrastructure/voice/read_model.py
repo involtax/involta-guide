@@ -121,6 +121,16 @@ class VoiceReadModel:
             assert location is not None
             link = row(conn, "SELECT * FROM voice_links WHERE review_id=:id", id=review_id)
             text_review = row(conn, "SELECT * FROM review_texts WHERE review_id=:id", id=review_id)
+            archived_asr = row(
+                conn, "SELECT reference FROM voice_archives WHERE source_review=:id", id=review_id
+            )
+            asr_reference = (
+                str(link["reference"])
+                if link
+                else str(archived_asr["reference"])
+                if archived_asr
+                else None
+            )
             proposals = [
                 dict(p)
                 for p in conn.execute(
@@ -217,6 +227,7 @@ class VoiceReadModel:
             }
         return {
             "affected_revisions": affected_revisions,
+            "asr_reference": asr_reference,
             "review": review,
             "text": text_review,
             "location": location,

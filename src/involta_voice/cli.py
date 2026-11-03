@@ -22,7 +22,7 @@ def main() -> None:
         print(json.dumps(create_app(settings).openapi(), ensure_ascii=False, indent=2))
         return
     if args.command == "prepare-model":
-        from .whisper import prepare
+        from .asr import prepare
 
         print(prepare(settings))
         return

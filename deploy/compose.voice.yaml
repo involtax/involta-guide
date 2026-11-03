@@ -146,11 +146,11 @@
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
-        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models"
       },
       "volumes": [
         "voice-audio:/app/var/voice",
-        "voice-models:/app/var/voice-models:ro"
+        "asr-models:/app/var/asr-models:ro"
       ],
       "command": [
         "voice-worker"
@@ -253,10 +253,10 @@
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
-        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models"
       },
       "volumes": [
-        "voice-models:/app/var/voice-models"
+        "asr-models:/app/var/asr-models"
       ],
       "command": [
         "voice",
@@ -268,7 +268,7 @@
   "volumes": {
     "voice-postgres": {},
     "voice-audio": {},
-    "voice-models": {}
+    "asr-models": {}
   },
   "networks": {
     "voice-private": {

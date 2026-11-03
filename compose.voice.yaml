@@ -46,11 +46,11 @@ services:
     environment:
       VOICE_DATA_DIR: /app/var/voice
       VOICE_HEARTBEAT_FILE: /tmp/involta-voice-worker
-      VOICE_WHISPER_MODELS_DIR: /app/var/voice-models
+      VOICE_ASR_MODELS_DIR: /app/var/asr-models
     command: [voice-worker]
     # Offline serving: weights must be prepared before worker startup.
     stop_grace_period: 120s
-    volumes: [voice-audio:/app/var/voice, voice-models:/app/var/voice-models:ro]
+    volumes: [voice-audio:/app/var/voice, asr-models:/app/var/asr-models:ro]
     depends_on:
       voice-prepare-model:
         condition: service_completed_successfully
@@ -66,11 +66,11 @@ services:
     image: ${VOICE_IMAGE:-involta-voice:local}
     env_file: ${VOICE_ENV_FILE:-.env.voice}
     environment:
-      VOICE_WHISPER_MODELS_DIR: /app/var/voice-models
+      VOICE_ASR_MODELS_DIR: /app/var/asr-models
     command: [voice, prepare-model]
-    volumes: [voice-models:/app/var/voice-models]
+    volumes: [asr-models:/app/var/asr-models]
     restart: "no"
 volumes:
   voice-postgres:
   voice-audio:
-  voice-models:
+  asr-models:

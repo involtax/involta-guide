@@ -162,6 +162,13 @@ class VoiceService:
             n=number,
             kind="analysis" if transcript is not None else "transcription",
         )
+        if transcript is None and frozen.get("asr_beta"):
+            execute(
+                conn,
+                "INSERT INTO stages(submission,run,kind) VALUES(:id,:n,'comparison')",
+                id=reference,
+                n=number,
+            )
         return number
 
     def new_run(
@@ -197,7 +204,7 @@ class VoiceService:
                 return {"reference": reference, "run": previous["number"], "state": "accepted"}
             active = row(
                 conn,
-                "SELECT 1 FROM stages WHERE submission=:id AND state IN ('queued','running')",
+                "SELECT 1 FROM stages WHERE submission=:id AND kind IN ('transcription','analysis') AND state IN ('queued','running')",
                 id=reference,
             )
             if active:
@@ -237,8 +244,20 @@ class VoiceService:
                 n=submission["active_run"],
             )
             ack = row(conn, "SELECT sequence FROM delivery_ack WHERE consumer='guide'")
-        current = [s for s in stages if s["run"] == submission["active_run"]]
-        failed = next((s for s in current if s["state"] in ("failed", "unknown")), None)
+        current = [
+            s
+            for s in stages
+            if s["run"] == submission["active_run"] and s["kind"] in ("transcription", "analysis")
+        ]
+        failed = next(
+            (
+                s
+                for s in current
+                if s["state"] in ("failed", "unknown")
+                and (s["kind"] == "analysis" or submission["transcript"] is None)
+            ),
+            None,
+        )
         if archived:
             state = "archived"
         elif failed:
