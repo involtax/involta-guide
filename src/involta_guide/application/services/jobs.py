@@ -312,9 +312,10 @@ class JobService:
                 ensure_ascii=False,
             )
             prompt = saved_prompt or prompt
+            # Nullable ranking fields are required keys at the ContentInput boundary.
             generated = Generation.model_validate(
                 self.provider.generate(prompt, job["id"])
-            ).model_dump(mode="json", exclude_none=True)
+            ).model_dump(mode="json")
             # Finish retrieving an already-paid response even if an editor changed the page.
             # Save it for audit, but never overwrite the editor's new version.
             if baseline_changed:
