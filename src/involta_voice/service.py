@@ -62,7 +62,9 @@ class VoiceService:
         if old:
             self._same(old, payload_hash)
             return self.status(str(old["reference"]), visitor)
-        name, duration = self.storage.save(content, mime)
+        name, duration = self.storage.save(
+            content, mime, min_duration_seconds=5 if purpose == "review" else 1
+        )
         reference = str(uuid4())
         try:
             with self.engine.begin() as conn:

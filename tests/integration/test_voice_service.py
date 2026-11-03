@@ -58,13 +58,13 @@ def voice_database(tmp_path):
             conn.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(name)))
 
 
-def recording():
+def recording(seconds=6):
     stream = io.BytesIO()
     with wave.open(stream, "wb") as audio:
         audio.setnchannels(1)
         audio.setsampwidth(2)
         audio.setframerate(8000)
-        audio.writeframes(b"\0\0" * 16000)
+        audio.writeframes(b"\0\0" * int(8000 * seconds))
     return stream.getvalue()
 
 

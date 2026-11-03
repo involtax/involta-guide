@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.datastructures import UploadFile
@@ -45,7 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(VoiceError)
     async def voice_error(request: Request, exc: VoiceError) -> JSONResponse:
         return JSONResponse(
-            {"error": {"code": exc.code, "message": str(exc)}}, status_code=exc.status
+            {"error": {"code": exc.code, "message": str(exc), **exc.details}},
+            status_code=exc.status,
         )
 
     @app.exception_handler(SQLAlchemyError)
@@ -95,6 +97,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with engine.connect() as conn:
             execute(conn, "SELECT version FROM voice_schema_versions")
         return {"status": "ready"}
+
+    app.mount("/vad", StaticFiles(directory=Path(__file__).parent / "static/vad"), name="vad")
 
     @app.get("/widget.v1.js")
     def widget() -> FileResponse:

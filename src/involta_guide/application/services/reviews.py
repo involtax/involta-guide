@@ -2,7 +2,7 @@ import hashlib
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from involta_guide.application.ports.repositories import AudioStorage, Repository, UowFactory
-from involta_guide.domain.entities import Conflict, RuleViolation
+from involta_guide.domain.entities import AudioTooShort, Conflict, RuleViolation
 
 from .editorial import require
 
@@ -63,6 +63,8 @@ class ReviewService:
             uow.repo.rate_limit("audio-ip:" + ip_hash, 30, 3600)
         name, duration = self.storage.save(content, mime)
         try:
+            if duration < 5:
+                raise AudioTooShort(duration)
             with self.uow() as uow:
                 repo = uow.repo
                 # guard_pending serializes intake. Recheck under that same lock so

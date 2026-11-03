@@ -11,6 +11,14 @@ class RuleViolation(ValueError):
     pass
 
 
+class AudioTooShort(RuleViolation):
+    def __init__(self, duration_seconds: float) -> None:
+        super().__init__(
+            "Слишком коротко. Запиши хотя бы 5 секунд: назови ресторан и расскажи, что думаешь."
+        )
+        self.duration_seconds = duration_seconds
+
+
 class Conflict(RuleViolation):
     pass
 

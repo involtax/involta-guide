@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Голосовой отзыв · локальный стенд</title
+  ><meta name="robots" content="noindex" /><link
+    rel="stylesheet"
+    href="/guide/assets/style.css"
+  />
+  <header class="header">
+    <a class="brand" href="/">инвольта<span>гид</span><sup>стенд</sup></a
+    ><span class="header-note">Настоящий микрофон · отправка перехвачена</span>
+  </header>
+  <main>
+    <section class="city-hero">
+      <h1>Где поесть<br /><span class="serif">в Иваново.</span></h1>
+      <p class="lead">
+        Локальный стенд настоящего компонента. Запись остаётся в этом браузере;
+        отзывы в production не создаются.
+      </p>
+    </section>
+    <div id="guide-voice"></div>
+    <details style="margin: 20px 0 60px">
+      <summary>Управление стендом · mock transport</summary>
+      <label
+        >Ответ отправки
+        <select id="scenario">
+          <option value="success">Успешная доставка</option>
+          <option value="html">HTML 502</option>
+          <option value="lost">Потеря ответа после принятия</option>
+          <option value="short">Backend: audio_too_short</option>
+        </select></label
+      ><label
+        ><input id="vad-failure" type="checkbox" />Модель VAD недоступна (до
+        старта)</label
+      >
+      <p id="mock-status" role="note">
+        Отправок: 0. Секреты и аудио в консоль не пишутся.
+      </p>
+    </details>
+  </main>
+  <script>
+    (() => {
+      const original = window.fetch.bind(window),
+        accepted = new Map();
+      let uploads = 0,
+        lost = false;
+      window.fetch = async (input, options = {}) => {
+        const url = new URL(
+          typeof input === "string" ? input : input.url,
+          location.href,
+        );
+        if (
+          url.pathname.endsWith(".onnx") &&
+          document.getElementById("vad-failure").checked
+        )
+          throw new TypeError("Stand: VAD model unavailable");
+        if (!url.pathname.startsWith("/guide/voice/api/v1/"))
+          return original(input, options);
+        const json = (data, status = 200) =>
+          new Response(JSON.stringify(data), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          });
+        if (url.pathname.endsWith("/identity"))
+          return json({ ready: true, actor: "visitor" });
+        if (url.pathname.endsWith("/mine")) return json({ rows: [] });
+        if (url.pathname.includes("/debug/"))
+          return json(
+            options.method === "POST" ? { saved: true } : { events: [] },
+          );
+        if (url.pathname.endsWith("/submissions")) {
+          ++uploads;
+          document.getElementById("mock-status").textContent =
+            `Отправок: ${uploads}. Mock: ${options.body.size} байт, ${options.body.type}.`;
+          const scenario = document.getElementById("scenario").value;
+          await new Promise((r) => setTimeout(r, 500));
+          if (scenario === "html")
+            return new Response(
+              "<html><h1>502 Bad Gateway</h1><p>Полный тестовый ответ прокси.</p></html>",
+              { status: 502, headers: { "Content-Type": "text/html" } },
+            );
+          if (scenario === "short")
+            return json(
+              {
+                error: {
+                  code: "audio_too_short",
+                  message:
+                    "Сервер определил: аудио короче 5 секунд. Запиши заново.",
+                  min_duration_seconds: 5,
+                },
+              },
+              422,
+            );
+          const key = url.searchParams.get("idempotency_key");
+          if (!accepted.has(key)) accepted.set(key, crypto.randomUUID());
+          if (scenario === "lost" && !lost) {
+            lost = true;
+            throw new TypeError("Mock: accepted response lost");
+          }
+          return json({ reference: accepted.get(key), state: "accepted" }, 202);
+        }
+        return json({
+          state: "result_ready",
+          moderation: "pending",
+          transcript:
+            "Тестовая расшифровка: это демонстрация интерфейса. ASR и OpenAI не запускались.",
+        });
+      };
+    })();
+  </script>
+  <script
+    defer
+    src="/guide/voice/widget.v1.js"
+    data-target="guide-voice"
+    data-api-base="/guide/voice/api/v1"
+    data-location="ivanovo"
+  ></script>
+</html>

@@ -115,7 +115,7 @@ try:
             audio.setnchannels(1)
             audio.setsampwidth(2)
             audio.setframerate(8000)
-            audio.writeframes(b"\0\0" * 16000)
+            audio.writeframes(b"\0\0" * 48000)
         r = c.post(
             "/guide/voice/api/v1/submissions",
             headers={"origin": "http://127.0.0.1:33080"},

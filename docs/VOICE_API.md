@@ -202,3 +202,17 @@ The card inherits PR17's common admin shell and always shows the GigaAM/Parakeet
 comparison immediately after audio, with explicit waiting/unavailable states.
 Settings failures cannot hide saved ASR results. GETs do not queue recognition,
 copy recordings, moderate reviews or replay commands.
+
+
+## Minimum duration for new reviews
+
+New intake independently measures audio with ffprobe before submission/queue creation.
+Minimum is 5.0 seconds; short uploads return HTTP 422 with
+`{"error":{"code":"audio_too_short","message":"…","min_duration_seconds":5,"duration_seconds":4.999}}`.
+The same-origin gateway preserves this response. Encoder padding does not extend the
+measured audio duration. Previously accepted idempotent submissions are resolved
+before new validation, archive/internal ASR imports retain their previous minimum,
+and OutboxEvent.duration still accepts historical >=1-second events.
+
+The centered microphone/stop UI, silence gate, stand, pinned browser assets, screenshots
+and actual checks are documented in [VOICE_WIDGET_UX_IMPLEMENTATION.md](VOICE_WIDGET_UX_IMPLEMENTATION.md).

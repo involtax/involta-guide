@@ -15,7 +15,7 @@ class AudioStorage:
         self.settings = settings
         self.root = settings.data_dir / "audio"
 
-    def save(self, content: bytes, mime: str) -> tuple[str, float]:
+    def save(self, content: bytes, mime: str, min_duration_seconds: float = 1) -> tuple[str, float]:
         formats = {
             "audio/webm": ("webm", content[:4] == b"\x1aE\xdf\xa3"),
             "audio/ogg": ("ogg", content[:4] == b"OggS"),
@@ -43,8 +43,10 @@ class AudioStorage:
                     "ffprobe",
                     "-v",
                     "error",
+                    "-select_streams",
+                    "a:0",
                     "-show_entries",
-                    "format=duration:stream=codec_type,duration:packet=pts_time,duration_time",
+                    "format=duration:stream=codec_type,duration,sample_rate:frame=nb_samples",
                     "-of",
                     "json",
                     str(temporary),
@@ -56,19 +58,24 @@ class AudioStorage:
             info = json.loads(probe.stdout)
             if not any(s.get("codec_type") == "audio" for s in info.get("streams", [])):
                 raise VoiceError("Аудиопоток не найден")
-            durations = [float(info.get("format", {}).get("duration") or 0)]
-            durations += [float(s.get("duration") or 0) for s in info.get("streams", [])]
-            packets = info.get("packets", [])
-            if packets:
-                durations.append(
-                    max(
-                        float(p.get("pts_time") or 0) + float(p.get("duration_time") or 0)
-                        for p in packets
-                    )
-                    - min(float(p.get("pts_time") or 0) for p in packets)
+            stream = info["streams"][0]
+            durations = [
+                float(info.get("format", {}).get("duration") or 0),
+                float(stream.get("duration") or 0),
+            ]
+            samples = sum(int(frame.get("nb_samples") or 0) for frame in info.get("frames", []))
+            if samples and stream.get("sample_rate"):
+                durations.append(samples / int(stream["sample_rate"]))
+            duration = min((d for d in durations if d > 0 and math.isfinite(d)), default=0)
+            if min_duration_seconds == 5 and duration < 5:
+                raise VoiceError(
+                    "Слишком коротко. Запиши хотя бы 5 секунд: назови ресторан и расскажи, что думаешь.",
+                    "audio_too_short",
+                    422,
+                    min_duration_seconds=5,
+                    duration_seconds=duration,
                 )
-            duration = max(durations)
-            if not math.isfinite(duration) or not 1 <= duration <= 121:
+            if not min_duration_seconds <= duration <= 121:
                 raise VoiceError("Длительность должна быть от 1 до 120 секунд")
             os.replace(temporary, target)
             descriptor = os.open(self.root, os.O_RDONLY)

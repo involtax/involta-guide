@@ -190,8 +190,8 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.locator("[data-consent]")).to_have_count(0)
                 # One widget uses the server session to mark administrator commands.
                 page.goto(base + "/ivanovo")
-                page.get_by_role("button", name="● Записать отзыв").click()
-                time.sleep(2.2)
+                page.get_by_role("button", name="Записать отзыв", exact=True).click()
+                time.sleep(5.3)
                 page.get_by_role("button", name="Остановить", exact=False).click()
                 page.get_by_role("button", name="Отправить отзыв").click()
                 expect(page.get_by_role("status")).to_contain_text(

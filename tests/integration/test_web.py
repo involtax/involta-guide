@@ -121,7 +121,7 @@ def test_upload_duration_signature_and_history(database):
             audio.setnchannels(1)
             audio.setsampwidth(2)
             audio.setframerate(8000)
-            audio.writeframes(b"\0\0" * 16000)
+            audio.writeframes(b"\0\0" * 48000)
         form = {"locationId": location["id"], "duration": "9999"}
         response = client.post(
             "/guide/api/reviews",
@@ -133,7 +133,7 @@ def test_upload_duration_signature_and_history(database):
         history = client.get("/guide/api/my-reviews?location=" + location["id"]).json()
         assert len(history) == 1
         review = app.state.context.queries.get("reviews", response.json()["id"])
-        assert 1.9 < review["duration_seconds"] < 2.1
+        assert 5.9 < review["duration_seconds"] < 6.1
         bad = client.post(
             "/guide/api/reviews",
             data=form,

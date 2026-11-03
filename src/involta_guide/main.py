@@ -13,7 +13,7 @@ from involta_guide.application.services.jobs import JobService
 from involta_guide.application.services.locations import LocationService, Queries
 from involta_guide.application.services.reviews import ReviewService
 from involta_guide.config import Settings
-from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
+from involta_guide.domain.entities import AudioTooShort, Conflict, NotFound, RuleViolation
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
@@ -102,6 +102,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
     app.mount(settings.path("/assets"), StaticFiles(directory=directory / "static"), name="assets")
 
+    import involta_voice
+
+    assert involta_voice.__file__ is not None
+    app.mount(
+        settings.path("/voice/vad"),
+        StaticFiles(directory=Path(involta_voice.__file__).parent / "static/vad"),
+        name="voice-vad",
+    )
+
     @app.get(settings.path("/widget.js"))
     def widget() -> object:
         from fastapi.responses import FileResponse
@@ -126,6 +135,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RuleViolation)
     def business_error(request: Request, exc: RuleViolation) -> JSONResponse:
+        if isinstance(exc, AudioTooShort):
+            return JSONResponse(
+                {
+                    "error": {
+                        "code": "audio_too_short",
+                        "message": str(exc),
+                        "min_duration_seconds": 5,
+                        "duration_seconds": exc.duration_seconds,
+                    }
+                },
+                status_code=422,
+            )
         return JSONResponse(
             {"error": str(exc)},
             status_code=404

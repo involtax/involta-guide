@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from involta_guide.domain.entities import RuleViolation
+from involta_guide.domain.entities import AudioTooShort, RuleViolation
 
 
 class FileAudioStorage:
@@ -33,8 +33,10 @@ class FileAudioStorage:
                     "ffprobe",
                     "-v",
                     "error",
+                    "-select_streams",
+                    "a:0",
                     "-show_entries",
-                    "format=duration:stream=codec_type,duration:packet=pts_time,duration_time",
+                    "format=duration:stream=codec_type,duration,sample_rate:frame=nb_samples",
                     "-of",
                     "json",
                     str(path),
@@ -46,19 +48,17 @@ class FileAudioStorage:
             info = json.loads(probe.stdout)
             if not any(stream.get("codec_type") == "audio" for stream in info.get("streams", [])):
                 raise RuleViolation("Аудиопоток не найден")
+            stream = info["streams"][0]
             durations = [
                 float(info.get("format", {}).get("duration") or 0),
-                *[float(stream.get("duration") or 0) for stream in info.get("streams", [])],
+                float(stream.get("duration") or 0),
             ]
-            packets = info.get("packets", [])
-            if packets:
-                starts = [float(p.get("pts_time") or 0) for p in packets]
-                ends = [
-                    float(p.get("pts_time") or 0) + float(p.get("duration_time") or 0)
-                    for p in packets
-                ]
-                durations.append(max(ends) - min(starts))
-            duration = max(durations)
+            samples = sum(int(frame.get("nb_samples") or 0) for frame in info.get("frames", []))
+            if samples and stream.get("sample_rate"):
+                durations.append(samples / int(stream["sample_rate"]))
+            duration = min((d for d in durations if d > 0 and math.isfinite(d)), default=0)
+            if 0 < duration < 1:
+                raise AudioTooShort(duration)
             if not math.isfinite(duration) or not 1 <= duration <= 121:
                 raise RuleViolation("Реальная длительность записи должна быть от 1 до 120 секунд")
             return name, duration
