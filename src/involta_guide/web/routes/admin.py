@@ -397,13 +397,24 @@ def routes(prefix: str) -> APIRouter:
                 detail = AIAudit(ctx.engine, ctx.settings).detail(new_id)
                 assert detail is not None
                 return log_redirect(request, detail["job"]["log_path"])
-            if action == "resume-generation":
+            if action in ("resume-generation", "reprocess-generation"):
                 from involta_guide.infrastructure.ai.background import resume_generation
 
                 job_id = submitted_log(request, form)
-                resume_generation(ctx.engine, job_id, ctx.settings.generation_wait_seconds)
+                reprocess = action == "reprocess-generation"
+                resume_generation(
+                    ctx.engine,
+                    job_id,
+                    ctx.settings.generation_wait_seconds,
+                    reprocess=reprocess,
+                    expected_version=uid(key(form, "expected")) if key(form, "expected") else None,
+                )
                 store = AIAudit(ctx.engine, ctx.settings)
-                store.record(job_id, "generation_resumed", {"new_generation": False})
+                store.record(
+                    job_id,
+                    "generation_reprocessed" if reprocess else "generation_resumed",
+                    {"new_generation": False},
+                )
                 detail = store.detail(job_id)
                 assert detail is not None
                 return log_redirect(request, detail["job"]["log_path"])
@@ -453,6 +464,17 @@ def routes(prefix: str) -> APIRouter:
             message = (
                 str(exc) if isinstance(exc, RuleViolation) else "Проверьте поля формы и формат JSON"
             )
+            if (
+                action in ("resume-generation", "reprocess-generation")
+                and key(form, "log_number").isdigit()
+            ):
+                store = AIAudit(ctx.engine, ctx.settings)
+                reference = store.resolve(key(form, "log_slug"), int(key(form, "log_number")))
+                detail = store.detail(reference) if reference else None
+                if detail:
+                    return log_redirect(
+                        request, detail["job"]["log_path"] + "?" + urlencode({"message": message})
+                    )
             if action == "intro" and location:
                 selected = ctx.queries.location(uid(location))
                 selected["content"]["intro"] = key(form, "intro")
