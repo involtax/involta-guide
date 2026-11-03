@@ -181,6 +181,8 @@ def test_restaurant_browser_in_chromium(database, tmp_path):
         page.wait_for_selector(".restaurant-record h3:text('Казанский ресторан')")
         page.locator(".restaurant-city", has_text="Иваново").click()
         page.wait_for_selector(".restaurant-hours")
+        # HTMX attaches the new input handlers during its settle phase after the swap.
+        page.wait_for_load_state("networkidle")
         page.locator("#restaurant-city-search").fill("ничего")
         page.wait_for_selector(".restaurant-record", state="detached")
         assert "наполненных городов нет" in page.locator(".restaurant-sidebar").inner_text()
