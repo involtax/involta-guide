@@ -1,6 +1,7 @@
 {%set d=audit_detail%}
 <header>
 <h2>{{d.job.location_name}} / {{d.job.run_number}}</h2>
+<p><a href="{{settings.path('/'+d.job.location_slug)}}">Открыть страницу: {{d.job.location_name}} ↗</a></p>
 <div id="log-live" data-url="{{settings.path(d.job.log_path)}}/status" data-active="{{'true' if d.job.status in ['queued','running'] else 'false'}}">
 <p role="status"><strong data-stage>{{d.job.stage_label}}</strong></p>
 <p data-progress>{%if d.job.response_id%}Запрос принят OpenAI. Проверок состояния: {{d.job.poll_count}}.{%endif%}</p>

@@ -66,6 +66,51 @@ def test_public_admin_htmx_and_csrf(database):
         assert client.get("/guide/health/ready").json()["status"] == "ready"
 
 
+def test_admin_cookie_and_database_expiry_renew_together_and_logout_stays_final(database):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, digest
+
+    settings, engine = database
+    with TestClient(create_app(settings)) as client:
+        csrf = login(client)
+        session_token = client.cookies.get("guide_admin")
+        cookie = next(c for c in client.cookies.jar if c.name == "guide_admin")
+        assert cookie._rest["SameSite"] == "lax"
+        assert cookie.expires > (datetime.now(UTC) + timedelta(days=364)).timestamp()
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE admin_sessions SET expires_at=now()+interval '1 hour' "
+                    "WHERE token_hash=:hash"
+                ),
+                {"hash": digest(session_token)},
+            )
+        response = client.get("/guide/health/live")
+        renewed_cookie = response.headers["set-cookie"]
+        assert f"Max-Age={ADMIN_SESSION_MAX_AGE}" in renewed_cookie
+        assert "SameSite=lax" in renewed_cookie
+        with engine.connect() as conn:
+            expiry = conn.execute(
+                text("SELECT expires_at FROM admin_sessions WHERE token_hash=:hash"),
+                {"hash": digest(session_token)},
+            ).scalar_one()
+        assert expiry > datetime.now(UTC) + timedelta(days=364)
+        assert "set-cookie" not in client.get("/guide/health/live").headers
+        response = client.post(
+            "/guide/admin/logout",
+            data={"_csrf": csrf},
+            headers={"origin": "http://testserver"},
+            follow_redirects=False,
+        )
+        assert "Max-Age=0" in response.headers["set-cookie"]
+        assert client.cookies.get("guide_admin") is None
+        client.cookies.set("guide_admin", session_token)
+        assert "set-cookie" not in client.get("/guide/health/live").headers
+
+
 def test_upload_duration_signature_and_history(database):
     settings, engine = database
     app = create_app(settings)

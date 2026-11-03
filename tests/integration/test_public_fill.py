@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from involta_guide.application.services.editorial import EditorialService
 from involta_guide.infrastructure.ai.openai import ProviderUnavailable
@@ -87,14 +89,32 @@ def test_manual_draft_or_published_data_is_never_overwritten(database):
     assert queries.get("locations", location["id"])["draft_version"] == version
 
 
-def test_admin_generation_keeps_manual_publication(database):
+def test_admin_generation_updates_public_page_without_manual_publication(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     assert service.enqueue(location["id"]) == 1
     assert service.enqueue_public_fill(location["id"])["state"] == "queued"
     assert queries.rows("audit", {"action": "temporary_public_fill"}) == []
     assert Worker(queue, service).once()
-    assert queries.get("locations", location["id"])["published_version"] is None
-    assert queries.get("locations", location["id"])["draft_version"]
+    stored = queries.get("locations", location["id"])
+    assert stored["published_version"]
+    assert stored["published_version"] == stored["draft_version"]
+    assert queries.public(location["slug"])["content"]["intro"] == "Сгенерировано"
+    assert service.enqueue_public_fill(location["id"])["state"] == "ready"
+    assert len(queries.rows("jobs")) == 1
+
+
+def test_bulk_initial_fill_skips_already_published_location_even_without_legacy_draft(database):
+    _, engine, _, queries, location, service, queue = setup(database)
+    service.enqueue(location["id"])
+    assert Worker(queue, service).once()
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE locations SET active=0 WHERE id<>:id"), {"id": location["id"]})
+        conn.execute(
+            text("UPDATE locations SET draft='[]'::jsonb WHERE id=:id"),
+            {"id": location["id"]},
+        )
+    assert service.enqueue(scope="empty") == 0
+    assert len(queries.rows("jobs")) == 1
 
 
 def test_editor_change_during_generation_is_not_overwritten(database):
@@ -131,7 +151,8 @@ def test_public_provider_failure_waits_for_manual_retry(database):
     assert len(queries.rows("jobs")) == 2
 
 
-def test_unpublishable_result_does_not_partially_write_or_publish(database):
+@pytest.mark.parametrize("public_fill", [False, True])
+def test_unpublishable_result_does_not_partially_write_or_publish(database, public_fill):
     class MissingPhoneAI(FakeAI):
         def generate(self, prompt, job_id):
             generated = super().generate(prompt, job_id)
@@ -139,7 +160,10 @@ def test_unpublishable_result_does_not_partially_write_or_publish(database):
             return generated
 
     settings, engine, uow, queries, location, service, queue = setup(database, MissingPhoneAI())
-    service.enqueue_public_fill(location["id"])
+    if public_fill:
+        service.enqueue_public_fill(location["id"])
+    else:
+        service.enqueue(location["id"])
     assert Worker(queue, service).once()
     assert queries.rows("jobs")[0]["status"] == "failed"
     assert queries.rows("versions") == []

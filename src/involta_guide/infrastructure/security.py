@@ -11,6 +11,9 @@ from involta_guide.application.ports.repositories import Record, UowFactory
 from involta_guide.config import Settings
 from involta_guide.domain.entities import RuleViolation
 
+ADMIN_SESSION_TTL = timedelta(days=365)
+ADMIN_SESSION_MAX_AGE = int(ADMIN_SESSION_TTL.total_seconds())
+
 
 def digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
@@ -66,11 +69,29 @@ class Security:
                     "id": str(uuid4()),
                     "token_hash": digest(token),
                     "csrf_hash": digest(self.csrf(token)),
-                    "expires_at": datetime.now(UTC) + timedelta(hours=8),
+                    "expires_at": datetime.now(UTC) + ADMIN_SESSION_TTL,
                 },
             )
             uow.repo.audit("admin_login", "admin")
         return token
+
+    def renew_admin(self, token: str) -> bool:
+        session = self.principal(token)
+        now = datetime.now(UTC)
+        if session is None or session["expires_at"] > now + ADMIN_SESSION_TTL - timedelta(days=1):
+            return False
+        with self.uow() as uow:
+            # Recheck under a lock so renewal cannot revive an expired or revoked session.
+            current = uow.repo.get("admin_sessions", session["id"], lock=True)
+            now = datetime.now(UTC)
+            if current is None or current["revoked"] or current["expires_at"] <= now:
+                return False
+            if current["expires_at"] > now + ADMIN_SESSION_TTL - timedelta(days=1):
+                return False
+            uow.repo.change(
+                "admin_sessions", current["id"], {"expires_at": now + ADMIN_SESSION_TTL}
+            )
+        return True
 
     def alex_login(self, secret: str) -> str | None:
         expected = self.settings.alex_secret.get_secret_value()

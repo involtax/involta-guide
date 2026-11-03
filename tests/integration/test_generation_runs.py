@@ -62,7 +62,7 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
         provider.close()
 
 
-def test_manual_repeat_creates_new_log_and_draft_without_replacing_published(database):
+def test_manual_repeat_creates_new_log_and_replaces_published_page(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     service.enqueue_public_fill(location["id"])
     first = queries.rows("jobs")[0]
@@ -77,8 +77,9 @@ def test_manual_repeat_creates_new_log_and_draft_without_replacing_published(dat
     assert queries.get("jobs", new_id)["prompt"] == prompt
     assert Worker(queue, service).once()
     location_after = queries.get("locations", location["id"])
-    assert location_after["published_version"] == published
-    assert location_after["draft_version"] != published
+    assert location_after["published_version"] != published
+    assert location_after["draft_version"] == location_after["published_version"]
+    assert queries.get("versions", published)["published"] == 1
     audit = AIAudit(engine, settings)
     assert audit.resolve("ivanovo", 1, public_only=True) == first["id"]
     assert audit.resolve("ivanovo", 2, public_only=True) == new_id

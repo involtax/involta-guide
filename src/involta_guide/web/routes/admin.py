@@ -19,6 +19,7 @@ from involta_guide.infrastructure.ai.catalog import (
     PRICES_CHECKED,
     PRICING_URL,
 )
+from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE
 from involta_guide.web.http import (
     admin_token,
     check_csrf,
@@ -235,11 +236,11 @@ def routes(prefix: str) -> APIRouter:
         response.set_cookie(
             "guide_admin",
             token,
-            max_age=28800,
+            max_age=ADMIN_SESSION_MAX_AGE,
             path=prefix,
             httponly=True,
             secure=ctx.settings.cookie_secure,
-            samesite="strict",
+            samesite="lax",
         )
         return response
 
@@ -394,7 +395,9 @@ def routes(prefix: str) -> APIRouter:
                     model=key(form, "model") or None,
                 )
                 return redirect(
-                    request, "fill", f"Поставлено в очередь: {count}. Публикация отдельно."
+                    request,
+                    "fill",
+                    f"Поставлено в очередь: {count}. Результат сразу появится на странице.",
                 )
             if action == "retry":
                 ctx.jobs.retry(submitted_log(request, form))

@@ -108,14 +108,11 @@ def test_restart_and_repeated_poll_failures_never_repeat_post(database):
         assert len(queries.rows("ai_usage")) == 1
         assert len(queries.rows("versions")) == 1
         assert queries.rows("versions")[0]["prompt"] == sent_prompt
-        assert queries.get("locations", location["id"])["published_version"] is None
+        assert queries.get("locations", location["id"])["published_version"]
         saved = task(engine, job)
         assert saved["response_json"]["status"] == "completed" and saved["poll_count"] == 5
         assert queries.rows("ai_usage")[0]["input_tokens"] == 150
-        assert (
-            AIAudit(engine, settings).detail(job["id"])["job"]["stage_label"]
-            == "Черновик создан; ещё не опубликован"
-        )
+        assert AIAudit(engine, settings).detail(job["id"])["job"]["stage_label"] == "Опубликовано"
     finally:
         provider.close()
 

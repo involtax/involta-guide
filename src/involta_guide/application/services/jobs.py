@@ -179,11 +179,11 @@ class JobService:
             for location in sorted(rows, key=lambda row: row["id"]):
                 if not location_id and (
                     (not location["listed"] and not location["published_version"])
-                    or (scope == "empty" and location["draft"])
+                    or (scope == "empty" and self._has_data(location))
                 ):
                     continue
                 location = require(repo, "locations", location["id"], lock=True)
-                if not location_id and scope == "empty" and location["draft"]:
+                if not location_id and scope == "empty" and self._has_data(location):
                     continue
                 count += self._queue_generation(repo, location, model=model) is not None
             repo.audit(
@@ -346,8 +346,8 @@ class JobService:
                     model=generation_model,
                     inherit=False,
                 )
+                publish(repo, location["id"], version_id, location["published_version"])
                 if is_public:
-                    publish(repo, location["id"], version_id, None)
                     repo.audit("temporary_public_fill_published", location["id"], version_id)
                 repo.audit(
                     "ai_trace", job["id"], json.dumps({"event": "response_validated", "data": {}})

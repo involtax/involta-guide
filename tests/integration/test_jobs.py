@@ -118,7 +118,8 @@ def test_queue_concurrent_claim_lease_fencing_and_recovery(database):
         service.process(old)
     service.process(new)
     assert queries.get("jobs", old["id"])["status"] == "done"
-    assert queries.get("locations", location["id"])["published_version"] is None
+    stored = queries.get("locations", location["id"])
+    assert stored["published_version"] == stored["draft_version"]
     assert queries.location(location["id"])["content"]["rankingReport"][0]["totalScore"] == 8
 
 

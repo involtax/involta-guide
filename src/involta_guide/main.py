@@ -1,9 +1,9 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,7 +16,7 @@ from involta_guide.config import Settings
 from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
-from involta_guide.infrastructure.security import Security
+from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.web.context import Context
 from involta_guide.web.routes import admin, api, public
@@ -54,6 +54,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False
     )
     app.state.context = ctx
+
+    @app.middleware("http")
+    async def renew_admin_session(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        from starlette.concurrency import run_in_threadpool
+
+        response = await call_next(request)
+        token = request.cookies.get("guide_admin", "")
+        if (
+            token
+            and not request.url.path.startswith(settings.path("/assets/"))
+            and request.url.path
+            not in (
+                settings.path("/admin/login"),
+                settings.path("/admin/logout"),
+            )
+            and response.status_code < 400
+            and await run_in_threadpool(ctx.security.renew_admin, token)
+        ):
+            response.set_cookie(
+                "guide_admin",
+                token,
+                max_age=ADMIN_SESSION_MAX_AGE,
+                path=settings.base_path,
+                httponly=True,
+                secure=settings.cookie_secure,
+                samesite="lax",
+            )
+            response.headers["Cache-Control"] = "private, no-store"
+        return response
+
     directory = Path(__file__).parent / "web"
     app.state.templates = Jinja2Templates(directory=directory / "templates")
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
