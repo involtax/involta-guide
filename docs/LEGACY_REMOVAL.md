@@ -13,3 +13,10 @@ attach/shared updates и глобальные блокировки катало�
 Alex-сессии/команды, Guide review jobs, guide_transcription и архивные API/CLI.
 Исторические SQL-миграции остаются только цепочкой установки текущей схемы;
 совместимость с дорефакторинговой матрицей баз не поддерживается.
+
+## Одноразовый production-переход beta_core
+
+После успешного перехода production и проверки восстановления убрать
+`deploy/beta-transition.py`, `transition-beta-production.yml` и режим
+`beta-transition` из SSH wrapper вместе с тестами одноразового контроллера.
+До завершения перехода/приёмки сохранять; штатные деплои и их rollback не удалять.

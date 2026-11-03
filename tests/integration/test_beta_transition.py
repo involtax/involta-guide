@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
@@ -15,8 +16,9 @@ from involta_voice.service import VoiceService
 from .test_voice_service import voice_database as voice_database
 
 
-def test_populated_review_urls_transition_preserves_owners_and_clears_incompatible_beta(
-    database, monkeypatch
+@pytest.mark.parametrize("previous_revision", ["admin_routes", "review_urls"])
+def test_populated_released_transition_preserves_owners_and_clears_incompatible_beta(
+    database, monkeypatch, previous_revision
 ):
     settings, admin_engine = database
     schema = "beta_transition_" + uuid4().hex
@@ -28,7 +30,7 @@ def test_populated_review_urls_transition_preserves_owners_and_clears_incompatib
     config = Config(str(settings.root_dir / "alembic.ini"))
     city, hub, other, restaurant, hub_rest, review, job, session = [str(uuid4()) for _ in range(8)]
     try:
-        command.upgrade(config, "review_urls")
+        command.upgrade(config, previous_revision)
         with engine.begin() as conn:
             for identity, slug, is_hub in [
                 (city, "owner", False),
@@ -63,7 +65,11 @@ def test_populated_review_urls_transition_preserves_owners_and_clears_incompatib
                 ),
                 {"id": review, "loc": city},
             )
-            old_review_number = conn.execute(text("SELECT number FROM reviews")).scalar_one()
+            old_review_number = (
+                conn.execute(text("SELECT number FROM reviews")).scalar_one()
+                if previous_revision == "review_urls"
+                else 1
+            )
             conn.execute(
                 text(
                     "INSERT INTO voice_links(review_id,reference,location_id,number,active_run,metadata) VALUES(:id,:id,:loc,7,1,'{}')"

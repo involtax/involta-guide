@@ -2,7 +2,8 @@
 
 Нормативное ТЗ: [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md).
 Ничего из этого runbook не выполняется на production при подготовке PR.
-Поддержаны свежая установка и прямой переход с Guide `review_urls` / Voice schema 3.
+Поддержаны свежая установка и переход с Guide `admin_routes` или `review_urls` / Voice schema 3.
+Для `admin_routes` сначала выполняется существующая миграция `review_urls`.
 Цепочек совместимости с прежними Node/Python-базами больше нет.
 
 ## Что меняет переход
@@ -28,6 +29,29 @@ global outbox sequence и ACK; пути файлов остаются в `purge_
 2. Voice: `voice migrate`, затем `voice prepare-model` с прежними pinned моделями.
 3. Проверить dry-run/execute cleanup ниже; на пустой установке файлов нет.
 4. Запустить один согласованный SHA Guide/worker/consumer/Voice и проверить readiness.
+
+## Автоматизированный переход
+
+Workflow **Transition beta core production** (`transition-beta-production.yml`)
+принимает полный проверенный SHA приложения. Он разрешает образ только после
+успешного main CI/publish и использует digest. Запускается по отдельной команде
+владельца на production-деплой.
+
+`deploy/beta-transition.py` проверяет фактическую host-топологию, владельцев
+контейнеров/томов, исходные схемы и образ до остановки. Под общими deployment locks
+останавливает только пять Guide/Voice writers, сохраняет согласованную копию обеих
+БД и audio-томов в `/opt/involta-guide/backups/beta-<run>-<attempt>`, обновляет схемы,
+выполняет cleanup и сверяет число локаций, ресторанов обычных владельцев и звёзд.
+После health/HTTPS записывает current-release. Nginx/SSH/firewall/TLS не меняются.
+
+При ошибке после начала миграции восстанавливает обе БД и аудио до запуска старых
+writers. Voice public schema восстанавливается только в предварительно проверенной
+выделенной БД Voice с известным составом таблиц; Guide использует существующий
+restore с защитой чужих зависимостей. Ошибка restore оставляет writers остановленными
+и явную диагностику; image-only rollback через границу не выполняется.
+
+Контроллер одноразовый для этой границы схем. После успешного перехода последующие
+релизы используют обычный `deploy-voice-production.yml`.
 
 ## Прямой переход существующей установки
 

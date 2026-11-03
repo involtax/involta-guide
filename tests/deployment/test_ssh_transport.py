@@ -20,7 +20,7 @@ if Path(sys.argv[0]).name=='ssh':
         sys.exit(255)
     if 'id -u' in command:
         print('root')
-    if 'remote-release.sh' in command or 'bootstrap-production.py' in command or 'sync-admin-password.py' in command:
+    if 'beta-transition.py' in command or 'remote-release.sh' in command or 'bootstrap-production.py' in command or 'sync-admin-password.py' in command:
         sys.stdin.read()
 """
 
@@ -29,6 +29,7 @@ if Path(sys.argv[0]).name=='ssh':
     "mode",
     [
         "deploy",
+        "beta-transition",
         "rollback",
         "bootstrap",
         "bootstrap-rollback",

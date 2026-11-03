@@ -1,0 +1,88 @@
+name: Transition beta core production
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Reviewed application SHA; migrates both databases with full backup"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: involta-guide-production
+  cancel-in-progress: false
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    outputs:
+      sha: ${{ steps.image.outputs.sha }}
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: image
+        name: Resolve the successful main CI image without rebuilding it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          sha="$REQUESTED_SHA"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$sha" origin/main
+          verified=''
+          for _ in $(seq 1 75); do
+            verified=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --event push --status success --json databaseId --jq '.[0].databaseId // empty')
+            [[ -z "$verified" ]] || break
+            sleep 10
+          done
+          [[ -n "$verified" ]] || { echo 'No successful main CI/publish for this SHA'; exit 1; }
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          digest=$(docker buildx imagetools inspect "$image:$sha" --format '{{json .Manifest.Digest}}' | tr -d '\"')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'sha=%s\nimage=%s@%s\n' "$sha" "$image" "$digest" >> "$GITHUB_OUTPUT"
+  transition:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: prod
+      url: https://involta.ru/guide/
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TARGET_SHA: ${{ needs.resolve.outputs.sha }}
+      IMAGE_REF: ${{ needs.resolve.outputs.image }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_ROOT: /opt/involta-guide
+      PUBLIC_URL: https://involta.ru/guide/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Preflight, consistent backup, transition and protected rollback
+        run: bash deploy/ssh-release.sh beta-transition
+      - name: Verify HTTPS from outside the server
+        run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA" external
+      - name: Report healthy services and ASR readiness
+        run: bash deploy/ssh-release.sh voice-report
+      - name: Check authenticated pages and revoke the test session
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: python3 deploy/check-admin.py
