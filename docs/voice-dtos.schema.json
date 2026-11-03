@@ -468,8 +468,11 @@
           "type": "string"
         },
         "actor": {
-          "const": "visitor",
           "default": "visitor",
+          "enum": [
+            "visitor",
+            "admin"
+          ],
           "title": "Actor",
           "type": "string"
         },

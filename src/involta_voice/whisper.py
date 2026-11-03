@@ -87,6 +87,23 @@ class LocalWhisper:
                 request["cpu_threads"],
             )
             if self._model is None or self._signature != signature:
+                # Drop the old native model before allocating another multi-GB copy.
+                self._model = None
+                self._signature = None
+                import gc
+
+                gc.collect()
+                limit_file = Path("/sys/fs/cgroup/memory.max")
+                if limit_file.exists():
+                    limit = limit_file.read_text().strip()
+                    required = (2.5 if request["model"] == "large-v3-russian" else 3.5) * 1024**3
+                    if limit != "max" and int(limit) < required:
+                        raise ProviderFailure(
+                            "Недостаточный лимит памяти для выбранной модели Whisper"
+                        )
+                import onnxruntime
+
+                onnxruntime.disable_telemetry_events()
                 from faster_whisper import WhisperModel
 
                 self._model = WhisperModel(
@@ -117,6 +134,7 @@ class LocalWhisper:
                     io.BytesIO(audio),
                     language="ru",
                     task="transcribe",
+                    hotwords=request.get("hotwords"),
                     beam_size=request["beam_size"],
                     vad_filter=True,
                     condition_on_previous_text=False,

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     whisper_models_dir: Path = Path("var/voice-models")
     whisper_device: Literal["cpu", "cuda"] = "cpu"
     whisper_compute_type: Literal["int8", "float16", "int8_float16"] = "int8"
-    whisper_cpu_threads: int = Field(default=4, ge=1, le=64)
+    whisper_cpu_threads: int = Field(default=2, ge=1, le=64)
     analysis_model: str = "gpt-4.1"
     max_audio_bytes: int = 10 * 1024 * 1024
     min_free_bytes: int = 64 * 1024 * 1024

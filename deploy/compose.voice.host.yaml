@@ -51,7 +51,7 @@
       "network_mode": "host",
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice"
       },
@@ -87,7 +87,7 @@
       "network_mode": "host",
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice"
       },
@@ -141,7 +141,7 @@
       "network_mode": "host",
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
         "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
@@ -171,7 +171,9 @@
         "interval": "15s",
         "timeout": "5s",
         "retries": 4
-      }
+      },
+      "mem_limit": "3g",
+      "cpus": 1.5
     },
     "voice-consumer": {
       "image": "${IMAGE_REF:?}",
@@ -237,7 +239,7 @@
       "network_mode": "host",
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
         "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
@@ -250,15 +252,6 @@
         "prepare-model"
       ],
       "depends_on": {}
-    },
-    "worker": {
-      "environment": {
-        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
-      },
-      "volumes": [
-        "audio:/app/var",
-        "voice-models:/app/var/voice-models:ro"
-      ]
     }
   },
   "volumes": {

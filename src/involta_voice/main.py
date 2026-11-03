@@ -172,6 +172,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
 
     @app.post(
+        "/internal/v1/guide-transcriptions",
+        dependencies=dependencies,
+        status_code=202,
+        response_model=SubmissionStatus,
+    )
+    @app.post(
         "/internal/v1/submissions",
         dependencies=dependencies,
         status_code=202,
@@ -215,6 +221,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not isinstance(audio, UploadFile):
                 raise VoiceError("Аудиозапись обязательна")
             metadata = SubmissionMetadata.model_validate_json(str(form.get("metadata") or ""))
+            purpose = (
+                "guide_transcription"
+                if request.url.path.endswith("/guide-transcriptions")
+                else "review"
+            )
+            if purpose == "review" and metadata.actor != "visitor":
+                raise VoiceError("Публичные отзывы не предоставляют прав администратора")
             from starlette.concurrency import run_in_threadpool
 
             return await run_in_threadpool(
@@ -222,6 +235,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 metadata,
                 await audio.read(),
                 (audio.content_type or "").split(";")[0],
+                purpose,
             )
         except ValueError as exc:
             if isinstance(exc, VoiceError):

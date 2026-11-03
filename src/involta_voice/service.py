@@ -33,11 +33,16 @@ class VoiceService:
         self.settings = settings
         self.storage = AudioStorage(settings)
 
-    def submit(self, metadata: SubmissionMetadata, content: bytes, mime: str) -> dict[str, Any]:
+    def submit(
+        self, metadata: SubmissionMetadata, content: bytes, mime: str, purpose: str = "review"
+    ) -> dict[str, Any]:
+        if purpose not in ("review", "guide_transcription"):
+            raise VoiceError("Неподдерживаемое назначение записи")
         sha = hashlib.sha256(content).hexdigest()
         payload_hash = hashlib.sha256(
             encoded(
                 {
+                    "purpose": purpose,
                     "sha256": sha,
                     "mime": mime,
                     "location": str(metadata.location.id),
@@ -91,9 +96,10 @@ class VoiceService:
                     execute(
                         conn,
                         """INSERT INTO submissions(reference,location_id,visitor,idempotency_key,
-                        payload_hash,metadata,audio,mime,duration,size,sha256,repeat_signals)
+                        payload_hash,metadata,audio,mime,duration,size,sha256,repeat_signals,purpose)
                         VALUES(:id,:location,:visitor,:key,:hash,CAST(:metadata AS jsonb),:audio,
-                        :mime,:duration,:size,:sha,CAST(:signals AS jsonb))""",
+                        :mime,:duration,:size,:sha,CAST(:signals AS jsonb),:purpose)""",
+                        purpose=purpose,
                         id=reference,
                         location=str(metadata.location.id),
                         visitor=visitor,
@@ -173,6 +179,10 @@ class VoiceService:
             )
             if not submission:
                 raise VoiceError("Запись не найдена", "not_found", 404)
+            if submission["purpose"] != "review":
+                raise VoiceError(
+                    "Внутренняя расшифровка Guide не создаёт обработки анализа", "conflict", 409
+                )
             previous = (
                 row(
                     conn,
@@ -240,7 +250,7 @@ class VoiceService:
                 else "result_ready"
             )
         elif submission["transcript"] is not None:
-            state = "analysis"
+            state = "result_ready" if submission["purpose"] == "guide_transcription" else "analysis"
         elif any(s["state"] == "running" for s in current):
             state = "transcription"
         else:
@@ -274,7 +284,7 @@ class VoiceService:
             items = (
                 conn.execute(
                     text("""SELECT reference FROM submissions
-                WHERE (CAST(:visitor AS text) IS NULL OR visitor=CAST(:visitor AS text))
+                WHERE purpose='review' AND (CAST(:visitor AS text) IS NULL OR visitor=CAST(:visitor AS text))
                 AND NOT EXISTS(SELECT 1 FROM archive_map a WHERE a.submission=submissions.reference)
                 ORDER BY created_at DESC,reference LIMIT 30 OFFSET :offset"""),
                     {"visitor": visitor, "offset": (page - 1) * 30},

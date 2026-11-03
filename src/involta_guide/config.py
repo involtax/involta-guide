@@ -21,11 +21,6 @@ class Settings(BaseSettings):
     voice_service_secret: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"
     transcription_model: str = "large-v3"
-    voice_transcription_model: str = "large-v3-russian"
-    voice_whisper_models_dir: Path = Path("var/voice-models")
-    voice_whisper_device: str = "cpu"
-    voice_whisper_compute_type: str = "int8"
-    voice_whisper_cpu_threads: int = 4
     site_url: str = "http://localhost:3000/guide"
     base_path: str = "/guide"
     release_sha: str = "development"

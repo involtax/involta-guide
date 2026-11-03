@@ -130,7 +130,12 @@ class Worker:
         context = LocationContext.model_validate(run["snapshot"]["location"])
         snapshot = run["snapshot"]
         if kind == "transcription":
-            request = snapshot.get("transcription") or {"model": snapshot["transcription_model"]}
+            request = dict(
+                snapshot.get("transcription") or {"model": snapshot["transcription_model"]}
+            )
+            request["hotwords"] = ", ".join(
+                [context.name] + [r.name for r in context.restaurants[:20]]
+            )[:500]
         else:
             request = {
                 "model": snapshot["analysis_model"],
@@ -315,6 +320,8 @@ class Worker:
                     n=number,
                 )
                 self.complete(conn, stage)
+                if submission["purpose"] == "guide_transcription":
+                    return
                 self.service.emit(conn, reference, number, "transcript_ready")
                 execute(
                     conn,
@@ -450,6 +457,8 @@ class Worker:
                     text=transcript,
                 )
                 self.complete(conn, stage)
+                if submission["purpose"] == "guide_transcription":
+                    return
                 self.service.emit(conn, reference, number, "transcript_ready")
                 execute(
                     conn,

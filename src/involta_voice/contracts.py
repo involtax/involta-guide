@@ -66,7 +66,7 @@ class SubmissionMetadata(DTO):
     widget_version: Literal["1"] = "1"
     language: str = Field(default="", max_length=40)
     timezone: str = Field(default="", max_length=100)
-    actor: Literal["visitor"] = "visitor"
+    actor: Literal["visitor", "admin"] = "visitor"
     correlation_id: UUID
 
 

@@ -187,6 +187,29 @@
         }
       }
     },
+    "/internal/v1/guide-transcriptions": {
+      "post": {
+        "summary": "Submit",
+        "operationId": "submit_internal_v1_guide_transcriptions_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/internal/v1/submissions/{reference}": {
       "get": {
         "summary": "Status",

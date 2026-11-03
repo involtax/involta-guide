@@ -47,6 +47,10 @@ def migrate(engine: Engine) -> None:
         exists = row(conn, "SELECT to_regclass('voice_schema_versions') AS name")
         if not exists or not exists["name"]:
             conn.exec_driver_sql((Path(__file__).parent / "migrations/001_initial.sql").read_text())
+        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=2"):
+            conn.exec_driver_sql(
+                (Path(__file__).parent / "migrations/002_guide_transcription.sql").read_text()
+            )
 
 
 def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
