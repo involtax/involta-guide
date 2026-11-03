@@ -103,6 +103,9 @@ def test_reset_survives_external_failure_without_resurrection(
             for r in conn.execute(text("SELECT sequence,payload FROM outbox ORDER BY sequence"))
         ]
         path = voice.storage.path(conn.execute(text("SELECT audio FROM submissions")).scalar_one())
+        calls_before_reset = conn.execute(
+            text("SELECT coalesce(sum(calls),0) FROM daily_usage")
+        ).scalar_one()
     consumer = Consumer(engine, None)
     for event in events:
         consumer.import_event(event)
@@ -186,6 +189,10 @@ def test_reset_survives_external_failure_without_resurrection(
     assert not path.exists() and not legacy_path.exists()
     assert voice.status(otherref)["reference"] == otherref
     with voice_engine.connect() as conn:
+        assert (
+            conn.execute(text("SELECT coalesce(sum(calls),0) FROM daily_usage")).scalar_one()
+            == calls_before_reset
+        )
         assert (
             conn.execute(
                 text("SELECT count(*) FROM submissions WHERE reference=:id"), {"id": ref}

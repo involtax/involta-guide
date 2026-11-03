@@ -51,3 +51,24 @@ Guide подтверждает свои файлы и удаляет завис�
 
 [Переход и эксплуатация](BETA_CORE_RUNBOOK.md) · [маршруты](ADMIN_ROUTES.md) ·
 [Voice API](VOICE_API.md) · [временные механизмы](LEGACY_REMOVAL.md).
+
+Схема после перехода:
+
+```mermaid
+flowchart LR
+    L[locations: epoch, initialized_at] -->|один владелец| R[restaurants: position, active, ranking]
+    J[jobs generate: model, prompt, baseline, epoch] -->|атомарное первое применение| L
+    W[Виджет: blob, key, исходный epoch] --> G[Guide gateway]
+    G --> V[Voice: audio, ASR, analysis]
+    V --> O[outbox]
+    O --> I[Guide durable inbox]
+    I --> P[Отзыв и пакет модерации]
+    P -->|локальная транзакция и diff| R
+    S[reset_pending + новый epoch] --> VP[Voice purge + manifest файлов]
+    VP --> GP[Guide cleanup]
+    GP -->|один запуск нового цикла| J
+```
+
+До перехода те же карточки дублировались в page_data и вторичных links, а запись
+администратора могла уйти в отдельный командный pipeline. Эти источники и пути
+удалены, а не оставлены режимами совместимости.

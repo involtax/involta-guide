@@ -2,6 +2,7 @@ import time
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
+from pydantic import ValidationError
 from sqlalchemy import Engine
 from sqlalchemy import text as sql_text
 
@@ -129,12 +130,25 @@ class Consumer:
         return not stale
 
     def _failed(self, event: dict[str, Any], exc: Exception) -> None:
+        import json
+
+        if isinstance(exc, ValidationError):
+            detail = json.dumps(
+                [
+                    {k: e[k] for k in ("loc", "type", "msg")}
+                    for e in exc.errors(include_input=False, include_url=False)
+                ],
+                ensure_ascii=False,
+            )
+        elif isinstance(exc, ValueError):
+            detail = str(exc)
+        else:
+            detail = "Не удалось применить событие; вход сохранён для повтора. Проверьте журнал consumer."
         with self.engine.begin() as conn:
             execute(
                 conn,
                 "UPDATE voice_inbox SET state='failed',error=:error WHERE event_id=:id AND state<>'imported'",
-                error=type(exc).__name__
-                + ": не удалось применить событие; вход сохранён для повтора",
+                error=(type(exc).__name__ + ": " + detail)[:4000],
                 id=self._event_id(event),
             )
 

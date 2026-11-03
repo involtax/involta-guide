@@ -30,7 +30,7 @@ uv run guide-worker
 БД. Миграции не запускаются при импорте модулей, просмотре страниц или старте web.
 `uv run guide seed` идемпотентно импортирует 1 448 локаций и сохраняет ручные правки.
 
-Адреса: `/guide` → **302** `/guide/`, `/guide/ivanovo`, `/guide/admin`, `/guide/alex`.
+Адреса: `/guide` → **302** `/guide/`, `/guide/ivanovo`, `/guide/admin`, `/guide/admin/reviews`.
 Все API, CSS/JS, health, robots и sitemap находятся внутри `BASE_PATH=/guide`.
 `SITE_URL` — полный публичный адрес, например `https://involta.ru/guide`.
 Публичные страницы — Jinja HTML с canonical, JSON-LD и noindex для пустых локаций.
@@ -75,7 +75,7 @@ HTTP handlers не выполняют SQL. ORM-модели не использ�
 
 Только `OPENAI_API_KEY` серверного окружения. Ключ не попадает в HTML, browser JS, Git,
 настройки сборки или логи. При отсутствии ключа задание получает понятную ошибку.
-Обычный просмотр сайта не вызывает AI. HTTPX adapter обеспечивает transcription,
+Обычный просмотр сайта не вызывает AI. HTTPX adapter обеспечивает первоначальное наполнение и
 Responses + web search, JSON schema и сохранение usage/модели. Промпт хранится вместе
 в логе запуска. Шкала рейтинга: 8 равных факторов, 0–10, half-up округление;
 неизвестный фактор не заменяется нулём и не исключается из знаменателя.
@@ -121,8 +121,8 @@ uvicorn с `--no-proxy-headers`, чтобы проверять реальный 
 По умолчанию аудио хранится 90 дней. Операция выполняется явно/по серверному расписанию:
 
 ```sh
-uv run guide retain-audio             # dry-run
-uv run guide retain-audio --execute   # удаляет только допустимые старые аудиофайлы
+uv run guide beta-cleanup-files             # dry-run миграционной очистки
+uv run guide beta-cleanup-files --execute   # удалить файлы по durable manifest
 ```
 
 Записи в активной очереди не удаляются. В БД остаются метаданные, расшифровка, журнал и

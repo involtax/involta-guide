@@ -13,7 +13,7 @@
 <h2>Отзывы</h2>
 {%if voice_unavailable%}<p role="alert" class="notice admin-error">{{voice_unavailable}}. Сохранённые отзывы доступны ниже.</p>{%endif%}
 <details><summary>Доставка Voice: {{"работает" if consumer_health.healthy else "нет подтверждения / ошибка"}}</summary><pre>{{consumer_health|tojson(indent=2)}}</pre></details>
-{%if failed_deliveries%}<section class="panel"><h3>Ошибки доставки</h3>{%for event in failed_deliveries%}<article><p>Событие {{event.sequence}} · {{event.error}}</p><form method="post" action="{{settings.path('/admin/reviews/inbox/'+event.event_id+'/retry')}}">{{csrf()}}<button>Повторить доставку сохранённого события</button></form></article>{%endfor%}</section>{%endif%}
+{%if failed_deliveries%}<section class="panel"><h3>Ошибки доставки</h3>{%for event in failed_deliveries%}<article><p>Событие {{event.sequence}} · {{event.error}}</p><details><summary>Сохранённый вход для повтора</summary><pre class="audit-json">{{event.payload|tojson(indent=2)}}</pre></details><form method="post" action="{{settings.path('/admin/reviews/inbox/'+event.event_id+'/retry')}}">{{csrf()}}<button>Повторить доставку сохранённого события</button></form></article>{%endfor%}</section>{%endif%}
 <div class="voice-admin-layout">
 <aside class="admin-sidebar" aria-label="Очередь отзывов">
 <h2>Очередь · {{queue.total}}</h2>
