@@ -105,3 +105,24 @@ Guide. Both old and Voice history/audio remain readable with the flag disabled.
 No migration deletes old rows, audio, request-log identities or versions. Archive
 copy is opt-in, repeatable, SHA-checked, and defaults to dry-run. Voice audio has
 no automatic retention expiry.
+
+## Frozen schema artifacts and compatibility
+
+Machine-readable schemas: [OpenAPI](voice-openapi.json) and
+[DTO JSON Schema](voice-dtos.schema.json). Schema version 1 accepts optional
+analysis; the transcript event alone is a complete textual review import.
+`processing_failed` is diagnostic and cannot erase an imported transcript.
+
+New-run POST takes an `idempotency_key` UUID plus optional fresh `context`.
+Revalidation may recover a saved transcription or analysis; it never calls the
+provider. POST `/admin/archive` accepts source UUID, metadata, legacy snapshot
+and original audio; SHA must match. It creates a read-only archive, no stages or
+outbox. Administrative calls carry a non-secret `X-Guide-Session` UUID for audit.
+
+Alex's GET shortcut now establishes the same administrator cookie as login.
+Guide retains the trusted executor and stores `admin_session_id`; existing Alex
+sessions remain compatible. Voice receives ordinary visitor submissions only.
+
+The parallel current-city editor is preserved. Voice proposal candidates have a
+separate private pointer and never replace current Guide content before explicit
+publication. Publish checks the candidate base against the current city version.

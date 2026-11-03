@@ -5,6 +5,7 @@ import re
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, NoReturn
+from uuid import uuid4
 
 import httpx
 from sqlalchemy import Engine, text
@@ -288,13 +289,26 @@ class BackgroundGeneration:
         raise GenerationPending(message)
 
 
-def resume_generation(engine: Engine, job_id: str, wait_seconds: int) -> None:
+def resume_generation(
+    engine: Engine,
+    job_id: str,
+    wait_seconds: int,
+    *,
+    reprocess: bool = False,
+    expected_version: str | None = None,
+) -> None:
     """Explicitly resume GETs or revalidate a cached result, never create another POST."""
     with engine.begin() as conn:
         location_id = conn.execute(
             text("SELECT location_id FROM jobs WHERE id=:id"), {"id": job_id}
         ).scalar_one()
-        conn.execute(text("SELECT id FROM locations WHERE id=:id FOR UPDATE"), {"id": location_id})
+        location = (
+            conn.execute(
+                text("SELECT * FROM locations WHERE id=:id FOR UPDATE"), {"id": location_id}
+            )
+            .mappings()
+            .one()
+        )
         job = (
             conn.execute(text("SELECT * FROM jobs WHERE id=:id FOR UPDATE"), {"id": job_id})
             .mappings()
@@ -316,7 +330,15 @@ def resume_generation(engine: Engine, job_id: str, wait_seconds: int) -> None:
             raise RuleViolation(
                 "Нет сохранённого ответа, который можно продолжить или проверить повторно"
             )
-        if job["status"] != "failed" or job["applied"]:
+        if reprocess:
+            if task["state"] != "completed" or not task["response_json"]:
+                raise RuleViolation("Нет полного сохранённого ответа для переобработки")
+            if job["status"] not in ("done", "failed", "cancelled"):
+                raise Conflict("Дождитесь завершения текущей обработки")
+            actual = str(location["published_version"]) if location["published_version"] else None
+            if actual != expected_version:
+                raise Conflict("Страница изменилась. Обновите лог перед переобработкой ответа.")
+        elif job["status"] != "failed" or job["applied"]:
             raise Conflict("Продолжение доступно только для остановленного неприменённого запроса")
         active = conn.execute(
             text(
@@ -326,6 +348,22 @@ def resume_generation(engine: Engine, job_id: str, wait_seconds: int) -> None:
         ).first()
         if active:
             raise Conflict("Для этой локации уже выполняется другой запрос")
+        if reprocess:
+            previous = conn.execute(
+                text(
+                    "SELECT detail FROM audit WHERE target=:id AND action='generation_run' "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"id": job_id},
+            ).scalar_one()
+            config = json.loads(previous)
+            config.update(baseline_version=expected_version, reprocess_saved_response=True)
+            conn.execute(
+                text(
+                    "INSERT INTO audit(id,action,target,detail) VALUES(:key,'generation_run',:id,:detail)"
+                ),
+                {"key": str(uuid4()), "id": job_id, "detail": json.dumps(config)},
+            )
         conn.execute(
             text("""UPDATE generation_requests SET state=CASE WHEN state='completed' THEN state ELSE 'in_progress' END,
             last_error=NULL,deadline_at=now()+make_interval(secs=>:wait),updated_at=now() WHERE job_id=:id"""),
@@ -333,7 +371,7 @@ def resume_generation(engine: Engine, job_id: str, wait_seconds: int) -> None:
         )
         conn.execute(
             text(
-                "UPDATE jobs SET status='queued',error=NULL,finished_at=NULL,available_at=now(),lease_owner=NULL,lease_until=NULL WHERE id=:id"
+                "UPDATE jobs SET status='queued',applied=false,attempts=0,error=NULL,finished_at=NULL,available_at=now(),lease_owner=NULL,lease_until=NULL WHERE id=:id"
             ),
             {"id": job_id},
         )

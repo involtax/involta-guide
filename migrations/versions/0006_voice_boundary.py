@@ -2,8 +2,8 @@
 
 from alembic import op
 
-revision = "0005_voice"
-down_revision = "0004_background"
+revision = "0006_voice"
+down_revision = "0005_current"
 
 
 def upgrade() -> None:
@@ -11,6 +11,14 @@ def upgrade() -> None:
     ALTER TABLE reviews ADD COLUMN admin_session_id uuid REFERENCES admin_sessions(id);
     ALTER TABLE alex_changes ALTER COLUMN session_id DROP NOT NULL;
     ALTER TABLE alex_changes ADD COLUMN admin_session_id uuid REFERENCES admin_sessions(id);
+    CREATE TABLE voice_page_drafts (
+      location_id uuid PRIMARY KEY REFERENCES locations(id), version_id uuid NOT NULL REFERENCES versions(id),
+      base_version uuid REFERENCES versions(id)
+    );
+    CREATE TABLE voice_candidate_proposals (
+      version_id uuid NOT NULL REFERENCES versions(id), proposal_id uuid NOT NULL REFERENCES proposals(id),
+      PRIMARY KEY(version_id,proposal_id)
+    );
     CREATE TABLE review_texts (
       review_id uuid PRIMARY KEY REFERENCES reviews(id), original_text text NOT NULL,
       editorial_text text NOT NULL, revision integer NOT NULL DEFAULT 1,

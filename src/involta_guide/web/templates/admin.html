@@ -1,7 +1,7 @@
 {%extends 'fragment_base.html' if fragment else 'base.html'%}
 {%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
 {%block body%}
-<main class="{{'restaurant-admin' if tab=='restaurants' else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
+<main class="{{'restaurant-admin' if tab in ['restaurants','locations'] else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML settle:0" hx-history="false">
 <header class="admin-header">
 <h1>Рабочий стол.</h1>
 <form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button>
@@ -27,208 +27,7 @@
 <p>{{overview.usage.calls}} вызовов · {{overview.usage.input_tokens}} входных / {{overview.usage.output_tokens}} выходных токенов · стоимость {{overview.usage.cost if overview.usage.cost is not none else 'не определена'}} USD · без тарифа: {{overview.usage.unpriced}}</p>
 {%endif%}
 {%if tab=='locations'%}
-<section class="panel">
-<form method="get" action="{{settings.path('/admin')}}" class="stack">
-<input type="hidden" name="tab" value="locations">
-<label>Поиск локаций<input name="q" value="{{q}}" placeholder="Город, район или курорт" hx-get="{{settings.path('/admin')}}" hx-trigger="input changed delay:350ms" hx-include="closest form">
-</label>
-<label>Статус<select name="status">
-{%for key,label in [('all','Все'),('empty','Пустые'),('draft','Черновики'),('published','Опубликованные'),('hidden','Внутренние'),('inactive','Отключённые')]%}
-<option value="{{key}}"
-{%if status==key%}
-selected
-{%endif%}
->{{label}}</option>
-{%endfor%}
-</select>
-</label>
-<button>Найти ↗</button>
-</form>
-<a href="{{settings.path('/admin/api/locations-export')}}" hx-boost="false">Экспорт локаций ↗</a> · <a href="{{settings.path('/admin')}}?tab=locations&amp;location=new">+ Локация</a>
-<div class="city-grid">
-{%for c in locations.rows%}
-<a class="city-link" href="{{settings.path('/admin')}}?tab=locations&amp;location={{c.id}}">
-<strong>{{c.name}}</strong>
-<small>{{c.region}} · {{kinds[c.kind]}}</small>
-</a>
-{%endfor%}
-</div>
-<nav>
-{%if locations.page>1%}
-<a href="?{{admin_page(locations.page-1)}}">← Назад</a>
-{%endif%}
- {{locations.page}} / {{locations.pages}}
-{%if locations.page<locations.pages%}
-<a href="?{{admin_page(locations.page+1)}}">Дальше →</a>
-{%endif%}
-</nav>
-</section>
-{%if selected is not none%}
-{%set c=selected.location%}
-<section class="panel">
-<h2>{{'Новая локация' if not c else c.name}}</h2>
-<form method="post" action="{{settings.path('/admin/actions/location')}}" class="stack">{{csrf()}}<input type="hidden" name="id" value="{{c.id if c else ''}}">
-{%for field,label in [('name','Название локации'),('region','Регион'),('slug','URL'),('in_phrase','Фраза «где поесть»'),('parent_id','Родительская локация (UUID)')]%}
-<label>{{label}}<input name="{{field}}" value="{{c[field] if c and c[field] is not none else ''}}"
-{%if field not in ['parent_id']%}
-required
-{%endif%}
->
-</label>
-{%endfor%}
-<label>Тип локации<select name="kind">
-{%for key,label in kinds.items()%}
-<option value="{{key}}"
-{%if c and c.kind==key%}
-selected
-{%endif%}
->{{label}}</option>
-{%endfor%}
-</select>
-</label>
-<label>Приоритет<select name="priority">
-{%for value in ['high','medium','low']%}
-<option
-{%if (c.priority if c else 'medium')==value%}
-selected
-{%endif%}
->{{value}}</option>
-{%endfor%}
-</select>
-</label>
-<label>Размер топа<input name="top_limit" type="number" min="1" max="10" value="{{c.top_limit if c else 3}}">
-</label>
-<label>Другие названия<input name="aliases" value="{{c.aliases|join(', ') if c else ''}}">
-</label>
-{%for field,label,default in [('active','Активна',true),('listed','Показывать в справочнике',true),('is_hub','Надлокация',false),('population_verified','Население подтверждено',false)]%}
-<label>
-<input type="checkbox" name="{{field}}"
-{%if (c[field] if c else default)%}
-checked
-{%endif%}
-> {{label}}</label>
-{%endfor%}
-{%for field,label in [('population','Постоянное население'),('latitude','Широта'),('longitude','Долгота')]%}
-<label>{{label}}<input name="{{field}}" type="number" step="any" value="{{c[field] if c and c[field] is not none else ''}}">
-</label>
-{%endfor%}
-<label>Охват<textarea name="coverage_note">{{c.coverage_note if c else ''}}</textarea>
-</label>
-<label>Границы (JSON)<textarea name="bounds">{{c.bounds|tojson if c and c.bounds else ''}}</textarea>
-</label>
-<label>Связанные локации (UUID через запятую)<input name="related_ids" value="{{selected.related_ids|join(', ')}}">
-</label>
-<button>Сохранить локацию</button>
-</form>
-</section>
-{%if c%}
-<section class="panel">
-<a href="{{settings.path('/'+c.slug)}}" hx-boost="false" target="_blank">Открыть страницу ↗</a>
-<h2>Черновик страницы</h2>
-<form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-{{generation_model_picker('Модель наполнения',generation_model)}}
-<small>* Сравнительные цены и описание моделей — на вкладке «Наполнение».</small>
-<button>Наполнить через GPT ↗</button>
-</form>
-<form method="post" action="{{settings.path('/admin/actions/content')}}" class="stack">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="expected" value="{{c.draft_version or ''}}">
-<input type="hidden" name="rankingReport" value="{{selected.content.get('rankingReport')|tojson}}">
-<label>Вступление<textarea name="intro" rows="3">{{selected.content.intro}}</textarea>
-</label>
-<div id="cards">
-{%for r in selected.content.restaurants%}
-{{restaurant(r,'r'~loop.index)}}
-{%endfor%}
-{%if add_card%}
-{{restaurant({},'new')}}
-{%endif%}
-</div>
-<button type="button" hx-get="{{settings.path('/admin/card')}}" hx-target="#cards" hx-select="unset" hx-swap="beforeend">+ Ресторан</button>
-<noscript>
-<a href="?tab=locations&amp;location={{c.id}}&amp;add=1">Добавить ресторан</a>
-</noscript>
-<button>Сохранить новую версию</button>
-</form>
-{%if selected.available%}
-<h3>Из других локаций направления</h3>
-<form method="post" action="{{settings.path('/admin/actions/select-restaurant')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="expected" value="{{c.draft_version or ''}}">
-<select name="restaurant_id" aria-label="Ресторан из дочерних локаций">
-{%for r in selected.available%}
-<option value="{{r.id}}">{{r.name}}</option>
-{%endfor%}
-</select>
-<button>Добавить в черновик</button>
-</form>
-{%endif%}
-<form method="post" action="{{settings.path('/admin/actions/attach')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<label>Связать ресторан (UUID)<input name="restaurant_id" required>
-</label>
-<button>Связать</button>
-</form>
-{%if c.draft_version%}
-<form method="post" action="{{settings.path('/admin/actions/publish')}}" class="publish">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="version_id" value="{{c.draft_version}}">
-<input type="hidden" name="expected" value="{{c.published_version or ''}}">
-<button>Опубликовать текущий черновик ↗</button>
-</form>
-{%endif%}
-{%if selected.content.rankingReport%}
-<h3>Рейтинг кандидатов</h3>
-<table>
-<thead>
-<tr>
-<th>Ресторан</th>
-{%for label in factor_labels%}
-<th>{{label}}</th>
-{%endfor%}
-<th>Итог</th>
-</tr>
-</thead>
-<tbody>
-{%for r in selected.content.rankingReport%}
-<tr>
-<td>{{r.name}}</td>
-{%for key in factors%}
-<td>{{r.scores.get(key,'—')}}</td>
-{%endfor%}
-<td>{{r.totalScore}}</td>
-</tr>
-{%endfor%}
-</tbody>
-</table>
-<details>
-<summary>Обоснования и источники</summary>
-<pre>{{selected.content.rankingReport|tojson(indent=2)}}</pre>
-</details>
-{%endif%}
-</section>
-<section class="panel">
-<h2>История страницы</h2>
-{%for v in selected.versions%}
-<article>
-<h3>Версия {{v.number}} · {{v.source}} · {{v.created_at}}</h3>
-<details>
-<summary>Содержимое, промпт и модель</summary>
-<pre>{{v.content|tojson(indent=2)}}</pre>
-<pre>{{v.prompt or ''}}</pre>
-<p>{{v.model or ''}}</p>
-</details>
-<form method="post" action="{{settings.path('/admin/actions/restore')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="version_id" value="{{v.id}}">
-<input type="hidden" name="expected" value="{{c.draft_version or ''}}">
-<button>Восстановить в черновик</button>
-</form>
-<form method="post" action="{{settings.path('/admin/actions/publish')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="version_id" value="{{v.id}}">
-<input type="hidden" name="expected" value="{{c.published_version or ''}}">
-<button>Опубликовать эту версию</button>
-</form>
-</article>
-{%endfor%}
-</section>
-{%endif%}
-{%endif%}
+{%include 'admin_locations.html'%}
 {%endif%}
 {%if tab=='fill'%}
 <section class="panel">
@@ -329,7 +128,7 @@ selected
 {%endfor%}
 <label>Режим работы (JSON)<textarea name="openingHours">{{payload.openingHours|tojson if payload.openingHours else (proposal_before.get(p.id) or {}).get('openingHours')|tojson}}</textarea>
 </label>
-<button name="decision" value="approve">В черновик</button>
+<button name="decision" value="approve">Применить на сайте</button>
 <button name="decision" value="reject">Отклонить</button>
 </form>
 </section>

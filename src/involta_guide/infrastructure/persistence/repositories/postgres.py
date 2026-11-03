@@ -154,7 +154,7 @@ class PostgresRepository:
                 "l.draft_version IS NOT NULL AND l.draft_version IS DISTINCT FROM l.published_version"
             )
         elif status == "published":
-            clauses.append("l.published_version IS NOT NULL")
+            clauses.append("l.published_version IS NOT NULL AND l.draft<>'[]'::jsonb")
         elif status == "hidden":
             clauses.append("NOT l.listed")
         if q:
@@ -273,7 +273,7 @@ class PostgresRepository:
 
     def restaurant_cities(self, query: str) -> list[Record]:
         return self.query(
-            """SELECT l.id,l.name,l.region,l.slug,l.kind,
+            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.published_version,l.draft_version,
                 count(DISTINCT r.id) restaurant_count,
                 (SELECT max(v.created_at) FROM versions v WHERE v.location_id=l.id) filled_at
             FROM locations l JOIN (

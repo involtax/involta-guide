@@ -204,4 +204,5 @@ def test_ack_loss_after_commit_and_concurrent_replay_create_one_review(database,
         results = list(pool.map(Consumer(engine, remote).import_event, [event, event]))
     assert results == [0, 0]
     assert len(queries.rows("reviews")) == 1
-    assert len(queries.rows("voice_inbox")) == 1
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM voice_inbox")).scalar_one() == 1

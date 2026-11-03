@@ -106,6 +106,14 @@ class VoiceReadModel:
                 raise NotFound("Отзыв не найден")
             location = row(conn, "SELECT * FROM locations WHERE id=:id", id=review["location_id"])
             assert location is not None
+            candidate = row(
+                conn,
+                "SELECT * FROM voice_page_drafts WHERE location_id=:id",
+                id=review["location_id"],
+            )
+            # A Voice-only candidate never replaces Guide's current page pointer.
+            if candidate:
+                location["draft_version"] = candidate["version_id"]
             link = row(conn, "SELECT * FROM voice_links WHERE review_id=:id", id=review_id)
             text_review = row(conn, "SELECT * FROM review_texts WHERE review_id=:id", id=review_id)
             proposals = [

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from involta_guide.application.ports.repositories import Record, Repository, UowFactory
 from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
-from involta_guide.domain.rules import assert_proposal, assert_publishable, assert_revision
+from involta_guide.domain.rules import assert_proposal, assert_revision
 
 
 def require(repo: Repository, table: str, key: str, *, lock: bool = False) -> Record:
@@ -14,10 +14,33 @@ def require(repo: Repository, table: str, key: str, *, lock: bool = False) -> Re
     return row
 
 
-def draft(repo: Repository, location: Record) -> Record:
-    if location["draft_version"]:
-        return copy.deepcopy(require(repo, "versions", location["draft_version"])["content"])
-    return {"intro": location["intro"], "restaurants": copy.deepcopy(location["draft"])}
+def current_content(repo: Repository, location: Record) -> Record:
+    version = location["published_version"]
+    content = (
+        copy.deepcopy(require(repo, "versions", version)["content"])
+        if version
+        else {"intro": location["intro"], "restaurants": copy.deepcopy(location["draft"])}
+    )
+    content["intro"] = location["intro"]
+    fields = {
+        "name": "name",
+        "cuisine": "cuisine",
+        "description": "description",
+        "mapsUrl": "maps_url",
+        "phone": "phone",
+        "sources": "sources",
+        "openingHours": "opening_hours",
+        "alexStar": "alex_star",
+        "latitude": "latitude",
+        "longitude": "longitude",
+    }
+    for card in content["restaurants"]:
+        record = repo.get("restaurants", card["id"]) if card.get("id") else None
+        if record:
+            for target, source in fields.items():
+                if target in card or record[source] is not None:
+                    card[target] = record[source]
+    return content
 
 
 def save(
@@ -33,7 +56,7 @@ def save(
     inherit: bool = True,
 ) -> str:
     location = require(repo, "locations", location_id, lock=True)
-    assert_revision(location["draft_version"], expected)
+    assert_revision(location["published_version"], expected)
     payload = copy.deepcopy(content)
     payload.pop("warnings", None)
     for card in payload["restaurants"]:
@@ -65,7 +88,9 @@ def save(
                 "sources": card.get("sources", []),
                 "phone": card.get("phone", ""),
                 "opening_hours": card.get("openingHours"),
-                "alex_star": card["alexStar"] if alex else bool(previous and previous["alex_star"]),
+                "alex_star": card["alexStar"]
+                if alex or source == "restore"
+                else bool(previous and previous["alex_star"]),
                 "latitude": card.get("latitude"),
                 "longitude": card.get("longitude"),
             }
@@ -73,7 +98,7 @@ def save(
                 repo.change("restaurants", card["id"], values)
             else:
                 repo.add("restaurants", {"id": card["id"], **values})
-        if alex and previous:
+        if (alex or source == "restore") and previous:
             repo.change("restaurants", card["id"], {"alex_star": card["alexStar"]})
         repo.link("restaurant_locations", {"restaurant_id": card["id"], "location_id": location_id})
     version = str(uuid4())
@@ -87,16 +112,22 @@ def save(
             "source": source,
             "prompt": prompt,
             "model": model,
+            "published": 1,
         },
     )
     repo.change(
         "locations",
         location_id,
-        {"intro": payload["intro"], "draft": payload["restaurants"], "draft_version": version},
+        {
+            "intro": payload["intro"],
+            "draft": payload["restaurants"],
+            "draft_version": version,
+            "published_version": version,
+        },
     )
     if inherit and expected:
         repo.inherit_reviews(expected, version)
-    repo.audit("draft", location_id, source)
+    repo.audit("page_saved", location_id, json.dumps({"source": source, "version_id": version}))
     return version
 
 
@@ -104,15 +135,17 @@ def publish(
     repo: Repository, location_id: str, version_id: str, expected_published: str | None
 ) -> None:
     location = require(repo, "locations", location_id, lock=True)
+    if location["published_version"] == version_id:
+        return
     if location["published_version"] != expected_published:
         raise Conflict("Опубликованная версия изменилась. Обновите страницу.")
     version = require(repo, "versions", version_id)
     if version["location_id"] != location_id:
         raise RuleViolation("Версия принадлежит другой локации")
-    assert_publishable(version["content"])
-    repo.change("versions", version_id, {"published": 1})
-    repo.change("locations", location_id, {"published_version": version_id})
-    repo.audit("publish", location_id, version_id)
+    restored = save(
+        repo, location_id, version["content"], expected_published, source="restore", inherit=False
+    )
+    repo.inherit_reviews(version_id, restored)
 
 
 class EditorialService:
@@ -122,6 +155,28 @@ class EditorialService:
     def save(self, location_id: str, content: Record, expected: str | None) -> str:
         with self.uow() as uow:
             return save(uow.repo, location_id, content, expected)
+
+    def save_intro(
+        self,
+        location_id: str,
+        intro: str,
+        expected: str | None,
+        expected_published: str | None,
+    ) -> bool:
+        if len(intro) > 4000:
+            raise RuleViolation("Вступление: не более 4000 символов")
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", location_id, lock=True)
+            assert_revision(location["published_version"], expected)
+            if location["published_version"] != expected_published:
+                raise Conflict(
+                    "Страница уже обновилась. Проверьте актуальные данные перед сохранением."
+                )
+            content = current_content(repo, location)
+            content["intro"] = intro
+            save(repo, location_id, content, expected, source="intro")
+            return True
 
     def publish(self, location_id: str, version_id: str, expected: str | None) -> None:
         with self.uow() as uow:
@@ -175,7 +230,7 @@ class EditorialService:
                 return None
             assert_proposal(p["status"], review["moderation"], bool(review["fraud"]))
             location = require(repo, "locations", p["location_id"], lock=True)
-            content = draft(repo, location)
+            content = current_content(repo, location)
             if p["kind"] == "restaurant":
                 if any(
                     r["name"].casefold() == edited["name"].casefold()
@@ -193,7 +248,7 @@ class EditorialService:
                     None,
                 )
                 if current is None:
-                    raise RuleViolation("Ресторан отсутствует в черновике")
+                    raise RuleViolation("Ресторан отсутствует на странице")
                 current.update(
                     {
                         k: v
@@ -202,11 +257,11 @@ class EditorialService:
                     }
                 )
             version = save(
-                repo, location["id"], content, location["draft_version"], source="review"
+                repo, location["id"], content, location["published_version"], source="review"
             )
             repo.link("version_reviews", {"version_id": version, "review_id": review["id"]})
             repo.change("proposals", proposal_id, {"status": "approved"})
-            repo.audit("proposal_draft", location["id"], review["id"])
+            repo.audit("proposal_applied", location["id"], review["id"])
             return version
 
     def apply_alex(
@@ -224,10 +279,8 @@ class EditorialService:
         if session["revoked"] or session["expires_at"] <= datetime.now(UTC):
             raise RuleViolation("Сессия Алекса завершена")
         location = require(repo, "locations", review["location_id"], lock=True)
-        assert_revision(location["draft_version"], expected)
-        if expected and expected != location["published_version"]:
-            raise Conflict("Сначала проверьте неопубликованный редакторский черновик")
-        content = draft(repo, location)
+        assert_revision(location["published_version"], expected)
+        content = current_content(repo, location)
         before = copy.deepcopy(content)
         if commands.get("intro") is not None:
             content["intro"] = commands["intro"]
@@ -260,7 +313,6 @@ class EditorialService:
         if changed:
             version = save(repo, location["id"], content, expected, source="alex", alex=True)
             repo.link("version_reviews", {"version_id": version, "review_id": review["id"]})
-            publish(repo, location["id"], version, location["published_version"])
         elif not commands.get("comment"):
             raise RuleViolation("Нет однозначной команды")
         repo.change(

@@ -52,6 +52,7 @@
 <h3>Необязательные предложения</h3>
 {%if v.location.draft_version|string in v.version_ids and v.location.draft_version!=v.location.published_version%}
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('publish-page')}}<input type="hidden" name="version_id" value="{{v.location.draft_version}}"><input type="hidden" name="published_revision" value="{{v.location.published_version or ''}}"><p>Черновик содержит изменения из этого отзыва. Публикация заменит публичную страницу.</p><button>Опубликовать проверенную версию страницы</button></form>
+<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('discard-page')}}<button>Сбросить подготовленные правки и проверить заново</button></form>
 {%endif%}
 {%for p in v.proposals%}
 <article class="panel"><h4>{{'Новое заведение' if p.kind=='restaurant' else 'Правка карточки'}} · {{p.status}} · обработка {{p.run}}</h4><p>{{p.payload.reason}}</p><blockquote>{{p.payload.quote or ''}}</blockquote>

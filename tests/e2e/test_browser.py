@@ -143,19 +143,23 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("status")).to_contain_text("Модель наполнения сохранена")
                 assert queries.setting("generation_model") == "gpt-6.1-sol"
                 page.goto(base + "/admin?tab=locations&location=" + location["id"])
+                page.get_by_role("textbox", name="Вступление", exact=True).fill("Тестовая подборка")
+                page.get_by_role("button", name="Сохранить вступление", exact=True).click()
+                expect(page.get_by_role("status")).to_contain_text(
+                    "Вступление сохранено и обновлено на сайте"
+                )
                 page.get_by_role("button", name="+ Ресторан", exact=True).click()
                 card = page.locator("[data-card]")
                 expect(card).to_have_count(1)
                 card.get_by_label("Название", exact=True).fill("Тестовый ресторан")
                 card.get_by_label("Кухня", exact=True).fill("Русская")
                 card.get_by_label("Почему стоит зайти").fill("Карточка для проверки публикации")
-                card.get_by_label("Телефон (обязателен для публикации)").fill("+74951234567")
+                card.get_by_label("Телефон").fill("+74951234567")
                 card.get_by_label("Яндекс Карты").fill("https://yandex.ru/maps/org/test/123/")
-                page.get_by_label("Вступление").fill("Тестовая подборка")
-                page.get_by_role("button", name="Сохранить новую версию", exact=True).click()
-                expect(page.get_by_role("status")).to_contain_text("Черновик сохранён")
-                page.get_by_role("button", name="Опубликовать текущий черновик ↗").click()
-                expect(page.get_by_role("status")).to_contain_text("Версия опубликована")
+                page.get_by_role("button", name="Сохранить рестораны", exact=True).click()
+                expect(page.get_by_role("status")).to_contain_text(
+                    "Данные сохранены и обновлены на сайте"
+                )
                 page.goto(base + "/ivanovo")
                 expect(
                     page.get_by_role(

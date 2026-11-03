@@ -80,7 +80,7 @@ def rank(content: dict[str, Any], limit: int) -> dict[str, Any]:
 
 def assert_revision(actual: str | None, expected: str | None) -> None:
     if actual != expected:
-        raise Conflict("Черновик изменён. Обновите страницу, чтобы не потерять ручные правки.")
+        raise Conflict("Страница изменена. Обновите редактор, чтобы не потерять ручные правки.")
 
 
 def assert_publishable(content: dict[str, Any]) -> None:

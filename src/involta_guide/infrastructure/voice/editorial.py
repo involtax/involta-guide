@@ -9,7 +9,7 @@ from sqlalchemy import Engine
 from sqlalchemy import text as sql_text
 
 from involta_guide.application.commands.schemas import RestaurantInput
-from involta_guide.application.services.editorial import draft, publish, require, save
+from involta_guide.application.services.editorial import current_content, require, save
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_voice.db import encoded, execute, row
@@ -75,13 +75,19 @@ class VoiceEditorial:
             active = link["active_run"] if link else 0
             if command.review_revision != text["revision"] or command.processing_run != active:
                 raise Conflict("Отзыв или выбранная обработка изменились. Обновите сравнение.")
+            candidate = row(
+                conn, "SELECT * FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
+            )
+            page_revision = (
+                str(candidate["version_id"]) if candidate else location["published_version"]
+            )
             before = {
                 "text": copy.deepcopy(text),
                 "moderation": review["moderation"],
                 "fraud": review["fraud"],
                 "result": review["result"],
                 "run": active,
-                "page_revision": location["draft_version"],
+                "page_revision": page_revision,
                 "published_revision": location["published_version"],
             }
             result: dict[str, Any] = {}
@@ -179,7 +185,7 @@ class VoiceEditorial:
                 expected_published = (
                     str(command.published_revision) if command.published_revision else None
                 )
-                if expected_page != location["draft_version"] or target != expected_page:
+                if not candidate or expected_page != page_revision or target != expected_page:
                     raise Conflict("Черновик изменился. Обновите сравнение.")
                 if not any(
                     r["version_id"] == target
@@ -192,10 +198,56 @@ class VoiceEditorial:
                     else None
                 )
                 assert target is not None
-                publish(repo, location["id"], target, expected_published)
-                result.update(
-                    published_version=target,
-                    published_content=require(repo, "versions", target)["content"],
+                base = str(candidate["base_version"]) if candidate["base_version"] else None
+                if (
+                    expected_published != location["published_version"]
+                    or base != expected_published
+                ):
+                    raise Conflict(
+                        "Страница изменилась после подготовки правок. Сбросьте черновик и проверьте предложения заново."
+                    )
+                if row(
+                    conn,
+                    "SELECT 1 FROM version_reviews v JOIN reviews r ON r.id=v.review_id WHERE v.version_id=:version AND (r.moderation<>'approved' OR r.fraud<>0)",
+                    version=target,
+                ):
+                    raise RuleViolation(
+                        "Один из отзывов черновика отклонён или помечен фродом; сбросьте правки"
+                    )
+                content = require(repo, "versions", target)["content"]
+                published = save(repo, location["id"], content, expected_published, source="review")
+                repo.inherit_reviews(target, published)
+                execute(
+                    conn, "DELETE FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
+                )
+                result.update(published_version=published, published_content=content)
+            elif command.action == "discard-page":
+                expected = str(command.page_revision) if command.page_revision else None
+                if not candidate or expected != page_revision:
+                    raise Conflict("Черновик изменился")
+                before["candidate"] = require(repo, "versions", page_revision)["content"]
+                execute(
+                    conn, "DELETE FROM voice_page_drafts WHERE location_id=:id", id=location["id"]
+                )
+                before["candidate_proposals"] = [
+                    dict(r)
+                    for r in conn.execute(
+                        sql_text(
+                            "SELECT p.id,p.status FROM proposals p JOIN voice_candidate_proposals v ON v.proposal_id=p.id WHERE v.version_id=:version"
+                        ),
+                        {"version": page_revision},
+                    ).mappings()
+                ]
+                execute(
+                    conn,
+                    "UPDATE voice_proposals SET revision=revision+1 WHERE proposal_id IN (SELECT proposal_id FROM voice_candidate_proposals WHERE version_id=:version)",
+                    version=page_revision,
+                )
+                # Keep snapshots/journal, but permit a fresh comparison of discarded proposals.
+                execute(
+                    conn,
+                    "UPDATE proposals SET status='pending' WHERE id IN (SELECT proposal_id FROM voice_candidate_proposals WHERE version_id=:version) AND status='approved'",
+                    version=page_revision,
                 )
             elif command.action == "activate-run":
                 if (
@@ -248,7 +300,7 @@ class VoiceEditorial:
                     if review["moderation"] != "approved" or review["fraud"]:
                         raise RuleViolation("Сначала примите отзыв; фрод не применяется")
                     expected = str(command.page_revision) if command.page_revision else None
-                    if expected != location["draft_version"]:
+                    if expected != page_revision:
                         raise Conflict("Страница изменилась. Обновите сравнение.")
                     allowed = {"name", "cuisine", "description", "mapsUrl", "phone", "openingHours"}
                     changes = command.changes
@@ -260,7 +312,19 @@ class VoiceEditorial:
                         if command.restaurant_id
                         else payload.get("restaurantId")
                     )
-                    content = draft(repo, location)
+                    if (
+                        candidate
+                        and (str(candidate["base_version"]) if candidate["base_version"] else None)
+                        != location["published_version"]
+                    ):
+                        raise Conflict(
+                            "Страница изменилась после подготовки правок. Сначала сбросьте черновик."
+                        )
+                    content = (
+                        copy.deepcopy(require(repo, "versions", page_revision)["content"])
+                        if candidate
+                        else current_content(repo, location)
+                    )
                     current = next(
                         (r for r in content["restaurants"] if r.get("id") == target), None
                     )
@@ -283,7 +347,39 @@ class VoiceEditorial:
                         content["restaurants"].append(validated)
                     else:
                         current.update(validated)
-                    version = save(repo, location["id"], content, expected, source="review")
+                    version = str(uuid4())
+                    repo.add(
+                        "versions",
+                        {
+                            "id": version,
+                            "location_id": location["id"],
+                            "content": content,
+                            "source": "voice_candidate",
+                            "number": repo.next_version(location["id"]),
+                            "published": 0,
+                        },
+                    )
+                    if candidate:
+                        repo.inherit_reviews(page_revision, version)
+                        execute(
+                            conn,
+                            "INSERT INTO voice_candidate_proposals(version_id,proposal_id) SELECT :version,proposal_id FROM voice_candidate_proposals WHERE version_id=:previous",
+                            version=version,
+                            previous=page_revision,
+                        )
+                    execute(
+                        conn,
+                        "INSERT INTO voice_candidate_proposals(version_id,proposal_id) VALUES(:version,:proposal)",
+                        version=version,
+                        proposal=proposal["id"],
+                    )
+                    execute(
+                        conn,
+                        "INSERT INTO voice_page_drafts(location_id,version_id,base_version) VALUES(:id,:version,:base) ON CONFLICT(location_id) DO UPDATE SET version_id=excluded.version_id",
+                        id=location["id"],
+                        version=version,
+                        base=location["published_version"],
+                    )
                     repo.link("version_reviews", {"version_id": version, "review_id": review_id})
                     result.update(version_id=version, changes=changes)
                 repo.change(

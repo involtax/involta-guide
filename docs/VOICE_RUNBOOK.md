@@ -156,3 +156,30 @@ uv run voice openapi > work/voice-openapi.json
 
 See `VOICE_API.md` for schemas, error semantics, event delivery and the editor
 boundary. See `VOICE_IMPLEMENTATION.md` for checked stages and remaining limits.
+
+## Legacy archive dry-run and copy
+
+With the Guide environment loaded and Voice reachable, use:
+
+```bash
+uv run python -m involta_guide.infrastructure.voice.archive --limit 1000
+# Inspect checked/skipped/missing_audio/sha_mismatch; resolve mismatches first.
+uv run python -m involta_guide.infrastructure.voice.archive --limit 1000 --execute
+# Repeat is safe: source_review and SHA map to the same read-only archive.
+uv run python -m involta_guide.infrastructure.voice.archive --limit 1000 --execute
+```
+
+The limit is a deterministic prefix of history, not an offset; choose it large
+ enough to cover the intended history and compare totals. Active/trusted/deleted
+records are skipped. Old IDs, ownership, jobs and Guide files remain unchanged.
+Archive entries never enter the processing queue or Guide outbox.
+
+## Compatibility with the current-page editor
+
+Main now saves city edits directly to its single current page. Voice does not
+change that behavior. Its reviewed proposal candidates live in
+`voice_page_drafts`, pointing at retained unpublished version snapshots, and do
+not modify restaurant rows or Guide's current version. Explicit publication
+checks both the candidate and its base current revision, then uses Guide's
+current save rules. A conflicting city edit returns 409. Discard the prepared
+Voice candidate and compare again; snapshots and the decision journal remain.

@@ -159,8 +159,37 @@ def test_proposal_partial_acceptance_detects_page_conflict_and_preserves_other_a
         principal["id"],
     )
     assert result["version_id"] != version
-    assert queries.get("locations", city["id"])["published_version"] == version
+    assert queries.get("locations", city["id"])["published_version"] == newer
+    assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] != "+74951234568"
+    assert (
+        queries.get("versions", result["version_id"])["content"]["restaurants"][0]["phone"]
+        == "+74951234568"
+    )
+    published = service.decide(
+        ref,
+        Decision(
+            idempotency_key=uuid4(),
+            review_revision=3,
+            processing_run=1,
+            action="publish-page",
+            page_revision=result["version_id"],
+            version_id=result["version_id"],
+            published_revision=newer,
+        ),
+        principal["id"],
+    )
+    assert (
+        queries.get("locations", city["id"])["published_version"] == published["published_version"]
+    )
     assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM voice_page_drafts")).scalar_one() == 0
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM review_decisions WHERE action='publish-page'")
+            ).scalar_one()
+            == 1
+        )
     assert (
         next(p for p in queries.rows("proposals") if p["kind"] == "restaurant")["status"]
         == "pending"
