@@ -1069,3 +1069,12 @@ pre.audit-json {
 .location-public-intro p { margin-top: 12px; white-space: pre-wrap; }
 .location-editor label:has(>input[type=checkbox]) { display: flex; align-items: center; gap: 9px; }
 .location-editor input[type=checkbox] { width: 16px; min-width: 16px; height: 16px; margin: 0; }
+.generation-quality { border: 1px solid var(--line); padding: 20px; margin: 22px 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.generation-quality.partial { border-left: 3px solid #a66a23; background: #faf7ef; }
+.generation-quality h3 { font-size: 18px; margin-bottom: 12px; }
+.generation-quality p { margin-bottom: 10px; }
+.generation-quality details { margin-top: 12px; }
+.candidate-review { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.candidate-review > span { display: inline-block; margin-left: 10px; color: var(--muted); font-size: 11px; }
+.candidate-review p { margin: 6px 0; }
+.candidate-review a { display: block; font-size: 11px; }

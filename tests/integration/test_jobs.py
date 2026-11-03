@@ -42,6 +42,15 @@ class FakeAI:
                     "totalScore": 0,
                 }
             ],
+            "candidateReview": [
+                {
+                    "name": CARD["name"],
+                    "mapsUrl": CARD["mapsUrl"],
+                    "status": "verified",
+                    "reason": "Подтверждены карточка и восемь факторов",
+                    "sources": [],
+                }
+            ],
             "warnings": [],
         }
 

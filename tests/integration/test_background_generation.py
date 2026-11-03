@@ -19,8 +19,10 @@ from .test_jobs import FakeAI, setup
 from .test_web import login, token
 
 
-def configured(database, handler):
+def configured(database, handler, *, location_query=None):
     settings, engine, uow, queries, location, service, queue = setup(database)
+    if location_query:
+        location = queries.directory(query=location_query)["rows"][0]
     settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-background-key")})
     provider = OpenAIProvider(
         settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)

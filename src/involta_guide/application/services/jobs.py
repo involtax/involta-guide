@@ -20,6 +20,12 @@ from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import assert_publishable, rank
 
 from .editorial import EditorialService, current_content, require, save
+from .generation_quality import (
+    CANDIDATE_LIMIT,
+    assess_coverage,
+    normalize_generation,
+    prepare_generation_prompt,
+)
 
 
 class JobService:
@@ -297,11 +303,11 @@ class JobService:
                 "{локация}": location["name"],
                 "{город}": location["name"],
                 "{регион}": location["region"],
-                "{лимит}": str(location["top_limit"]),
+                "{лимит}": str(CANDIDATE_LIMIT),
                 "{родитель}": parents[-1]["name"] if parents else "нет",
                 "{охват}": scope,
             }
-            prompt = job["prompt"] or ""
+            prompt = prepare_generation_prompt(job["prompt"] or "")
             for key, value in replacements.items():
                 prompt = prompt.replace(key, value)
             prompt += "\nОБЯЗАТЕЛЬНЫЙ ГЕОГРАФИЧЕСКИЙ КОНТЕКСТ\n" + json.dumps(
@@ -310,16 +316,18 @@ class JobService:
                     "scope": scope,
                     "parent": parents,
                     "knownRestaurants": known,
-                    "topLimit": location["top_limit"],
+                    "candidateLimit": CANDIDATE_LIMIT,
+                    "previousCandidates": content.get("candidateReview") or [],
                 },
                 default=str,
                 ensure_ascii=False,
             )
             prompt = saved_prompt or prompt
             # Nullable ranking fields are required keys at the ContentInput boundary.
-            generated = Generation.model_validate(
+            normalized, normalization = normalize_generation(
                 self.provider.generate(prompt, job["id"])
-            ).model_dump(mode="json")
+            )
+            generated = Generation.model_validate(normalized).model_dump(mode="json")
             # Finish retrieving an already-paid response even if an editor changed the page.
             # Save it for audit, but never overwrite the editor's new version.
             if baseline_changed:
@@ -328,7 +336,7 @@ class JobService:
                 )
             if is_public and not self.public_fill_enabled and not reprocess:
                 raise RuleViolation("Ответ сохранён; временное наполнение отключено")
-            result = rank(generated, location["top_limit"])
+            result = assess_coverage(rank(generated), normalization)
             if reprocess:
                 for card in result["restaurants"]:
                     existing = next(
@@ -375,6 +383,14 @@ class JobService:
                     repo.audit("temporary_public_fill_published", location["id"], version_id)
                 repo.audit(
                     "ai_trace", job["id"], json.dumps({"event": "response_validated", "data": {}})
+                )
+                repo.audit(
+                    "generation_quality",
+                    job["id"],
+                    json.dumps(
+                        {"event": "generation_quality", "data": result["qualityReport"]},
+                        ensure_ascii=False,
+                    ),
                 )
                 repo.audit(
                     "ai_result",

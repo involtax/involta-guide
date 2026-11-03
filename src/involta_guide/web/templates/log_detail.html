@@ -12,6 +12,9 @@
  · <a href="{{settings.path(d.job.log_path)}}">Обновить полный лог ↻</a>
  · <a href="#log-requests">К списку запросов ↑</a>
 </header>
+{%set quality_report=d.job.quality_report%}
+{%set candidate_review=d.versions[0].content.get('candidateReview') if d.versions else []%}
+{%include 'generation_quality.html'%}
 {%for v in d.versions%}<p>Результат запроса: версия страницы №{{v.number}}.</p>{%endfor%}
 {%if not d.versions and d.job.kind=='generate' and d.job.status=='failed'%}<p>Новая версия страницы не создана.</p>{%endif%}
 {%if logs_admin%}
@@ -49,7 +52,7 @@
 <p>Одно обращение — одна генерация. GET в хронологии только проверяет тот же ответ. done означает, что полный ответ сохранён; публикация показана отдельно выше. Пока статистика OpenAI не получена, нули токенов не означают отсутствие расходов.</p>
 {%for c in d.calls%}<details open><summary>{{c.created_at}} · {{c.model}} · {{c.operation}} · {{c.status}}</summary><pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>{%else%}<p>Обращений к провайдеру нет.</p>{%endfor%}
 <h3>Хронология</h3>
-{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Запрос к OpenAI: метод указан ниже','response':'Полный ответ OpenAI','provider_error':'Ошибка связи с OpenAI','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы','generation_status':'Состояние генерации OpenAI','generation_resumed':'Продолжение без новой генерации','generation_reprocessed':'Повторная обработка сохранённого ответа без новой генерации','response_validated':'Ответ прошёл проверку'}%}
+{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Запрос к OpenAI: метод указан ниже','response':'Полный ответ OpenAI','provider_error':'Ошибка связи с OpenAI','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы','generation_status':'Состояние генерации OpenAI','generation_resumed':'Продолжение без новой генерации','generation_reprocessed':'Повторная обработка сохранённого ответа без новой генерации','response_validated':'Ответ прошёл проверку','generation_quality':'Полнота поиска и очистка описаний'}%}
 {%for e in d.events%}
 <details open><summary>{{e.time}} · {{labels.get(e.payload.event,e.payload.event|default('Событие'))}}</summary>
 {%if e.response_body is defined%}<pre class="audit-json">{{e.response_meta|tojson(indent=2)}}</pre><pre class="audit-json">{{e.response_body}}</pre>

@@ -47,7 +47,7 @@ def score(values: dict[str, int | None]) -> float | None:
     )
 
 
-def rank(content: dict[str, Any], limit: int) -> dict[str, Any]:
+def rank(content: dict[str, Any], limit: int | None = None) -> dict[str, Any]:
     report = content.get("rankingReport", [])
 
     def key(s: str) -> str:
@@ -66,12 +66,10 @@ def rank(content: dict[str, Any], limit: int) -> dict[str, Any]:
     cards = {key(row["name"]): row for row in content["restaurants"]}
     eligible = [row for row in report if row["totalScore"] is not None and row.get("mapsUrl")]
     result = []
-    for index, row in enumerate(eligible):
+    for row in eligible:
         card = cards.get(key(row["name"]))
         if card is None:
-            if index < limit:
-                raise RuleViolation("Нет карточки лидера рейтинга")
-            continue
+            raise RuleViolation("Нет карточки оценённого кандидата: " + row["name"])
         result.append({**card, "mapsUrl": row["mapsUrl"]})
     if len(result) != len(content["restaurants"]):
         raise RuleViolation("В подборке есть ресторан вне рассчитанного топа")
