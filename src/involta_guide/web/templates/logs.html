@@ -1,15 +1,12 @@
-{%extends 'base.html'%}
+{%extends 'admin_shell.html'%}
+{%set workspace_title='Рабочий стол.' if logs_admin else 'Логи'%}
+{%set workspace_id='logs-main'%}{%set workspace_boost=false%}
+{%set show_admin_nav=logs_admin%}{%set show_admin_logout=logs_admin%}
 {%from 'macros.html' import csrf,generation_model_picker with context%}
-{%block body%}
-<main id="logs-main">
-<header class="admin-header"><h1>Логи</h1>
-{%if logs_admin%}<form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button></form>
-{%else%}<a href="{{settings.path('/admin')}}">Войти в админку ↗</a>{%endif%}
-</header>
-{%if logs_admin%}{%include 'admin_navigation.html'%}{%endif%}
-{%if message%}<p role="status">{{message}}</p>{%endif%}
+{%block admin_content%}
+<header class="admin-section-heading">{%if logs_admin%}<h2>Логи</h2>{%endif%}{%if not logs_admin%}<a href="{{settings.path('/admin')}}">Войти в админку ↗</a>{%endif%}</header>
 <div class="logs-layout">
-<aside class="logs-sidebar" id="log-requests" aria-label="Запросы">
+<aside class="logs-sidebar admin-sidebar" id="log-requests" aria-label="Запросы">
 <h2>Запросы · {{audit_jobs.total}}</h2>
 <form method="get" action="{{settings.path('/logs')}}" class="stack">
 <label>Город или адрес лога<input name="q" value="{{q}}" placeholder="Иваново или ivanovo/2"></label>
@@ -30,10 +27,9 @@
 {%if audit_jobs.page<audit_jobs.pages%}<a href="{{settings.path('/logs')}}?{{audit_page(audit_jobs.page+1)}}">Дальше →</a>{%endif%}
 </nav>
 </aside>
-<section class="logs-content" aria-label="Выбранный лог">
+<section class="logs-content admin-detail" aria-label="Выбранный лог">
 {%if audit_detail%}{%include 'log_detail.html'%}{%else%}<h2>Выберите запрос</h2><p>Здесь появятся промт, полный ответ, ошибки и применённые изменения.</p>{%endif%}
 </section>
 </div>
-</main>
 {%endblock%}
 {%block scripts%}<script defer src="{{settings.path('/assets/log-status.js')}}"></script>{%endblock%}

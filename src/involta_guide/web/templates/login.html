@@ -1,11 +1,8 @@
-{%extends 'base.html'%}
-{%block body%}
-<main>
+{%extends 'admin_shell.html'%}
+{%set message_role='alert'%}{%set show_admin_nav=false%}{%set show_admin_header=false%}{%set workspace_boost=false%}{%set workspace_class='admin-login'%}
+{%block admin_content%}
 <section class="panel">
-<h1>Вход в редакцию</h1>
-{%if message%}
-<p role="alert" class="error">{{message}}</p>
-{%endif%}
+<h1>Вход в редакцию</h1><p class="admin-muted">Управление локациями, ресторанами и отзывами.</p>
 <form method="post" action="{{settings.path('/admin/login')}}" class="stack">
 <input type="hidden" name="_csrf" value="{{csrf_token}}">
 <label>Пароль редакции<input type="password" name="password" autocomplete="current-password" required>
@@ -13,5 +10,4 @@
 <button>Войти ↗</button>
 </form>
 </section>
-</main>
 {%endblock%}

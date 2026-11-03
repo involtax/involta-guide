@@ -1,0 +1,95 @@
+/* Shared administrative shell. The locations screen is the visual reference. */
+.admin-workspace { max-width: 1440px; padding-top: 32px; padding-bottom: 64px; }
+.admin-workspace .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; gap: 20px; }
+.admin-workspace .admin-header h1 { font-size: 42px; letter-spacing: -2px; margin: 0; }
+.admin-workspace .admin-header button { padding: 8px 14px; font-size: 12px; background: white; color: var(--black); border-color: var(--line); }
+.admin-workspace .admin-tabs, #logs-main.admin-workspace .admin-tabs { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+.admin-workspace .admin-tabs a { font-size: 13px; padding-bottom: 6px; }
+.admin-workspace .admin-tabs a.selected { border-bottom: 2px solid var(--black); }
+.admin-content { margin-top: 32px; min-width: 0; }
+.admin-workspace h2 { font-size: 24px; }
+.admin-workspace h3 { font-size: 20px; }
+.admin-workspace h4 { font-size: 15px; }
+.admin-workspace .restaurant-results-heading h2 { font-size: 42px; }
+.admin-workspace .panel { padding: 24px; min-width: 0; }
+.admin-workspace .panel h3:first-child { margin-top: 0; }
+.admin-workspace .restaurant-browser { margin-top: 0; }
+.admin-workspace .stack input:not([type=checkbox]):not([type=radio]), .admin-workspace .stack select, .admin-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.admin-workspace textarea { line-height: 1.65; }
+.admin-workspace input[type=checkbox], .admin-workspace input[type=radio] { width: auto; flex: 0 0 auto; }
+.admin-workspace label:has(>input[type=checkbox]), .admin-workspace label:has(>input[type=radio]) { display: flex; align-items: center; gap: 9px; }
+.admin-workspace label, .admin-workspace dd, .admin-workspace p, .admin-workspace a, .admin-workspace h2, .admin-workspace h3 { overflow-wrap: anywhere; }
+.admin-workspace form { min-width: 0; }
+.admin-workspace button { max-width: 100%; overflow-wrap: anywhere; }
+.admin-workspace form:not(.stack) > button { margin-top: 12px; }
+.admin-workspace .admin-header form > button { margin-top: 0; }
+.admin-workspace form + form { margin-top: 24px; }
+.admin-browser, .admin-workspace .voice-admin-layout, .admin-workspace .logs-layout { display: grid; grid-template-columns: 285px minmax(0,1fr); gap: 36px; align-items: start; }
+.admin-sidebar { border: 1px solid var(--line); background: white; padding: 20px; min-width: 0; }
+.admin-sidebar h2 { font-size: 23px; margin: 0 0 20px; }
+.admin-sidebar label { font-size: 12px; }
+.admin-sidebar button { font-size: 12px; padding: 8px 12px; }
+.admin-sidebar nav { margin-top: 20px; font-size: 12px; }
+.admin-sidebar .admin-list-item { margin: 0; padding: 17px 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.admin-list-item > a { display: block; }
+.admin-list-item p { font-size: 11px; color: var(--muted); margin: 7px 0 0; }
+.admin-list-item.selected, .admin-workspace .log-request.selected { background: #f3f2ec; box-shadow: inset 3px 0 #25251f; outline: none; }
+.admin-list-item:hover, .admin-workspace .log-request:hover { background: #f8f7f2; }
+.admin-workspace .log-request { border-top: 1px solid var(--line); border-bottom: 0; padding: 17px 12px; }
+.admin-detail { min-width: 0; }
+.admin-detail > h2 { font-size: 42px; letter-spacing: -1.5px; margin-bottom: 24px; }
+.admin-detail > .panel:first-child { margin-top: 0; }
+.admin-detail > form, .admin-detail > audio { margin-bottom: 24px; }
+.admin-detail audio, .admin-workspace audio { width: 100%; max-width: 100%; }
+.admin-workspace blockquote { margin: 0 0 24px; padding: 16px 20px; border-left: 3px solid var(--line); background: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; font-size: 12px; }
+.admin-workspace summary { cursor: pointer; overflow-wrap: anywhere; }
+.admin-workspace details { min-width: 0; margin-bottom: 20px; }
+.admin-workspace details[open] > summary { margin-bottom: 18px; }
+.admin-workspace fieldset { min-width: 0; border: 1px solid var(--line); margin: 12px 0; padding: 16px; }
+.admin-workspace fieldset label + label { margin-top: 12px; }
+.admin-workspace .admin-decisions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.admin-workspace .admin-decisions form { margin: 0; }
+.admin-workspace .admin-decisions button { margin-top: 12px; }
+.admin-workspace .stats { margin: 0 0 24px; }
+.admin-workspace .stats > article { border: 1px solid var(--line); padding: 24px; }
+.admin-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin: 0; }
+.admin-facts dt { font-size: 12px; color: var(--muted); }
+.admin-facts dd { margin: 6px 0 0; font-size: 16px; }
+.admin-table { width: 100%; border-collapse: collapse; text-align: left; }
+.admin-table th, .admin-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.admin-table th { font-size: 12px; color: var(--muted); font-weight: 500; }
+.admin-table-scroll { overflow-x: auto; max-width: 100%; }
+.admin-section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+.admin-record { border-top: 1px solid var(--line); padding: 18px 0; }
+.admin-muted { color: var(--muted); font-size: 13px; }
+.admin-empty { border: 1px solid var(--line); padding: 24px; color: var(--muted); }
+.admin-error { border-left: 3px solid #963e34; }
+.admin-settings { margin-top: 24px; }
+.admin-login .admin-content { max-width: 520px; margin: 32px auto; }
+.admin-login h1 { font-size: 32px; letter-spacing: -1px; }
+@media (max-width: 900px) {
+  .admin-browser, .admin-workspace .voice-admin-layout, .admin-workspace .logs-layout { grid-template-columns: 230px minmax(0,1fr); gap: 20px; }
+}
+@media (max-width: 650px) {
+  .admin-workspace .admin-header h1 { font-size: 30px; letter-spacing: -1px; }
+  .admin-workspace .panel, .admin-workspace .stats > article { padding: 16px; }
+  .admin-workspace .restaurant-results-heading h2, .admin-detail > h2 { font-size: 34px; }
+  .admin-browser, .admin-workspace .voice-admin-layout { display: grid; grid-template-columns: minmax(0,1fr); gap: 28px; }
+  .admin-workspace .logs-layout { display: flex; flex-direction: column; gap: 28px; }
+  .admin-workspace .admin-decisions, .admin-facts { grid-template-columns: minmax(0,1fr); }
+  .admin-workspace .stats { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .admin-workspace .stats strong { font-size: 34px; }
+}
+/* Keep the approved city editor's existing typography and spacing. */
+.admin-workspace .location-editor h3 { font-size: 1.17em; }
+.admin-workspace .location-editor .panel h3:first-child { margin-top: 25px; }
+.admin-compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin-bottom: 24px; }
+.admin-compare article { border: 1px solid var(--line); padding: 16px; min-width: 0; }
+.admin-workspace .asr-comparison form { display: flex; flex-direction: column; gap: 18px; margin-bottom: 20px; }
+.admin-workspace .asr-comparison form > button { align-self: flex-start; margin-top: 0; }
+.admin-login > .notice { max-width: 520px; margin: 0 auto; }
+@media (max-width: 650px) { .admin-compare { grid-template-columns: minmax(0,1fr); } }
+/* Reset the older 760px logs order before the shared 650px breakpoint. */
+.admin-workspace .logs-content { order: 0; }
+@media (max-width: 650px) { .admin-workspace .logs-content { order: -1; } }

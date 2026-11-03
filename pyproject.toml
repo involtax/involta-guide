@@ -20,7 +20,16 @@ voice-worker = "involta_voice.worker:main"
 guide-voice-consumer = "involta_guide.infrastructure.voice.consumer:main"
 guide-voice-asr-backfill = "involta_guide.infrastructure.voice.backfill:main"
 [dependency-groups]
-dev = ["pytest>=8", "pytest-cov>=6", "ruff>=0.11", "mypy>=1.15", "playwright>=1.50", "types-requests"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=6",
+    "ruff>=0.11",
+    "mypy>=1.15",
+    "playwright>=1.50",
+    "types-requests",
+    "numpy>=2,<3",
+    "av>=14,<16",
+]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

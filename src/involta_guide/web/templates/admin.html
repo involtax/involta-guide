@@ -1,16 +1,7 @@
-{%extends 'fragment_base.html' if fragment else 'base.html'%}
+{%extends 'admin_shell.html'%}
 {%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
-{%block body%}
-<main class="{{'restaurant-admin' if tab in ['restaurants','locations'] else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML settle:0" hx-history="false">
-<header class="admin-header">
-<h1>Рабочий стол.</h1>
-<form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button>
-</form>
-</header>
-{%include 'admin_navigation.html'%}
-{%if message%}
-<p role="status" class="notice">{{message}}</p>
-{%endif%}
+{%from 'admin_components.html' import status_label%}
+{%block admin_content%}
 {%if tab=='overview'%}
 <section class="stats">
 <article>
@@ -23,8 +14,8 @@
 <strong>{{overview.pending_reviews}}</strong> записей в очереди</article>
 </section>
 <p><a href="{{settings.path('/admin/locations')}}">Все локации</a> · <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые</a> · <a href="{{settings.path('/admin/locations')}}?status=filled">Наполненные</a> · <a href="{{settings.path('/logs')}}">Логи наполнения</a></p>
-<h2>Использование OpenAI сегодня</h2>
-<p>{{overview.usage.calls}} вызовов · {{overview.usage.input_tokens}} входных / {{overview.usage.output_tokens}} выходных токенов · стоимость {{overview.usage.cost if overview.usage.cost is not none else 'не определена'}} USD · без тарифа: {{overview.usage.unpriced}}</p>
+<section class="panel"><h2>Использование OpenAI сегодня</h2><dl class="admin-facts">
+{%for label,value in [('Вызовы',overview.usage.calls),('Входные токены',overview.usage.input_tokens),('Выходные токены',overview.usage.output_tokens),('Стоимость, USD',overview.usage.cost if overview.usage.cost is not none else 'Не определена'),('Записи без тарифа',overview.usage.unpriced)]%}<div><dt>{{label}}</dt><dd>{{value}}</dd></div>{%endfor%}</dl></section>
 {%endif%}
 {%if tab=='locations'%}
 {%include 'admin_locations.html'%}
@@ -38,13 +29,13 @@
 <label>Промпт наполнения<textarea name="prompt" rows="18" minlength="50" maxlength="30000">{{prompt}}</textarea></label>
 <button>Сохранить настройки наполнения</button>
 </form>
-{%include 'model_prices.html'%}
+</section><section class="panel">{%include 'model_prices.html'%}
 <p>Первичное наполнение запускается на публичной странице пустого города. Повторный запрос и переобработка доступны администратору в конкретном логе.</p>
 <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
 </section>
 {%endif%}
 {%if tab=='reviews'%}
-<section class="panel">
+<div class="admin-browser"><aside class="admin-sidebar">
 <h2>Голосовые отзывы</h2>
 <form method="get">
 <input type="hidden" name="tab" value="reviews">
@@ -55,18 +46,16 @@
 {%if moderation==m%}
 selected
 {%endif%}
->{{m}}</option>
+ value="{{m}}">{{status_label(m)}}</option>
 {%endfor%}
 </select>
 </label>
 <button>Фильтр</button>
 </form>
 {%for r in reviews%}
-<p>
-<a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{r.id}}">{{r.created_at}} · {{r.status}} · {{r.moderation}} · {{r.transcript or 'Ожидает расшифровки'}}</a>
-</p>
-{%endfor%}
-</section>
+<article class="admin-list-item {{'selected' if review_detail and r.id==review_detail.review.id else ''}}"><a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{r.id}}"><strong>{{r.created_at}}</strong><p>{{status_label(r.status)}} · {{status_label(r.moderation)}}</p><p>{{r.transcript or 'Ожидает расшифровки'}}</p></a></article>
+{%else%}<p class="admin-muted">Отзывов по выбранным условиям нет.</p>{%endfor%}
+</aside><div class="admin-detail">
 {%if review_detail%}
 {%set r=review_detail.review%}
 <section class="panel">
@@ -103,7 +92,7 @@ selected
 {%for p in review_detail.proposals%}
 {%set payload=p.payload%}
 <section class="panel">
-<h3>Предложение: {{p.kind}} · {{p.status}}</h3>
+<h3>Предложение: {{p.kind}} · {{status_label(p.status)}}</h3>
 <p>{{payload.reason}}</p>
 <details>
 <summary>Было</summary>
@@ -122,17 +111,16 @@ selected
 </form>
 </section>
 {%endfor%}
-{%endif%}
-{%endif%}
+{%else%}<div class="admin-empty"><h2>Выберите отзыв</h2><p>Слева — поиск и список отзывов.</p></div>{%endif%}
+</div></div>{%endif%}
 {%if tab=='restaurants'%}
 {%include 'admin_restaurants.html'%}
 {%endif%}
 {%if tab=='ratings'%}
 <h2>Внутренние оценки</h2>
 <p>Только одобренные отзывы без фрода. Значения не меняют публичный топ автоматически.</p>
-{%for r in ratings%}
-<p>{{r.name}} · авторов {{r.visitors}} · оценка {{r.rating}} · тональность {{r.sentiment}} · рекомендация {{r.recommendation}}</p>
-{%endfor%}
+<section class="panel admin-table-scroll"><table class="admin-table"><thead><tr><th>Ресторан</th><th>Авторов</th><th>Оценка</th><th>Тональность</th><th>Рекомендация</th></tr></thead><tbody>
+{%for r in ratings%}<tr><td>{{r.name}}</td><td>{{r.visitors}}</td>{%for value in [r.rating,r.sentiment,r.recommendation]%}<td>{{value if value is not none else 'Нет данных'}}</td>{%endfor%}</tr>{%else%}<tr><td colspan="5">Одобренных оценок пока нет.</td></tr>{%endfor%}</tbody></table></section>
 {%endif%}
 {%if tab=='contacts'%}
 <h2>Предложения телефонов</h2>
@@ -140,22 +128,19 @@ selected
 {%for g in contacts%}
 <article class="panel">
 <h3>{{g.restaurant_name or 'Новый ресторан'}}</h3>
-<p>{{g.current_phone or 'не указан'}} → {{g.phone}}</p>
+<dl class="admin-facts"><div><dt>Текущий телефон</dt><dd>{{g.current_phone or 'Не указан'}}</dd></div><div><dt>Предлагается</dt><dd>{{g.phone}}</dd></div></dl>
 <p>Сообщений {{g.messages}} · браузеров {{g.visitors}} · сетей {{g.networks}} · одобрено {{g.approved}} · фрод {{g.fraud}}</p>
 {%for r in g.evidence%}
 <p>
-<a href="?tab=reviews&amp;review={{r.reviewId}}">{{r.date}} · {{r.status}}</a> {{r.reason}}</p>
+<a href="?tab=reviews&amp;review={{r.reviewId}}">{{r.date}} · {{status_label(r.status)}}</a> {{r.reason}}</p>
 {%endfor%}
 </article>
-{%endfor%}
+{%else%}<p class="admin-empty">Предложений телефонов пока нет.</p>{%endfor%}
 {%endif%}
 {%if tab=='sessions'%}
 <h2>Сессии редакции</h2>
 <form method="post" action="{{settings.path('/admin/actions/revoke-admin')}}">{{csrf()}}<button>Завершить все сессии редакции</button>
 </form>
-{%for s in sessions%}
-<p>{{s.id}} · {{s.created_at}} · {{'завершена' if s.revoked else s.expires_at}}</p>
-{%endfor%}
+<section class="panel"><h3>Административные сессии</h3>{%for s in sessions%}<article class="admin-record"><strong>{{'Завершена' if s.revoked else 'Срок действия до '+s.expires_at|string}}</strong><p class="admin-muted">Создана {{s.created_at}}</p><details><summary>Идентификатор сессии</summary>{{s.id}}</details></article>{%else%}<p>Сессий пока нет.</p>{%endfor%}</section>
 {%endif%}
-</main>
 {%endblock%}

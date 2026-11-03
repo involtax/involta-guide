@@ -1,4 +1,4 @@
-{%extends 'fragment_base.html' if fragment else 'base.html'%}
+{%extends 'admin_shell.html'%}
 {%from 'macros.html' import csrf with context%}
 {%macro decision_fields(action,proposal=None)%}
 {{csrf()}}<input type="hidden" name="idempotency_key" value="{{new_key()}}">
@@ -9,51 +9,50 @@
 <input type="hidden" name="page_revision" value="{{v.location.revision or ''}}">
 {%if proposal%}<input type="hidden" name="proposal_id" value="{{proposal.id}}"><input type="hidden" name="proposal_revision" value="{{proposal.revision}}">{%endif%}
 {%endmacro%}
-{%block body%}
-<main id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
-<h1>Голосовые отзывы</h1>{%include 'admin_navigation.html'%}
-{%if message%}<p role="status">{{message}}</p>{%endif%}
-{%if voice_unavailable%}<p role="alert">{{voice_unavailable}}. Сохранённые отзывы доступны ниже.</p>{%endif%}
+{%from 'admin_components.html' import status_label%}
+{%block admin_content%}
+<h2>Голосовые отзывы</h2>
+{%if voice_unavailable%}<p role="alert" class="notice admin-error">{{voice_unavailable}}. Сохранённые отзывы доступны ниже.</p>{%endif%}
 <details><summary>Доставка Voice: {{"работает" if consumer_health.healthy else "нет подтверждения / ошибка"}}</summary><pre>{{consumer_health|tojson(indent=2)}}</pre></details>
 <div class="voice-admin-layout">
-<aside aria-label="Очередь отзывов">
+<aside class="admin-sidebar" aria-label="Очередь отзывов">
 <h2>Очередь · {{queue.total}}</h2>
 <form method="get" action="{{settings.path('/admin/voice')}}" class="stack">
 <label>Локация<input name="q" value="{{q}}"></label>
 <label>Этап<select name="stage"><option value="">Все</option>{%for key,label in [('waiting-text','Ожидается текст'),('text-ready','Текст сохранён'),('analysis-ready','Анализ готов'),('failed','Ошибка обработки')]%}<option value="{{key}}" {%if stage_filter==key%}selected{%endif%}>{{label}}</option>{%endfor%}</select></label>
-<label>Модерация<select name="moderation"><option value="">Все</option>{%for value in ['pending','approved','rejected']%}<option value="{{value}}" {%if moderation==value%}selected{%endif%}>{{value}}</option>{%endfor%}</select></label>
+<label>Модерация<select name="moderation"><option value="">Все</option>{%for value in ['pending','approved','rejected']%}<option value="{{value}}" {%if moderation==value%}selected{%endif%}>{{status_label(value)}}</option>{%endfor%}</select></label>
 <label>Предложение<select name="kind"><option value="">Все</option>{%for key,label in [('edit','Правка'),('restaurant','Новое заведение')]%}<option value="{{key}}" {%if proposal_kind==key%}selected{%endif%}>{{label}}</option>{%endfor%}</select></label>
 <label><input type="checkbox" name="repeat" value="1" {%if repeat_filter%}checked{%endif%}> Есть сигналы повторов</label><button>Найти</button>
 </form>
-{%for item in pending_voice%}<p><a href="{{settings.path('/admin/voice/submission/'+item.reference)}}">{{item.location.name}} · {{item.state}}</a></p>{%endfor%}
+{%for item in pending_voice%}<p><a href="{{settings.path('/admin/voice/submission/'+item.reference)}}">{{item.location.name}} · {{status_label(item.state)}}</a></p>{%endfor%}
 {%for item in queue.rows%}
-<article><a href="{{settings.path(item.path)}}"><strong>{{item.location_name}}{%if item.number%} / {{item.number}}{%endif%}</strong></a><p>{{item.created_at}} · {{item.moderation}}</p><p>{{(item.editorial_text or item.transcript or 'Ожидается расшифровка')[:140]}}</p></article>
+<article class="admin-list-item {{'selected' if v and item.id|string==v.review.id|string else ''}}"><a href="{{settings.path(item.path)}}" {%if v and item.id|string==v.review.id|string%}aria-current="page"{%endif%}><strong>{{item.location_name}}{%if item.number%} / {{item.number}}{%endif%}</strong></a><p>{{item.created_at}} · {{status_label(item.moderation)}}</p><p>{{(item.editorial_text or item.transcript or 'Ожидается расшифровка')[:140]}}</p></article>
 {%else%}<p>Нет отзывов по выбранным условиям.</p>{%endfor%}
 <nav aria-label="Страницы отзывов">{%if queue.page>1%}<a href="?{{page_query(queue.page-1)}}">← Назад</a>{%endif%} {{queue.page}} / {{queue.pages}} {%if queue.page<queue.pages%}<a href="?{{page_query(queue.page+1)}}">Дальше →</a>{%endif%}</nav>
 </aside>
-<section aria-label="Выбранный отзыв">
+<section class="admin-detail" aria-label="Выбранный отзыв">
 {%if v%}
 <h2>{{v.location.name}}{%if v.link%} / {{v.link.number}}{%endif%}</h2>
-<p><a href="{{settings.path('/'+v.location.slug)}}" hx-boost="false">Открыть страницу ↗</a> · {{v.review.created_at}} · {{v.review.moderation}}{%if v.review.fraud%} · Фрод{%endif%}</p>
+<p><a href="{{settings.path('/'+v.location.slug)}}" hx-boost="false">Открыть страницу ↗</a> · {{v.review.created_at}} · {{status_label(v.review.moderation)}}{%if v.review.fraud%} · Фрод{%endif%}</p>
 <audio controls preload="none" src="{{settings.path('/api/admin/audio/'+v.review.id|string)}}"></audio>
 {%if v.text%}
-<h3>Исходный текст отзыва</h3><blockquote>{{v.text.original_text}}</blockquote>
+<section class="panel"><h3>Исходный текст отзыва</h3><blockquote>{{v.text.original_text}}</blockquote>
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}" class="stack">{{decision_fields('edit-text')}}
 <label>Редакционная версия текста<textarea name="text" rows="5" required>{{v.text.editorial_text}}</textarea></label><button>Сохранить текст</button></form>
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('bind')}}
 <label>Привязать отзыв к ресторану<select name="restaurant_id"><option value="">Ресторан пока не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id==v.text.restaurant_id%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку</button></form>
-<div class="button-row">{%for key,label in [('approve','Одобрить весь пакет'),('reject','Отклонить отзыв'),('fraud','Пометить фродом'),('reset','Вернуть на проверку')]%}
-<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields(key)}}<label>Причина<input name="reason" maxlength="2000"></label><button>{{label}}</button></form>{%endfor%}</div>
-<h3>Распознанные фрагменты и показатели</h3>
+</section><section class="panel"><h3>Решение по отзыву</h3><div class="button-row admin-decisions">{%for key,label in [('approve','Одобрить весь пакет'),('reject','Отклонить отзыв'),('fraud','Пометить фродом'),('reset','Вернуть на проверку')]%}
+<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields(key)}}<label>Причина<input name="reason" maxlength="2000"></label><button class="{{'' if key=='approve' else 'secondary'}}">{{label}}</button></form>{%endfor%}</div>
+</section><section class="panel"><h3>Распознанные фрагменты и показатели</h3>
 {%for entry in (v.analysis or {}).get('entries',[])%}
 <article><h4>{{entry.restaurantName or 'Ресторан не определён'}}</h4><blockquote>{{entry.quote}}</blockquote>
 <p>Оценка: {{entry.rating if entry.rating is not none else 'не названа'}} · Тональность: {{entry.sentiment if entry.sentiment is not none else 'не определена'}} · Рекомендация: {{entry.recommendation if entry.recommendation is not none else 'не определена'}}</p><p>{{entry.experience}} · уверенность {{entry.confidence}}</p>
 {%if entry.candidates%}<p>Кандидаты: {%for r in v.restaurants%}{%if r.id|string in entry.candidates%}{{r.name}}; {%endif%}{%endfor%}</p>{%endif%}
 {%if v.link%}<form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('bind-fragment')}}<input type="hidden" name="fragment_number" value="{{loop.index0}}"><label>Ресторан этого фрагмента<select name="restaurant_id"><option value="">Не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id|string==entry.restaurantId%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку фрагмента</button></form>{%endif%}</article>
 {%else%}<p>Дополнительный анализ не содержит показателей. Текст отзыва сохранён и доступен для модерации.</p>{%endfor%}
-<h3>Необязательные предложения</h3>
+</section><h3>Необязательные предложения</h3>
 {%for p in v.proposals%}
-<article class="panel"><h4>{{'Новое заведение' if p.kind=='restaurant' else 'Правка карточки'}} · {{p.status}} · обработка {{p.run}}</h4><p>{{p.payload.reason}}</p><blockquote>{{p.payload.quote or ''}}</blockquote>
+<article class="panel"><h4>{{'Новое заведение' if p.kind=='restaurant' else 'Правка карточки'}} · {{status_label(p.status)}} · обработка {{p.run}}</h4><p>{{p.payload.reason}}</p><blockquote>{{p.payload.quote or ''}}</blockquote>
 <dl>{%for field,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Ссылка на карту'),('phone','Телефон')]%}<dt>{{label}}: было</dt><dd>{{p.before.get('maps_url' if field=='mapsUrl' else field) or 'Не указано'}}</dd><dt>Предлагается</dt><dd>{{p.final.get(field) if p.final.get(field) is not none else 'Удалить значение'}}</dd>{%endfor%}</dl>
 {%if p.status=='pending' and (not v.link or p.run==v.link.active_run)%}
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}" class="stack">{{decision_fields('edit-proposal',p)}}
@@ -73,20 +72,18 @@
 {%endif%}
 {%include 'asr_comparison.html'%}
 {%if v.link and v.text%}
-<h3>Обработки</h3><form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('new-run')}}<button>Новая обработка с текущими настройками</button></form>
+<section class="panel"><h3>Обработки</h3><form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('new-run')}}<button>Новая обработка с текущими настройками</button></form>
 {%if remote and remote.stages%}{%for number in remote.stages|map(attribute='run')|unique%}<p><a href="{{settings.path(v.path)}}/runs/{{number}}">Технический лог обработки {{number}} ↗</a></p>{%endfor%}{%endif%}
 {%for r in v.runs%}<p><a href="{{settings.path(v.path)}}/runs/{{r.run}}">Полный лог обработки {{r.run}} ↗</a></p><form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('activate-run')}}<input type="hidden" name="run" value="{{r.run}}"><button>Выбрать результат {{r.run}} для проверки</button></form>{%endfor%}
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('revalidate')}}<label>Номер обработки<input type="number" name="run" min="1" value="{{v.link.active_run}}" required></label><button>Проверить сохранённый ответ без OpenAI</button></form>
-{%endif%}
+</section>{%endif%}
 {%for job in v.legacy_jobs%}<p><a href="{{settings.path(job.path)}}" hx-boost="false">Существующий лог обработки ↗</a></p>{%endfor%}
 {%if remote%}<details {%if run_log%}open{%endif%}><summary>Технический статус и полный лог</summary><pre class="audit-json">{{remote|tojson(indent=2)}}</pre></details>{%endif%}
-<h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre>
-<h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre>
-<h3>Журнал ручных решений</h3>{%for event in v.decisions%}<details><summary>{{event.created_at}} · {{event.actor}} · {{event.action}}</summary><p>Сессия {{event.session_id}} · {{event.reason}}</p><h4>До</h4><pre class="audit-json">{{event.before_data|tojson(indent=2)}}</pre><h4>После</h4><pre class="audit-json">{{event.after_data|tojson(indent=2)}}</pre></details>{%else%}<p>Ручных решений пока нет.</p>{%endfor%}
-{%else%}<h2>Выберите отзыв</h2><p>Текст сохраняется до дополнительного анализа. Предложенные действия необязательны.</p>{%endif%}
+<section class="panel"><h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre></section>
+<section class="panel"><h3>Журнал ручных решений</h3>{%for event in v.decisions%}<details><summary>{{event.created_at}} · {{event.actor}} · {{event.action}}</summary><p>Сессия {{event.session_id}} · {{event.reason}}</p><h4>До</h4><pre class="audit-json">{{event.before_data|tojson(indent=2)}}</pre><h4>После</h4><pre class="audit-json">{{event.after_data|tojson(indent=2)}}</pre></details>{%else%}<p>Ручных решений пока нет.</p>{%endfor%}
+</section>{%else%}<div class="admin-empty"><h2>Выберите отзыв</h2><p>Текст сохраняется до дополнительного анализа. Предложенные действия необязательны.</p></div>{%endif%}
 </section></div>
-{%if voice_settings%}<details><summary>Модели и промпт голоса</summary><form method="post" action="{{settings.path('/admin/voice/settings')}}" class="stack">{{csrf()}}
+{%if voice_settings%}<details class="panel admin-settings"><summary>Модели и промпт голоса</summary><form method="post" action="{{settings.path('/admin/voice/settings')}}" class="stack">{{csrf()}}
 {%for field,label,category in [('transcription_model','Расшифровка','transcription'),('analysis_model','Разбор','analysis')]%}<label>{{label}}<select name="{{field}}">{%for model in voice_settings.models[category]%}<option value="{{model}}" {%if voice_settings[field]==model%}selected{%endif%}>{{model}} · {%if category=="transcription"%}локальный ASR{%elif model in voice_settings.prices%}{{voice_settings.prices[model]}}{%else%}стоимость неизвестна{%endif%}</option>{%endfor%}</select></label>{%endfor%}
 <p>Каталог: {{voice_settings.prices_checked}}. Неизвестная стоимость не считается нулевой.</p><label>Промпт разбора<textarea name="prompt" rows="12">{{voice_settings.prompt}}</textarea></label><button>Сохранить настройки новых обработок</button></form></details>{%endif%}
-</main>
 {%endblock%}
