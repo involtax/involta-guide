@@ -271,6 +271,53 @@ class PostgresRepository:
             {"id": location_id},
         )
 
+    def restaurant_cities(self, query: str) -> list[Record]:
+        return self.query(
+            """SELECT l.id,l.name,l.region,l.slug,l.kind,
+                count(DISTINCT r.id) restaurant_count,
+                (SELECT max(v.created_at) FROM versions v WHERE v.location_id=l.id) filled_at
+            FROM locations l JOIN (
+                SELECT location_id,restaurant_id FROM restaurant_locations
+                UNION SELECT location_id,id FROM restaurants
+            ) membership ON membership.location_id=l.id
+            JOIN restaurants r ON r.id=membership.restaurant_id
+            WHERE translate(lower(l.name||' '||l.region||' '||array_to_string(l.aliases,' ')),
+                'ё','е') LIKE :q
+            GROUP BY l.id ORDER BY filled_at DESC NULLS LAST,l.name,l.id""",
+            {
+                "q": "%"
+                + query.strip()
+                .lower()
+                .replace("ё", "е")
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+                + "%"
+            },
+        )
+
+    def city_restaurants(self, location_id: str) -> list[Record]:
+        return self.query(
+            """SELECT r.*,l.name location_name,
+                (SELECT jsonb_agg(jsonb_build_object('id',v.id,'created_at',v.created_at,
+                    'moderation',v.moderation,'fraud',v.fraud,'transcript',v.transcript,
+                    'entries',(SELECT jsonb_agg(e) FROM jsonb_array_elements(
+                        coalesce(v.result->'entries','[]'::jsonb)) e
+                        WHERE e->>'restaurantId'=r.id::text)) ORDER BY v.created_at DESC)
+                 FROM reviews v WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(
+                    coalesce(v.result->'entries','[]'::jsonb)) e
+                    WHERE e->>'restaurantId'=r.id::text)) reviews,
+                (SELECT jsonb_agg(jsonb_build_object('id',a.id,'name',a.name,'slug',a.slug)
+                    ORDER BY a.name) FROM locations a
+                    WHERE a.id=r.location_id OR EXISTS(SELECT 1 FROM restaurant_locations rl
+                        WHERE rl.location_id=a.id AND rl.restaurant_id=r.id)) collections
+            FROM restaurants r JOIN locations l ON l.id=r.location_id
+            WHERE r.location_id=:id OR EXISTS(SELECT 1 FROM restaurant_locations rl
+                WHERE rl.restaurant_id=r.id AND rl.location_id=:id)
+            ORDER BY lower(r.name),r.id""",
+            {"id": location_id},
+        )
+
     def summary(self) -> Record:
         result = self.query(
             "SELECT count(*) total,count(*) FILTER (WHERE draft='[]') empty,count(*) FILTER (WHERE published_version IS NOT NULL) published FROM locations"

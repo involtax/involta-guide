@@ -1,7 +1,7 @@
 {%extends 'fragment_base.html' if fragment else 'base.html'%}
 {%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
 {%block body%}
-<main id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
+<main class="{{'restaurant-admin' if tab=='restaurants' else ''}}" id="admin-main" hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML" hx-history="false">
 <header class="admin-header">
 <h1>Рабочий стол.</h1>
 <form method="post" action="{{settings.path('/admin/logout')}}">{{csrf()}}<button>Выйти</button>
@@ -337,14 +337,7 @@ selected
 {%endif%}
 {%endif%}
 {%if tab=='restaurants'%}
-<h2>База ресторанов</h2>
-{%for r in restaurants%}
-<article class="panel">
-<h3>{{r.name}}</h3>
-<p>{{r.cuisine}} · {{r.phone}} · {{'★' if r.alex_star else ''}}</p>
-<a href="?tab=locations&amp;location={{r.location_id}}">Открыть локацию</a>
-</article>
-{%endfor%}
+{%include 'admin_restaurants.html'%}
 {%endif%}
 {%if tab=='ratings'%}
 <h2>Внутренние оценки</h2>

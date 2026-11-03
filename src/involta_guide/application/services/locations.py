@@ -91,6 +91,93 @@ class Queries:
                 "parents": repo.tree(key, ancestors=True),
             }
 
+    def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
+        from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score
+
+        with self.uow() as uow:
+            repo = uow.repo
+            cities = repo.restaurant_cities(query)
+            selected = next((c for c in cities if c["id"] == location_id), None)
+            if selected is None and not location_id and cities:
+                selected = cities[0]
+            result: Record = {
+                "restaurant_cities": cities,
+                "restaurant_city": selected,
+                "restaurant_cards": [],
+                "factors": list(zip(FACTORS, FACTOR_LABELS)),
+            }
+            if selected is None:
+                return result
+            cards = repo.city_restaurants(selected["id"])
+            versions = repo.rows("versions", {"location_id": selected["id"]}, limit=100000)
+            location = require(repo, "locations", selected["id"])
+            current = next((v for v in versions if v["id"] == location["draft_version"]), None)
+            report = (current["content"] if current else {}).get("rankingReport") or []
+
+            def normalize(name: str) -> str:
+                return " ".join(name.casefold().split())
+
+            for card in cards:
+                candidate = next(
+                    (
+                        r
+                        for r in report
+                        if normalize(r["name"]) == normalize(card["name"])
+                        and (not r.get("mapsUrl") or r["mapsUrl"] == card["maps_url"])
+                    ),
+                    None,
+                )
+                approved = [
+                    entry
+                    for review in card["reviews"] or []
+                    if review["moderation"] == "approved" and not review["fraud"]
+                    for entry in review["entries"] or []
+                ]
+                card["review_scores"] = {
+                    key: (sum(values) / len(values) if values else None)
+                    for key in ("rating", "sentiment", "recommendation")
+                    for values in [[e[key] for e in approved if e.get(key) is not None]]
+                }
+                card["review_count"] = len(approved)
+                card["ranking"] = candidate
+                card["score"] = score(candidate["scores"]) if candidate else None
+                card["snapshots"] = [
+                    {
+                        "version": v["number"],
+                        "created_at": v["created_at"].isoformat(),
+                        "source": v["source"],
+                        "model": v["model"],
+                        "published": v["id"] == location["published_version"],
+                        "current": v["id"] == location["draft_version"],
+                        "restaurant": r,
+                        "ranking": next(
+                            (
+                                item
+                                for item in v["content"].get("rankingReport") or []
+                                if normalize(item["name"]) == normalize(r["name"])
+                                and (not item.get("mapsUrl") or item["mapsUrl"] == r.get("mapsUrl"))
+                            ),
+                            None,
+                        ),
+                    }
+                    for v in versions
+                    for r in v["content"].get("restaurants", [])
+                    if r.get("id") == card["id"]
+                ]
+            cards.sort(
+                key=lambda c: (
+                    c["score"] is None,
+                    -(c["score"] if c["score"] is not None else 0),
+                    c["review_scores"]["rating"] is None,
+                    -(c["review_scores"]["rating"] or 0),
+                    -int(c["alex_star"]),
+                    normalize(c["name"]),
+                    c["id"],
+                )
+            )
+            result["restaurant_cards"] = cards
+            return result
+
     def public(self, slug: str) -> Record | None:
         with self.uow() as uow:
             repo = uow.repo
