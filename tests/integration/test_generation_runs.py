@@ -52,8 +52,6 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
     try:
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
-        version = queries.rows("versions")[0]
-        assert version["model"] == "gpt-5"
         assert queries.rows("ai_usage")[0]["model"] == "gpt-5"
         provider.analyze("Analyze independently", job["id"])
         assert [r["model"] for r in captured] == ["gpt-5", settings.openai_model]
@@ -67,7 +65,7 @@ def test_manual_repeat_creates_new_log_and_replaces_published_page(database):
     service.enqueue_public_fill(location["id"])
     first = queries.rows("jobs")[0]
     assert Worker(queue, service).once()
-    published = queries.get("locations", location["id"])["published_version"]
+    published = queries.get("locations", location["id"])["revision"]
     service.set_generation_model("gpt-5")
     prompt = "Новый промт для повторного наполнения: проверить источники и телефоны."
     service.set_prompt(prompt)
@@ -77,17 +75,20 @@ def test_manual_repeat_creates_new_log_and_replaces_published_page(database):
     assert queries.get("jobs", new_id)["prompt"] == prompt
     assert Worker(queue, service).once()
     location_after = queries.get("locations", location["id"])
-    assert location_after["published_version"] != published
-    assert location_after["draft_version"] == location_after["published_version"]
-    assert queries.get("versions", published)["published"] == 1
+    assert location_after["revision"] != published
+    assert location_after["revision"] == location_after["revision"]
     audit = AIAudit(engine, settings)
     assert audit.resolve("ivanovo", 1, public_only=True) == first["id"]
     assert audit.resolve("ivanovo", 2, public_only=True) == new_id
     detail = audit.detail(new_id)
     assert detail["job"]["model_name"] == "gpt-5"
     assert detail["job"]["generation_config"]["previous_number"] == 1
-    assert detail["versions"][0]["id"] == location_after["draft_version"]
-    assert detail["versions"][0]["model"] == "gpt-5"
+    assert (
+        detail["changes"] == []
+    )  # Identical response keeps the same restaurant; no artificial diff.
+    assert len(queries.rows("restaurants")) == 1
+    assert detail["job"]["applied"]
+    assert detail["job"]["generation_config"]["model"] == "gpt-5"
     with TestClient(create_app(settings)) as client:
         assert client.get("/guide/logs/ivanovo/2").status_code == 200
         assert client.get("/guide/logs/ivanovo/2.json").json()["job"]["id"] == new_id

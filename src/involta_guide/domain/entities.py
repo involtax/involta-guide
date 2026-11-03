@@ -81,21 +81,6 @@ class Proposal:
 
 
 @dataclass(frozen=True)
-class PublicationVersion:
-    id: UUID
-    location_id: UUID
-    number: int
-    content: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class Publication:
-    location_id: UUID
-    draft_version: UUID | None
-    published_version: UUID | None
-
-
-@dataclass(frozen=True)
 class AIJob:
     id: UUID
     kind: str

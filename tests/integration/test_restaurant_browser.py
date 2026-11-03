@@ -41,7 +41,7 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
     editor.save(kazan["id"], {"intro": "", "restaurants": [{**CARD, "name": "Казанский"}]}, None)
     with engine.begin() as conn:
         conn.execute(
-            text("UPDATE versions SET created_at=now()-interval '1 day' WHERE location_id=:id"),
+            text("UPDATE locations SET updated_at=now()-interval '1 day' WHERE id=:id"),
             {"id": ivanovo["id"]},
         )
     result = queries.restaurant_browser()

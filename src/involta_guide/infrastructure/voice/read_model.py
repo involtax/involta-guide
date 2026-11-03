@@ -174,13 +174,6 @@ class VoiceReadModel:
                     {"id": review_id},
                 ).mappings()
             ]
-            version_ids = [
-                str(value)
-                for value in conn.execute(
-                    text("SELECT version_id FROM version_reviews WHERE review_id=:id"),
-                    {"id": review_id},
-                ).scalars()
-            ]
             analysis = next(
                 (r["analysis"] for r in runs if link and r["run"] == link["active_run"]),
                 review["result"] or {},
@@ -217,13 +210,12 @@ class VoiceReadModel:
         with self.engine.connect() as conn:
             shared = conn.execute(
                 text(
-                    "SELECT DISTINCT l.id,l.published_version FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE l.id<>:id AND x.restaurant_id IN (SELECT restaurant_id FROM restaurant_locations WHERE location_id=:id)"
+                    "SELECT DISTINCT l.id,l.revision FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE l.id<>:id AND x.restaurant_id IN (SELECT restaurant_id FROM restaurant_locations WHERE location_id=:id)"
                 ),
                 {"id": review["location_id"]},
             ).mappings()
             affected_revisions = {
-                str(r["id"]): str(r["published_version"]) if r["published_version"] else None
-                for r in shared
+                str(r["id"]): str(r["revision"]) if r["revision"] else None for r in shared
             }
         return {
             "affected_revisions": affected_revisions,
@@ -238,7 +230,7 @@ class VoiceReadModel:
             "restaurants": restaurants,
             "legacy_jobs": legacy_jobs,
             "analysis": analysis,
-            "version_ids": version_ids,
+            "changes": review["changes"],
             "path": "/admin/voice/" + location["slug"] + "/" + str(link["number"])
             if link
             else "/admin/voice/legacy/" + review_id,

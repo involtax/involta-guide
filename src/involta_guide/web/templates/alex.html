@@ -31,8 +31,7 @@
 {%endif%}
 <details>
 <summary>Было / стало</summary>
-<pre>{{c.before_content|tojson(indent=2)}}</pre>
-<pre>{{c.after_content|tojson(indent=2)}}</pre>
+<pre>{{c.changes|tojson(indent=2)}}</pre>
 </details>
 </article>
 {%endfor%}

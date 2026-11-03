@@ -104,9 +104,24 @@ write_state() {
   printf '%s %s %s\n' "$sha" "$image" "$id" > "$file.tmp"
   mv -f -- "$file.tmp" "$file"
 }
+stop_guide_writers() {
+  local sha=$1 image=$2
+  compose "$sha" "$image" stop --timeout 240 worker web
+  if [[ -f "$DEPLOY_ROOT/releases/$sha/compose.voice.yaml" ]]; then
+    compose "$sha" "$image" stop --timeout 240 voice-consumer
+  fi
+}
+restore_cutover_database() {
+  local backup="$DEPLOY_ROOT/releases/$target_sha/pre-cutover.$deployment_id.dump"
+  [[ -f "$backup" ]] || return 0
+  stop_guide_writers "$target_sha" "$target_image" || return 1
+  compose "$target_sha" "$target_image" run --rm --no-deps -T web \
+    python -m involta_guide.infrastructure.persistence.release_backup restore < "$backup" || return 1
+}
 restore_previous() {
   export VOICE_INTAKE=false
   [[ -n "$previous_sha" ]] || return 1
+  restore_cutover_database || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
   compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
@@ -181,7 +196,7 @@ if [[ "$mode" == rollback && -n "$previous_sha" && -f "$DEPLOY_ROOT/releases/$pr
   docker run --rm --entrypoint python "$target_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Cannot roll back Voice references to an incompatible image' >&2; exit 2; }
 fi
 docker volume inspect "$AUDIO_VOLUME" >/dev/null
-# Schema upgrades must be additive and image rollback compatible. Never seed/drop data here.
+# The current-state cutover has a private pre-change dump; image rollback restores it first.
 changed=0
 failed() {
   local status=$1
@@ -194,6 +209,7 @@ failed() {
       compose "$target_sha" "$target_image" stop --timeout 240 worker
       restore_previous && echo "Rollback to $previous_sha succeeded" >&2 || echo 'ROLLBACK FAILED: operator intervention required' >&2
     else
+      restore_cutover_database || { echo "DATABASE RESTORE FAILED" >&2; exit "$status"; }
       # First installation: remove only our failed web/worker containers; keep all volumes and networks.
       compose "$target_sha" "$target_image" stop --timeout 240 web worker
       compose "$target_sha" "$target_image" rm --force web worker
@@ -206,7 +222,16 @@ trap 'failed $?' ERR
 trap 'failed 143' HUP TERM
 trap 'failed 130' INT
 changed=1
-if [[ -n "$previous_sha" ]]; then compose "$previous_sha" "$previous_image" stop --timeout 240 worker web; fi
+if [[ -n "$previous_sha" ]]; then stop_guide_writers "$previous_sha" "$previous_image"; fi
+needs_backup=$(compose "$target_sha" "$target_image" run --rm --no-deps -T web python -m involta_guide.infrastructure.persistence.release_backup needed)
+if [[ "$needs_backup" == yes ]]; then
+  compose "$target_sha" "$target_image" run --rm --no-deps -T web \
+    python -m involta_guide.infrastructure.persistence.release_backup backup > "$release_dir/pre-cutover.$deployment_id.dump.tmp"
+  [[ -s "$release_dir/pre-cutover.$deployment_id.dump.tmp" ]] || { echo 'Empty database backup; migration refused' >&2; false; }
+  mv -f -- "$release_dir/pre-cutover.$deployment_id.dump.tmp" "$release_dir/pre-cutover.$deployment_id.dump"
+elif [[ "$needs_backup" != no ]]; then
+  echo 'Cannot determine schema compatibility; migration refused' >&2; false
+fi
 compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
 if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" up -d --no-build voice-db

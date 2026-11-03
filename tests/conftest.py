@@ -41,22 +41,7 @@ def database(tmp_path, monkeypatch, request):
         root_dir=ROOT,
     )
     config = Config(str(ROOT / "alembic.ini"))
-    if request.node.get_closest_marker("legacy"):
-        import hashlib
-
-        with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
-            conn.execute(
-                "CREATE TABLE schema_migrations(name text PRIMARY KEY,checksum text NOT NULL,applied_at timestamptz NOT NULL DEFAULT now())"
-            )
-            for path in sorted((ROOT / "migrations").glob("*.sql")):
-                content = path.read_text()
-                conn.execute(content)
-                conn.execute(
-                    "INSERT INTO schema_migrations(name,checksum) VALUES(%s,%s)",
-                    (path.name, hashlib.sha256(content.encode()).hexdigest()),
-                )
-    else:
-        command.upgrade(config, "head")
+    command.upgrade(config, "head")
     engine = create_database(settings)
     try:
         seed(PostgresUow(engine), ROOT)

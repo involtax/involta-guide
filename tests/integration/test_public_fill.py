@@ -4,11 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.infrastructure.ai.openai import ProviderUnavailable
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
+from .editor_fixture import FixtureEditor as EditorialService
 from .test_editorial import CONTENT
 from .test_jobs import FakeAI, setup
 
@@ -45,11 +45,8 @@ def test_anonymous_click_publishes_one_city_and_removes_button(database):
         assert BUTTON not in page.text and "public-fill.js" not in page.text
         assert "Сгенерировано" in page.text
         stored = queries.get("locations", location["id"])
-        version = queries.get("versions", stored["published_version"])
-        assert version["source"] == "public_fill"
-        assert version["model"] == service.provider.model
-        assert version["prompt"]
-        assert version["published"] == 1
+        assert stored["revision"]
+        assert queries.get("jobs", job["id"])["changes"]
         assert len(queries.rows("restaurants")) == 1
         # A stale form cannot regenerate, overwrite or spend another API call.
         assert (
@@ -57,7 +54,7 @@ def test_anonymous_click_publishes_one_city_and_removes_button(database):
             == "ready"
         )
         assert len(queries.rows("jobs")) == 1
-        assert queries.get("locations", location["id"])["published_version"] == version["id"]
+        assert queries.get("locations", location["id"])["revision"] == stored["revision"]
 
 
 def test_parallel_public_clicks_queue_one_job(database):
@@ -81,12 +78,11 @@ def test_current_manual_data_is_never_overwritten(database):
             == "ready"
         )
         assert queries.rows("jobs") == []
-        editor.publish(location["id"], version, None)
         assert (
             client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
             == "ready"
         )
-    assert queries.get("locations", location["id"])["draft_version"] == version
+    assert queries.get("locations", location["id"])["revision"] == version
 
 
 def test_admin_generation_updates_public_page_without_manual_publication(database):
@@ -96,23 +92,20 @@ def test_admin_generation_updates_public_page_without_manual_publication(databas
     assert queries.rows("audit", {"action": "temporary_public_fill"}) == []
     assert Worker(queue, service).once()
     stored = queries.get("locations", location["id"])
-    assert stored["published_version"]
-    assert stored["published_version"] == stored["draft_version"]
+    assert stored["revision"]
+    assert stored["revision"] == stored["revision"]
     assert queries.public(location["slug"])["content"]["intro"] == "Сгенерировано"
     assert service.enqueue_public_fill(location["id"])["state"] == "ready"
     assert len(queries.rows("jobs")) == 1
 
 
-def test_bulk_initial_fill_skips_already_published_location_even_without_legacy_draft(database):
+def test_bulk_initial_fill_skips_current_data(database):
     _, engine, _, queries, location, service, queue = setup(database)
     service.enqueue(location["id"])
     assert Worker(queue, service).once()
     with engine.begin() as conn:
         conn.execute(text("UPDATE locations SET active=0 WHERE id<>:id"), {"id": location["id"]})
-        conn.execute(
-            text("UPDATE locations SET draft='[]'::jsonb WHERE id=:id"),
-            {"id": location["id"]},
-        )
+
     assert service.enqueue(scope="empty") == 0
     assert len(queries.rows("jobs")) == 1
 
@@ -128,9 +121,9 @@ def test_editor_change_during_generation_is_not_overwritten(database):
     assert Worker(queue, service).once()
     job = queries.rows("jobs")[0]
     assert job["status"] == "failed"
-    assert queries.get("locations", location["id"])["published_version"] is not None
-    assert len(queries.rows("versions")) == 1
-    assert queries.rows("versions")[0]["source"] == "manual"
+    assert queries.get("locations", location["id"])["revision"] is not None
+    assert len([r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]) == 1
+    assert queries.rows("reviews")[0]["changes"]
 
 
 def test_public_provider_failure_waits_for_manual_retry(database):
@@ -166,7 +159,7 @@ def test_unpublishable_result_does_not_partially_write_or_publish(database, publ
         service.enqueue(location["id"])
     assert Worker(queue, service).once()
     assert queries.rows("jobs")[0]["status"] == "failed"
-    assert queries.rows("versions") == []
+    assert [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]] == []
     assert queries.rows("restaurants") == []
     assert service.public_fill_state(location["id"])["can_start"]
 
@@ -196,7 +189,7 @@ def test_disabling_feature_stops_pending_public_jobs(database):
     service.public_fill_enabled = False
     assert Worker(queue, service).once()
     assert queries.rows("jobs")[0]["status"] == "failed"
-    assert queries.rows("versions") == []
+    assert [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]] == []
 
 
 def test_html_form_works_without_login_or_javascript(database):

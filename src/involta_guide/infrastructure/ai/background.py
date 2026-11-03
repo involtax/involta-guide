@@ -335,7 +335,7 @@ def resume_generation(
                 raise RuleViolation("Нет полного сохранённого ответа для переобработки")
             if job["status"] not in ("done", "failed", "cancelled"):
                 raise Conflict("Дождитесь завершения текущей обработки")
-            actual = str(location["published_version"]) if location["published_version"] else None
+            actual = str(location["revision"]) if location["revision"] else None
             if actual != expected_version:
                 raise Conflict("Страница изменилась. Обновите лог перед переобработкой ответа.")
         elif job["status"] != "failed" or job["applied"]:
@@ -357,7 +357,7 @@ def resume_generation(
                 {"id": job_id},
             ).scalar_one()
             config = json.loads(previous)
-            config.update(baseline_version=expected_version, reprocess_saved_response=True)
+            config.update(baseline_revision=expected_version, reprocess_saved_response=True)
             conn.execute(
                 text(
                     "INSERT INTO audit(id,action,target,detail) VALUES(:key,'generation_run',:id,:detail)"

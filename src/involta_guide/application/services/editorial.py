@@ -14,33 +14,59 @@ def require(repo: Repository, table: str, key: str, *, lock: bool = False) -> Re
     return row
 
 
+# A page has one mutable state. The token only fences concurrent writes; it has no history.
+CARD_FIELDS = {
+    "name": "name",
+    "cuisine": "cuisine",
+    "description": "description",
+    "mapsUrl": "maps_url",
+    "phone": "phone",
+    "sources": "sources",
+    "openingHours": "opening_hours",
+    "alexStar": "alex_star",
+    "latitude": "latitude",
+    "longitude": "longitude",
+}
+
+
 def current_content(repo: Repository, location: Record) -> Record:
-    version = location["published_version"]
-    content = (
-        copy.deepcopy(require(repo, "versions", version)["content"])
-        if version
-        else {"intro": location["intro"], "restaurants": copy.deepcopy(location["draft"])}
-    )
+    content = copy.deepcopy(location["page_data"])
     content["intro"] = location["intro"]
-    fields = {
-        "name": "name",
-        "cuisine": "cuisine",
-        "description": "description",
-        "mapsUrl": "maps_url",
-        "phone": "phone",
-        "sources": "sources",
-        "openingHours": "opening_hours",
-        "alexStar": "alex_star",
-        "latitude": "latitude",
-        "longitude": "longitude",
-    }
+    content.setdefault("restaurants", [])
     for card in content["restaurants"]:
-        record = repo.get("restaurants", card["id"]) if card.get("id") else None
-        if record:
-            for target, source in fields.items():
-                if target in card or record[source] is not None:
-                    card[target] = record[source]
+        record = require(repo, "restaurants", card["id"])
+        card.update({target: record[source] for target, source in CARD_FIELDS.items()})
+        card["locationId"] = record["location_id"]
+        card["locationName"] = require(repo, "locations", record["location_id"])["name"]
     return content
+
+
+def field_diff(before: Record, after: Record) -> list[Record]:
+    """Changed fields only, including additions/removals and explicit collection order."""
+    changes: list[Record] = []
+
+    def walk(old: Record, new: Record, path: list[str]) -> None:
+        for key in sorted(old.keys() | new.keys()):
+            left, right = old.get(key), new.get(key)
+            if key in old and key in new and left == right:
+                continue
+            if (
+                (isinstance(left, dict) or isinstance(right, dict))
+                and (left is None or isinstance(left, dict))
+                and (right is None or isinstance(right, dict))
+            ):
+                walk(left or {}, right or {}, [*path, key])
+            else:
+                changes.append({"path": [*path, key], "before": left, "after": right})
+
+    left, right = copy.deepcopy(before), copy.deepcopy(after)
+    old_cards, new_cards = left.pop("restaurants", []), right.pop("restaurants", [])
+    walk(left, right, [])
+    walk({r["id"]: r for r in old_cards}, {r["id"]: r for r in new_cards}, ["restaurants"])
+    old_order, new_order = [r["id"] for r in old_cards], [r["id"] for r in new_cards]
+    if old_order != new_order:
+        changes.append({"path": ["restaurantOrder"], "before": old_order, "after": new_order})
+    return changes
 
 
 def save(
@@ -49,16 +75,34 @@ def save(
     content: Record,
     expected: str | None,
     *,
-    source: str = "manual",
-    prompt: str | None = None,
-    model: str | None = None,
+    job_id: str | None = None,
+    review_id: str | None = None,
     alex: bool = False,
-    inherit: bool = True,
 ) -> str:
+    """Apply current data and append its diff to exactly one source, in the caller's transaction."""
+    from datetime import UTC, datetime
+
+    if bool(job_id) == bool(review_id):
+        raise RuleViolation("Изменение должно принадлежать запуску наполнения или отзыву")
+    locations = repo.lock_locations()
     location = require(repo, "locations", location_id, lock=True)
-    assert_revision(location["published_version"], expected)
+    assert_revision(location["revision"], expected)
+    before = current_content(repo, location)
     payload = copy.deepcopy(content)
     payload.pop("warnings", None)
+    source_table, source_id = ("jobs", job_id) if job_id else ("reviews", review_id)
+    assert source_id is not None
+    source = require(repo, source_table, source_id, lock=True)
+    if source["location_id"] != location_id or (job_id and source["kind"] != "generate"):
+        raise RuleViolation("Источник изменения не соответствует локации или операции")
+    # Lock all locations in stable order: canonical restaurant edits can affect several pages.
+    affected: dict[str, Record] = {}
+    card_ids = {card.get("id") for card in payload["restaurants"]}
+    for other in locations:
+        if other["id"] != location_id and any(
+            card["id"] in card_ids for card in other["page_data"].get("restaurants", [])
+        ):
+            affected[other["id"]] = current_content(repo, other)
     for card in payload["restaurants"]:
         card["id"] = card.get("id") or str(uuid4())
         previous = repo.get("restaurants", card["id"], lock=True)
@@ -69,129 +113,52 @@ def save(
         ):
             raise RuleViolation("Сначала свяжите ресторан с этой локацией")
         card["alexStar"] = (
-            bool(card.get("alexStar"))
-            if alex or source == "restore"
-            else bool(previous and previous["alex_star"])
+            bool(card.get("alexStar")) if alex else bool(previous and previous["alex_star"])
         )
-        if previous and previous["location_id"] != location_id:
-            card["locationId"] = previous["location_id"]
-            card["locationName"] = require(repo, "locations", previous["location_id"])["name"]
+        values = {column: card.get(field) for field, column in CARD_FIELDS.items()}
+        values.update(phone=card.get("phone") or "", sources=card.get("sources") or [])
+        if previous:
+            repo.change("restaurants", card["id"], values)
         else:
-            card["locationId"] = location_id
-            card["locationName"] = location["name"]
-            values = {
-                "location_id": location_id,
-                "name": card["name"],
-                "cuisine": card["cuisine"],
-                "description": card["description"],
-                "maps_url": card["mapsUrl"],
-                "sources": card.get("sources", []),
-                "phone": card.get("phone", ""),
-                "opening_hours": card.get("openingHours"),
-                "alex_star": card["alexStar"]
-                if alex or source == "restore"
-                else bool(previous and previous["alex_star"]),
-                "latitude": card.get("latitude"),
-                "longitude": card.get("longitude"),
-            }
-            if previous:
-                repo.change("restaurants", card["id"], values)
-            else:
-                repo.add("restaurants", {"id": card["id"], **values})
-        if (alex or source == "restore") and previous:
-            repo.change("restaurants", card["id"], {"alex_star": card["alexStar"]})
+            repo.add("restaurants", {"id": card["id"], "location_id": location_id, **values})
         repo.link("restaurant_locations", {"restaurant_id": card["id"], "location_id": location_id})
-    version = str(uuid4())
-    repo.add(
-        "versions",
+    data = {key: value for key, value in payload.items() if key != "intro"}
+    data["restaurants"] = [
         {
-            "id": version,
-            "location_id": location_id,
-            "number": repo.next_version(location_id),
-            "content": payload,
-            "source": source,
-            "prompt": prompt,
-            "model": model,
-            "published": 1,
-        },
-    )
+            key: value
+            for key, value in card.items()
+            if key not in CARD_FIELDS and key not in {"locationId", "locationName"}
+        }
+        for card in payload["restaurants"]
+    ]
+    revision = str(uuid4())
+    now = datetime.now(UTC)
     repo.change(
         "locations",
         location_id,
         {
             "intro": payload["intro"],
-            "draft": payload["restaurants"],
-            "draft_version": version,
-            "published_version": version,
+            "page_data": data,
+            "revision": revision,
+            "updated_at": now,
         },
     )
-    if inherit and expected:
-        repo.inherit_reviews(expected, version)
-    repo.audit("page_saved", location_id, json.dumps({"source": source, "version_id": version}))
-    return version
-
-
-def publish(
-    repo: Repository, location_id: str, version_id: str, expected_published: str | None
-) -> None:
-    location = require(repo, "locations", location_id, lock=True)
-    if location["published_version"] == version_id:
-        return
-    if location["published_version"] != expected_published:
-        raise Conflict("Опубликованная версия изменилась. Обновите страницу.")
-    version = require(repo, "versions", version_id)
-    if version["location_id"] != location_id:
-        raise RuleViolation("Версия принадлежит другой локации")
-    restored = save(
-        repo, location_id, version["content"], expected_published, source="restore", inherit=False
-    )
-    repo.inherit_reviews(version_id, restored)
+    events = copy.deepcopy(source["changes"])
+    for key, previous_content in {location_id: before, **affected}.items():
+        updated = require(repo, "locations", key)
+        diff = field_diff(previous_content, current_content(repo, updated))
+        if not diff:
+            continue
+        if key != location_id:
+            repo.change("locations", key, {"revision": str(uuid4()), "updated_at": now})
+        events.append({"location_id": key, "at": now.isoformat(), "diff": diff})
+    repo.change(source_table, source_id, {"changes": events})
+    return revision
 
 
 class EditorialService:
     def __init__(self, uow: UowFactory) -> None:
         self.uow = uow
-
-    def save(self, location_id: str, content: Record, expected: str | None) -> str:
-        with self.uow() as uow:
-            return save(uow.repo, location_id, content, expected)
-
-    def save_intro(
-        self,
-        location_id: str,
-        intro: str,
-        expected: str | None,
-        expected_published: str | None,
-    ) -> bool:
-        if len(intro) > 4000:
-            raise RuleViolation("Вступление: не более 4000 символов")
-        with self.uow() as uow:
-            repo = uow.repo
-            location = require(repo, "locations", location_id, lock=True)
-            assert_revision(location["published_version"], expected)
-            if location["published_version"] != expected_published:
-                raise Conflict(
-                    "Страница уже обновилась. Проверьте актуальные данные перед сохранением."
-                )
-            content = current_content(repo, location)
-            content["intro"] = intro
-            save(repo, location_id, content, expected, source="intro")
-            return True
-
-    def publish(self, location_id: str, version_id: str, expected: str | None) -> None:
-        with self.uow() as uow:
-            publish(uow.repo, location_id, version_id, expected)
-
-    def restore(self, location_id: str, version_id: str, expected: str | None) -> str:
-        with self.uow() as uow:
-            version = require(uow.repo, "versions", version_id)
-            if version["location_id"] != location_id:
-                raise RuleViolation("Чужая версия")
-            new = save(
-                uow.repo, location_id, version["content"], expected, source="restore", inherit=False
-            )
-            uow.repo.inherit_reviews(version_id, new)
-            return new
 
     def moderate(self, review_id: str, decision: str, reason: str) -> None:
         if decision not in ("approved", "rejected", "fraud", "reset"):
@@ -218,6 +185,7 @@ class EditorialService:
     def proposal(self, proposal_id: str, edited: Record | None) -> str | None:
         with self.uow() as uow:
             repo = uow.repo
+            repo.lock_locations()
             p = require(repo, "proposals", proposal_id, lock=True)
             if repo.get("voice_proposals", proposal_id):
                 raise Conflict("Используйте карточку голосового отзыва с проверкой версии")
@@ -256,19 +224,19 @@ class EditorialService:
                         if k not in ("id", "locationId", "locationName", "alexStar")
                     }
                 )
-            version = save(
-                repo, location["id"], content, location["published_version"], source="review"
+            revision = save(
+                repo, location["id"], content, location["revision"], review_id=review["id"]
             )
-            repo.link("version_reviews", {"version_id": version, "review_id": review["id"]})
             repo.change("proposals", proposal_id, {"status": "approved"})
             repo.audit("proposal_applied", location["id"], review["id"])
-            return version
+            return revision
 
     def apply_alex(
         self, repo: Repository, review: Record, commands: Record, expected: str | None
     ) -> None:
         from datetime import UTC, datetime
 
+        repo.lock_locations()
         admin_session = review.get("admin_session_id")
         session = require(
             repo,
@@ -279,7 +247,7 @@ class EditorialService:
         if session["revoked"] or session["expires_at"] <= datetime.now(UTC):
             raise RuleViolation("Сессия Алекса завершена")
         location = require(repo, "locations", review["location_id"], lock=True)
-        assert_revision(location["published_version"], expected)
+        assert_revision(location["revision"], expected)
         content = current_content(repo, location)
         before = copy.deepcopy(content)
         if commands.get("intro") is not None:
@@ -309,10 +277,11 @@ class EditorialService:
 
         changed = content != before
         content = ContentInput.model_validate(content).model_dump(mode="json", exclude_none=True)
-        version = None
+        revision = None
         if changed:
-            version = save(repo, location["id"], content, expected, source="alex", alex=True)
-            repo.link("version_reviews", {"version_id": version, "review_id": review["id"]})
+            revision = save(
+                repo, location["id"], content, expected, review_id=review["id"], alex=True
+            )
         elif not commands.get("comment"):
             raise RuleViolation("Нет однозначной команды")
         repo.change(
@@ -326,15 +295,12 @@ class EditorialService:
                 "alex_changes",
                 change[0]["id"],
                 {
-                    "version_id": version,
                     "status": "applied",
-                    "detail": "Применено" if version else "Комментарий сохранён",
-                    "before_content": before,
-                    "after_content": content,
+                    "detail": "Применено" if revision else "Комментарий сохранён",
                 },
             )
         repo.audit(
-            "alex_publish" if version else "alex_comment",
+            "alex_publish" if revision else "alex_comment",
             location["id"],
-            json.dumps({"reviewId": review["id"], "versionId": version}),
+            json.dumps({"reviewId": review["id"], "revision": revision}),
         )

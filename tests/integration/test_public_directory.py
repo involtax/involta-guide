@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.main import create_app
 
+from .editor_fixture import FixtureEditor as EditorialService
 from .test_editorial import CONTENT
 from .test_jobs import setup
 
@@ -13,11 +13,9 @@ def test_home_shows_only_filled_cities_and_search_covers_all_types(database):
     other = next(row for row in queries.directory(kind="resort")["rows"] if row["listed"])
     with TestClient(create_app(settings)) as client:
         assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
-        draft = editor.save(city["id"], CONTENT, None)
+        editor.save(city["id"], CONTENT, None)
         assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
-        editor.publish(city["id"], draft, None)
-        resort_version = editor.save(other["id"], CONTENT, None)
-        editor.publish(other["id"], resort_version, None)
+        editor.save(other["id"], CONTENT, None)
         home = client.get("/guide/")
         assert f'href="/guide/{city["slug"]}"' in home.text
         assert f'href="/guide/{other["slug"]}"' not in home.text
@@ -30,8 +28,7 @@ def test_home_shows_only_filled_cities_and_search_covers_all_types(database):
 def test_city_page_omits_removed_metadata_and_review_controls(database):
     settings, _, uow, _, city, _, _ = setup(database)
     editor = EditorialService(uow)
-    version = editor.save(city["id"], CONTENT, None)
-    editor.publish(city["id"], version, None)
+    editor.save(city["id"], CONTENT, None)
     with TestClient(create_app(settings)) as client:
         page = client.get("/guide/" + city["slug"])
         for removed in (

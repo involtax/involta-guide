@@ -77,6 +77,8 @@ jobs:
           CHROMIUM_PATH: ""
       - name: Build production image (also for pull requests)
         run: docker build -t involta-guide:ci .
+      - name: Verify current-state cutover and real database rollback
+        run: uv run python tests/deployment/current_state_smoke.py
       - name: Validate generated routes with real nginx
         run: uv run python tests/deployment/nginx_smoke.py
       - name: Check deployment shell scripts

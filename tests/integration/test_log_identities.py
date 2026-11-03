@@ -1,15 +1,10 @@
-import json
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from involta_guide.infrastructure.ai.audit import AIAudit
-from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
-from involta_guide.infrastructure.seed import seed
 from involta_guide.main import create_app
 
 from .test_jobs import setup
@@ -86,65 +81,3 @@ def test_concurrent_private_requests_receive_distinct_persisted_numbers(database
         login(client)
         assert client.get("/guide/logs/ivanovo/1").status_code == 200
         assert client.get("/guide/logs/ivanovo/1.json").status_code == 200
-
-
-def test_migration_preserves_old_numbers_jobs_and_raw_responses(database, monkeypatch):
-    settings, engine = database
-    schema = "test_log_upgrade_" + uuid4().hex
-    with engine.begin() as conn:
-        conn.exec_driver_sql("CREATE SCHEMA " + schema)
-    custom = settings.model_copy(update={"database_schema": schema})
-    target = create_database(custom)
-    monkeypatch.setenv("DATABASE_SCHEMA", schema)
-    config = Config(str(settings.root_dir / "alembic.ini"))
-    try:
-        command.upgrade(config, "0002_python")
-        seed(PostgresUow(target), settings.root_dir)
-        ids = [uuid4() for _ in range(3)]
-        raw = json.dumps({"event": "response", "data": {"body": "original answer"}})
-        with target.begin() as conn:
-            location_id = conn.execute(
-                text("SELECT id FROM locations WHERE slug='ivanovo'")
-            ).scalar_one()
-            for i, kind in enumerate(("generate", "generate", "review")):
-                conn.execute(
-                    text(
-                        "INSERT INTO jobs(id,kind,location_id,status,created_at) VALUES(:id,:kind,:location,'failed',CAST(:stamp AS timestamptz))"
-                    ),
-                    {
-                        "id": ids[i],
-                        "kind": kind,
-                        "location": location_id,
-                        "stamp": f"2026-01-0{i + 1}T00:00:00Z",
-                    },
-                )
-            conn.execute(
-                text(
-                    "INSERT INTO audit(id,action,target,detail) VALUES(:id,'generation_run',:job,:detail)"
-                ),
-                {"id": uuid4(), "job": str(ids[0]), "detail": '{"number":1,"model":"gpt-4.1"}'},
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO audit(id,action,target,detail) VALUES(:id,'ai_trace',:job,:detail)"
-                ),
-                {"id": uuid4(), "job": str(ids[1]), "detail": raw},
-            )
-        command.upgrade(config, "head")
-        with target.connect() as conn:
-            rows = conn.execute(
-                text("SELECT job_id,number,path FROM request_logs ORDER BY number")
-            ).all()
-            assert [(r[0], r[1], r[2]) for r in rows] == [
-                (ids[i], i + 1, f"/logs/ivanovo/{i + 1}") for i in range(3)
-            ]
-            assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 3
-            assert (
-                conn.execute(text("SELECT detail FROM audit WHERE action='ai_trace'")).scalar_one()
-                == raw
-            )
-        command.upgrade(config, "head")
-    finally:
-        target.dispose()
-        with engine.begin() as conn:
-            conn.exec_driver_sql("DROP SCHEMA " + schema + " CASCADE")
