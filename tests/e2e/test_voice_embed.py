@@ -1,12 +1,11 @@
 import json
-from email.parser import BytesParser
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import expect, sync_playwright
 
 
-def test_standalone_embed_two_instances_permission_retry_and_lost_202():
+def test_widget_permission_html_error_reload_and_lost_202():
     widget = (Path(__file__).parents[2] / "src/involta_voice/static/widget.v1.js").read_text()
     origin = "http://localhost:9876"
     html = """<!doctype html><meta charset="utf-8"><div id="a"></div><div id="b"></div>
@@ -28,18 +27,17 @@ def test_standalone_embed_two_instances_permission_retry_and_lost_202():
             route.fulfill(content_type="application/json", body='{"rows":[]}')
         elif path.endswith("/submissions"):
             api_requests.append(request.method)
-            content_type = request.headers["content-type"]
-            message = BytesParser().parsebytes(
-                ("Content-Type: " + content_type + "\r\nMIME-Version: 1.0\r\n\r\n").encode()
-                + request.post_data_buffer
-            )
-            fields = {
-                part.get_param("name", header="content-disposition"): part.get_payload(decode=True)
-                for part in message.get_payload()
-            }
-            keys.append(fields["idempotency_key"])
-            assert fields["audio"]
+            assert request.headers["content-type"].startswith("audio/")
+            fields = parse_qs(urlsplit(request.url).query)
+            keys.append(fields["idempotency_key"][0])
+            assert request.post_data_buffer
             if len(keys) == 1:
+                route.fulfill(
+                    status=502,
+                    content_type="text/html",
+                    body="<html><h1>Proxy upload failed</h1><p>full error response end</p></html>",
+                )
+            elif len(keys) == 2:
                 route.abort("failed")
             else:
                 route.fulfill(
@@ -110,10 +108,18 @@ def test_standalone_embed_two_instances_permission_retry_and_lost_202():
         first.get_by_role("button", name="Отправить отзыв").click()
         expect(first.get_by_role("alert")).not_to_be_empty()
         expect(first.locator("audio")).to_be_visible()
+        expect(first.get_by_role("alert")).to_contain_text("HTTP 502")
+        expect(first.locator("pre").last).to_contain_text("full error response end")
+        expect(first.get_by_role("link", name="Скачать аудио")).to_be_visible()
+        page.reload()
+        expect(first.get_by_role("status")).to_contain_text("Восстановлена неотправленная запись")
+        expect(first.locator("audio")).to_be_visible()
+        first.get_by_role("button", name="Отправить отзыв").click()
+        expect(first.get_by_role("alert")).to_contain_text("Связь прервалась")
         first.get_by_role("button", name="Отправить отзыв").click()
         expect(first.get_by_role("status")).to_contain_text("Текст отзыва сохранён", timeout=10000)
         expect(first.get_by_text("Был в Огоньке сегодня, было вкусно", exact=True)).to_be_visible()
-        assert keys[0] == keys[1] and api_requests[:2] == ["POST", "POST"]
+        assert keys[0] == keys[1] == keys[2] and api_requests[:3] == ["POST"] * 3
         assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
         page.evaluate("window.InvoltaVoice.unmount('a');window.InvoltaVoice.unmount('b')")
         expect(first.locator("section")).to_have_count(0)

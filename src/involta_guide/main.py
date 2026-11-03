@@ -86,6 +86,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers["Cache-Control"] = "private, no-store"
         return response
 
+    from involta_guide.infrastructure.voice.upload_debug import UploadDebug
+    from involta_guide.web.middleware.voice_upload import VoiceUploadTrace
+
+    app.add_middleware(
+        VoiceUploadTrace,
+        store=UploadDebug(engine, settings),
+        security=ctx.security,
+        prefix=settings.base_path,
+        enabled=settings.voice_debug_enabled,
+    )
+
     directory = Path(__file__).parent / "web"
     app.state.templates = Jinja2Templates(directory=directory / "templates")
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
@@ -95,8 +106,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def widget() -> object:
         from fastapi.responses import FileResponse
 
+        import involta_voice
+
+        assert involta_voice.__file__ is not None
         return FileResponse(
-            directory / "static/widget.js",
+            Path(involta_voice.__file__).parent / "static/widget.v1.js",
             media_type="text/javascript",
             headers={"Cache-Control": "public,max-age=300"},
         )

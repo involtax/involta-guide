@@ -285,9 +285,14 @@ def test_guide_beta_panel_and_admin_archive_preserve_reviews_commands_and_csrf(
     with TestClient(app) as client:
         assert client.get(path).status_code == 401
         login(client)
+        # The production regression hid trusted recordings from the only queue link.
+        queue = client.get("/guide/admin/voice")
+        assert queue.status_code == 200
+        assert path in queue.text and "Запись администратора" in queue.text
         page = client.get(path)
         assert page.status_code == 200 and "GigaAM" in page.text and "Parakeet" in page.text
         assert "В Огоньке вкусно." in page.text and "В огне вкусно." in page.text
+        assert page.text.index("Бета: GigaAM / Parakeet") < page.text.index("Исходный текст отзыва")
         trial = report(ve, reference)["runs"][0]
         data = dict(
             action="asr-evaluate",

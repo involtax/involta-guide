@@ -19,14 +19,29 @@ that review. Original text is immutable; edits have their own revision/history.
 
 | Method | Route under `/guide/voice/api/v1` | Contract |
 |---|---|---|
-| POST | `/identity` | Origin-checked cookie bootstrap before upload; no processing or audio data |
-| POST | `/submissions` | multipart `audio`, `location`, `idempotency_key`; 202 only after durable file + submission/run/queue commit |
+| POST | `/identity` | Origin-checked HttpOnly visitor bootstrap; returns server-derived `actor` and admin `csrf_token` |
+| POST | `/submissions?location=slug&idempotency_key=UUID&language=ru&timezone=Europe/Moscow` | Binary audio body, `Content-Type: audio/*`; trusted sessions also require `X-CSRF-Token`; 202 after durable audio + queue commit |
+| GET/POST | `/debug/{request_id}` | Beta upload diagnostics in existing Guide audit; owner/admin read, Origin-checked browser report write, max 1 MiB |
 | GET | `/submissions/mine` | paginated current visitor's history; never all visitors |
 | GET | `/submissions/{reference}` | owner-only processing + Guide moderation/publication status |
 
 Guide creates/reads its HttpOnly visitor cookie, validates Origin, rate limits,
 resolves the slug, and overwrites all identity/actor/network fields. Browser role
 or IP headers have no authority. Browser optional language/timezone are untrusted.
+One widget handles both roles. Administrator/Alex cookies select the existing Guide
+command executor; browser actor values cannot grant authority. Both roles use the same
+upload URL, raw binary transport and widget asset. Multipart remains accepted for open
+older clients; the browser never sends multipart through the public proxy.
+
+The widget keeps the blob and idempotency key in IndexedDB, including after reload,
+until a valid accepted reference arrives. HTML/non-JSON errors show HTTP status and
+the complete response, retaining audio for retry/download. Each attempt has an
+`X-Voice-Request-ID`; server receive/response events and the browser's proxy response
+are correlated in Guide audit. Credentials/CSRF/cookies and audio are excluded.
+Browser diagnostic reports are explicitly untrusted evidence. A failed debug write
+cannot invalidate an accepted recording. `VOICE_DEBUG_ENABLED` controls server logging;
+beta widget diagnostics remain visible for local failures.
+
 The widget retains the idempotency key and blob when a 202 response is lost.
 The same visitor/key/content/context identity returns the original submission;
 the same key with another payload returns 409. Equal audio SHA with another key

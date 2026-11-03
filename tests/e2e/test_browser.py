@@ -188,20 +188,16 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     page.get_by_role("button", name="Запарсить эти данные", exact=True)
                 ).to_have_count(0)
                 expect(page.locator("[data-consent]")).to_have_count(0)
-                # Visitor review uses an anonymous browser session; admin cookie now marks commands.
-                context.clear_cookies()
+                # One widget uses the server session to mark administrator commands.
                 page.goto(base + "/ivanovo")
                 page.get_by_role("button", name="● Записать отзыв").click()
                 time.sleep(2.2)
                 page.get_by_role("button", name="Остановить", exact=False).click()
-                page.get_by_role("button", name="Отправить ↗").click()
-                expect(page.get_by_text("Получен · в очереди", exact=True)).to_be_visible(
-                    timeout=10000
+                page.get_by_role("button", name="Отправить отзыв").click()
+                expect(page.get_by_role("status")).to_contain_text(
+                    "Запись доставлена", timeout=10000
                 )
                 review = queries.rows("reviews")[0]
-                page.goto(base + "/admin")
-                page.get_by_label("Пароль редакции").fill("test-password-123456")
-                page.get_by_role("button", name="Войти ↗").click()
                 page.goto(base + "/admin?tab=reviews&review=" + review["id"])
                 page.get_by_role("button", name="Одобрить отзыв", exact=True).click()
                 expect(page.get_by_role("status")).to_contain_text("Решение сохранено")
@@ -294,8 +290,11 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 alex_page.goto(base + "/ivanovo")
                 expect(alex_page.get_by_text("Режим Алекса:", exact=False)).to_be_visible()
                 page.goto(base + "/alex")
-                page.get_by_role("button", name="Завершить все сессии Алекса").click()
-                # Wait for the HTMX revoke/redirect to commit before checking another session.
+                with page.expect_response(
+                    lambda r: r.request.method == "POST" and r.url.endswith("/revoke-alex")
+                ):
+                    page.get_by_role("button", name="Завершить все сессии Алекса").click()
+                # Wait for the HTMX redirect before inspecting another session.
                 expect(page.get_by_text("Для входа откройте персональную ссылку.")).to_be_visible()
                 alex_page.goto(base + "/alex")
                 expect(

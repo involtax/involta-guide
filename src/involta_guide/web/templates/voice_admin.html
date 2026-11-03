@@ -26,7 +26,7 @@
 </form>
 {%for item in pending_voice%}<p><a href="{{settings.path('/admin/voice/submission/'+item.reference)}}">{{item.location.name}} · {{status_label(item.state)}}</a></p>{%endfor%}
 {%for item in queue.rows%}
-<article class="admin-list-item {{'selected' if v and item.id|string==v.review.id|string else ''}}"><a href="{{settings.path(item.path)}}" {%if v and item.id|string==v.review.id|string%}aria-current="page"{%endif%}><strong>{{item.location_name}}{%if item.number%} / {{item.number}}{%endif%}</strong></a><p>{{item.created_at}} · {{status_label(item.moderation)}}</p><p>{{(item.editorial_text or item.transcript or 'Ожидается расшифровка')[:140]}}</p></article>
+<article class="admin-list-item {{'selected' if v and item.id|string==v.review.id|string else ''}}"><a href="{{settings.path(item.path)}}" {%if v and item.id|string==v.review.id|string%}aria-current="page"{%endif%}><strong>{{item.location_name}}{%if item.number%} / {{item.number}}{%endif%}</strong></a><p>{{item.created_at}} · {{status_label(item.moderation)}}{%if item.admin_session_id or item.alex_session_id%} · Запись администратора{%endif%}</p><p>{{(item.editorial_text or item.transcript or 'Ожидается расшифровка')[:140]}}</p></article>
 {%else%}<p>Нет отзывов по выбранным условиям.</p>{%endfor%}
 <nav aria-label="Страницы отзывов">{%if queue.page>1%}<a href="?{{page_query(queue.page-1)}}">← Назад</a>{%endif%} {{queue.page}} / {{queue.pages}} {%if queue.page<queue.pages%}<a href="?{{page_query(queue.page+1)}}">Дальше →</a>{%endif%}</nav>
 </aside>
@@ -35,6 +35,7 @@
 <h2>{{v.location.name}}{%if v.link%} / {{v.link.number}}{%endif%}</h2>
 <p><a href="{{settings.path('/'+v.location.slug)}}" hx-boost="false">Открыть страницу ↗</a> · {{v.review.created_at}} · {{status_label(v.review.moderation)}}{%if v.review.fraud%} · Фрод{%endif%}</p>
 <audio controls preload="none" src="{{settings.path('/api/admin/audio/'+v.review.id|string)}}"></audio>
+{%include 'asr_comparison.html'%}
 {%if v.text%}
 <section class="panel"><h3>Исходный текст отзыва</h3><blockquote>{{v.text.original_text}}</blockquote>
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}" class="stack">{{decision_fields('edit-text')}}
@@ -70,7 +71,6 @@
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('exclude-proposal',p)}}<button>Убрать ошибочную правку из пакета</button></form>
 {%endif%}</article>{%else%}<p>Предложений нет. Это не мешает принять сам отзыв.</p>{%endfor%}
 {%endif%}
-{%include 'asr_comparison.html'%}
 {%if v.link and v.text%}
 <section class="panel"><h3>Обработки</h3><form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('new-run')}}<button>Новая обработка с текущими настройками</button></form>
 {%if remote and remote.stages%}{%for number in remote.stages|map(attribute='run')|unique%}<p><a href="{{settings.path(v.path)}}/runs/{{number}}">Технический лог обработки {{number}} ↗</a></p>{%endfor%}{%endif%}

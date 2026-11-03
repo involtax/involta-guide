@@ -42,4 +42,5 @@ def test_city_page_omits_removed_metadata_and_review_controls(database):
         ):
             assert removed not in page.text
         assert "Тестовый ресторан" in page.text
-        assert "Записать отзыв" in page.text
+        assert page.text.count('data-target="guide-voice"') == 1
+        assert "Записать отзыв" in client.get("/guide/voice/widget.v1.js").text

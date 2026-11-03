@@ -367,10 +367,6 @@ def routes(prefix: str) -> APIRouter:
                 "days": DAYS,
                 "opening_status": opening_status,
                 "alex": alex,
-                "voice_csrf": ctx.security.csrf(admin_token(request) if admin else alex_token)
-                if alex
-                else "",
-                "voice_v1": ctx.settings.voice_enabled and not alex,
                 "public_reviews": public_reviews,
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
