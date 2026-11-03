@@ -64,7 +64,7 @@
             headers: { "Content-Type": "application/json" },
           });
         if (url.pathname.endsWith("/identity"))
-          return json({ ready: true, actor: "visitor" });
+          return json({ ready: true, content_epoch: 1 });
         if (url.pathname.endsWith("/mine")) return json({ rows: [] });
         if (url.pathname.includes("/debug/"))
           return json(

@@ -37,16 +37,14 @@ class VoiceUploadTrace:
             request_id = str(uuid4())
         scope.setdefault("state", {})["voice_request_id"] = request_id
         owner_cookie = request.cookies.get("guide_visitor", "")
-        owner = (
-            self.security.fingerprint("voice-upload-debug:" + owner_cookie) if owner_cookie else ""
-        )
+        owner = owner_cookie
         private = (
             *request.cookies.values(),
             request.headers.get("authorization", ""),
             request.headers.get("x-csrf-token", ""),
             *(
                 self.security.csrf(request.cookies[key])
-                for key in ("guide_admin", "guide_alex")
+                for key in ("guide_admin",)
                 if request.cookies.get(key)
             ),
         )
@@ -65,7 +63,17 @@ class VoiceUploadTrace:
             try:
                 with anyio.CancelScope(shield=True):
                     await run_in_threadpool(
-                        self.store.append, request_id, {"owner": owner, **event}, private
+                        self.store.append,
+                        request_id,
+                        {
+                            "owner": owner,
+                            "_context": {
+                                "slug": request.query_params.get("location", ""),
+                                "content_epoch": request.query_params.get("content_epoch", "0"),
+                            },
+                            **event,
+                        },
+                        private,
                     )
             except Exception:
                 logging.getLogger(__name__).exception(

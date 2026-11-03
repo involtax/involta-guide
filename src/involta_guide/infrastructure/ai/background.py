@@ -5,7 +5,6 @@ import re
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, NoReturn
-from uuid import uuid4
 
 import httpx
 from sqlalchemy import Engine, text
@@ -35,6 +34,14 @@ class BackgroundGeneration:
         # Reserve usage and mark submission in one transaction BEFORE any network activity.
         # This intentionally favours an explicit unknown outcome over duplicate paid requests.
         with self.engine.begin() as conn:
+            live = conn.execute(
+                text(
+                    "SELECT l.id FROM locations l JOIN jobs j ON j.location_id=l.id WHERE j.id=:id AND j.content_epoch=l.content_epoch AND NOT l.reset_pending AND l.initialized_at IS NULL FOR SHARE OF l"
+                ),
+                {"id": job_id},
+            ).first()
+            if not live:
+                raise Conflict("Цикл наполнения завершён или сброшен")
             conn.execute(text("SELECT pg_advisory_xact_lock(47031009)"))
             row = (
                 conn.execute(
@@ -330,16 +337,20 @@ def resume_generation(
             raise RuleViolation(
                 "Нет сохранённого ответа, который можно продолжить или проверить повторно"
             )
-        if reprocess:
-            if task["state"] != "completed" or not task["response_json"]:
-                raise RuleViolation("Нет полного сохранённого ответа для переобработки")
-            if job["status"] not in ("done", "failed", "cancelled"):
-                raise Conflict("Дождитесь завершения текущей обработки")
-            actual = str(location["revision"]) if location["revision"] else None
-            if actual != expected_version:
-                raise Conflict("Страница изменилась. Обновите лог перед переобработкой ответа.")
-        elif job["status"] != "failed" or job["applied"]:
-            raise Conflict("Продолжение доступно только для остановленного неприменённого запроса")
+        if (
+            location["is_hub"]
+            or location["reset_pending"]
+            or location["initialized_at"] is not None
+            or job["content_epoch"] != location["content_epoch"]
+        ):
+            raise Conflict("Подборка уже наполнена или цикл изменён; доступен полный бета-сброс")
+        if job["applied"] or job["status"] not in ("failed", "cancelled"):
+            raise Conflict("Запуск уже применён или ещё выполняется")
+        if (
+            reprocess
+            and (str(location["revision"]) if location["revision"] else None) != expected_version
+        ):
+            raise Conflict("Страница изменилась")
         active = conn.execute(
             text(
                 "SELECT 1 FROM jobs WHERE location_id=:location AND kind='generate' AND status IN ('queued','running')"
@@ -348,22 +359,6 @@ def resume_generation(
         ).first()
         if active:
             raise Conflict("Для этой локации уже выполняется другой запрос")
-        if reprocess:
-            previous = conn.execute(
-                text(
-                    "SELECT detail FROM audit WHERE target=:id AND action='generation_run' "
-                    "ORDER BY created_at DESC LIMIT 1"
-                ),
-                {"id": job_id},
-            ).scalar_one()
-            config = json.loads(previous)
-            config.update(baseline_revision=expected_version, reprocess_saved_response=True)
-            conn.execute(
-                text(
-                    "INSERT INTO audit(id,action,target,detail) VALUES(:key,'generation_run',:id,:detail)"
-                ),
-                {"key": str(uuid4()), "id": job_id, "detail": json.dumps(config)},
-            )
         conn.execute(
             text("""UPDATE generation_requests SET state=CASE WHEN state='completed' THEN state ELSE 'in_progress' END,
             last_error=NULL,deadline_at=now()+make_interval(secs=>:wait),updated_at=now() WHERE job_id=:id"""),

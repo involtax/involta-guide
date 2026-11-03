@@ -1,3 +1,5 @@
+> Архитектурные положения этого документа заменены [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md). Текущая реализация: [CURRENT_STATE.md](CURRENT_STATE.md); переход: [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md).
+
 # ТЗ для sol2: ЧПУ админки, настройки наполнения и редактор вступления
 
 Статус: согласованная задача на реализацию. Обновлено 2026-11-03.

@@ -7,7 +7,6 @@ from pydantic import SecretStr
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.main import create_app
 
 from .test_jobs import FakeAI, setup
@@ -18,9 +17,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     settings = settings.model_copy(update={"openai_api_key": SecretStr("sk-private-never-store")})
     queue.settings = settings
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     response = FakeAI().generate("", "")
     response["restaurants"][0] = {**response["restaurants"][0], "phone": "wrong phone"}
     response["intro"] = "<script>alert('xss')</script> sk-private-never-store"
@@ -52,8 +49,8 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     detail = store.detail(job["id"])
     assert detail["trace_available"]
     events = [e["payload"] for e in detail["events"]]
-    assert {e["event"] for e in events[:2]} == {"temporary_public_fill", "generation_run"}
-    assert [e["event"] for e in events[2:]] == [
+    assert {e["event"] for e in events[:2]} == {"job_started", "request"}
+    assert [e["event"] for e in events] == [
         "job_started",
         "request",
         "response",

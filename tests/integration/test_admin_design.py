@@ -136,7 +136,6 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         "logs": "/logs",
         "city-logs": "/logs/ivanovo",
         "log": log["path"],
-        "alex": "/alex",
     }
     from pathlib import Path
 
@@ -207,6 +206,12 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                 assert page.locator("h1").inner_text() == "Рабочий стол.", name
                 if width != 768:
                     page.screenshot(path=str(shots / f"{name}-{width}.png"), full_page=True)
+                    if name in ("city", "voice-review"):
+                        page.screenshot(path=str(shots / f"{name}-viewport-{width}.png"))
+                    if name == "city":
+                        page.locator('form[action$="/reset-and-fill"]').locator("..").screenshot(
+                            path=str(shots / f"city-reset-{width}.png")
+                        )
                 if name == "voice-review":
                     assert (
                         page.get_by_role("heading", name="Применённые изменения страницы").count()

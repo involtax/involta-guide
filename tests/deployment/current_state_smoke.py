@@ -34,7 +34,7 @@ def main() -> None:
         }
     }
     docker = ["docker", "--host=unix:///var/run/docker.sock"]
-    for previous in ["0007_voice_package", "0006_coverage"]:
+    for previous in ["review_urls"]:
         schema = "test_release_" + uuid4().hex
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
@@ -82,9 +82,8 @@ def main() -> None:
 
         backup_command = ["python", "-m", "involta_guide.infrastructure.persistence.release_backup"]
         try:
+            call(["alembic", "upgrade", previous])
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
-                conn.execute((ROOT / "tests/fixtures/schema/pre_current_state.sql").read_text())
-                conn.execute("INSERT INTO alembic_version VALUES(%s)", (previous,))
                 conn.execute(
                     "INSERT INTO locations(id,name,region,slug,intro) VALUES(%s,'Current city','Region','current-city','Current intro')",
                     (str(uuid4()),),
@@ -92,14 +91,7 @@ def main() -> None:
                 conn.execute("INSERT INTO settings VALUES('test-marker','keep')")
                 conn.execute("CREATE TABLE unrelated_original(payload text)")
                 conn.execute("INSERT INTO unrelated_original VALUES('before')")
-                if previous == "0006_coverage":
-                    conn.execute(
-                        "DROP TABLE review_fragment_bindings,review_decisions,voice_archives,voice_inbox,voice_cursor,voice_consumer_health,voice_fragments,voice_proposals,voice_results,voice_links,review_texts,voice_candidate_proposals,voice_page_drafts"
-                    )
-                    conn.execute(
-                        "ALTER TABLE reviews DROP COLUMN admin_session_id; ALTER TABLE alex_changes DROP COLUMN admin_session_id"
-                    )
-            assert call([*backup_command, "needed"]).strip() == b"yes"
+            assert call([*backup_command, "needed"]).strip() == b"manual-beta-transition"
             dump = call([*backup_command, "backup"])
             assert dump.startswith(b"PGDMP")
             call(["alembic", "upgrade", "head"])
@@ -119,7 +111,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "review_urls"
+                    == "beta_core"
                 )
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)

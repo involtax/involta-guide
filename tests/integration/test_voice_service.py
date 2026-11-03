@@ -42,7 +42,7 @@ def voice_database(tmp_path):
     settings = Settings(
         database_url=url.render_as_string(hide_password=False),
         service_secret="local-voice-test-" + "x" * 40,
-        data_dir=tmp_path,
+        data_dir=tmp_path / "voice",
         min_free_bytes=0,
         fake_provider=True,
         asr_beta_enabled=False,
@@ -70,9 +70,9 @@ def recording(seconds=6):
 
 def metadata(**kwargs):
     return SubmissionMetadata(
-        location=LocationContext(id=uuid4(), slug="ivanovo", name="Иваново"),
+        location=LocationContext(id=uuid4(), slug="ivanovo", name="Иваново", content_epoch=1),
         visitor="v" * 64,
-        ip_fingerprint="i" * 64,
+        ip="127.0.0.1",
         idempotency_key=uuid4(),
         correlation_id=uuid4(),
         **kwargs,

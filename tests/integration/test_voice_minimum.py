@@ -80,7 +80,9 @@ def test_old_accepted_short_recording_replays_and_delivers_unchanged(voice_datab
     original = service.storage.save
     with monkeypatch.context() as patch:
         patch.setattr(
-            service.storage, "save", lambda content, mime, **kwargs: original(content, mime)
+            service.storage,
+            "save",
+            lambda content, mime, **kwargs: original(content, mime, name=kwargs.get("name")),
         )
         accepted = service.submit(meta, audio, "audio/wav")
     assert service.submit(meta, audio, "audio/wav")["reference"] == accepted["reference"]
@@ -94,7 +96,7 @@ def test_old_accepted_short_recording_replays_and_delivers_unchanged(voice_datab
 
 
 @pytest.mark.parametrize("admin", [False, True])
-def test_guide_raw_gateway_preserves_short_error_for_both_existing_intake_paths(
+def test_guide_raw_gateway_preserves_short_error_for_visitor_and_admin(
     database, voice_database, admin
 ):
     settings, engine, _, queries, city, _, _ = setup(database)
@@ -108,11 +110,16 @@ def test_guide_raw_gateway_preserves_short_error_for_both_existing_intake_paths(
     with TestClient(app) as client:
         if admin:
             login(client)
-        identity = client.post("/guide/voice/api/v1/identity", headers=headers).json()
-        headers["x-csrf-token"] = identity["csrf_token"]
+        identity = client.post(
+            "/guide/voice/api/v1/identity?location=ivanovo", headers=headers
+        ).json()
         result = client.post(
             "/guide/voice/api/v1/submissions",
-            params={"location": city["slug"], "idempotency_key": str(uuid4())},
+            params={
+                "location": city["slug"],
+                "content_epoch": identity["content_epoch"],
+                "idempotency_key": str(uuid4()),
+            },
             headers=headers,
             content=recording(4.999),
         )

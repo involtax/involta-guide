@@ -104,6 +104,19 @@ class Worker:
         return value
 
     def fenced(self, conn: Any, stage: dict[str, Any]) -> None:
+        submission = row(
+            conn,
+            "SELECT location_id,content_epoch FROM submissions WHERE reference=:id",
+            id=stage["submission"],
+        )
+        if not submission:
+            raise ProviderFailure("Worker lease lost", unknown=True)
+        from .reset import lock_epoch
+
+        try:
+            lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
+        except VoiceError:
+            raise ProviderFailure("Content epoch changed", unknown=True) from None
         valid = row(
             conn,
             """SELECT 1 FROM stages WHERE submission=:id AND run=:n AND kind=:kind
@@ -126,7 +139,8 @@ class Worker:
                 id=reference,
                 n=number,
             )
-        assert submission and run
+        if not submission or not run:
+            return
         context = LocationContext.model_validate(run["snapshot"]["location"])
         snapshot = run["snapshot"]
         if kind != "analysis":
@@ -174,13 +188,13 @@ class Worker:
                 execute(conn, "SELECT pg_advisory_xact_lock(47032005)")
                 count = row(
                     conn,
-                    "SELECT count(*) n FROM provider_calls WHERE kind='analysis' AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+                    "SELECT coalesce(sum(calls),0) n FROM daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date",
                 )
                 if kind == "analysis" and count and count["n"] >= self.settings.daily_calls:
                     raise ProviderFailure("Дневной лимит обращений Voice к OpenAI исчерпан")
                 reserved = row(
                     conn,
-                    "SELECT coalesce(sum(coalesce(cost_usd,reserved_usd)),0) usd FROM provider_calls WHERE kind='analysis' AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+                    "SELECT coalesce(sum(cost),0) usd FROM daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date",
                 )
                 if (
                     kind == "analysis"
@@ -364,8 +378,6 @@ class Worker:
                     text=transcript,
                     engine=request["model"],
                 )
-                if submission["purpose"] == "guide_transcription":
-                    return
                 self.service.emit(conn, reference, number, "transcript_ready")
                 execute(
                     conn,
@@ -446,7 +458,10 @@ class Worker:
                     )
 
     def revalidate(self, reference: str, number: int) -> None:
+        from .reset import lock_submission
+
         with self.engine.begin() as conn:
+            lock_submission(conn, reference)
             run = row(
                 conn,
                 "SELECT * FROM runs WHERE submission=:id AND number=:n FOR UPDATE",
@@ -515,8 +530,6 @@ class Worker:
                         submission,
                     )
                 self.complete(conn, stage)
-                if submission["purpose"] == "guide_transcription":
-                    return
                 self.service.emit(conn, reference, number, "transcript_ready")
                 execute(
                     conn,

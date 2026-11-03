@@ -1,8 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -18,7 +16,7 @@ def add_review(engine, city):
     with engine.begin() as conn:
         return dict(
             conn.execute(
-                text("""INSERT INTO reviews(id,location_id,visitor,audio,mime,hash,ip_hash,device)
+                text("""INSERT INTO reviews(id,location_id,visitor,audio,mime,hash,ip,user_agent)
             VALUES(:id,:city,'owner','kept-original.wav','audio/wav','sha','ip','test') RETURNING *"""),
                 {"id": key, "city": city},
             )
@@ -67,27 +65,6 @@ def test_review_numbers_survive_sorting_slug_changes_and_concurrent_creation(dat
         )
 
 
-def test_review_number_migration_preserves_rows_and_rolls_back(database):
-    settings, engine, _, _, city, _, _ = setup(database)
-    originals = [add_review(engine, city["id"]) for _ in range(2)]
-    config = Config(str(settings.root_dir / "alembic.ini"))
-    command.downgrade(config, "admin_routes")
-    with engine.connect() as conn:
-        restored = [
-            dict(r)
-            for r in conn.execute(text("SELECT * FROM reviews ORDER BY created_at,id")).mappings()
-        ]
-    assert restored == [{k: v for k, v in r.items() if k != "number"} for r in originals]
-    command.upgrade(config, "head")
-    with engine.connect() as conn:
-        upgraded = [
-            dict(r)
-            for r in conn.execute(text("SELECT * FROM reviews ORDER BY created_at,id")).mappings()
-        ]
-    assert upgraded == originals
-    assert add_review(engine, city["id"])["number"] == 3
-
-
 def test_saved_model_comparison_survives_settings_failure_and_shows_outages(database):
     from pydantic import SecretStr
 
@@ -98,9 +75,9 @@ def test_saved_model_comparison_survives_settings_failure_and_shows_outages(data
     with engine.begin() as conn:
         conn.execute(
             text(
-                "INSERT INTO voice_archives(source_review,reference,sha256) VALUES(:id,:ref,'sha')"
+                "INSERT INTO voice_links(review_id,reference,location_id,number,active_run,metadata) VALUES(:id,:id,:loc,1,1,'{}')"
             ),
-            {"id": review["id"], "ref": str(uuid4())},
+            {"id": review["id"], "loc": city["id"]},
         )
     settings = settings.model_copy(
         update={"voice_service_secret": SecretStr("test-voice-secret-" + "x" * 40)}

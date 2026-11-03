@@ -34,7 +34,7 @@
       recording: ["stopping", "idle", "error"],
       stopping: ["preview", "idle", "error"],
       preview: ["starting", "uploading", "idle"],
-      uploading: ["accepted", "retry"],
+      uploading: ["accepted", "retry", "idle"],
       accepted: ["starting"],
       retry: ["starting", "uploading", "idle"],
       error: ["starting", "idle", "preview"],
@@ -126,14 +126,14 @@
         }));
     }
     class Diagnostics {
-      constructor(root, { key, api, role = "visitor", location = "" }) {
-        this.key = `${key}:${role}:${location}`;
+      constructor(root, { key, api, location = "" }) {
+        this.key = `${key}:visitor:${location}`;
         this.api = api;
-        this.role = role;
+        this.location = location;
+        this.epoch = null;
         this.report = {
-          version: 1,
+          version: 2,
           browser: navigator.userAgent,
-          role,
           location,
           events: [],
         };
@@ -259,13 +259,15 @@
         this.download.download = `voice-${id}.${blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm"}`;
         this.download.hidden = false;
       }
-      async save(blob, id, durationMs) {
+      async save(blob, id, durationMs, epoch) {
+        this.epoch = epoch;
         this.showAudio(blob, id);
         this.report.draft = {
           id,
           bytes: blob.size,
           mime: blob.type,
           durationMs,
+          content_epoch: epoch,
           local_copy_saved: false,
         };
         try {
@@ -275,7 +277,8 @@
             blob,
             seconds: durationMs / 1000,
             durationMs,
-            role: this.role,
+            location: this.location,
+            content_epoch: epoch,
             updated: Date.now(),
           });
           this.report.draft.local_copy_saved = true;
@@ -348,9 +351,10 @@
                 : data.error?.message) ||
                 (typeof data.detail === "string"
                   ? data.detail
-                  : `Не удалось отправить запись (HTTP ${response.status}).`),
+                  : data.detail?.message ||
+                    `Не удалось отправить запись (HTTP ${response.status}).`),
             );
-            error.code = data.error?.code;
+            error.code = data.error?.code || data.detail?.code;
             error.status = response.status;
             throw error;
           }
@@ -365,13 +369,16 @@
       async publish() {
         if (!this.id) return;
         try {
-          const response = await fetch(`${this.api}/debug/${this.id}`, {
-            method: "POST",
-            credentials: "same-origin",
-            signal: AbortSignal.timeout(5000),
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...this.report, server: undefined }),
-          });
+          const response = await fetch(
+            `${this.api}/debug/${this.id}?location=${encodeURIComponent(this.location)}&content_epoch=${this.epoch || 0}`,
+            {
+              method: "POST",
+              credentials: "same-origin",
+              signal: AbortSignal.timeout(5000),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...this.report, server: undefined }),
+            },
+          );
           this.report.diagnostics_saved = response.ok;
           this.report.diagnostics_status = response.status;
         } catch (e) {
@@ -383,10 +390,13 @@
       async serverTrace() {
         if (!this.id) return;
         try {
-          const r = await fetch(`${this.api}/debug/${this.id}`, {
-            credentials: "same-origin",
-            signal: AbortSignal.timeout(5000),
-          });
+          const r = await fetch(
+            `${this.api}/debug/${this.id}?location=${encodeURIComponent(this.location)}&content_epoch=${this.epoch || 0}`,
+            {
+              credentials: "same-origin",
+              signal: AbortSignal.timeout(5000),
+            },
+          );
           if (r.ok) this.report.server = await r.json();
           else this.report.server_trace_status = r.status;
         } catch (e) {
@@ -686,9 +696,79 @@
       const diagnostics = new Diagnostics(panel, {
         key: "voice",
         api: api.href,
-        role: options.actor || "visitor",
         location: options.location || "",
       });
+      let intentEpoch = null;
+      let knownEpoch = Number(options.contentEpoch) || null;
+      async function identity() {
+        const response = await fetch(
+          api.href +
+            "/identity?location=" +
+            encodeURIComponent(options.location || ""),
+          {
+            method: "POST",
+            credentials: "same-origin",
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        const data = await response.json();
+        if (
+          !response.ok ||
+          !data.ready ||
+          !Number.isInteger(data.content_epoch)
+        ) {
+          const failure = new Error(
+            data.detail?.message ||
+              data.error?.message ||
+              "Локация временно недоступна. Дождись завершения сброса.",
+          );
+          failure.code = data.detail?.code || data.error?.code;
+          throw failure;
+        }
+        knownEpoch = Math.max(knownEpoch || 0, data.content_epoch);
+        return knownEpoch;
+      }
+      async function discardStale(epoch) {
+        try {
+          const db = await diagnostics.db();
+          try {
+            await new Promise((resolve, reject) => {
+              const tx = db.transaction("drafts", "readwrite");
+              const store = tx.objectStore("drafts");
+              const all = store.getAll();
+              all.onsuccess = () => {
+                for (const draft of all.result) {
+                  if (
+                    (draft.location === options.location ||
+                      draft.key.endsWith(":" + options.location)) &&
+                    (!Number.isInteger(draft.content_epoch) ||
+                      draft.content_epoch < epoch)
+                  )
+                    store.delete(draft.key);
+                }
+              };
+              tx.oncomplete = resolve;
+              tx.onerror = () => reject(tx.error);
+              tx.onabort = () => reject(tx.error);
+            });
+          } finally {
+            db.close();
+          }
+        } catch (e) {
+          diagnostics.report.storage_error = e.message;
+          diagnostics.render();
+        }
+      }
+      async function stale(id = key) {
+        await diagnostics.clear(id);
+        clearBlob();
+        intentEpoch = null;
+        if (disposed) return;
+        error.textContent =
+          "Локация сброшена. Устаревшая запись удалена из очереди браузера. Запиши новый отзыв.";
+        if (machine.state !== "idle") transition("idle");
+        else render();
+      }
       const mic =
         '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="10" y="3" width="8" height="14" rx="4"/><path d="M6 12v2a8 8 0 0 0 16 0v-2M14 22v4M9 26h10"/></svg>';
       const square =
@@ -1030,15 +1110,34 @@
         }
         try {
           diagnostics.mark("permission_request");
-          const incoming = await navigator.mediaDevices.getUserMedia({
+          const microphone = navigator.mediaDevices.getUserMedia({
             audio: true,
           });
+          const epochReady = identity().catch((problem) => {
+            if (problem.code === "stale_epoch" || !knownEpoch)
+              return { error: problem };
+            return knownEpoch;
+          });
+          const incoming = await microphone;
           if (disposed || session !== s || s.token !== token) {
             incoming.getTracks().forEach((t) => t.stop());
             return;
           }
           diagnostics.mark("permission_resolved");
           s.stream = incoming;
+          const epoch = await epochReady;
+          if (disposed || session !== s || s.token !== token) {
+            release(s);
+            return;
+          }
+          if (epoch?.error) {
+            failStart(s, epoch.error.message, epoch.error);
+            return;
+          }
+          s.epoch = epoch;
+          intentEpoch = epoch;
+          diagnostics.epoch = epoch;
+          await discardStale(epoch);
           // A late IndexedDB restore must never be overwritten by a short/cancelled new attempt.
           await replacement;
           let saved = null;
@@ -1227,7 +1326,8 @@
         blob = recorded;
         key = s.id;
         durationMs = s.duration;
-        await diagnostics.save(blob, key, durationMs);
+        intentEpoch = s.epoch;
+        await diagnostics.save(blob, key, durationMs, s.epoch);
         release(s);
         if (disposed) return;
         status.textContent = diagnostics.report.draft?.local_copy_saved
@@ -1308,20 +1408,16 @@
         const params = new URLSearchParams({
           location: options.location || "",
           idempotency_key: key,
+          content_epoch: String(intentEpoch || 0),
           language: navigator.language || "",
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
         });
         try {
-          const identity = await diagnostics.request(api.href + "/identity", {
-            method: "POST",
-            credentials: "same-origin",
-          });
-          if (!identity.ready)
-            throw new Error("Не удалось подготовить отправку записи.");
-          if (identity.actor && identity.actor !== diagnostics.role)
-            throw new Error(
-              "Режим входа изменился. Вернись в прежний режим — запись сохранена.",
-            );
+          const currentEpoch = await identity();
+          if (!intentEpoch || currentEpoch !== intentEpoch) {
+            await stale();
+            return;
+          }
           const data = await diagnostics.request(
             api.href + "/submissions?" + params,
             {
@@ -1330,7 +1426,6 @@
               body: blob,
               headers: {
                 "Content-Type": blob.type || "audio/webm",
-                "X-CSRF-Token": identity.csrf_token || "",
               },
             },
           );
@@ -1350,6 +1445,10 @@
           schedule();
         } catch (e) {
           if (disposed) return;
+          if (e.code === "stale_epoch") {
+            await stale();
+            return;
+          }
           blocked = e.code === "audio_too_short";
           error.textContent =
             e.name === "TypeError"
@@ -1456,6 +1555,8 @@
       function restoreBlob(saved) {
         blob = saved.blob;
         key = saved.id;
+        intentEpoch = saved.content_epoch;
+        diagnostics.epoch = intentEpoch;
         durationMs = saved.durationMs ?? saved.seconds * 1000;
         blocked = !Number.isFinite(durationMs) || durationMs < MIN_MS;
         status.textContent = blocked
@@ -1490,8 +1591,22 @@
       render();
       loadHistory();
       const restored = diagnostics.restore();
-      restored.then((saved) => {
+      restored.then(async (saved) => {
+        let epoch;
+        try {
+          epoch = await identity();
+          await discardStale(epoch);
+        } catch {
+          epoch = knownEpoch;
+        }
         if (!disposed && saved?.blob && machine.state === "idle") {
+          if (
+            !Number.isInteger(saved.content_epoch) ||
+            (epoch && saved.content_epoch !== epoch)
+          ) {
+            await stale(saved.id);
+            return;
+          }
           restoreBlob(saved);
           transition("preview");
         }
@@ -1517,6 +1632,6 @@
     window.InvoltaVoice.mount(script.dataset.target, {
       apiBase: script.dataset.apiBase,
       location: script.dataset.location,
-      actor: script.dataset.actor,
+      contentEpoch: script.dataset.contentEpoch,
     });
 })();

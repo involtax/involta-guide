@@ -2,22 +2,19 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.application.services.jobs import JobService
 from involta_guide.application.services.locations import LocationService, Queries
-from involta_guide.application.services.reviews import ReviewService
 from involta_guide.config import Settings
-from involta_guide.domain.entities import AudioTooShort, Conflict, NotFound, RuleViolation
+from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.web.context import Context
 from involta_guide.web.routes import admin, admin_content, api, public, voice, voice_admin
 
@@ -25,8 +22,7 @@ from involta_guide.web.routes import admin, admin_content, api, public, voice, v
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     engine = create_database(settings)
-    storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    provider = OpenAIProvider(settings, engine, storage)
+    provider = OpenAIProvider(settings, engine)
 
     def factory() -> PostgresUow:
         return PostgresUow(engine)
@@ -35,12 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings,
         engine,
         Queries(factory),
-        EditorialService(factory),
         LocationService(factory),
-        ReviewService(factory, storage, settings.pending_review_limit),
-        JobService(
-            factory, provider, storage, public_fill_enabled=settings.temporary_public_fill_enabled
-        ),
+        JobService(factory, provider, public_fill_enabled=settings.temporary_public_fill_enabled),
         Security(settings, factory),
     )
 
@@ -102,15 +94,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
     app.mount(settings.path("/assets"), StaticFiles(directory=directory / "static"), name="assets")
 
-    import involta_voice
-
-    assert involta_voice.__file__ is not None
-    app.mount(
-        settings.path("/voice/vad"),
-        StaticFiles(directory=Path(involta_voice.__file__).parent / "static/vad"),
-        name="voice-vad",
-    )
-
     @app.get(settings.path("/widget.js"))
     def widget() -> object:
         from fastapi.responses import FileResponse
@@ -130,23 +113,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get(settings.path("/health/ready"))
     def ready() -> dict[str, str]:
-        ctx.queries.health()
+        try:
+            ctx.queries.health()
+        except RuleViolation as exc:
+            raise HTTPException(503, str(exc)) from exc
         return {"status": "ready", "revision": settings.release_sha}
 
     @app.exception_handler(RuleViolation)
     def business_error(request: Request, exc: RuleViolation) -> JSONResponse:
-        if isinstance(exc, AudioTooShort):
-            return JSONResponse(
-                {
-                    "error": {
-                        "code": "audio_too_short",
-                        "message": str(exc),
-                        "min_duration_seconds": 5,
-                        "duration_seconds": exc.duration_seconds,
-                    }
-                },
-                status_code=422,
-            )
         return JSONResponse(
             {"error": str(exc)},
             status_code=404

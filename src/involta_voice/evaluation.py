@@ -14,6 +14,7 @@ from sqlalchemy import Engine, text
 from .asr import MODELS
 from .db import encoded, execute, row, snapshot
 from .errors import VoiceError
+from .reset import lock_submission
 
 
 def save_candidate(
@@ -55,6 +56,7 @@ def queue_evaluation(
     engine: Engine, settings: Any, reference: str, key: str, force: bool = False
 ) -> dict[str, Any]:
     with engine.begin() as conn:
+        lock_submission(conn, reference)
         execute(conn, "SELECT pg_advisory_xact_lock(hashtext(:key))", key=key)
         accepted = row(conn, "SELECT * FROM asr_run_requests WHERE id=:key", key=key)
         if accepted:
@@ -291,6 +293,7 @@ def evaluate(
         ).encode()
     ).hexdigest()
     with engine.begin() as conn:
+        lock_submission(conn, reference)
         execute(
             conn, "SELECT pg_advisory_xact_lock(hashtext(:key))", key=str(command.idempotency_key)
         )

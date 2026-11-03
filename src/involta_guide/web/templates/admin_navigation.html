@@ -4,5 +4,4 @@
 <a href="{{settings.path(route)}}" class="{{'selected' if tab==key else ''}}" {%if tab==key%}aria-current="page"{%endif%}>{{label}}</a>
 {%endfor%}
 <a href="{{settings.path('/logs')}}" hx-boost="false" class="{{'selected' if tab=='logs' else ''}}" {%if tab=='logs'%}aria-current="page"{%endif%}>Логи</a>
-<a href="{{settings.path('/alex')}}" class="{{'selected' if tab=='alex' else ''}}" {%if tab=='alex'%}aria-current="page"{%endif%} hx-boost="false">Алекс ↗</a>
 </nav>

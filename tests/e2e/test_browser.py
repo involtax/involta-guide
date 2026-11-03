@@ -1,21 +1,18 @@
-import json
 import os
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
-from uuid import uuid4
 
 import httpx
 from playwright.sync_api import expect, sync_playwright
 
 from involta_guide.application.services.locations import Queries
-from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 
 
-def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
+def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
     settings, engine = database
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -28,7 +25,6 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
         "DATABASE_SCHEMA": settings.database_schema,
         "SESSION_SECRET": settings.session_secret.get_secret_value(),
         "ADMIN_PASSWORD": "test-password-123456",
-        "ALEX_SECRET": settings.alex_secret.get_secret_value(),
         "OPENAI_API_KEY": "",
         "SITE_URL": base,
         "DATA_DIR": str(tmp_path),
@@ -111,7 +107,7 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                         status=200,
                         json={
                             "state": "failed",
-                            "can_start": True,
+                            "can_start": False,
                             "message": "Тестовая ошибка поиска",
                         },
                     ),
@@ -121,7 +117,7 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(fill.get_by_role("status")).to_have_text(
                     "Тестовая ошибка поиска", timeout=10000
                 )
-                expect(fill_button).to_be_enabled()
+                expect(fill_button).to_be_disabled()
                 assert submissions == ["POST"]
                 page.unroute("**/api/locations/ivanovo/fill")
                 page.unroute("**/api/locations/ivanovo/fill/status")
@@ -188,145 +184,17 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     page.get_by_role("button", name="Запарсить эти данные", exact=True)
                 ).to_have_count(0)
                 expect(page.locator("[data-consent]")).to_have_count(0)
-                # One widget uses the server session to mark administrator commands.
-                page.goto(base + "/ivanovo")
-                page.get_by_role("button", name="Записать отзыв", exact=True).click()
-                # Permission/device startup is not recorded audio. Wait for the actual
-                # recorder timer rather than sleeping from the initial button press.
-                expect(page.locator("#guide-voice").locator(".stage .timer")).to_have_text(
-                    "00:05", timeout=15000
-                )
-                page.get_by_role("button", name="Остановить", exact=False).click()
-                page.get_by_role("button", name="Отправить отзыв").click()
-                expect(page.get_by_role("status")).to_contain_text(
-                    "Запись доставлена", timeout=10000
-                )
-                review = queries.rows("reviews")[0]
-                page.goto(base + "/admin?tab=reviews&review=" + review["id"])
-                expect(page).to_have_url(base + "/admin/reviews/ivanovo/" + str(review["number"]))
+                page.goto(base + "/admin/locations/ivanovo")
+                reset = page.locator('form[action$="/reset-and-fill"]')
                 expect(
-                    page.get_by_text(
-                        "Команда выполняется существующим обработчиком Алекса;", exact=False
-                    )
+                    reset.get_by_role("button", name="Очистить локацию и наполнить заново")
                 ).to_be_visible()
-                expect(page.get_by_role("region", name="Сравнение распознавания")).to_be_visible()
-                expect(
-                    page.get_by_role("button", name="Одобрить весь пакет", exact=True)
-                ).to_have_count(0)
-                page.get_by_role("link", name="Настройки наполнения", exact=True).click()
-                expect(
-                    page.get_by_role("heading", name="Настройки наполнения", exact=True)
-                ).to_be_visible()
-                assert page.locator("#admin-main").count() == 1
-                job = queries.rows("jobs", {"review_id": review["id"]})[0]
-                AIAudit(engine, settings).record(
-                    job["id"],
-                    "job_failed",
-                    {
-                        "validation_errors": [
-                            {"loc": ["restaurants", 0, "phone"], "msg": "Телефон неверен"}
-                        ],
-                        "traceback": "browser audit fixture\n" * 200,
-                    },
-                )
-                page.get_by_role("link", name="Логи", exact=True).click()
-                expect(page.get_by_role("heading", name="Логи", exact=True)).to_be_visible()
-                with PostgresUow(engine) as tx:
-                    reference = tx.repo.log_reference(job["id"])
-                page.goto(base + reference["path"])
-                expect(page.locator("pre").filter(has_text="Телефон неверен")).to_be_visible()
-                sidebar = page.get_by_role("complementary", name="Запросы").bounding_box()
-                content = page.get_by_role("region", name="Выбранный лог").bounding_box()
-                assert sidebar["x"] < content["x"]
-                for width in (1280, 390):
-                    page.set_viewport_size({"width": width, "height": 844})
-                    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
-                    assert (
-                        page.evaluate("""() => [...document.querySelectorAll('#logs-main *')].filter(e => {
-                        const s=getComputedStyle(e);
-                        return e.clientHeight>0 && ((['auto','scroll'].includes(s.overflowY) && e.scrollHeight>e.clientHeight+1)
-                            || (['auto','scroll'].includes(s.overflowX) && e.scrollWidth>e.clientWidth+1));
-                    }).length""")
-                        == 0
-                    )
-                page.set_viewport_size({"width": 1280, "height": 844})
-                with page.expect_download() as downloaded:
-                    page.get_by_role("link", name="Скачать полный JSON ↗").click()
-                export = json.loads(Path(downloaded.value.path()).read_text())
-                assert export["job"]["id"] == job["id"]
-                failed_id = str(uuid4())
-                with PostgresUow(engine) as tx:
-                    tx.repo.queue(
-                        {
-                            "id": failed_id,
-                            "kind": "generate",
-                            "location_id": location["id"],
-                            "prompt": "old browser fixture prompt",
-                        }
-                    )
-                    tx.repo.change("jobs", failed_id, {"status": "failed", "error": "old failure"})
-                    tx.repo.audit("temporary_public_fill", failed_id, location["id"])
-                page.goto(base + "/logs/ivanovo/2")
-                repeat = page.locator('form[action$="/regenerate"]')
-                repeat.get_by_label("Модель нового запроса").select_option("gpt-6-astra")
-                repeat.get_by_role("button", name="Повторить новым запросом").click()
-                expect(page.get_by_role("heading", name="Иваново / 3", exact=False)).to_be_visible()
-                expect(page).to_have_url(base + "/logs/ivanovo/3")
-                new_job = queries.rows("jobs", {"kind": "generate", "status": "queued"})[0]
-                assert new_job["id"] != failed_id
-                config = queries.rows(
-                    "audit", {"action": "generation_run", "target": new_job["id"]}
-                )[0]
-                assert json.loads(config["detail"])["model"] == "gpt-6-astra"
-                page.goto(base + "/logs/ivanovo/3")
-                expect(page.get_by_role("heading", name="Иваново / 3", exact=False)).to_be_visible()
-                # Status updates without navigation or replacing the model selection form.
-                with PostgresUow(engine) as tx:
-                    tx.repo.change(
-                        "jobs",
-                        new_job["id"],
-                        {"status": "failed", "error": "Проверка живого статуса"},
-                    )
-                expect(page.locator("#log-live [data-error]")).to_have_text(
-                    "Проверка живого статуса", timeout=15000
-                )
-                expect(page.locator("#log-live [data-stage]")).to_have_text("Ошибка")
-                expect(page.get_by_role("link", name="Скачать полный JSON ↗")).to_have_attribute(
-                    "href", "/guide/logs/ivanovo/3.json?download=1"
-                )
-                # Alex bootstrap is not a named parameter and is cleared from the URL.
-                alex = browser.new_context()
-                alex_page = alex.new_page()
-                alex_page.goto(base + "/?" + settings.alex_secret.get_secret_value())
-                expect(alex_page).to_have_url(base + "/")
-                alex_page.goto(base + "/ivanovo")
-                expect(alex_page.get_by_text("Режим Алекса:", exact=False)).to_be_visible()
-                page.goto(base + "/alex")
-                with page.expect_response(
-                    lambda r: r.request.method == "POST" and r.url.endswith("/revoke-alex")
-                ):
-                    page.get_by_role("button", name="Завершить все сессии Алекса").click()
-                # Wait for the HTMX redirect before inspecting another session.
-                expect(page.get_by_text("Для входа откройте персональную ссылку.")).to_be_visible()
-                alex_page.goto(base + "/alex")
-                expect(
-                    alex_page.get_by_text("Для входа откройте персональную ссылку.")
-                ).to_be_visible()
-                alex.close()
-                nojs = browser.new_context(java_script_enabled=False)
-                nojs_page = nojs.new_page()
-                nojs_page.goto(base + "/ivanovo")
-                expect(
-                    nojs_page.get_by_role("heading", name="Тестовый ресторан", exact=False)
-                ).to_be_visible()
-                nojs.close()
-                page.set_viewport_size({"width": 390, "height": 844})
-                page.goto(base + "/ivanovo")
-                assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
-                shots = Path("var/screenshots")
-                shots.mkdir(parents=True, exist_ok=True)
-                page.screenshot(path=str(shots / "python-public-mobile.png"), full_page=True)
-                assert not errors, errors
+                reset.get_by_label("Для подтверждения введите Иваново").fill("Иваново")
+                reset.get_by_role("button", name="Очистить локацию и наполнить заново").click()
+                expect(page.get_by_text("Сброс выполняется.", exact=False)).to_be_visible()
+                assert queries.get("locations", location["id"])["reset_pending"]
+                assert queries.get("locations", location["id"])["content_epoch"] == 2
+                assert not errors
                 browser.close()
         finally:
             process.terminate()

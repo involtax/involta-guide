@@ -141,16 +141,7 @@ class VoiceReadModel:
             assert location is not None
             link = row(conn, "SELECT * FROM voice_links WHERE review_id=:id", id=review_id)
             text_review = row(conn, "SELECT * FROM review_texts WHERE review_id=:id", id=review_id)
-            archived_asr = row(
-                conn, "SELECT reference FROM voice_archives WHERE source_review=:id", id=review_id
-            )
-            asr_reference = (
-                str(link["reference"])
-                if link
-                else str(archived_asr["reference"])
-                if archived_asr
-                else None
-            )
+            asr_reference = str(link["reference"]) if link else None
             proposals = [
                 dict(p)
                 for p in conn.execute(
@@ -185,15 +176,6 @@ class VoiceReadModel:
                     {"id": review["location_id"]},
                 ).mappings()
             ]
-            legacy_jobs = [
-                dict(p)
-                for p in conn.execute(
-                    text(
-                        "SELECT j.id,r.path FROM jobs j JOIN request_logs r ON r.job_id=j.id WHERE j.review_id=:id ORDER BY j.created_at DESC"
-                    ),
-                    {"id": review_id},
-                ).mappings()
-            ]
             analysis = next(
                 (r["analysis"] for r in runs if link and r["run"] == link["active_run"]),
                 review["result"] or {},
@@ -212,7 +194,7 @@ class VoiceReadModel:
                         str(binding["restaurant_id"]) if binding["restaurant_id"] else None
                     )
         for p in proposals:
-            target = p["payload"].get("restaurantId")
+            target = str(p["restaurant_id"]) if p["restaurant_id"] else None
             p["before"] = next((r for r in restaurants if str(r["id"]) == target), {})
             before = p["before"]
             p["changes"] = p["payload"].get("changes", p["payload"])
@@ -227,18 +209,7 @@ class VoiceReadModel:
             }
             p["revision"] = p["revision"] or 1
             p["run"] = p["run"] or 0
-        with self.engine.connect() as conn:
-            shared = conn.execute(
-                text(
-                    "SELECT DISTINCT l.id,l.revision FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE l.id<>:id AND x.restaurant_id IN (SELECT restaurant_id FROM restaurant_locations WHERE location_id=:id)"
-                ),
-                {"id": review["location_id"]},
-            ).mappings()
-            affected_revisions = {
-                str(r["id"]): str(r["revision"]) if r["revision"] else None for r in shared
-            }
         return {
-            "affected_revisions": affected_revisions,
             "asr_reference": asr_reference,
             "review": review,
             "text": text_review,
@@ -248,7 +219,6 @@ class VoiceReadModel:
             "decisions": decisions,
             "runs": runs,
             "restaurants": restaurants,
-            "legacy_jobs": legacy_jobs,
             "analysis": analysis,
             "changes": review["changes"],
             "path": "/admin/reviews/" + location["slug"] + "/" + str(review["number"]),

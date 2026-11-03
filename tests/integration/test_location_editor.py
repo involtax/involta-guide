@@ -47,7 +47,7 @@ def test_current_schema_has_no_page_history(database):
         "schema_migrations",
     } & set(inspector.get_table_names())
     columns = {c["name"] for c in inspector.get_columns("locations")}
-    assert {"page_data", "revision", "updated_at"} <= columns
+    assert {"initialized_at", "content_epoch", "revision", "updated_at"} <= columns
+    assert "page_data" not in columns
     assert not {"draft", "draft_version", "published_version"} & columns
-    columns = {c["name"] for c in inspector.get_columns("alex_changes")}
-    assert not {"version_id", "before_content", "after_content"} & columns
+    assert "alex_changes" not in inspector.get_table_names()

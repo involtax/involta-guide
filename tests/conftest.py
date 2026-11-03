@@ -34,7 +34,6 @@ def database(tmp_path, monkeypatch, request):
         database_schema=schema,
         session_secret=SecretStr("test-session-secret-" + "x" * 40),
         admin_password=SecretStr("test-password-123456"),
-        alex_secret=SecretStr("alex-test-" + "x" * 40),
         openai_api_key=SecretStr(""),
         site_url="http://testserver/guide",
         data_dir=tmp_path,

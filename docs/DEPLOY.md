@@ -1,3 +1,5 @@
+> Для beta_core сначала выполнить согласованный переход по [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Старые команды archive/backfill/guide-transcription больше не применяются. Обычный image-only rollback через эту границу запрещён.
+
 # Production через GitHub Actions
 
 Серверные команды вручную не нужны. Два workflow используют уже настроенные

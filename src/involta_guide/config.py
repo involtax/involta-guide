@@ -1,4 +1,3 @@
-from base64 import b64decode
 from pathlib import Path
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -13,26 +12,22 @@ class Settings(BaseSettings):
     session_secret: SecretStr
     admin_password: SecretStr = SecretStr("")
     admin_password_hash: SecretStr = SecretStr("")
-    alex_secret: SecretStr = SecretStr("")
-    alex_secret_base64: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
     voice_enabled: bool = False
     voice_debug_enabled: bool = True
     voice_url: str = "http://voice-api:3100"
     voice_service_secret: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"
-    transcription_model: str = "gigaam"
     site_url: str = "http://localhost:3000/guide"
     base_path: str = "/guide"
     release_sha: str = "development"
     # TEMPORARY: explicitly requested anonymous, one-location-at-a-time initial fill.
     temporary_public_fill_enabled: bool = True
     public_fill_logs_enabled: bool = True
+    beta_reset_enabled: bool = True
     cookie_secure: bool = False
     data_dir: Path = Path("var")
-    audio_retention_days: int = 90
     max_audio_bytes: int = 10 * 1024 * 1024
-    pending_review_limit: int = 1000
     daily_ai_calls: int = 1000
     ai_daily_budget_usd: float = 20
     ai_prices_json: str = "{}"
@@ -88,12 +83,6 @@ class Settings(BaseSettings):
         if self.voice_enabled and len(self.voice_service_secret.get_secret_value()) < 32:
             raise ValueError("VOICE_SERVICE_SECRET requires at least 32 characters")
 
-        encoded_alex = self.alex_secret_base64.get_secret_value()
-        if encoded_alex:
-            try:
-                self.alex_secret = SecretStr(b64decode(encoded_alex, validate=True).decode("utf-8"))
-            except ValueError as exc:
-                raise ValueError("Invalid ALEX_SECRET_BASE64 encoding") from exc
         if len(self.session_secret.get_secret_value()) < 32:
             raise ValueError("SESSION_SECRET должен содержать минимум 32 символа")
         if not self.database_url.get_secret_value().startswith(

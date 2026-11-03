@@ -81,7 +81,6 @@ print(json.dumps({
     "openai_api_key": os.environ.get("BOOTSTRAP_OPENAI_API_KEY", ""),
     "admin_password": os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", ""),
     "admin_password_hash": os.environ.get("BOOTSTRAP_ADMIN_PASSWORD_HASH", ""),
-    "alex_secret": os.environ.get("BOOTSTRAP_ALEX_SECRET", ""),
 }))
 PAYLOAD
   exit 0

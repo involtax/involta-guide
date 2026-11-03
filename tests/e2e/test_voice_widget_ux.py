@@ -73,7 +73,7 @@ def widget_page(browser):
                 body='{"reference":"saved","state":"accepted"}',
             )
         elif path.endswith("/identity"):
-            route.fulfill(content_type="application/json", body='{"ready":true}')
+            route.fulfill(content_type="application/json", body='{"ready":true,"content_epoch":1}')
         else:
             route.fulfill(
                 content_type="application/json",
@@ -287,7 +287,7 @@ def test_old_short_draft_is_playable_but_not_sendable(widget_page):
     page, widget, uploads = widget_page
     page.evaluate("""async()=>{
       InvoltaVoice.unmount('a');const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('involta-voice-drafts',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject});
-      await new Promise(resolve=>{const tx=db.transaction('drafts','readwrite');tx.objectStore('drafts').put({key:'voice:visitor:ivanovo',id:'old-short',blob:new Blob(['old'],{type:'audio/webm'}),seconds:2});tx.oncomplete=resolve});db.close();
+      await new Promise(resolve=>{const tx=db.transaction('drafts','readwrite');tx.objectStore('drafts').put({key:'voice:visitor:ivanovo',id:'old-short',blob:new Blob(['old'],{type:'audio/webm'}),seconds:2,content_epoch:1,location:'ivanovo'});tx.oncomplete=resolve});db.close();
       InvoltaVoice.mount('a',{location:'ivanovo'});
     }""")
     state(widget, "preview")
@@ -352,3 +352,49 @@ def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
     state(widget, "preview")
     assert report(widget)["draft"]["durationMs"] == 5100
     assert not uploads
+
+
+@pytest.mark.parametrize("reset_at", ["identity", "upload"])
+def test_reset_rejects_new_widget_draft_without_relabelling_its_epoch(widget_page, reset_at):
+    page, widget, uploads = widget_page
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "preview")
+    assert report(widget)["draft"]["content_epoch"] == 1
+    attempted_epochs = []
+    if reset_at == "identity":
+        page.route(
+            "**/identity?*",
+            lambda route: route.fulfill(
+                content_type="application/json", body='{"ready":true,"content_epoch":2}'
+            ),
+        )
+    else:
+        from urllib.parse import parse_qs
+
+        def reject_stale(route):
+            attempted_epochs.append(parse_qs(urlsplit(route.request.url).query)["content_epoch"])
+            route.fulfill(
+                status=409,
+                content_type="application/json",
+                body='{"detail":{"code":"stale_epoch","message":"Локация сброшена"}}',
+            )
+
+        page.route("**/submissions?*", reject_stale)
+    widget.get_by_role("button", name="Отправить отзыв").dispatch_event("click")
+    state(widget, "idle")
+    expect(widget.get_by_role("alert")).to_contain_text("Локация сброшена")
+    expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
+    assert not uploads
+    assert attempted_epochs == ([] if reset_at == "identity" else [["1"]])
+    assert (
+        page.evaluate("""async()=>{
+      const db=await new Promise(resolve=>{const q=indexedDB.open('involta-voice-drafts',1);q.onsuccess=()=>resolve(q.result)});
+      const count=await new Promise(resolve=>{const q=db.transaction('drafts').objectStore('drafts').count();q.onsuccess=()=>resolve(q.result)});
+      db.close();return count;
+    }""")
+        == 0
+    )

@@ -20,6 +20,7 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
                 "kind": "generate",
                 "location_id": other["id"],
                 "prompt": "private legacy prompt",
+                "public_log": False,
             }
         )
     admin_job = queries.rows("jobs", {"location_id": other["id"]})[0]
@@ -28,7 +29,8 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
         tx.repo.queue(
             {
                 "id": private_id,
-                "kind": "review",
+                "kind": "reset",
+                "public_log": False,
                 "location_id": location["id"],
                 "prompt": "private voice text",
             }
@@ -62,11 +64,11 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
         assert "/logs/ivanovo/1" in index.text and admin_job["id"] not in index.text
         assert private_id not in index.text
         assert "noindex" in index.headers["x-robots-tag"]
-        page = client.get("/guide/logs/" + public_job["id"])
+        page = client.get("/guide/logs/ivanovo/1")
         assert page.status_code == 200, page.text
         assert "Открытый ответ" in page.text and "Неверный телефон" in page.text
         assert "<script>alert" not in page.text
-        exported = client.get("/guide/logs/" + public_job["id"] + ".json")
+        exported = client.get("/guide/logs/ivanovo/1" + ".json")
         assert exported.status_code == 200
         assert exported.json()["job"]["id"] == public_job["id"]
         assert "secret-cookie" not in exported.text
@@ -86,4 +88,4 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
     with TestClient(create_app(disabled)) as client:
         assert client.get("/guide/logs").status_code == 404
         assert client.get("/guide/logs/ivanovo/1/status").status_code == 404
-        assert client.get("/guide/logs/" + public_job["id"] + ".json").status_code == 404
+        assert client.get("/guide/logs/ivanovo/1" + ".json").status_code == 404

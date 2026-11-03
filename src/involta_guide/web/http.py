@@ -40,15 +40,13 @@ def require_admin(request: Request) -> dict[str, Any]:
     return principal
 
 
-def check_csrf(
-    request: Request, form: FormData, *, alex: bool = False, login: bool = False
-) -> None:
+def check_csrf(request: Request, form: FormData, *, login: bool = False) -> None:
     check_origin(request)
     ctx = context(request)
     token = (
         request.cookies.get("guide_login_csrf", "")
         if login
-        else request.cookies.get("guide_alex" if alex else "guide_admin", "")
+        else request.cookies.get("guide_admin", "")
     )
     expected = ctx.security.csrf(token)
     if not token or not hmac.compare_digest(str(form.get("_csrf", "")), expected):

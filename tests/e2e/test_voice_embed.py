@@ -12,7 +12,9 @@ def test_widget_permission_html_error_reload_and_lost_202():
       <script defer src="/widget.v1.js" data-target="a" data-api-base="/voice/api/v1" data-location="ivanovo"></script>
       <script defer src="/widget.v1.js" data-target="b" data-api-base="/voice/api/v1" data-location="ivanovo"></script>"""
     keys = []
+    epochs = []
     api_requests = []
+    epoch = [1]
 
     def handle(route):
         request = route.request
@@ -22,7 +24,10 @@ def test_widget_permission_html_error_reload_and_lost_202():
         elif path == "/widget.v1.js":
             route.fulfill(content_type="application/javascript", body=widget)
         elif path.endswith("/identity"):
-            route.fulfill(content_type="application/json", body='{"ready":true}')
+            route.fulfill(
+                content_type="application/json",
+                body=json.dumps({"ready": True, "content_epoch": epoch[0]}),
+            )
         elif path.endswith("/mine"):
             route.fulfill(content_type="application/json", body='{"rows":[]}')
         elif path.endswith("/submissions"):
@@ -30,6 +35,7 @@ def test_widget_permission_html_error_reload_and_lost_202():
             assert request.headers["content-type"].startswith("audio/")
             fields = parse_qs(urlsplit(request.url).query)
             keys.append(fields["idempotency_key"][0])
+            epochs.append(int(fields["content_epoch"][0]))
             assert request.post_data_buffer
             if len(keys) == 1:
                 route.fulfill(
@@ -121,6 +127,34 @@ def test_widget_permission_html_error_reload_and_lost_202():
         expect(first.get_by_text("Был в Огоньке сегодня, было вкусно", exact=True)).to_be_visible()
         assert keys[0] == keys[1] == keys[2] and api_requests[:3] == ["POST"] * 3
         assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+        # A stored old-cycle intent must be deleted, never silently stamped with epoch 2.
+        page.evaluate("""async () => {
+          const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('involta-voice-drafts',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+          await new Promise((resolve,reject)=>{const tx=db.transaction('drafts','readwrite');
+            tx.objectStore('drafts').put({key:'voice:visitor:ivanovo',id:'old-cycle-intent',location:'ivanovo',content_epoch:1,blob:new Blob(['old private recording'],{type:'audio/webm'}),seconds:2});
+            tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();
+        }""")
+        before_reset_calls = len(keys)
+        epoch[0] = 2
+        page.reload()
+        expect(first.get_by_role("alert")).to_contain_text("Локация сброшена")
+        assert len(keys) == before_reset_calls
+        expect(first.get_by_role("button", name="Отправить отзыв")).to_have_count(0)
+        assert (
+            page.evaluate(
+                """async () => {const db=await new Promise(r=>{const q=indexedDB.open('involta-voice-drafts',1);q.onsuccess=()=>r(q.result)});const count=await new Promise(r=>{const q=db.transaction('drafts').objectStore('drafts').count();q.onsuccess=()=>r(q.result)});db.close();return count}"""
+            )
+            == 0
+        )
+        first.get_by_role("button", name="Записать отзыв", exact=True).click()
+        expect(first.get_by_role("alert")).to_contain_text("Нет доступа")
+        first.get_by_role("button", name="Записать отзыв", exact=True).click()
+        expect(first.get_by_role("button", name="Остановить запись")).to_be_visible()
+        expect(first.locator(".stage .timer")).to_have_text("00:05", timeout=15000)
+        first.get_by_role("button", name="Остановить запись").click()
+        first.get_by_role("button", name="Отправить отзыв").click()
+        expect(first.get_by_role("status")).to_contain_text("Текст отзыва сохранён", timeout=10000)
+        assert epochs == [1, 1, 1, 2] and keys[-1] not in {keys[0], "old-cycle-intent"}
         page.evaluate("window.InvoltaVoice.unmount('a');window.InvoltaVoice.unmount('b')")
         expect(first.locator("section")).to_have_count(0)
         assert page.evaluate(

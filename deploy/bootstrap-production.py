@@ -4,7 +4,6 @@
 Stdlib only; compatible with Python 3.10+. Never logs command output or credentials.
 """
 
-import base64
 import fcntl
 import hashlib
 import ipaddress
@@ -267,8 +266,6 @@ def validate_request(request):
             raise Failure(f"Invalid {name}: multiline/escaped values are not supported")
     if request.get("admin_password") and len(request["admin_password"]) < 12:
         raise Failure("ADMIN_PASSWORD must contain at least 12 characters")
-    if not isinstance(request.get("alex_secret", ""), str):
-        raise Failure("ALEX_SECRET must be a string")
 
 
 def validate_os_release(release):
@@ -584,10 +581,6 @@ def initialize(request, frontend, container=None):
             "SESSION_SECRET": secrets.token_urlsafe(48),
             "ADMIN_PASSWORD": request.get("admin_password") or secrets.token_urlsafe(32),
             "ADMIN_PASSWORD_HASH": request.get("admin_password_hash", ""),
-            # Encode for env-file transport so quotes, Unicode and newlines remain literal.
-            "ALEX_SECRET_BASE64": base64.b64encode(
-                request.get("alex_secret", "").encode("utf-8")
-            ).decode("ascii"),
             "OPENAI_API_KEY": request.get("openai_api_key", ""),
             "SITE_URL": "https://involta.ru/guide",
             "BASE_PATH": "/guide",

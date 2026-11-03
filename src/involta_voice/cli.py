@@ -16,6 +16,7 @@ def main() -> None:
             "worker-health",
             "openapi",
             "orphan-audio",
+            "beta-cleanup-files",
             "prepare-model",
             "asr-backfill",
             "asr-report",
@@ -39,6 +40,16 @@ def main() -> None:
     try:
         if args.command == "migrate":
             migrate(engine)
+        elif args.command == "beta-cleanup-files":
+            from .reset import cleanup_files
+            from .service import VoiceService
+
+            with engine.connect() as conn:
+                result = row(conn, "SELECT count(*) n FROM purge_files")
+                count = result["n"] if result else 0
+            print(json.dumps({"pending_files": count, "execute": args.execute}))
+            if args.execute:
+                cleanup_files(VoiceService(engine, settings))
         elif args.command in ("asr-backfill", "asr-report"):
             from .beta import backfill, summary
 
@@ -51,7 +62,7 @@ def main() -> None:
             if result.get("errors"):
                 raise SystemExit(1)
         else:
-            # Intake holds this lock until commit; never remove a referenced/young file.
+            # Synchronize owner-prefixed files with intake/reset and prove no committed reference.
             from .db import execute
 
             with engine.begin() as conn:
@@ -64,6 +75,18 @@ def main() -> None:
                         or time.time() - path.stat().st_mtime < 86400
                     ):
                         continue
+                    from uuid import UUID
+
+                    try:
+                        location = str(UUID(path.name.split(".")[0]))
+                    except ValueError:
+                        location = None
+                    if location:
+                        row(
+                            conn,
+                            "SELECT location_id FROM location_epochs WHERE location_id=:id FOR SHARE",
+                            id=location,
+                        )
                     if row(conn, "SELECT 1 FROM submissions WHERE audio=:name", name=path.name):
                         continue
                     count += 1

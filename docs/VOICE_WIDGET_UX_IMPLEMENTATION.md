@@ -93,8 +93,8 @@ Recorder стартует до анализа. AudioContext/VAD инициали
   поздний stream, отмена, одна финализация, unmount и восстановление.
 - Настоящий MediaRecorder: финальные чанки, preview, HTML 502, reload/IndexedDB,
   потерянный ответ и повтор с прежним ключом, освобождение tracks/object URLs.
-- Backend: WAV/WebM/Ogg/MP4 на границах, cleanup коротких файлов, оба текущих пути
-  приёма в Guide, повтор прежней двухсекундной записи и доставка её события.
+- Backend: WAV/WebM/Ogg/MP4 на границах, cleanup коротких файлов, единый путь
+  приёма посетителя и администратора через Voice, повтор прежней двухсекундной записи и доставка её события.
 - Скриншоты 1440×1000 и 390×844: центр круга в пределах 1 px от оси viewport,
   одна позиция/размер в idle/recording, отсутствие горизонтальной прокрутки.
 
@@ -137,3 +137,22 @@ TaskDuration основного потока вкладки — около 9% о
 | Idle | ![Idle desktop](screenshots/voice-widget/idle-desktop.png) | ![Idle mobile](screenshots/voice-widget/idle-mobile.png) |
 | Запись | ![Recording desktop](screenshots/voice-widget/recording-desktop.png) | ![Recording mobile](screenshots/voice-widget/recording-mobile.png) |
 | Прослушивание | ![Preview desktop](screenshots/voice-widget/preview-desktop.png) | ![Preview mobile](screenshots/voice-widget/preview-mobile.png) |
+
+## Совмещение с упрощением ядра (PR20)
+
+Виджет использует обычный Voice для всех пользователей; старый Guide ReviewService
+и редакторский путь не возвращаются. Минимум 5 секунд проверяется внутри защищённого
+приёма Voice после проверки исходного content_epoch и идемпотентности. Имена файлов
+сохраняют владельца/epoch, поэтому полный reset находит и удаляет их.
+
+Каждая запись и её IndexedDB draft сохраняют исходный content_epoch. Identity
+проверяется при начале записи и перед отправкой; микрофон запрашивается сразу
+из пользовательского нажатия, параллельно получению epoch. Смена цикла или ответ
+stale_epoch очищают старую попытку без переприсвоения нового epoch. Диагностика
+также привязана к локации/epoch. Локальный стенд использует тот же контракт.
+
+Добавлены браузерные проверки сброса перед отправкой и во время запроса; сохранены
+проверки reload, старого IndexedDB draft, нового сознательного отзыва после reset,
+минимальной длины и сохранения timeline/VAD в серверной диагностике. Приведённые
+выше измерения задержек относятся к исходному стенду PR19 до совмещения; сетевое
+ожидание epoch на production отдельно не измерено.

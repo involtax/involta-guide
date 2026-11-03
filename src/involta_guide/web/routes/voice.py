@@ -4,18 +4,15 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from sqlalchemy import text as sql_text
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request as StarletteRequest
 
 from involta_guide.domain.entities import NotFound
 from involta_guide.infrastructure.voice.client import VoiceClient, VoiceUnavailable
-from involta_guide.web.http import admin_token, check_csrf, check_origin, client_ip, context
+from involta_guide.web.http import admin_token, check_origin, client_ip, context
 from involta_voice.contracts import LocationContext, RestaurantContext, SubmissionMetadata
-
-
-def visitor_identity(request: Request, visitor: str) -> str:
-    return context(request).security.fingerprint("voice-visitor:" + visitor)
 
 
 def voice_client(request: Request) -> VoiceClient:
@@ -31,7 +28,7 @@ def owner(request: Request) -> str:
         UUID(visitor)
     except ValueError:
         raise HTTPException(404, "Запись не найдена") from None
-    return visitor_identity(request, visitor)
+    return visitor
 
 
 def editorial_status(request: Request, reference: str, visitor: str) -> dict[str, Any] | None:
@@ -40,7 +37,7 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
         review = ctx.queries.get("reviews", reference)
     except NotFound:
         return None
-    if review["visitor"] not in (visitor, request.cookies.get("guide_visitor")):
+    if review["visitor"] != visitor:
         raise HTTPException(404, "Запись не найдена")
     try:
         text = ctx.queries.get("review_texts", reference)
@@ -77,17 +74,21 @@ def routes(prefix: str) -> APIRouter:
         except ValueError:
             visitor = str(uuid4())
         ctx = context(request)
-        token = admin_token(request)
-        trusted = ctx.security.principal(token)
-        if not trusted:
-            token = request.cookies.get("guide_alex", "")
-            trusted = ctx.security.principal(token, alex=True)
+        ctx.queries.health()
+        public = ctx.queries.public(request.query_params.get("location", ""))
+        if not public or public["location"]["is_hub"]:
+            raise HTTPException(404, "Выберите обычную локацию")
+        location = public["location"]
+        if location["reset_pending"]:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "stale_epoch",
+                    "message": "Локация сбрасывается. Запишите новый отзыв после завершения.",
+                },
+            )
         response = JSONResponse(
-            {
-                "ready": True,
-                "actor": "admin" if trusted else "visitor",
-                "csrf_token": ctx.security.csrf(token) if trusted else "",
-            },
+            {"ready": True, "content_epoch": location["content_epoch"]},
             headers={"Cache-Control": "private,no-store"},
         )
         response.set_cookie(
@@ -109,7 +110,7 @@ def routes(prefix: str) -> APIRouter:
         if not ctx.settings.voice_debug_enabled:
             raise HTTPException(404, "Диагностика отключена")
         cookie = request.cookies.get("guide_visitor", "")
-        identity = ctx.security.fingerprint("voice-upload-debug:" + cookie) if cookie else ""
+        identity = cookie
         administrator = bool(ctx.security.principal(admin_token(request)))
         events = UploadDebug(ctx.engine, ctx.settings).read(
             str(request_id), identity, administrator
@@ -128,6 +129,16 @@ def routes(prefix: str) -> APIRouter:
         if not ctx.settings.voice_debug_enabled:
             raise HTTPException(404, "Диагностика отключена")
         visitor = owner(request)
+        public = ctx.queries.public(request.query_params.get("location", ""))
+        if (
+            not public
+            or str(public["location"]["content_epoch"]) != request.query_params.get("content_epoch")
+            or public["location"]["reset_pending"]
+            or public["location"]["is_hub"]
+        ):
+            raise HTTPException(
+                409, detail={"code": "stale_epoch", "message": "Контекст записи устарел"}
+            )
         chunks, size = [], 0
         async for chunk in request.stream():
             size += len(chunk)
@@ -146,9 +157,11 @@ def routes(prefix: str) -> APIRouter:
             str(request_id),
             {
                 "stage": "browser",
-                "owner": ctx.security.fingerprint(
-                    "voice-upload-debug:" + request.cookies["guide_visitor"]
-                ),
+                "_context": {
+                    "slug": request.query_params.get("location", ""),
+                    "content_epoch": request.query_params.get("content_epoch", "0"),
+                },
+                "owner": request.cookies["guide_visitor"],
                 "visitor": visitor,
                 "report": {
                     key: report[key]
@@ -189,16 +202,27 @@ def routes(prefix: str) -> APIRouter:
     async def submit(request: Request) -> Response:
         check_origin(request)
         ctx = context(request)
-        admin = await run_in_threadpool(ctx.security.principal, admin_token(request))
-        alex = await run_in_threadpool(
-            ctx.security.principal, request.cookies.get("guide_alex"), alex=True
-        )
-        if request.headers.get("x-csrf-token") and not (admin or alex):
-            raise HTTPException(403, "Сессия редактора завершилась. Войдите и повторите отправку.")
-        if not ctx.settings.voice_enabled and not (admin or alex):
-            return JSONResponse(
-                {"error": {"code": "unavailable", "message": "Приём новых записей Voice отключён"}},
-                status_code=503,
+        if not ctx.settings.voice_enabled:
+            raise HTTPException(503, "Приём новых записей Voice отключён")
+        ctx.queries.health()
+        public = ctx.queries.public(request.query_params.get("location", ""))
+        if not public:
+            raise HTTPException(404, "Локация не найдена")
+        location = public["location"]
+        try:
+            epoch = int(request.query_params.get("content_epoch", ""))
+        except ValueError:
+            epoch = 0
+        request.state.voice_context = {"location_id": location["id"], "content_epoch": epoch}
+        if location["is_hub"]:
+            raise HTTPException(400, "Выберите подлокацию для отзыва")
+        if location["reset_pending"] or epoch != location["content_epoch"]:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "stale_epoch",
+                    "message": "Локация сброшена. Запишите новый отзыв.",
+                },
             )
         chunks, size = [], 0
         async for chunk in request.stream():
@@ -231,52 +255,15 @@ def routes(prefix: str) -> APIRouter:
             audio = form.get("audio")
             if not isinstance(audio, UploadFile):
                 raise HTTPException(400, "Нужна аудиозапись")
-            public = ctx.queries.public(str(form.get("location") or ""))
-            if public is None:
-                raise HTTPException(404, "Локация не найдена")
-            location = public["location"]
             selected = ctx.queries.location(location["id"])
-            visitor = request.cookies.get("guide_visitor", "")
-            try:
-                UUID(visitor)
-            except ValueError:
-                visitor = str(uuid4())
-            if admin or alex:
-                check_csrf(request, form, alex=not bool(admin))
-                key = await run_in_threadpool(
-                    ctx.reviews.submit,
-                    location["id"],
-                    visitor_identity(request, visitor),
-                    ctx.security.fingerprint(client_ip(request)),
-                    request.headers.get("user-agent", ""),
-                    await audio.read(),
-                    (audio.content_type or "").split(";")[0],
-                    alex["id"] if alex and not admin else None,
-                    admin["id"] if admin else None,
-                    str(UUID(str(form.get("idempotency_key") or ""))),
-                )
-                result = JSONResponse(
-                    {"reference": key, "state": "accepted"},
-                    status_code=202,
-                    headers={"Cache-Control": "private,no-store"},
-                )
-                result.set_cookie(
-                    "guide_visitor",
-                    visitor,
-                    max_age=365 * 86400,
-                    path=prefix,
-                    httponly=True,
-                    secure=ctx.settings.cookie_secure,
-                    samesite="lax",
-                )
-                return result
+            visitor = owner(request)
             metadata = SubmissionMetadata(
                 location=LocationContext(
                     id=location["id"],
                     slug=location["slug"],
                     name=location["name"],
                     revision=location["revision"],
-                    published_revision=location["revision"],
+                    content_epoch=epoch,
                     restaurants=[
                         RestaurantContext(
                             id=r["id"],
@@ -288,24 +275,43 @@ def routes(prefix: str) -> APIRouter:
                         for r in selected["available"]
                     ][:200],
                 ),
-                visitor=visitor_identity(request, visitor),
+                visitor=visitor,
                 idempotency_key=UUID(str(form.get("idempotency_key") or "")),
-                ip_fingerprint=ctx.security.fingerprint(client_ip(request)),
-                user_agent=request.headers.get("user-agent", "")[:500],
+                ip=client_ip(request),
+                user_agent=request.headers.get("user-agent", ""),
                 language=str(form.get("language") or "")[:40],
                 timezone=str(form.get("timezone") or "")[:100],
                 correlation_id=UUID(request.state.voice_request_id)
                 if getattr(request.state, "voice_request_id", None)
                 else uuid4(),
             )
-            client = voice_client(request)
-            response = await run_in_threadpool(
-                client.request,
-                "POST",
-                "/submissions",
-                data={"metadata": metadata.model_dump_json()},
-                files={"audio": ("recording", await audio.read(), audio.content_type or "")},
-            )
+            with ctx.engine.begin() as guard:
+                live = (
+                    guard.execute(
+                        sql_text(
+                            "SELECT content_epoch,reset_pending FROM locations WHERE id=:id FOR SHARE"
+                        ),
+                        {"id": location["id"]},
+                    )
+                    .mappings()
+                    .one()
+                )
+                if live["reset_pending"] or live["content_epoch"] != epoch:
+                    raise HTTPException(
+                        409,
+                        detail={
+                            "code": "stale_epoch",
+                            "message": "Локация сброшена. Запишите новый отзыв.",
+                        },
+                    )
+                client = voice_client(request)
+                response = await run_in_threadpool(
+                    client.request,
+                    "POST",
+                    "/submissions",
+                    data={"metadata": metadata.model_dump_json()},
+                    files={"audio": ("recording", await audio.read(), audio.content_type or "")},
+                )
             try:
                 payload = response.json()
             except ValueError:
@@ -317,9 +323,10 @@ def routes(prefix: str) -> APIRouter:
                         str(metadata.correlation_id),
                         {
                             "stage": "upstream",
+                            "_context": {"slug": location["slug"], "content_epoch": epoch},
                             "status": response.status_code,
                             "response_body": response.text,
-                            "owner": ctx.security.fingerprint("voice-upload-debug:" + visitor),
+                            "owner": visitor,
                         },
                     )
                 raise VoiceUnavailable("Voice вернул ответ не в формате JSON") from None
@@ -374,15 +381,13 @@ def routes(prefix: str) -> APIRouter:
                 "service_available": False,
             }
         known = {r["reference"] for r in data["rows"]}
-        for identity in (visitor, request.cookies["guide_visitor"]):
-            rows = context(request).queries.rows("reviews", {"visitor": identity}, limit=30)
-            for row in rows:
-                if row["id"] not in known:
-                    item = editorial_status(request, row["id"], visitor)
-                    if item:
-                        item["created_at"] = str(row["created_at"])
-                        data["rows"].append(item)
-                        known.add(row["id"])
+        rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
+        for item in rows:
+            if item["id"] not in known:
+                own = editorial_status(request, item["id"], visitor)
+                if own:
+                    own["created_at"] = str(item["created_at"])
+                    data["rows"].append(own)
         if location:
             public = context(request).queries.public(location)
             data["rows"] = [

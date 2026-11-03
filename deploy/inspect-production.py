@@ -175,7 +175,7 @@ from involta_guide.config import Settings
 from involta_guide.infrastructure.persistence.unit_of_work import create_database
 e = create_database(Settings())
 with e.connect() as c:
-    rows = c.execute(text("SELECT r.id,l.slug,r.status,r.admin_session_id IS NOT NULL OR r.alex_session_id IS NOT NULL AS trusted,r.transcript IS NOT NULL AS has_transcript,coalesce(v.reference,a.reference) AS asr_reference,v.number FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN voice_archives a ON a.source_review=r.id LEFT JOIN voice_links v ON v.review_id=r.id ORDER BY r.created_at DESC LIMIT 10")).mappings().all()
+    rows = c.execute(text("SELECT r.id,l.slug,r.status,r.transcript IS NOT NULL AS has_transcript,v.reference AS asr_reference,r.number FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN voice_links v ON v.review_id=r.id ORDER BY r.created_at DESC LIMIT 10")).mappings().all()
     debug = c.execute(text("SELECT target AS request_id,detail FROM audit WHERE action='voice_upload_http' ORDER BY created_at DESC LIMIT 20")).mappings().all()
 print(json.dumps({'recordings':[dict(r) for r in rows], 'upload_debug':[dict(r) for r in debug]},default=str))
 e.dispose()

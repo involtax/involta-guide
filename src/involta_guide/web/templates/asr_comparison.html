@@ -3,7 +3,7 @@
 <section class="panel asr-comparison" aria-label="Сравнение распознавания">
 <h3>Бета: GigaAM / Parakeet</h3>
 <form method="post" action="{{asr_action}}">{{csrf()}}<input type="hidden" name="action" value="asr-run"><input type="hidden" name="idempotency_key" value="{{new_key()}}"><label><input type="checkbox" name="force" value="yes">Новый повторный прогон (сохранить предыдущие)</label><button>Распознать сохранённое аудио обеими моделями</button></form>
-<p>Сравнение не меняет отзыв, страницу или команды администратора. Оценка сохраняется отдельно.</p>
+<p>Сравнение не меняет отзыв, страницу или решение модератора. Оценка сохраняется отдельно.</p>
 {%if asr_comparison%}{%for trial in asr_comparison.runs%}
 <details {%if loop.first%}open{%endif%}><summary>ASR-прогон {{trial.run}} · источник основного текста: {{trial.source_engine or 'исторический / только сравнение'}}</summary>
 <div class="admin-compare">{%for c in trial.candidates%}<article><h4>{{c.name}} · {{status_label(c.state)}}</h4><small>{{c.revision}}</small>{%if c.error%}<p role="alert">{{c.error}}</p>{%endif%}<blockquote>{{c.text or 'Результата пока нет'}}</blockquote><p>Обработка: {{c.seconds if c.seconds is not none else '—'}} с · RTF: {{c.rtf if c.rtf is not none else '—'}} · WER: {{c.wer if c.wer is not none else 'нужен эталон'}} · CER: {{c.cer if c.cer is not none else 'нужен эталон'}}</p></article>{%endfor%}</div>

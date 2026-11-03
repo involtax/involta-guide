@@ -36,13 +36,16 @@ class LocationService:
             children = [r for r in repo.tree(target)[1:] if r["active"]] if key else []
             if not data["active"] and children:
                 raise RuleViolation("Сначала отключите дочерние локации")
-            data["is_hub"] = bool(data["is_hub"] or children)
+            # is_hub is explicit; the hierarchy remains navigation, never shared ownership.
+            if key:
+                current = require(repo, "locations", key, lock=True)
+                if current["reset_pending"]:
+                    raise Conflict("Сброс не завершён")
+            data["is_hub"] = bool(data["is_hub"])
             if key:
                 repo.change("locations", target, data)
             else:
                 repo.add("locations", {"id": target, **data})
-            if data["parent_id"]:
-                repo.change("locations", data["parent_id"], {"is_hub": True})
             repo.replace_relations(target, related)
             repo.audit("location", target, json.dumps(values, ensure_ascii=False))
             return target
@@ -53,6 +56,8 @@ class LocationService:
         with self.uow() as uow:
             repo = uow.repo
             location = require(repo, "locations", key, lock=True)
+            if location["is_hub"] or location["reset_pending"]:
+                raise Conflict("Локация не принимает изменение вступления")
             if location["revision"] != expected:
                 raise Conflict("Город изменён другим действием. Сравните тексты и сохраните снова.")
             if location["intro"] == text:
@@ -72,21 +77,12 @@ class LocationService:
                 json.dumps(
                     {
                         "admin_session_id": actor,
-                        "fields": [{"field": "intro", "before": location["intro"], "after": text}],
+                        "diff": [{"path": ["intro"], "before": location["intro"], "after": text}],
                     },
                     ensure_ascii=False,
                 ),
             )
             return True
-
-    def attach(self, restaurant_id: str, location_id: str) -> None:
-        with self.uow() as uow:
-            require(uow.repo, "restaurants", restaurant_id)
-            require(uow.repo, "locations", location_id)
-            uow.repo.link(
-                "restaurant_locations", {"restaurant_id": restaurant_id, "location_id": location_id}
-            )
-            uow.repo.audit("restaurant_location", location_id, restaurant_id)
 
 
 class Queries:
@@ -119,9 +115,13 @@ class Queries:
         with self.uow() as uow:
             repo = uow.repo
             location = require(repo, "locations", key)
+            runs = repo.rows(
+                "jobs", {"location_id": key, "kind": "generate", "applied": True}, limit=1
+            )
+            report = runs[0]["report"] if runs else {}
             return {
                 "location": location,
-                "content": current_content(repo, location),
+                "content": {**current_content(repo, location), **report},
                 "available": repo.available(key),
                 "related_ids": [row["id"] for row in repo.related(key)],
                 "parents": repo.tree(key, ancestors=True),
@@ -168,25 +168,20 @@ class Queries:
             if selected is None:
                 return result
             cards = repo.city_restaurants(selected["id"])
-            location = require(repo, "locations", selected["id"])
-            content = current_content(repo, location)
-            report = content.get("rankingReport") or []
-            result["generation_quality"] = content.get("qualityReport")
-            result["candidate_review"] = content.get("candidateReview")
+            runs = repo.rows(
+                "jobs",
+                {"location_id": selected["id"], "kind": "generate", "applied": True},
+                limit=1,
+            )
+            report = runs[0]["report"] if runs else {}
+            result["generation_quality"] = report.get("qualityReport")
+            result["candidate_review"] = report.get("candidateReview")
 
             def normalize(name: str) -> str:
                 return " ".join(name.casefold().split())
 
             for card in cards:
-                candidate = next(
-                    (
-                        r
-                        for r in report
-                        if normalize(r["name"]) == normalize(card["name"])
-                        and (not r.get("mapsUrl") or r["mapsUrl"] == card["maps_url"])
-                    ),
-                    None,
-                )
+                candidate = card["ranking"]
                 approved = [
                     entry
                     for review in card["reviews"] or []
@@ -223,7 +218,7 @@ class Queries:
                 return None
             location, redirect = found
             tree = repo.tree(location["id"])
-            useful = {r["id"] for r in tree if r["page_data"].get("restaurants")}
+            useful = {r["id"] for r in tree if r["initialized_at"] is not None}
             # Hidden locations are visible only if their subtree has published content.
             for item in reversed(tree):
                 if item["id"] in useful and item["parent_id"]:
@@ -245,7 +240,7 @@ class Queries:
                 if r["active"]
                 and (
                     r["listed"]
-                    or any(item["page_data"].get("restaurants") for item in repo.tree(r["id"]))
+                    or any(item["initialized_at"] is not None for item in repo.tree(r["id"]))
                 )
             ]
             return {
@@ -261,7 +256,7 @@ class Queries:
     def sitemap(self) -> list[Record]:
         with self.uow() as uow:
             rows = uow.repo.rows("locations", {"active": 1}, limit=100000)
-            useful = {row["id"] for row in rows if row["page_data"].get("restaurants")}
+            useful = {row["id"] for row in rows if row["initialized_at"] is not None}
             parents = {row["id"]: row["parent_id"] for row in rows}
             for key in list(useful):
                 parent = parents.get(key)
