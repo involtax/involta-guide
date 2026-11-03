@@ -122,6 +122,30 @@ def test_queue_concurrent_claim_lease_fencing_and_recovery(database):
     assert queries.location(location["id"])["content"]["rankingReport"][0]["totalScore"] == 8
 
 
+def test_generation_saves_candidate_with_null_maps_url(database):
+    class NullableCandidateAI(FakeAI):
+        def generate(self, prompt, job_id):
+            content = super().generate(prompt, job_id)
+            content["rankingReport"].append(
+                {
+                    "name": "Неподтверждённый кандидат",
+                    "mapsUrl": None,
+                    "scores": dict.fromkeys(FACTORS),
+                    "evidence": [{"factor": factor} for factor in FACTORS],
+                }
+            )
+            return content
+
+    _, _, _, queries, location, service, queue = setup(database, NullableCandidateAI())
+    service.enqueue(location["id"])
+    job = queue.claim()
+    service.process(job)
+    assert queries.get("jobs", job["id"])["status"] == "done"
+    content = queries.location(location["id"])["content"]
+    assert len(content["restaurants"]) == 1
+    assert content["rankingReport"][1]["mapsUrl"] is None
+
+
 def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     outer = service.provider
