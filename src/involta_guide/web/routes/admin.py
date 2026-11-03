@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from starlette.datastructures import FormData
 
-from involta_guide.application.commands.schemas import LocationInput, RestaurantInput
+from involta_guide.application.commands.schemas import RestaurantInput
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
@@ -64,7 +64,8 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
         name=name,
         context={
             "settings": ctx.settings,
-            "fragment": request.headers.get("HX-Request") == "true",
+            "fragment": request.headers.get("HX-Request") == "true"
+            and request.headers.get("HX-History-Restore-Request") != "true",
             "admin_ui": True,
             "csrf_token": ctx.security.csrf(token),
             "kinds": KINDS,
@@ -83,6 +84,11 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
 
 
 def redirect(request: Request, tab: str = "overview", message: str = "", **params: str) -> Response:
+    if tab == "overview":
+        return RedirectResponse(
+            context(request).settings.path("/admin") + "?" + urlencode({"message": message}),
+            status_code=303,
+        )
     return RedirectResponse(
         context(request).settings.path("/admin")
         + "?"
@@ -139,8 +145,10 @@ def routes(prefix: str) -> APIRouter:
             return response
         params = request.query_params
         tab = params.get("tab", "overview")
-        if tab == "cities":
-            tab = "locations"
+        if tab not in ("overview", "reviews", "ratings", "contacts") or (
+            tab == "overview" and ("tab" in params or "location" in params or "city" in params)
+        ):
+            raise HTTPException(404, "Раздел перенесён на отдельный адрес")
         q = params.get("q", "")
         status = params.get("status", "all")
         data: dict[str, Any] = {
@@ -153,23 +161,7 @@ def routes(prefix: str) -> APIRouter:
             "review_detail": None,
             "add_card": params.get("add") == "1",
         }
-        if tab == "locations":
-            data["location_cities"] = ctx.queries.ready_locations(q)
-            location = params.get("location") or params.get("city")
-            if not location and data["location_cities"]:
-                location = data["location_cities"][0]["id"]
-            if location:
-                data["selected"] = (
-                    {"location": None, "related_ids": []}
-                    if location == "new"
-                    else ctx.queries.location(uid(location))
-                )
-        elif tab == "fill":
-            data.update(
-                prompt=ctx.queries.setting("prompt"),
-                jobs=AIAudit(ctx.engine, ctx.settings).listing(1)["rows"],
-            )
-        elif tab == "reviews":
+        if tab == "reviews":
             moderation = params.get("moderation", "")
             data["moderation"] = moderation
             data["reviews"] = ctx.queries.rows(
@@ -190,38 +182,13 @@ def routes(prefix: str) -> APIRouter:
                     )
                     for p in detail["proposals"]
                 }
-        elif tab == "restaurants":
-            data.update(
-                ctx.queries.restaurant_browser(
-                    q, uid(params["location"]) if params.get("location") else None
-                )
-            )
         elif tab == "ratings":
             from involta_guide.domain.rules import aggregate_scores
 
             data["ratings"] = aggregate_scores(ctx.queries.rows("reviews", limit=10000))
         elif tab == "contacts":
             data["contacts"] = ctx.queries.contacts()
-        elif tab == "sessions":
-            data["sessions"] = ctx.queries.rows("admin_sessions")
-        elif tab == "ai-audit":
-            store = AIAudit(ctx.engine, ctx.settings)
-            if params.get("job"):
-                old_log = store.detail(uid(params["job"]))
-                if old_log is None:
-                    raise HTTPException(404, "Задание не найдено")
-                return log_redirect(request, old_log["job"]["log_path"], code=308)
-            return log_redirect(request, "/logs", code=308)
         return render(request, "admin.html", data)
-
-    @router.get(prefix + "/admin/ai-audit/{job_id}.json")
-    def audit_download(request: Request, job_id: str) -> Response:
-        require_admin(request)
-        ctx = context(request)
-        detail = AIAudit(ctx.engine, ctx.settings).detail(uid(job_id))
-        if detail is None:
-            raise HTTPException(404, "Задание не найдено")
-        return log_redirect(request, detail["job"]["log_path"] + ".json?download=1", code=308)
 
     @router.post(prefix + "/admin/login")
     def login(request: Request, form: FormData = Depends(form_data)) -> Response:
@@ -254,14 +221,6 @@ def routes(prefix: str) -> APIRouter:
         response.delete_cookie("guide_admin", path=prefix)
         return response
 
-    @router.get(prefix + "/admin/jobs")
-    def job_list(request: Request) -> Response:
-        require_admin(request)
-        ctx = context(request)
-        return render(
-            request, "jobs.html", {"jobs": AIAudit(ctx.engine, ctx.settings).listing(1)["rows"]}
-        )
-
     @router.get(prefix + "/admin/contacts")
     def contacts(request: Request) -> Response:
         require_admin(request)
@@ -272,56 +231,13 @@ def routes(prefix: str) -> APIRouter:
         require_admin(request)
         check_csrf(request, form)
         ctx = context(request)
-        location = key(form, "location_id")
-        key(form, "expected") or None
         try:
-            if action == "location":
-                fields: dict[str, Any] = {
-                    name: key(form, name)
-                    for name in (
-                        "name",
-                        "region",
-                        "slug",
-                        "in_phrase",
-                        "kind",
-                        "priority",
-                        "coverage_note",
-                    )
-                }
-                fields.update(
-                    parent_id=key(form, "parent_id") or None,
-                    aliases=[v.strip() for v in key(form, "aliases").split(",") if v.strip()],
-                    top_limit=int(key(form, "top_limit") or 3),
-                    related_ids=[
-                        uid(v.strip()) for v in key(form, "related_ids").split(",") if v.strip()
-                    ],
-                    bounds=json.loads(key(form, "bounds")) if key(form, "bounds") else None,
-                )
-                for name in ("is_hub", "listed", "population_verified"):
-                    fields[name] = form.get(name) == "on"
-                fields["active"] = int(form.get("active") == "on")
-                for name in ("population", "latitude", "longitude"):
-                    fields[name] = float(key(form, name)) if key(form, name) else None
-                validated = LocationInput.model_validate(fields).model_dump(mode="json")
-                location = ctx.locations.save(
-                    uid(key(form, "id")) if key(form, "id") else None, validated
-                )
-                return redirect(request, "locations", "Локация сохранена", location=location)
-            if action == "attach":
-                ctx.locations.attach(uid(key(form, "restaurant_id")), uid(location))
-                return redirect(
-                    request, "locations", "Ресторан связан с локацией", location=location
-                )
-            if action == "prompt":
-                ctx.jobs.set_prompt(key(form, "prompt"))
-                return redirect(request, "fill", "Промпт сохранён")
-            if action == "generation-model":
-                ctx.jobs.set_generation_model(key(form, "model"))
-                return redirect(
-                    request,
-                    "fill",
-                    "Модель наполнения сохранена. Новые запросы используют её; отзывы не затронуты.",
-                )
+            if action == "retry":
+                job_id = submitted_log(request, form)
+                ctx.jobs.retry(job_id)
+                detail = AIAudit(ctx.engine, ctx.settings).detail(job_id)
+                assert detail is not None
+                return log_redirect(request, detail["job"]["log_path"])
             if action == "regenerate":
                 new_id = ctx.jobs.regenerate(
                     submitted_log(request, form), model=key(form, "model") or None
@@ -350,23 +266,6 @@ def routes(prefix: str) -> APIRouter:
                 detail = store.detail(job_id)
                 assert detail is not None
                 return log_redirect(request, detail["job"]["log_path"])
-            if action == "generate":
-                count = ctx.jobs.enqueue(
-                    uid(location) if location else None,
-                    key(form, "scope") or "empty",
-                    model=key(form, "model") or None,
-                )
-                return redirect(
-                    request,
-                    "fill",
-                    f"Поставлено в очередь: {count}. Результат сразу появится на странице.",
-                )
-            if action == "retry":
-                ctx.jobs.retry(submitted_log(request, form))
-                return redirect(request, "fill", "Задание поставлено повторно")
-            if action == "cancel":
-                ctx.jobs.cancel()
-                return redirect(request, "fill", "Ожидающие задания отменены")
             if action == "moderate":
                 ctx.editorial.moderate(
                     uid(key(form, "review_id")), key(form, "decision"), key(form, "reason")
@@ -398,7 +297,7 @@ def routes(prefix: str) -> APIRouter:
                 str(exc) if isinstance(exc, RuleViolation) else "Проверьте поля формы и формат JSON"
             )
             if (
-                action in ("resume-generation", "reprocess-generation")
+                action in ("resume-generation", "reprocess-generation", "regenerate", "retry")
                 and key(form, "log_number").isdigit()
             ):
                 store = AIAudit(ctx.engine, ctx.settings)
@@ -408,12 +307,7 @@ def routes(prefix: str) -> APIRouter:
                     return log_redirect(
                         request, detail["job"]["log_path"] + "?" + urlencode({"message": message})
                     )
-            return redirect(
-                request,
-                "locations" if location else "overview",
-                message,
-                **({"location": location} if location else {}),
-            )
+            return redirect(request, message=message)
 
     @router.get(prefix + "/alex")
     def alex(request: Request) -> Response:

@@ -76,11 +76,11 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     assert "private-cookie" not in json.dumps(detail)
 
     with TestClient(create_app(settings)) as client:
-        url = f"/guide/admin/ai-audit/{job['id']}.json"
-        assert client.get(url).status_code == 401
+        url = "/guide/logs/ivanovo/1.json?download=1"
+        assert client.get("/guide/admin/ai-audit/" + job["id"] + ".json").status_code == 404
         assert "resp_test_full_response" not in client.get("/guide/admin?tab=ai-audit").text
         login(client)
-        page = client.get(f"/guide/admin?tab=ai-audit&job={job['id']}")
+        page = client.get("/guide/logs/ivanovo/1")
         assert page.status_code == 200, page.text
         assert "wrong phone" in page.text and "req_audit123" in page.text
         assert "<script>alert" not in page.text
@@ -88,7 +88,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
         exported = client.get(url)
         assert exported.status_code == 200 and exported.json()["job"]["id"] == job["id"]
         assert "attachment" in exported.headers["content-disposition"]
-        assert client.get("/guide/admin?tab=ai-audit&q=Иваново&status=failed").status_code == 200
+        assert client.get("/guide/logs?q=Иваново&status=failed").status_code == 200
 
 
 def test_audit_preserves_each_attempt_success_and_legacy_data(database):

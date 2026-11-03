@@ -13,13 +13,13 @@ def test_city_shows_current_data_and_only_supported_edit_channels(database):
     editor.save(city["id"], CONTENT, None)
     with TestClient(create_app(settings)) as client:
         csrf = login(client)
-        page = client.get("/guide/admin?tab=locations")
+        page = client.get("/guide/admin/locations/" + city["slug"])
         assert page.status_code == 200
         assert CONTENT["intro"] in page.text
-        assert "Наполнить через GPT" in page.text
-        assert "Сохранить вступление" not in page.text
+        assert "Наполнить через GPT" not in page.text
+        assert "Сохранить вступление" in page.text
         assert "Восстановить" not in page.text
-        assert "Сохранённые версии" not in client.get("/guide/admin?tab=restaurants").text
+        assert "Сохранённые версии" not in client.get("/guide/admin/restaurants").text
         assert client.get("/guide/logs/history/" + city["id"]).status_code in (404, 422)
         for action in ("intro", "content", "restore", "publish", "select-restaurant"):
             assert (
@@ -30,8 +30,8 @@ def test_city_shows_current_data_and_only_supported_edit_channels(database):
                 ).status_code
                 == 404
             )
-        assert client.get("/guide/admin?tab=locations&location=new").status_code == 200
-        assert client.get("/guide/admin?tab=locations&q=ничего").status_code == 200
+        assert client.get("/guide/admin/locations/new").status_code == 200
+        assert client.get("/guide/admin/locations?q=ничего").status_code == 200
 
 
 def test_current_schema_has_no_page_history(database):

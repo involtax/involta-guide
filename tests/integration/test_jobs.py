@@ -15,6 +15,7 @@ from involta_guide.infrastructure.security import Security
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 from .editor_fixture import FixtureEditor as EditorialService
+from .editor_fixture import enqueue_fixture
 from .test_editorial import CARD, CONTENT
 
 
@@ -110,7 +111,10 @@ def setup(database, provider=None):
 
 def test_queue_concurrent_claim_lease_fencing_and_recovery(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    assert service.enqueue(location["id"]) == 1 and service.enqueue(location["id"]) == 0
+    assert (
+        enqueue_fixture(service, location["id"]) == 1
+        and enqueue_fixture(service, location["id"]) == 0
+    )
     with ThreadPoolExecutor(2) as pool:
         jobs = list(pool.map(lambda _: queue.claim(), range(2)))
     assert sum(j is not None for j in jobs) == 1
@@ -147,7 +151,7 @@ def test_generation_saves_candidate_with_null_maps_url(database):
             return content
 
     _, _, _, queries, location, service, queue = setup(database, NullableCandidateAI())
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queue.claim()
     service.process(job)
     assert queries.get("jobs", job["id"])["status"] == "done"
@@ -166,7 +170,7 @@ def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):
             return outer.generate(prompt, job_id)
 
     service.provider = Racing()
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queue.claim()
     with pytest.raises(Conflict):
         service.process(job)
@@ -178,7 +182,7 @@ def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):
         settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
     )
     service.provider = provider
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     worker = Worker(queue, service)
     assert worker.once()
     provider.close()
@@ -288,7 +292,7 @@ def test_bounded_retries_and_owner_guard(database):
             raise ProviderUnavailable("OpenAI HTTP 429")
 
     settings, engine, uow, queries, location, service, queue = setup(database, Failing())
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     worker = Worker(queue, service)
     for _ in range(settings.max_job_attempts):
         assert worker.once()
@@ -315,7 +319,7 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
         }
     )
     service.set_generation_model("gpt-4.1")
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queue.claim()
     provider = OpenAIProvider(
         settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
@@ -360,7 +364,7 @@ def test_provider_429_reason_persisted_without_response_secrets(database, code):
 
     settings, engine, uow, queries, location, service, queue = setup(database)
     settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-test-only")})
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queue.claim()
     provider = OpenAIProvider(
         settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)

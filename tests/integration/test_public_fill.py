@@ -2,13 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from involta_guide.infrastructure.ai.openai import ProviderUnavailable
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
 from .editor_fixture import FixtureEditor as EditorialService
+from .editor_fixture import enqueue_fixture
 from .test_editorial import CONTENT
 from .test_jobs import FakeAI, setup
 
@@ -87,7 +87,7 @@ def test_current_manual_data_is_never_overwritten(database):
 
 def test_admin_generation_updates_public_page_without_manual_publication(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    assert service.enqueue(location["id"]) == 1
+    assert enqueue_fixture(service, location["id"]) == 1
     assert service.enqueue_public_fill(location["id"])["state"] == "queued"
     assert queries.rows("audit", {"action": "temporary_public_fill"}) == []
     assert Worker(queue, service).once()
@@ -99,15 +99,9 @@ def test_admin_generation_updates_public_page_without_manual_publication(databas
     assert len(queries.rows("jobs")) == 1
 
 
-def test_bulk_initial_fill_skips_current_data(database):
-    _, engine, _, queries, location, service, queue = setup(database)
-    service.enqueue(location["id"])
-    assert Worker(queue, service).once()
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE locations SET active=0 WHERE id<>:id"), {"id": location["id"]})
-
-    assert service.enqueue(scope="empty") == 0
-    assert len(queries.rows("jobs")) == 1
+def test_bulk_generation_service_was_removed(database):
+    *_, service, queue = setup(database)
+    assert not hasattr(service, "enqueue")
 
 
 def test_editor_change_during_generation_is_not_overwritten(database):
@@ -156,7 +150,7 @@ def test_unpublishable_result_does_not_partially_write_or_publish(database, publ
     if public_fill:
         service.enqueue_public_fill(location["id"])
     else:
-        service.enqueue(location["id"])
+        enqueue_fixture(service, location["id"])
     assert Worker(queue, service).once()
     assert queries.rows("jobs")[0]["status"] == "failed"
     assert [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]] == []

@@ -26,3 +26,10 @@ class FixtureEditor(EditorialService):
                 },
             )
             return save(work.repo, location_id, content, expected, review_id=review_id)
+
+
+def enqueue_fixture(service, location_id):
+    """Seed a specific generation for worker tests; no public/bulk administrative API."""
+    with service.uow() as work:
+        location = work.repo.get("locations", location_id, lock=True)
+        return int(service._queue_generation(work.repo, location) is not None)

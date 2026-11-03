@@ -92,24 +92,20 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
     result = queries.restaurant_browser(location_id=ivanovo["id"])
     assert result["restaurant_cards"][0]["review_scores"]["rating"] == 7
     with TestClient(create_app(settings)) as client:
-        assert "Полное описание" not in client.get("/guide/admin?tab=restaurants").text
+        assert "Полное описание" not in client.get("/guide/admin/restaurants").text
         login(client)
-        response = client.get(
-            "/guide/admin", params={"tab": "restaurants", "location": ivanovo["id"]}
-        )
+        response = client.get("/guide/admin/restaurants", params={"location": ivanovo["slug"]})
         assert response.status_code == 200
         assert "restaurant-sidebar" in response.text and 'aria-current="page"' in response.text
-        assert response.text.index("<h3>Лидер</h3>") < response.text.index(
-            "<h3>Нулевая оценка</h3>"
-        )
+        assert response.text.index("Лидер /") < response.text.index("Нулевая оценка /")
         assert (
             "Полное описание Лидер" in response.text and "https://example.com/menu" in response.text
         )
         assert "0.0, 0.0" in response.text and "7.00" in response.text
-        fragment = client.get("/guide/admin?tab=restaurants&q=иван", headers={"HX-Request": "true"})
+        fragment = client.get("/guide/admin/restaurants?q=иван", headers={"HX-Request": "true"})
         assert fragment.status_code == 200 and "<!doctype" not in fragment.text
         assert "Казанский" not in fragment.text
-        assert client.get("/guide/admin?tab=restaurants&q=пустой").status_code == 200
+        assert client.get("/guide/admin/restaurants?q=пустой").status_code == 200
 
 
 def test_restaurant_browser_in_chromium(database, tmp_path):
@@ -164,7 +160,7 @@ def test_restaurant_browser_in_chromium(database, tmp_path):
 
         page.route("**/*", respond)
         page.goto(
-            "http://testserver/guide/admin?tab=restaurants&location=" + city["id"],
+            "http://testserver/guide/admin/restaurants?location=" + city["slug"],
             wait_until="networkidle",
         )
         assert page.locator(".restaurant-record").count() == 1
@@ -178,7 +174,7 @@ def test_restaurant_browser_in_chromium(database, tmp_path):
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         page.screenshot(path=tmp_path / "restaurant-mobile.png", full_page=True)
         page.locator(".restaurant-city", has_text="Казань").click()
-        page.wait_for_selector(".restaurant-record h3:text('Казанский ресторан')")
+        page.wait_for_selector(".restaurant-record h3:has-text('Казанский ресторан')")
         page.locator(".restaurant-city", has_text="Иваново").click()
         page.wait_for_selector(".restaurant-hours")
         page.locator("#restaurant-city-search").fill("ничего")

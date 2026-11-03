@@ -45,10 +45,11 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
     provider.client.close()
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     service.provider = provider
-    service.set_generation_model("gpt-5")
+    service.save_filling_settings("Первый промпт для будущего наполнения. " * 3, "gpt-5")
     service.enqueue_public_fill(location["id"])
     job = queries.rows("jobs")[0]
-    service.set_generation_model("gpt-4.1")
+    service.save_filling_settings("Второй промпт для будущего наполнения. " * 3, "gpt-4.1")
+    assert queries.get("jobs", job["id"])["prompt"] == "Первый промпт для будущего наполнения. " * 3
     try:
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
@@ -95,9 +96,9 @@ def test_manual_repeat_creates_new_log_and_replaces_published_page(database):
         legacy = client.get("/guide/logs/" + first["id"], follow_redirects=False)
         assert legacy.status_code == 308 and legacy.headers["location"] == "/guide/logs/ivanovo/1"
         login(client)
-        page = client.get("/guide/admin?tab=fill")
-        assert 'value="gpt-5"' in page.text and "Повторить новым запросом" in page.text
-        assert "Сохранённая модель: gpt-5" in page.text
+        page = client.get("/guide/admin/settings/filling")
+        assert 'value="gpt-5"' in page.text and "Повторить новым запросом" not in page.text
+        assert "Сохранённая модель: gpt-5" in client.get("/guide/logs/ivanovo/2").text
         assert 'value="gpt-6.1-sol"' in page.text
         assert "GPT-6 Astra" in page.text and "$0.40" in page.text
         assert "Точный ID модели OpenAI" not in page.text

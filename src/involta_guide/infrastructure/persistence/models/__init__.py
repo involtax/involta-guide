@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, Integer, SmallInteger, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, Identity, Integer, SmallInteger, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -44,6 +44,7 @@ class LocationRow(Base):
 
 class RestaurantRow(Base):
     __tablename__ = "restaurants"
+    number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
     name: Mapped[str] = mapped_column(Text)

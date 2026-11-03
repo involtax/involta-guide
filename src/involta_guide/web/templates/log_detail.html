@@ -35,7 +35,7 @@
 <form method="post" action="{{settings.path('/admin/actions/regenerate')}}" class="stack">{{csrf()}}
 <input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}">
 {{generation_model_picker('Модель нового запроса',generation_model)}}
-<small>* Сравнение цен и моделей — на вкладке «Наполнение».</small>
+<small>* Сравнение цен и моделей — в «Настройках наполнения».</small>
 <button {%if d.job.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button></form>
 {%elif d.job.status=='failed'%}
 <form method="post" action="{{settings.path('/admin/actions/retry')}}">{{csrf()}}<input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}"><button>Повторить</button></form>

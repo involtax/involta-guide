@@ -69,10 +69,11 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
         assert AIAudit(engine, settings).detail(job["id"])["job"]["stage_label"] == "Поиск неполный"
         with TestClient(create_app(settings)) as client:
             login(client)
-            for tab in ["locations", "restaurants"]:
-                html = client.get(
-                    "/guide/admin", params={"tab": tab, "location": location["id"]}
-                ).text
+            for path in [
+                "/guide/admin/locations/" + location["slug"],
+                "/guide/admin/restaurants?location=" + location["slug"],
+            ]:
+                html = client.get(path).text
                 assert "Полнота поиска" in html and "Поиск неполный" in html and "Бояре" in html
     finally:
         provider.close()
@@ -135,7 +136,7 @@ def test_partial_coverage_is_readable_in_browser_and_on_mobile(database, tmp_pat
 
             page.route("**/*", respond)
             page.goto(
-                "http://testserver/guide/admin?tab=restaurants&location=" + location["id"],
+                "http://testserver/guide/admin/restaurants?location=" + location["slug"],
                 wait_until="networkidle",
             )
             quality = page.get_by_role("region", name="Полнота поиска")

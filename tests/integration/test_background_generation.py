@@ -15,6 +15,7 @@ from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import FakeAI, setup
 from .test_web import login, token
 
@@ -31,7 +32,7 @@ def configured(database, handler, *, location_query=None):
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     service.provider = provider
     queue.settings = settings
-    service.enqueue(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queries.rows("jobs")[0]
     return settings, engine, queries, location, service, queue, provider, job
 
@@ -318,7 +319,7 @@ def test_terminal_incomplete_response_is_kept_and_not_retried(database):
 def test_background_capacity_is_bounded_across_workers(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     for city in queries.directory(query="")["rows"][:5]:
-        service.enqueue(city["id"])
+        enqueue_fixture(service, city["id"])
     with ThreadPoolExecutor(5) as pool:
         claimed = list(pool.map(lambda _: queue.claim(), range(5)))
     assert sum(job is not None for job in claimed) == settings.generation_parallel_limit

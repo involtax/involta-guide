@@ -39,7 +39,7 @@ def test_public_admin_htmx_and_csrf(database):
         assert client.get("/guide/gazprom-laura", follow_redirects=False).status_code == 308
         assert client.get("/guide/api/admin/audio/missing").status_code == 401
         csrf = login(client)
-        fragment = client.get("/guide/admin?tab=locations", headers={"HX-Request": "true"})
+        fragment = client.get("/guide/admin/locations", headers={"HX-Request": "true"})
         assert (
             fragment.status_code == 200
             and "<!doctype" not in fragment.text
@@ -60,7 +60,7 @@ def test_public_admin_htmx_and_csrf(database):
             == 403
         )
         assert client.get("/guide/admin/card").status_code == 404
-        for tab in ("fill", "reviews", "restaurants", "ratings", "contacts", "sessions"):
+        for tab in ("reviews", "ratings", "contacts"):
             response = client.get("/guide/admin?tab=" + tab)
             assert response.status_code == 200, response.text[:300]
         assert client.get("/guide/health/ready").json()["status"] == "ready"

@@ -22,7 +22,7 @@
 <article>
 <strong>{{overview.pending_reviews}}</strong> записей в очереди</article>
 </section>
-<a href="{{settings.path('/admin')}}?tab=fill">Начать наполнение ↗</a>
+<p><a href="{{settings.path('/admin/locations')}}">Все локации</a> · <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые</a> · <a href="{{settings.path('/admin/locations')}}?status=filled">Наполненные</a> · <a href="{{settings.path('/logs')}}">Логи наполнения</a></p>
 <h2>Использование OpenAI сегодня</h2>
 <p>{{overview.usage.calls}} вызовов · {{overview.usage.input_tokens}} входных / {{overview.usage.output_tokens}} выходных токенов · стоимость {{overview.usage.cost if overview.usage.cost is not none else 'не определена'}} USD · без тарифа: {{overview.usage.unpriced}}</p>
 {%endif%}
@@ -31,28 +31,17 @@
 {%endif%}
 {%if tab=='fill'%}
 <section class="panel">
-<h2>Наполнение</h2>
-<p>Пустых локаций: {{overview.empty}}</p>
-<form method="post" action="{{settings.path('/admin/actions/generation-model')}}" class="stack">{{csrf()}}
-{{generation_model_picker('Модель для новых запросов наполнения',generation_model)}}
-<p>Выбери модель из списка и сохрани. Для баланса качества и цены рекомендую GPT-6.1 Sol. Настройка действует только на новые запросы наполнения, включая публичную кнопку.</p>
-<button>Сохранить модель наполнения</button></form>
+<h2>Настройки наполнения</h2>
+<p>Промпт и модель применяются только к будущим запросам. Сохранение не запускает наполнение и не меняет текущие задания.</p>
+<form method="post" action="{{settings.path('/admin/settings/filling')}}" class="stack">{{csrf()}}
+{{generation_model_picker('Модель новых запросов наполнения',generation_model)}}
+<label>Промпт наполнения<textarea name="prompt" rows="18" minlength="50" maxlength="30000">{{prompt}}</textarea></label>
+<button>Сохранить настройки наполнения</button>
+</form>
 {%include 'model_prices.html'%}
-<form method="post" action="{{settings.path('/admin/actions/prompt')}}" class="stack">{{csrf()}}<label>Промпт генерации<textarea name="prompt" rows="18">{{prompt}}</textarea>
-</label>
-<button>Сохранить промпт</button>
-</form>
-<form method="post" action="{{settings.path('/admin/actions/generate')}}">{{csrf()}}<input type="hidden" name="model" value="{{generation_model}}"><select name="scope">
-<option value="empty">Пустые локации</option>
-<option value="all">Все локации</option>
-</select>
-<button>Поставить в очередь</button>
-</form>
-<form method="post" action="{{settings.path('/admin/actions/cancel')}}">{{csrf()}}<button>Отменить ожидающие задания</button>
-</form>
-<p>После проверки результат сразу заменяет содержимое страницы. Исходный ответ и история обработки сохраняются в логе. Наполнение пустых локаций пропускает уже заполненные страницы.</p>
+<p>Первичное наполнение запускается на публичной странице пустого города. Повторный запрос и переобработка доступны администратору в конкретном логе.</p>
+<a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
 </section>
-{%include 'jobs.html'%}
 {%endif%}
 {%if tab=='reviews'%}
 <section class="panel">

@@ -19,7 +19,7 @@ from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, c
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.web.context import Context
-from involta_guide.web.routes import admin, api, public, voice, voice_admin
+from involta_guide.web.routes import admin, admin_content, api, public, voice, voice_admin
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -133,6 +133,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(admin.routes(settings.base_path))
+    app.include_router(admin_content.routes(settings.base_path))
     app.include_router(api.routes(settings.base_path))
     app.include_router(public.routes(settings.base_path))
     app.include_router(voice.routes(settings.base_path))
