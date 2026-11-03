@@ -1,4 +1,5 @@
 <nav class="admin-tabs" aria-label="Администрирование">
+<a href="{{settings.path('/admin/voice')}}" class="{{'selected' if tab=='voice' else ''}}">Голосовые отзывы</a>
 {%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Наполнение'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
 <a href="{{settings.path('/admin')}}?tab={{key}}" class="{{'selected' if tab==key else ''}}">{{label}}</a>
 {%endfor%}

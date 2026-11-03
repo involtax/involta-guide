@@ -22,6 +22,7 @@ class ReviewService:
         content: bytes,
         mime: str,
         alex_session: str | None = None,
+        admin_session: str | None = None,
     ) -> str:
         with self.uow() as uow:
             location = require(uow.repo, "locations", location_id)
@@ -48,14 +49,16 @@ class ReviewService:
                         "device": device[:500],
                         "duration_seconds": duration,
                         "alex_session_id": alex_session,
+                        "admin_session_id": admin_session,
                     },
                 )
-                if alex_session:
+                if alex_session or admin_session:
                     repo.add(
                         "alex_changes",
                         {
                             "id": str(uuid4()),
                             "session_id": alex_session,
+                            "admin_session_id": admin_session,
                             "review_id": key,
                             "location_id": location_id,
                             "status": "queued",
@@ -78,6 +81,8 @@ class ReviewService:
     def audio(self, review_id: str, *, alex_only: bool = False) -> tuple[bytes, str]:
         with self.uow() as uow:
             row = require(uow.repo, "reviews", review_id)
-            if row["deleted_at"] or (alex_only and not row["alex_session_id"]):
+            if row["deleted_at"] or (
+                alex_only and not (row["alex_session_id"] or row.get("admin_session_id"))
+            ):
                 raise RuleViolation("Запись недоступна")
             return self.storage.read(row["audio"]), row["mime"]

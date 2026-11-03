@@ -17,7 +17,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["seed", "schema-audit", "hash-password", "retain-audio", "worker-health"],
+        choices=[
+            "seed",
+            "schema-audit",
+            "hash-password",
+            "retain-audio",
+            "worker-health",
+            "voice-consumer-health",
+        ],
     )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -25,6 +32,11 @@ def main() -> None:
         print(PasswordHasher().hash(getpass.getpass("Password: ")))
         return
     settings = Settings()
+    if args.command == "voice-consumer-health":
+        from involta_guide.infrastructure.voice.diagnostics import health
+
+        health()
+        return
     if args.command == "worker-health":
         import time
 
@@ -71,6 +83,7 @@ def main() -> None:
                     if row["created_at"] < cutoff
                     and row["status"] != "pending"
                     and row["id"] not in active
+                    and not row["audio"].startswith("voice:")
                 ]
                 print(
                     f"Audio eligible: {len(reviews)}; mode: {'execute' if args.execute else 'dry-run'}"

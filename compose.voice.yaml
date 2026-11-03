@@ -1,0 +1,63 @@
+# Local Voice deployment: own PostgreSQL cluster/role and persistent audio volume.
+# Use a digest-qualified VOICE_IMAGE for a reviewed deployment; no production workflow changes.
+services:
+  voice-db:
+    image: ${VOICE_POSTGRES_IMAGE:-postgres:17-alpine}
+    environment:
+      POSTGRES_DB: voice
+      POSTGRES_USER: voice
+      POSTGRES_PASSWORD: ${VOICE_POSTGRES_PASSWORD:?Set VOICE_POSTGRES_PASSWORD}
+    volumes: [voice-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U voice -d voice"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  voice-migrate:
+    image: ${VOICE_IMAGE:-involta-voice:local}
+    build: .
+    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    command: [voice, migrate]
+    depends_on:
+      voice-db:
+        condition: service_healthy
+    restart: "no"
+  voice-api:
+    image: ${VOICE_IMAGE:-involta-voice:local}
+    build: .
+    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    environment:
+      VOICE_DATA_DIR: /app/var/voice
+    command: [uvicorn, "involta_voice.main:create_app", --factory, --host, "0.0.0.0", --port, "3100", --no-access-log, --no-proxy-headers]
+    ports: ["127.0.0.1:3100:3100"]
+    volumes: [voice-audio:/app/var/voice]
+    depends_on:
+      voice-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3100/health/ready',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+  voice-worker:
+    image: ${VOICE_IMAGE:-involta-voice:local}
+    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    environment:
+      VOICE_DATA_DIR: /app/var/voice
+      VOICE_HEARTBEAT_FILE: /tmp/involta-voice-worker
+    command: [voice-worker]
+    stop_grace_period: 120s
+    volumes: [voice-audio:/app/var/voice]
+    depends_on:
+      voice-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, voice, worker-health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+volumes:
+  voice-postgres:
+  voice-audio:

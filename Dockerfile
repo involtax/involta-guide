@@ -37,7 +37,7 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 RUN chmod -R a+rX /app/.venv /app/data /app/migrations \
     && chmod a+r /app/alembic.ini \
-    && mkdir -p /app/var/audio \
+    && mkdir -p /app/var/audio /app/var/voice/audio \
     && chown -R guide:guide /app/var
 ENV PATH="/app/.venv/bin:$PATH" \
     ROOT_DIR=/app \

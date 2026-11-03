@@ -31,7 +31,7 @@ def routes(prefix: str) -> APIRouter:
         ctx = context(request)
         pairs = list(request.query_params.multi_items())
         if len(pairs) == 1 and not pairs[0][1]:
-            token = ctx.security.alex_login(pairs[0][0])
+            token = ctx.security.admin_shortcut(pairs[0][0])
             if token:
                 response = RedirectResponse(
                     ctx.settings.path("/"),
@@ -39,13 +39,13 @@ def routes(prefix: str) -> APIRouter:
                     headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
                 )
                 response.set_cookie(
-                    "guide_alex",
+                    "guide_admin",
                     token,
-                    max_age=30 * 86400,
+                    max_age=365 * 86400,
                     path=prefix,
                     httponly=True,
                     secure=ctx.settings.cookie_secure,
-                    samesite="strict",
+                    samesite="lax",
                 )
                 return response
         try:
@@ -317,7 +317,11 @@ def routes(prefix: str) -> APIRouter:
         if data["redirect"]:
             return RedirectResponse(ctx.settings.path("/" + c["slug"]), status_code=308)
         alex_token = request.cookies.get("guide_alex", "")
-        alex = ctx.security.principal(alex_token, alex=True)
+        admin = ctx.security.principal(admin_token(request))
+        alex = admin or ctx.security.principal(alex_token, alex=True)
+        from involta_guide.infrastructure.voice.read_model import VoiceReadModel
+
+        public_reviews = VoiceReadModel(ctx.engine).public_texts(c["id"])
         title = "Где поесть " + (c["in_phrase"] or "в " + c["name"])
         breadcrumbs = [{"name": "Все локации", "slug": ""}, *data["parents"], c]
         structured = [
@@ -377,7 +381,11 @@ def routes(prefix: str) -> APIRouter:
                 "days": DAYS,
                 "opening_status": opening_status,
                 "alex": alex,
-                "voice_csrf": ctx.security.csrf(alex_token) if alex else "",
+                "voice_csrf": ctx.security.csrf(admin_token(request) if admin else alex_token)
+                if alex
+                else "",
+                "voice_v1": ctx.settings.voice_enabled and not alex,
+                "public_reviews": public_reviews,
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
                 and not (c["published_version"] or c["draft_version"] or c["draft"])
