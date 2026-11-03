@@ -191,7 +191,11 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 # One widget uses the server session to mark administrator commands.
                 page.goto(base + "/ivanovo")
                 page.get_by_role("button", name="Записать отзыв", exact=True).click()
-                time.sleep(5.3)
+                # Permission/device startup is not recorded audio. Wait for the actual
+                # recorder timer rather than sleeping from the initial button press.
+                expect(page.locator("#guide-voice").locator(".stage .timer")).to_have_text(
+                    "00:05", timeout=15000
+                )
                 page.get_by_role("button", name="Остановить", exact=False).click()
                 page.get_by_role("button", name="Отправить отзыв").click()
                 expect(page.get_by_role("status")).to_contain_text(
