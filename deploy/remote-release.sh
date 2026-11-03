@@ -109,6 +109,13 @@ restore_previous() {
   [[ -n "$previous_sha" ]] || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
+  compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
+  wait_health "$previous_sha" "$previous_image" web || return 1
+  check_local "$previous_sha" || return 1
+  # An older worker must not turn a pending background GET into another paid POST.
+  compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
+  compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
+  wait_health "$previous_sha" "$previous_image" worker || return 1
   # Roll back Voice executors as well, retaining their current volumes/schema.
   # The gateway-compatible baseline may predate the overlay, so reuse the current
   # service definition with its reviewed previous image and no dependency recreation.
@@ -118,13 +125,6 @@ restore_previous() {
     wait_health "$target_sha" "$previous_image" voice-worker || return 1
     wait_health "$target_sha" "$previous_image" voice-consumer || return 1
   fi
-  compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
-  wait_health "$previous_sha" "$previous_image" web || return 1
-  check_local "$previous_sha" || return 1
-  # An older worker must not turn a pending background GET into another paid POST.
-  compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
-  compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
-  wait_health "$previous_sha" "$previous_image" worker || return 1
   write_state "$state_file" "$previous_sha" "$previous_image" "$previous_id"
 }
 # Never let Compose adopt a foreign container even if its name collides with ours.
