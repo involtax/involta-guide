@@ -85,11 +85,20 @@ class Queries:
             return {
                 "location": location,
                 "content": draft(repo, location),
+                "published_intro": (
+                    require(repo, "versions", location["published_version"])["content"]["intro"]
+                    if location["published_version"]
+                    else None
+                ),
                 "versions": repo.rows("versions", {"location_id": key}),
                 "available": repo.available(key),
                 "related_ids": [row["id"] for row in repo.related(key)],
                 "parents": repo.tree(key, ancestors=True),
             }
+
+    def ready_locations(self, query: str = "") -> list[Record]:
+        with self.uow() as uow:
+            return [city for city in uow.repo.restaurant_cities(query) if city["published_version"]]
 
     def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
         from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score

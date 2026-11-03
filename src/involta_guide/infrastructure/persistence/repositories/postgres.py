@@ -273,7 +273,7 @@ class PostgresRepository:
 
     def restaurant_cities(self, query: str) -> list[Record]:
         return self.query(
-            """SELECT l.id,l.name,l.region,l.slug,l.kind,
+            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.published_version,l.draft_version,
                 count(DISTINCT r.id) restaurant_count,
                 (SELECT max(v.created_at) FROM versions v WHERE v.location_id=l.id) filled_at
             FROM locations l JOIN (

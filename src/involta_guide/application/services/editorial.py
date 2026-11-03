@@ -123,6 +123,68 @@ class EditorialService:
         with self.uow() as uow:
             return save(uow.repo, location_id, content, expected)
 
+    def save_intro(
+        self,
+        location_id: str,
+        intro: str,
+        expected: str | None,
+        expected_published: str | None,
+    ) -> bool:
+        if len(intro) > 4000:
+            raise RuleViolation("Вступление: не более 4000 символов")
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", location_id, lock=True)
+            assert_revision(location["draft_version"], expected)
+            if location["published_version"] != expected_published:
+                raise Conflict(
+                    "Страница обновилась. Обновите редактор перед сохранением вступления."
+                )
+            content = draft(repo, location)
+            content["intro"] = intro
+
+            def snapshot(payload: Record, previous: str | None) -> str:
+                original = require(repo, "versions", previous) if previous else {}
+                version = str(uuid4())
+                repo.add(
+                    "versions",
+                    {
+                        "id": version,
+                        "location_id": location_id,
+                        "number": repo.next_version(location_id),
+                        "content": payload,
+                        "source": "intro",
+                        "prompt": original.get("prompt"),
+                        "model": original.get("model"),
+                    },
+                )
+                if previous:
+                    repo.inherit_reviews(previous, version)
+                return version
+
+            published = location["published_version"]
+            if published:
+                public_content = copy.deepcopy(require(repo, "versions", published)["content"])
+                public_content["intro"] = intro
+                public_version = snapshot(public_content, published)
+                # Copy the already published snapshot without revalidating or writing restaurant rows.
+                repo.change("versions", public_version, {"published": 1})
+                repo.change("locations", location_id, {"published_version": public_version})
+                version = public_version if expected == published else snapshot(content, expected)
+            else:
+                version = snapshot(content, expected)
+            repo.change(
+                "locations",
+                location_id,
+                {
+                    "intro": intro,
+                    "draft": content["restaurants"],
+                    "draft_version": version,
+                },
+            )
+            repo.audit("intro_publish" if published else "intro_draft", location_id, version)
+            return bool(published)
+
     def publish(self, location_id: str, version_id: str, expected: str | None) -> None:
         with self.uow() as uow:
             publish(uow.repo, location_id, version_id, expected)
