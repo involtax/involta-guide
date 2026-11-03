@@ -45,7 +45,8 @@ class VoiceReadModel:
         page: int = 1,
         stage: str = "",
     ) -> dict[str, Any]:
-        clauses = ["r.alex_session_id IS NULL AND r.admin_session_id IS NULL"]
+        # This is an administrator-only queue; trusted audio needs comparison too.
+        clauses = ["TRUE"]
         params: dict[str, Any] = {
             "q": "%" + query.replace("%", "\\%").replace("_", "\\_") + "%",
             "moderation": moderation,
