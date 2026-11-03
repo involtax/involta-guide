@@ -67,6 +67,8 @@ services:
     env_file: ${VOICE_ENV_FILE:-.env.voice}
     environment:
       VOICE_ASR_MODELS_DIR: /app/var/asr-models
+      HF_HOME: /tmp/huggingface
+      HF_HUB_DISABLE_XET: "1"
     command: [voice, prepare-model]
     volumes: [asr-models:/app/var/asr-models]
     restart: "no"

@@ -146,7 +146,9 @@
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
-        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models"
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
+        "HF_HOME": "/tmp/huggingface",
+        "HF_HUB_OFFLINE": "1"
       },
       "volumes": [
         "voice-audio:/app/var/voice",
@@ -253,7 +255,9 @@
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
-        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models"
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
+        "HF_HOME": "/tmp/huggingface",
+        "HF_HUB_DISABLE_XET": "1"
       },
       "volumes": [
         "asr-models:/app/var/asr-models"
