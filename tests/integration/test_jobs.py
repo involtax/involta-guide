@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -11,8 +10,6 @@ from involta_guide.domain.rules import FACTORS
 from involta_guide.infrastructure.jobs.queue import JobQueue
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
-from involta_guide.infrastructure.security import Security
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 from .editor_fixture import FixtureEditor as EditorialService
 from .editor_fixture import enqueue_fixture
@@ -55,46 +52,6 @@ class FakeAI:
             "warnings": [],
         }
 
-    def transcribe(self, path, mime, job_id):
-        return "Добавьте новый ресторан Тест"
-
-    def analyze(self, prompt, job_id, *, alex=False):
-        if alex:
-            return {
-                "actions": [
-                    {
-                        "kind": "update",
-                        "restaurantId": self.restaurant_id,
-                        "changes": {"description": "Голосовая правка", "alexStar": True},
-                    }
-                ]
-            }
-        return {
-            "entries": [
-                {
-                    "restaurantId": None,
-                    "restaurantName": "Новый",
-                    "type": "review",
-                    "text": "Предлагаю новый ресторан",
-                    "quote": "новый ресторан",
-                    "sentiment": None,
-                    "recommendation": None,
-                    "rating": None,
-                    "confidence": 0.9,
-                    "topics": ["facts"],
-                    "experience": "unknown",
-                }
-            ],
-            "suggestions": [
-                {
-                    "kind": "restaurant",
-                    "restaurantId": None,
-                    "name": "Новый",
-                    "reason": "Пользователь предложил",
-                }
-            ],
-        }
-
 
 def setup(database, provider=None):
     settings, engine = database
@@ -104,8 +61,7 @@ def setup(database, provider=None):
 
     queries = Queries(uow)
     location = queries.directory(query="Иваново")["rows"][0]
-    storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    service = JobService(uow, provider or FakeAI(), storage)
+    service = JobService(uow, provider or FakeAI())
     return settings, engine, uow, queries, location, service, JobQueue(engine, settings)
 
 
@@ -178,11 +134,10 @@ def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):
     queue.fail(job, "conflict", retry=False)
     from involta_guide.infrastructure.ai.openai import OpenAIProvider
 
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     service.provider = provider
-    enqueue_fixture(service, location["id"])
+    other = queries.directory(query="Шуя")["rows"][0]
+    enqueue_fixture(service, other["id"])
     worker = Worker(queue, service)
     assert worker.once()
     provider.close()
@@ -190,102 +145,8 @@ def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):
     assert any("OPENAI_API_KEY" in row["error"] for row in failed)
 
 
-def test_review_generates_proposals_without_publication(database):
-    settings, engine, uow, queries, location, service, queue = setup(database)
-    review_id = str(uuid4())
-    with uow() as work:
-        work.repo.add(
-            "reviews",
-            {
-                "id": review_id,
-                "location_id": location["id"],
-                "visitor": "v",
-                "audio": "fake.wav",
-                "mime": "audio/wav",
-                "hash": "h",
-                "ip_hash": "ip",
-                "device": "test",
-            },
-        )
-        work.repo.queue(
-            {
-                "id": str(uuid4()),
-                "kind": "review",
-                "location_id": location["id"],
-                "review_id": review_id,
-            }
-        )
-    job = queue.claim()
-    service.process(job)
-    review = queries.get("reviews", review_id)
-    assert review["status"] == "processed" and review["moderation"] == "pending"
-    assert len(queries.rows("proposals", {"review_id": review_id})) == 1
-    assert queries.get("locations", location["id"])["revision"] is None
-
-
-def test_alex_authority_star_rollback_and_revocation(database):
-    settings, engine, uow, queries, location, service, queue = setup(database)
-    editor = EditorialService(uow)
-    editor.save(location["id"], CONTENT, None)
-    card = queries.location(location["id"])["content"]["restaurants"][0]
-    service.provider.restaurant_id = card["id"]
-    security = Security(settings, uow)
-    token = security.alex_login(settings.alex_secret.get_secret_value())
-    session = security.principal(token, alex=True)
-
-    def queue_review():
-        review = str(uuid4())
-        with uow() as work:
-            work.repo.add(
-                "reviews",
-                {
-                    "id": review,
-                    "location_id": location["id"],
-                    "visitor": "v",
-                    "audio": "fake.wav",
-                    "mime": "audio/wav",
-                    "hash": review,
-                    "ip_hash": "ip",
-                    "device": "test",
-                    "alex_session_id": session["id"],
-                },
-            )
-            work.repo.add(
-                "alex_changes",
-                {
-                    "id": str(uuid4()),
-                    "session_id": session["id"],
-                    "review_id": review,
-                    "location_id": location["id"],
-                    "status": "queued",
-                    "detail": "queued",
-                },
-            )
-            work.repo.queue(
-                {
-                    "id": str(uuid4()),
-                    "kind": "review",
-                    "location_id": location["id"],
-                    "review_id": review,
-                }
-            )
-        return queue.claim()
-
-    service.process(queue_review())
-    published = queries.public(location["slug"])
-    assert published["content"]["restaurants"][0]["alexStar"]
-    assert published["content"]["restaurants"][0]["description"] == "Голосовая правка"
-    security.revoke(token, alex=True)
-    with pytest.raises(ValueError):
-        service.process(queue_review())
-    manual = queries.location(location["id"])
-    manual["content"]["restaurants"][0]["alexStar"] = False
-    editor.save(location["id"], manual["content"], manual["location"]["revision"])
-    assert queries.get("restaurants", card["id"])["alex_star"]
-
-
 def test_bounded_retries_and_owner_guard(database):
-    from involta_guide.infrastructure.ai.openai import ProviderUnavailable
+    from involta_guide.infrastructure.ai.errors import ProviderUnavailable
 
     class Failing(FakeAI):
         def generate(self, prompt, job_id):
@@ -294,13 +155,10 @@ def test_bounded_retries_and_owner_guard(database):
     settings, engine, uow, queries, location, service, queue = setup(database, Failing())
     enqueue_fixture(service, location["id"])
     worker = Worker(queue, service)
-    for _ in range(settings.max_job_attempts):
-        assert worker.once()
-        with engine.begin() as conn:
-            conn.execute(text("UPDATE jobs SET available_at=now() WHERE status='queued'"))
+    assert worker.once()
     assert not worker.once()
     row = queries.rows("jobs")[0]
-    assert row["status"] == "failed" and row["attempts"] == settings.max_job_attempts
+    assert row["status"] == "failed" and row["attempts"] == 1
     assert row["error"] == "OpenAI HTTP 429"
 
 
@@ -321,9 +179,7 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
     service.set_generation_model("gpt-4.1")
     enqueue_fixture(service, location["id"])
     job = queue.claim()
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     captured = []
 
     def handler(request):
@@ -346,8 +202,11 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     assert provider.generate("test prompt", job["id"]) == {"ok": True}
     assert provider.generate("test prompt", job["id"]) == {"ok": True}
+    other = queries.directory(query="Шуя")["rows"][0]
+    enqueue_fixture(service, other["id"])
+    other_job = next(j for j in queries.rows("jobs") if j["location_id"] == other["id"])
     with pytest.raises(ValueError):
-        provider.generate("another", str(uuid4()))
+        provider.generate("another", other_job["id"])
     usage = queries.rows("ai_usage")[0]
     assert usage["input_tokens"] == 100 and usage["output_tokens"] == 50
     assert usage["estimated_cost_usd"] == 0.0002
@@ -360,15 +219,14 @@ def test_provider_429_reason_persisted_without_response_secrets(database, code):
     import httpx
     from pydantic import SecretStr
 
-    from involta_guide.infrastructure.ai.openai import OpenAIProvider, ProviderUnavailable
+    from involta_guide.infrastructure.ai.errors import ProviderUnavailable
+    from involta_guide.infrastructure.ai.openai import OpenAIProvider
 
     settings, engine, uow, queries, location, service, queue = setup(database)
     settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-test-only")})
     enqueue_fixture(service, location["id"])
     job = queue.claim()
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     provider.client.close()
     provider.client = httpx.Client(
         transport=httpx.MockTransport(

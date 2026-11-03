@@ -1,3 +1,5 @@
+> Архитектурные положения этого документа заменены [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md). Текущая реализация: [CURRENT_STATE.md](CURRENT_STATE.md); переход: [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md).
+
 # PR8 revision: whole review package
 
 Supersedes the draft/partial-acceptance sections of VOICE_SERVICE_SPEC.md@90c396f.

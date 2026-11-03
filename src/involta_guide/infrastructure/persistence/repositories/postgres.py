@@ -12,7 +12,7 @@ from involta_guide.domain.rules import KINDS, similarity
 
 from ..models import Base
 
-PUBLIC = """(l.listed OR l.id IN (WITH RECURSIVE useful AS (SELECT id,parent_id FROM locations WHERE active=1 AND jsonb_array_length(page_data->'restaurants')>0 UNION SELECT p.id,p.parent_id FROM locations p JOIN useful u ON p.id=u.parent_id WHERE p.active=1) SELECT id FROM useful))"""
+PUBLIC = """(l.listed OR l.id IN (WITH RECURSIVE useful AS (SELECT id,parent_id FROM locations WHERE active=1 AND initialized_at IS NOT NULL UNION SELECT p.id,p.parent_id FROM locations p JOIN useful u ON p.id=u.parent_id WHERE p.active=1) SELECT id FROM useful))"""
 
 
 def row_dict(row: Any) -> Record:
@@ -26,7 +26,9 @@ class PostgresRepository:
         self.session = session
 
     def health(self) -> None:
-        self.session.execute(text("SELECT 1"))
+        pending = self.session.execute(text("SELECT count(*) FROM beta_cleanup_files")).scalar_one()
+        if pending:
+            raise RuleViolation("Переход БД не завершён: выполните явную очистку Guide-аудио")
 
     def table(self, name: str) -> Any:
         return Base.metadata.tables[name]
@@ -140,14 +142,14 @@ class PostgresRepository:
         if options.get("public_only"):
             clauses.append(PUBLIC)
         if options.get("filled_only"):
-            clauses.append("jsonb_array_length(l.page_data->'restaurants')>0")
+            clauses.append("l.initialized_at IS NOT NULL")
         if status in ("active", "inactive"):
             clauses.append("l.active=:active")
             params["active"] = int(status == "active")
         elif status == "empty":
-            clauses.append("l.page_data->'restaurants'='[]'::jsonb")
+            clauses.append("l.initialized_at IS NULL")
         elif status in ("published", "filled"):
-            clauses.append("jsonb_array_length(l.page_data->'restaurants')>0")
+            clauses.append("l.initialized_at IS NOT NULL")
         elif status == "hidden":
             clauses.append("NOT l.listed")
         if q:
@@ -194,8 +196,8 @@ class PostgresRepository:
     def allowed(self, restaurant_id: str, location_id: str) -> bool:
         return bool(
             self.query(
-                """WITH RECURSIVE tree AS (SELECT id FROM locations WHERE id=:location UNION ALL SELECT l.id FROM locations l JOIN tree t ON l.parent_id=t.id) SELECT r.id FROM restaurants r WHERE r.id=:restaurant AND (r.location_id IN(SELECT id FROM tree) OR EXISTS(SELECT 1 FROM restaurant_locations rl WHERE rl.restaurant_id=r.id AND rl.location_id=:location))""",
-                {"location": location_id, "restaurant": restaurant_id},
+                "SELECT 1 FROM restaurants WHERE id=:restaurant AND location_id=:location",
+                {"restaurant": restaurant_id, "location": location_id},
             )
         )
 
@@ -212,54 +214,28 @@ class PostgresRepository:
         for key in set(related):
             self.link("location_relations", {"location_id": location_id, "related_id": key})
 
-    def lock_locations(self) -> list[Record]:
-        return self.query("SELECT * FROM locations ORDER BY id FOR UPDATE")
-
     def available(self, location_id: str) -> list[Record]:
-        result: dict[str, Record] = {}
-        for area in self.tree(location_id):
-            if not area["active"] or not area["page_data"].get("restaurants"):
-                continue
-            from involta_guide.application.services.editorial import current_content
+        from involta_guide.application.services.editorial import current_content
 
-            for card in current_content(self, area)["restaurants"]:
-                result[card["id"]] = card
-        for relation in self.rows(
-            "restaurant_locations", {"location_id": location_id}, limit=10000
-        ):
-            card = self.get("restaurants", relation["restaurant_id"])
-            if card and card["location_id"] != location_id and card["id"] not in result:
-                # Explicit links may be selected by an editor; never expose unpublished descriptions from descendants implicitly.
-                result[card["id"]] = {
-                    "id": card["id"],
-                    "locationId": card["location_id"],
-                    "name": card["name"],
-                    "cuisine": card["cuisine"],
-                    "description": card["description"],
-                    "mapsUrl": card["maps_url"],
-                    "sources": card["sources"],
-                    "phone": card["phone"],
-                    "openingHours": card["opening_hours"],
-                    "alexStar": card["alex_star"],
-                }
-        return list(result.values())
+        location = self.get("locations", location_id)
+        return (
+            current_content(self, location)["restaurants"]
+            if location and not location["is_hub"]
+            else []
+        )
 
     def known(self, location_id: str) -> list[Record]:
         return self.query(
-            """WITH RECURSIVE tree AS (SELECT id FROM locations WHERE id=:id UNION ALL SELECT l.id FROM locations l JOIN tree t ON l.parent_id=t.id) SELECT r.id,r.name,r.location_id FROM restaurants r WHERE r.active=1 AND (r.location_id IN(SELECT id FROM tree) OR EXISTS(SELECT 1 FROM restaurant_locations rl WHERE rl.restaurant_id=r.id AND rl.location_id=:id))""",
+            "SELECT id,name,location_id FROM restaurants WHERE location_id=:id AND active=1",
             {"id": location_id},
         )
 
     def restaurant_cities(self, query: str) -> list[Record]:
         return self.query(
-            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.revision,l.page_data,
+            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.revision,l.initialized_at,
                 count(DISTINCT r.id) restaurant_count,
                 l.updated_at filled_at
-            FROM locations l JOIN (
-                SELECT location_id,restaurant_id FROM restaurant_locations
-                UNION SELECT location_id,id FROM restaurants
-            ) membership ON membership.location_id=l.id
-            JOIN restaurants r ON r.id=membership.restaurant_id
+            FROM locations l JOIN restaurants r ON r.location_id=l.id
             WHERE translate(lower(l.name||' '||l.region||' '||array_to_string(l.aliases,' ')),
                 'ё','е') LIKE :q
             GROUP BY l.id ORDER BY filled_at DESC NULLS LAST,l.name,l.id""",
@@ -278,31 +254,27 @@ class PostgresRepository:
     def city_restaurants(self, location_id: str) -> list[Record]:
         return self.query(
             """SELECT r.*,l.name location_name,
-                (SELECT jsonb_agg(jsonb_build_object('id',v.id,'created_at',v.created_at,
-                    'moderation',v.moderation,'fraud',v.fraud,'transcript',v.transcript,
-                    'entries',(SELECT jsonb_agg(e) FROM jsonb_array_elements(
-                        coalesce(v.result->'entries','[]'::jsonb)) e
-                        WHERE e->>'restaurantId'=r.id::text)) ORDER BY v.created_at DESC)
-                 FROM reviews v WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(
-                    coalesce(v.result->'entries','[]'::jsonb)) e
-                    WHERE e->>'restaurantId'=r.id::text)) reviews,
-                (SELECT jsonb_agg(jsonb_build_object('id',a.id,'name',a.name,'slug',a.slug)
-                    ORDER BY a.name) FROM locations a
-                    WHERE a.id=r.location_id OR EXISTS(SELECT 1 FROM restaurant_locations rl
-                        WHERE rl.location_id=a.id AND rl.restaurant_id=r.id)) collections
-            FROM restaurants r JOIN locations l ON l.id=r.location_id
-            WHERE r.location_id=:id OR EXISTS(SELECT 1 FROM restaurant_locations rl
-                WHERE rl.restaurant_id=r.id AND rl.location_id=:id)
-            ORDER BY lower(r.name),r.id""",
+          (SELECT jsonb_agg(jsonb_build_object('id',v.id,'created_at',v.created_at,'moderation',v.moderation,
+            'fraud',v.fraud,'transcript',v.transcript,'entries',(SELECT jsonb_agg(f.fragment)
+            FROM voice_fragments f LEFT JOIN review_fragment_bindings b USING(review_id,run,number)
+            WHERE f.review_id=v.id AND f.run=vl.active_run AND CASE WHEN b.review_id IS NOT NULL
+            THEN b.restaurant_id ELSE f.restaurant_id END=r.id)))
+           FROM reviews v JOIN voice_links vl ON vl.review_id=v.id WHERE v.location_id=l.id AND EXISTS(
+            SELECT 1 FROM voice_fragments f LEFT JOIN review_fragment_bindings b USING(review_id,run,number)
+            WHERE f.review_id=v.id AND f.run=vl.active_run AND CASE WHEN b.review_id IS NOT NULL
+            THEN b.restaurant_id ELSE f.restaurant_id END=r.id)) reviews,
+          jsonb_build_array(jsonb_build_object('id',l.id,'name',l.name,'slug',l.slug)) collections
+          FROM restaurants r JOIN locations l ON l.id=r.location_id WHERE r.location_id=:id
+          ORDER BY r.position,r.number""",
             {"id": location_id},
         )
 
     def summary(self) -> Record:
         result = self.query(
-            "SELECT count(*) total,count(*) FILTER (WHERE page_data->'restaurants'='[]'::jsonb) empty,count(*) FILTER (WHERE jsonb_array_length(page_data->'restaurants')>0) published FROM locations"
+            "SELECT count(*) total,count(*) FILTER (WHERE initialized_at IS NULL) empty,count(*) FILTER (WHERE initialized_at IS NOT NULL) published FROM locations"
         )[0]
         result["pending_reviews"] = self.query(
-            "SELECT count(*) n FROM reviews WHERE status='pending'"
+            "SELECT count(*) n FROM reviews WHERE moderation='pending'"
         )[0]["n"]
         result["jobs"] = self.query("SELECT status,count(*) n FROM jobs GROUP BY status")
         result["usage"] = self.query(
@@ -318,7 +290,7 @@ class PostgresRepository:
             ratio = similarity(review["transcript"], other["transcript"])
             same = other["hash"] == review["hash"]
             visitor = other["visitor"] == review["visitor"]
-            ip = other["ip_hash"] == review["ip_hash"]
+            ip = other["ip"] == review["ip"]
             if ratio >= 0.45 or same or visitor or ip:
                 matches.append(
                     {
@@ -333,7 +305,7 @@ class PostgresRepository:
 
     def phone_proposals(self) -> list[Record]:
         return self.query(
-            """SELECT p.payload->>'restaurantId' restaurant_id,p.payload->>'phone' phone,max(r.name) restaurant_name,max(r.phone) current_phone,count(*) messages,count(DISTINCT v.visitor) visitors,count(DISTINCT v.ip_hash) networks,count(*) FILTER (WHERE v.fraud=1) fraud,count(*) FILTER (WHERE v.moderation='approved' AND v.fraud=0) approved,jsonb_agg(jsonb_build_object('reviewId',v.id,'date',v.created_at,'reason',p.payload->>'reason','status',p.status)) evidence FROM proposals p JOIN reviews v ON v.id=p.review_id LEFT JOIN restaurants r ON r.id::text=p.payload->>'restaurantId' WHERE coalesce(p.payload->>'phone','')<>'' GROUP BY p.payload->>'restaurantId',p.payload->>'phone' ORDER BY max(v.created_at) DESC LIMIT 200"""
+            """SELECT p.restaurant_id restaurant_id,p.payload->>'phone' phone,max(r.name) restaurant_name,max(r.phone) current_phone,count(*) messages,count(DISTINCT v.visitor) visitors,count(DISTINCT v.ip) networks,count(*) FILTER (WHERE v.fraud=1) fraud,count(*) FILTER (WHERE v.moderation='approved' AND v.fraud=0) approved,jsonb_agg(jsonb_build_object('reviewId',v.id,'date',v.created_at,'reason',p.payload->>'reason','status',p.status)) evidence FROM proposals p JOIN reviews v ON v.id=p.review_id LEFT JOIN restaurants r ON r.id=p.restaurant_id WHERE coalesce(p.payload->>'phone','')<>'' GROUP BY p.restaurant_id,p.payload->>'phone' ORDER BY max(v.created_at) DESC LIMIT 200"""
         )
 
     def queue(self, values: Record) -> bool:
@@ -374,9 +346,3 @@ class PostgresRepository:
                 {"id": job_id, "owner": owner},
             )
         )
-
-    def guard_pending(self, limit: int) -> None:
-        self.session.execute(text("SELECT pg_advisory_xact_lock(47031008)"))
-        count = self.query("SELECT count(*) n FROM reviews WHERE status='pending'")[0]["n"]
-        if count >= limit:
-            raise RuleViolation("Очередь заполнена. Попробуйте позже.")

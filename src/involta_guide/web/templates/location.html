@@ -60,7 +60,7 @@
 <h1>Где поесть <br>
 <span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
 </h1>
-<p class="lead">{{content.intro or ('Выберите район или курорт ниже. Здесь появится общая редакционная подборка направления.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
+<p class="lead">{{content.intro or ('Выберите район или курорт ниже.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
 {%if location.coverage_note%}
 <p class="coverage">{{location.coverage_note}}</p>
 {%endif%}
@@ -125,11 +125,7 @@
 </section>
 {%endif%}
 {%if public_reviews%}<section aria-label="Отзывы посетителей"><h2>Отзывы посетителей</h2>{%for review in public_reviews%}<article>{%if review.restaurant_name%}<h3>{{review.restaurant_name}}</h3>{%endif%}<p>{{review.editorial_text}}</p><small>{{review.created_at.strftime('%d.%m.%Y')}}</small></article>{%endfor%}</section>{%endif%}
-{%if alex%}
-<p>Режим Алекса: голосовая команда изменит страницу сразу. <a href="{{settings.path('/alex')}}">Журнал ↗</a>
-</p>
-{%endif%}
-<div id="guide-voice"></div>
+{%if not location.is_hub%}<div id="guide-voice"></div>{%endif%}
 <script type="application/ld+json">{{structured|tojson}}</script>
 </main>
 {%endblock%}
@@ -139,5 +135,5 @@
 {%endif%}
 <script type="module" src="{{settings.path('/assets/hours.js')}}">
 </script>
-<script defer src="{{settings.path('/voice/widget.v1.js')}}?v={{settings.release_sha}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}" data-actor="{{'admin' if alex else 'visitor'}}"></script>
+{%if not location.is_hub%}<script defer src="{{settings.path('/voice/widget.v1.js')}}?v={{settings.release_sha}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}" data-content-epoch="{{location.content_epoch}}"></script>{%endif%}
 {%endblock%}

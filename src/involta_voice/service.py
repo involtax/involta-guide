@@ -11,16 +11,20 @@ from .errors import VoiceError
 from .storage import AudioStorage
 
 
-def rate_limit(conn: Connection, key: str, limit: int, seconds: int) -> None:
+def rate_limit(
+    conn: Connection, key: str, limit: int, seconds: int, location: str, epoch: int
+) -> None:
     value = row(
         conn,
-        """INSERT INTO intake_windows(key,count) VALUES(:key,1)
+        """INSERT INTO intake_windows(key,count,location_id,content_epoch) VALUES(:key,1,:location,:epoch)
         ON CONFLICT(key) DO UPDATE SET
         count=CASE WHEN intake_windows.started_at<now()-make_interval(secs=>:seconds)
           THEN 1 ELSE intake_windows.count+1 END,
         started_at=CASE WHEN intake_windows.started_at<now()-make_interval(secs=>:seconds)
           THEN now() ELSE intake_windows.started_at END RETURNING count""",
-        key=key,
+        key=location + ":" + str(epoch) + ":" + key,
+        location=location,
+        epoch=epoch,
         seconds=seconds,
     )
     if value and value["count"] > limit:
@@ -33,40 +37,41 @@ class VoiceService:
         self.settings = settings
         self.storage = AudioStorage(settings)
 
-    def submit(
-        self, metadata: SubmissionMetadata, content: bytes, mime: str, purpose: str = "review"
-    ) -> dict[str, Any]:
-        if purpose not in ("review", "guide_transcription"):
-            raise VoiceError("Неподдерживаемое назначение записи")
+    def submit(self, metadata: SubmissionMetadata, content: bytes, mime: str) -> dict[str, Any]:
+        from .reset import lock_epoch
+
         sha = hashlib.sha256(content).hexdigest()
+        location = str(metadata.location.id)
+        epoch = metadata.location.content_epoch
         payload_hash = hashlib.sha256(
             encoded(
                 {
-                    "purpose": purpose,
                     "sha256": sha,
                     "mime": mime,
-                    "location": str(metadata.location.id),
+                    "location": location,
+                    "content_epoch": epoch,
                     "language": metadata.language,
                     "timezone": metadata.timezone,
                 }
             ).encode()
         ).hexdigest()
         visitor, key = metadata.visitor, str(metadata.idempotency_key)
-        with self.engine.connect() as conn:
-            old = row(
-                conn,
-                "SELECT * FROM submissions WHERE visitor=:visitor AND idempotency_key=:key",
-                visitor=visitor,
-                key=key,
-            )
-        if old:
-            self._same(old, payload_hash)
-            return self.status(str(old["reference"]), visitor)
-        name, duration = self.storage.save(content, mime)
         reference = str(uuid4())
+        name = None
         try:
             with self.engine.begin() as conn:
-                execute(conn, "SELECT pg_advisory_xact_lock(47032002)")
+                if row(conn, "SELECT 1 FROM purge_files WHERE content_epoch=1 LIMIT 1"):
+                    raise VoiceError(
+                        "Переход Voice не завершён; требуется очистка файлов",
+                        "transition_pending",
+                        503,
+                    )
+                lock_epoch(conn, location, epoch)
+                execute(
+                    conn,
+                    "SELECT pg_advisory_xact_lock(hashtextextended(:key,0))",
+                    key=visitor + key,
+                )
                 old = row(
                     conn,
                     "SELECT * FROM submissions WHERE visitor=:visitor AND idempotency_key=:key",
@@ -77,8 +82,8 @@ class VoiceService:
                     self._same(old, payload_hash)
                     reference = str(old["reference"])
                 else:
-                    rate_limit(conn, "visitor:" + visitor, 6, 900)
-                    rate_limit(conn, "ip:" + metadata.ip_fingerprint, 30, 3600)
+                    rate_limit(conn, "visitor:" + visitor, 6, 900, location, epoch)
+                    rate_limit(conn, "ip:" + metadata.ip, 30, 3600, location, epoch)
                     pending = row(
                         conn, "SELECT count(*) n FROM stages WHERE state IN ('queued','running')"
                     )
@@ -86,22 +91,26 @@ class VoiceService:
                         raise VoiceError("Очередь заполнена", "queue_full", 429)
                     signals = row(
                         conn,
-                        """SELECT count(*) same_audio,
-                        count(*) FILTER(WHERE visitor=:visitor) same_visitor
-                        FROM (SELECT visitor,sha256 FROM submissions ORDER BY created_at DESC LIMIT 500) s
-                        WHERE sha256=:sha""",
+                        "SELECT count(*) same_audio,count(*) FILTER(WHERE visitor=:visitor) same_visitor FROM submissions WHERE sha256=:sha",
                         visitor=visitor,
                         sha=sha,
                     )
+                    extension = {
+                        "audio/webm": "webm",
+                        "audio/ogg": "ogg",
+                        "audio/mp4": "mp4",
+                        "audio/wav": "wav",
+                    }.get(mime, "invalid")
+                    name = f"{location}.{epoch}.{reference}.{extension}"
+                    name, duration = self.storage.save(content, mime, name=name)
                     execute(
                         conn,
-                        """INSERT INTO submissions(reference,location_id,visitor,idempotency_key,
-                        payload_hash,metadata,audio,mime,duration,size,sha256,repeat_signals,purpose)
-                        VALUES(:id,:location,:visitor,:key,:hash,CAST(:metadata AS jsonb),:audio,
-                        :mime,:duration,:size,:sha,CAST(:signals AS jsonb),:purpose)""",
-                        purpose=purpose,
+                        """INSERT INTO submissions(reference,location_id,content_epoch,visitor,idempotency_key,
+                      payload_hash,metadata,audio,mime,duration,size,sha256,repeat_signals)
+                      VALUES(:id,:location,:epoch,:visitor,:key,:hash,CAST(:metadata AS jsonb),:audio,:mime,:duration,:size,:sha,CAST(:signals AS jsonb))""",
                         id=reference,
-                        location=str(metadata.location.id),
+                        location=location,
+                        epoch=epoch,
                         visitor=visitor,
                         key=key,
                         hash=payload_hash,
@@ -114,12 +123,11 @@ class VoiceService:
                         signals=encoded(signals or {}),
                     )
                     self._new_run(conn, reference, None)
-            if old:
-                self.storage.path(name).unlink(missing_ok=True)
         except VoiceError:
-            self.storage.path(name).unlink(missing_ok=True)
+            if name:
+                self.storage.path(name).unlink(missing_ok=True)
             raise
-        # On ambiguous database commit failure retain the file; orphan GC proves it unreferenced later.
+        # An ambiguous commit retains an owner+epoch filename, discoverable by reset/GC.
         return self.status(reference, visitor)
 
     @staticmethod
@@ -175,21 +183,17 @@ class VoiceService:
         self, reference: str, request_key: str | None = None, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            if row(conn, "SELECT 1 FROM archive_map WHERE submission=:id", id=reference):
-                raise VoiceError(
-                    "Архивная копия доступна только для чтения; исходная запись остаётся в Guide",
-                    "conflict",
-                    409,
-                )
+            submission = row(conn, "SELECT * FROM submissions WHERE reference=:id", id=reference)
+            if not submission:
+                raise VoiceError("Запись не найдена", "not_found", 404)
+            from .reset import lock_epoch
+
+            lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
             submission = row(
                 conn, "SELECT * FROM submissions WHERE reference=:id FOR UPDATE", id=reference
             )
             if not submission:
                 raise VoiceError("Запись не найдена", "not_found", 404)
-            if submission["purpose"] != "review":
-                raise VoiceError(
-                    "Внутренняя расшифровка Guide не создаёт обработки анализа", "conflict", 409
-                )
             previous = (
                 row(
                     conn,
@@ -235,9 +239,6 @@ class VoiceService:
                 id=reference,
                 n=submission["active_run"],
             )
-            archived = row(
-                conn, "SELECT source_review FROM archive_map WHERE submission=:id", id=reference
-            )
             delivery = row(
                 conn,
                 "SELECT coalesce(max(sequence),0) n FROM outbox WHERE submission=:id AND run=:n",
@@ -267,9 +268,7 @@ class VoiceService:
         )
         if failed and failed["kind"] == "transcription" and fallback_pending:
             failed = None
-        if archived:
-            state = "archived"
-        elif failed:
+        if failed:
             state = failed["kind"] + "_" + failed["state"]
         elif run and run["result"] is not None:
             state = (
@@ -278,7 +277,7 @@ class VoiceService:
                 else "result_ready"
             )
         elif submission["transcript"] is not None:
-            state = "result_ready" if submission["purpose"] == "guide_transcription" else "analysis"
+            state = "analysis"
         elif any(s["state"] == "running" for s in current):
             state = "transcription"
         else:
@@ -312,8 +311,7 @@ class VoiceService:
             items = (
                 conn.execute(
                     text("""SELECT reference FROM submissions
-                WHERE purpose='review' AND (CAST(:visitor AS text) IS NULL OR visitor=CAST(:visitor AS text))
-                AND NOT EXISTS(SELECT 1 FROM archive_map a WHERE a.submission=submissions.reference)
+                WHERE (CAST(:visitor AS text) IS NULL OR visitor=CAST(:visitor AS text))
                 ORDER BY created_at DESC,reference LIMIT 30 OFFSET :offset"""),
                     {"visitor": visitor, "offset": (page - 1) * 30},
                 )
@@ -341,7 +339,7 @@ class VoiceService:
         }
         event_id = str(uuid4())
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "event_id": event_id,
             "kind": kind,
             "reference": reference,

@@ -18,7 +18,6 @@ guide-worker = "involta_guide.infrastructure.jobs.worker:main"
 voice = "involta_voice.cli:main"
 voice-worker = "involta_voice.worker:main"
 guide-voice-consumer = "involta_guide.infrastructure.voice.consumer:main"
-guide-voice-asr-backfill = "involta_guide.infrastructure.voice.backfill:main"
 [dependency-groups]
 dev = [
     "pytest>=8",

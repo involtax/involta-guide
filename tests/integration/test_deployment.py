@@ -58,6 +58,7 @@ if args[0]=='compose':
  if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
   operation=args[-1]
   if operation=='needed':print(os.getenv('FAKE_CUTOVER','no'))
+  elif operation=='compatibility':print(os.getenv('FAKE_COMPATIBILITY','previous'))
   elif operation=='backup':print('test-dump')
   elif operation=='restore':sys.stdin.read()
   sys.exit(0)
@@ -372,4 +373,41 @@ def test_first_voice_release_requires_backup_and_rolls_back_without_old_voice_wo
     assert any(
         "restore" in args and "involta_guide.infrastructure.persistence.release_backup" in args
         for args in calls
+    )
+
+
+def test_incompatible_beta_transition_is_refused_before_schema_changes(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    result = deploy(root, {**env, "FAKE_CUTOVER": "manual-beta-transition"}, B, "2-1")
+    assert result.returncode != 0
+    assert "coordinated Guide + Voice" in result.stderr
+    commands = Path(str(state) + ".log").read_text().splitlines()
+    operations = [json.loads(line) for line in commands]
+    assert not any("alembic" in call[1] and call[2] == B for call in operations)
+    assert (root / "current-release").read_text().split()[0] == A
+
+
+def test_image_only_rollback_never_starts_pre_beta_image_on_beta_database(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    log = Path(str(state) + ".log")
+    before = len(log.read_text().splitlines())
+    result = deploy(
+        root,
+        {
+            **env,
+            "FAKE_FAIL_SHA": B,
+            "FAKE_COMPATIBILITY": "beta",
+            "FAKE_PRE_VOICE_IMAGE": IMAGES[A],
+        },
+        B,
+        "2-1",
+    )
+    assert result.returncode != 0
+    assert "Image-only rollback across beta_core is incompatible" in result.stderr
+    commands = [json.loads(line) for line in log.read_text().splitlines()[before:]]
+    assert not any(
+        call[0] == "docker" and "compose" in call[1] and "up" in call[1] and call[2] == A
+        for call in commands
     )

@@ -55,6 +55,10 @@ def migrate(engine: Engine) -> None:
             conn.exec_driver_sql(
                 (Path(__file__).parent / "migrations/003_asr_beta.sql").read_text()
             )
+        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=4"):
+            conn.exec_driver_sql(
+                (Path(__file__).parent / "migrations/004_beta_core.sql").read_text()
+            )
 
 
 def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
@@ -72,7 +76,7 @@ def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
         "asr_models": {e: options(settings, e) for e in MODELS},
         "asr_beta": settings.asr_beta_enabled,
         "fake_provider": settings.fake_provider,
-        "schema_version": 1,
+        "schema_version": 2,
         "transcription_model": selected,
         "analysis_model": saved.get("analysis_model", settings.analysis_model),
         "prompt": saved.get("prompt", DEFAULT_PROMPT),

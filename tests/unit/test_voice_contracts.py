@@ -13,6 +13,7 @@ def test_rating_is_not_invented_from_positive_words_and_fragments_do_not_overlap
         id=uuid4(),
         slug="ivanovo",
         name="Иваново",
+        content_epoch=1,
         restaurants=[RestaurantContext(id=restaurant, name="Огонёк")],
     )
     transcript = "Был в Огоньке сегодня, было вкусно"
@@ -53,7 +54,7 @@ def test_rating_is_not_invented_from_positive_words_and_fragments_do_not_overlap
 
 
 def test_explicit_rating_and_unfinished_restaurant_suggestion_are_valid():
-    context = LocationContext(id=uuid4(), slug="ivanovo", name="Иваново")
+    context = LocationContext(id=uuid4(), slug="ivanovo", name="Иваново", content_epoch=1)
     transcript = "Оценка 8 из 10, кафе новое"
     result = validate_analysis(
         {

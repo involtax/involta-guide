@@ -3,26 +3,20 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import httpx
-from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from involta_guide.domain.entities import Conflict
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
-from involta_guide.main import create_app
 
 from .test_jobs import FakeAI, setup
-from .test_web import login
 
 
 def test_model_snapshot_changes_generation_only_and_records_actual_model(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-no-paid-calls")})
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     captured = []
 
     def handler(request):
@@ -50,58 +44,16 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
     job = queries.rows("jobs")[0]
     service.save_filling_settings("Второй промпт для будущего наполнения. " * 3, "gpt-4.1")
     assert queries.get("jobs", job["id"])["prompt"] == "Первый промпт для будущего наполнения. " * 3
+    with engine.begin() as conn:
+        conn.execute(__import__("sqlalchemy").text("DELETE FROM audit"))
     try:
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
         assert queries.rows("ai_usage")[0]["model"] == "gpt-5"
-        provider.analyze("Analyze independently", job["id"])
-        assert [r["model"] for r in captured] == ["gpt-5", settings.openai_model]
+        assert [r["model"] for r in captured] == ["gpt-5"]
         assert provider.model == settings.openai_model
     finally:
         provider.close()
-
-
-def test_manual_repeat_creates_new_log_and_replaces_published_page(database):
-    settings, engine, uow, queries, location, service, queue = setup(database)
-    service.enqueue_public_fill(location["id"])
-    first = queries.rows("jobs")[0]
-    assert Worker(queue, service).once()
-    published = queries.get("locations", location["id"])["revision"]
-    service.set_generation_model("gpt-5")
-    prompt = "Новый промт для повторного наполнения: проверить источники и телефоны."
-    service.set_prompt(prompt)
-    new_id = service.regenerate(first["id"])
-    assert new_id != first["id"]
-    assert queries.get("jobs", first["id"])["status"] == "done"
-    assert queries.get("jobs", new_id)["prompt"] == prompt
-    assert Worker(queue, service).once()
-    location_after = queries.get("locations", location["id"])
-    assert location_after["revision"] != published
-    assert location_after["revision"] == location_after["revision"]
-    audit = AIAudit(engine, settings)
-    assert audit.resolve("ivanovo", 1, public_only=True) == first["id"]
-    assert audit.resolve("ivanovo", 2, public_only=True) == new_id
-    detail = audit.detail(new_id)
-    assert detail["job"]["model_name"] == "gpt-5"
-    assert detail["job"]["generation_config"]["previous_number"] == 1
-    assert (
-        detail["changes"] == []
-    )  # Identical response keeps the same restaurant; no artificial diff.
-    assert len(queries.rows("restaurants")) == 1
-    assert detail["job"]["applied"]
-    assert detail["job"]["generation_config"]["model"] == "gpt-5"
-    with TestClient(create_app(settings)) as client:
-        assert client.get("/guide/logs/ivanovo/2").status_code == 200
-        assert client.get("/guide/logs/ivanovo/2.json").json()["job"]["id"] == new_id
-        legacy = client.get("/guide/logs/" + first["id"], follow_redirects=False)
-        assert legacy.status_code == 308 and legacy.headers["location"] == "/guide/logs/ivanovo/1"
-        login(client)
-        page = client.get("/guide/admin/settings/filling")
-        assert 'value="gpt-5"' in page.text and "Повторить новым запросом" not in page.text
-        assert "Сохранённая модель: gpt-5" in client.get("/guide/logs/ivanovo/2").text
-        assert 'value="gpt-6.1-sol"' in page.text
-        assert "GPT-6 Astra" in page.text and "$0.40" in page.text
-        assert "Точный ID модели OpenAI" not in page.text
 
 
 def test_legacy_numbers_remain_stable_when_backfilled_and_repeated(database):
@@ -148,6 +100,56 @@ def test_concurrent_manual_repeats_get_one_new_number_and_preserve_old_failure(d
     assert audit.resolve("ivanovo", 2) == new_id
     assert audit.detail(old["id"])["job"]["error"] == "Original failure"
     queue.fail(queue.claim(), "Second failure", retry=False)
-    service.retry(new_id)
+    service.regenerate(new_id)
     assert audit.resolve("ivanovo", 3)
     assert queries.get("jobs", new_id)["status"] == "failed"
+
+
+def test_reset_deletion_cannot_erase_daily_provider_limits(database):
+    import pytest
+    from sqlalchemy import text
+
+    from involta_guide.domain.entities import RuleViolation
+
+    settings, engine, uow, queries, city, service, queue = setup(database)
+    settings = settings.model_copy(
+        update={"openai_api_key": SecretStr("fake-limit-test"), "daily_ai_calls": 1}
+    )
+    provider = OpenAIProvider(settings, engine)
+    calls = []
+
+    def handle(request):
+        calls.append(request.method)
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_limit",
+                "status": "completed",
+                "output": [
+                    {
+                        "content": [
+                            {"type": "output_text", "text": json.dumps(FakeAI().generate("", ""))}
+                        ]
+                    }
+                ],
+            },
+        )
+
+    provider.client.close()
+    provider.client = httpx.Client(transport=httpx.MockTransport(handle))
+    service.provider = provider
+    try:
+        service.enqueue_public_fill(city["id"])
+        assert Worker(queue, service).once()
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM generation_requests"))
+            conn.execute(text("DELETE FROM ai_usage"))
+            conn.execute(text("DELETE FROM audit"))
+        other = queries.directory(query="Шуя")["rows"][0]
+        service.enqueue_public_fill(other["id"])
+        job = queries.rows("jobs", {"location_id": other["id"]})[0]
+        with pytest.raises(RuleViolation, match="лимит"):
+            provider.generate("new request", job["id"])
+        assert calls == ["POST"]
+    finally:
+        provider.close()

@@ -21,6 +21,5 @@ class Decision(BaseModel):
     changes: dict[str, Any] = Field(default_factory=dict)
     proposal_edits: dict[str, dict[str, Any]] = Field(default_factory=dict)
     excluded_proposals: list[UUID] = Field(default_factory=list)
-    affected_revisions: dict[str, str | None] = Field(default_factory=dict)
     run: int | None = None
     fragment_number: int | None = Field(default=None, ge=0)

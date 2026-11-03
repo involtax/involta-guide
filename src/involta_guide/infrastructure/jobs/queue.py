@@ -81,10 +81,16 @@ class JobQueue:
 
     def fail(self, job: Record, message: str, *, retry: bool = True) -> None:
         with self.engine.begin() as conn:
-            row = (
+            if job["kind"] == "reset":
+                # Use the same owner -> job order as reset application.
+                conn.execute(
+                    text("SELECT id FROM locations WHERE id=:id FOR UPDATE"),
+                    {"id": job["location_id"]},
+                )
+            updated = (
                 conn.execute(
                     text(
-                        "UPDATE jobs SET status=CASE WHEN :retry AND attempts<:max THEN 'queued' ELSE 'failed' END,error=:message,finished_at=now(),lease_until=NULL,lease_owner=NULL,available_at=now()+make_interval(secs=>least(60,attempts*5)) WHERE id=:id AND lease_owner=:owner AND status='running' RETURNING review_id,status"
+                        "UPDATE jobs SET status=CASE WHEN :retry AND attempts<:max THEN 'queued' ELSE 'failed' END,error=:message,finished_at=now(),lease_until=NULL,lease_owner=NULL,available_at=now()+make_interval(secs=>least(60,attempts*5)) WHERE id=:id AND lease_owner=:owner AND status='running' RETURNING status"
                     ),
                     {
                         "retry": retry,
@@ -97,22 +103,16 @@ class JobQueue:
                 .mappings()
                 .first()
             )
-            if row and row["review_id"]:
-                conn.execute(
-                    text("UPDATE reviews SET status=:status,error=:message WHERE id=:id"),
-                    {
-                        "status": "pending" if row["status"] == "queued" else "failed",
-                        "message": message[:2000],
-                        "id": row["review_id"],
-                    },
-                )
+            if updated is None:
+                return
+            if job["kind"] == "reset":
                 conn.execute(
                     text(
-                        "UPDATE alex_changes SET status=:status,detail=:message WHERE review_id=:id AND status<>'applied'"
+                        "UPDATE locations SET reset_error=:error WHERE id=:id AND content_epoch=:epoch AND reset_pending"
                     ),
                     {
-                        "status": "queued" if row["status"] == "queued" else "failed",
-                        "message": message[:2000],
-                        "id": row["review_id"],
+                        "error": message[:2000],
+                        "id": job["location_id"],
+                        "epoch": job["content_epoch"],
                     },
                 )

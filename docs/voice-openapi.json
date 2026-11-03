@@ -65,27 +65,59 @@
         }
       }
     },
-    "/internal/v1/admin/archive": {
+    "/internal/v1/locations/{location_id}/reset": {
       "post": {
-        "summary": "Archive",
-        "operationId": "archive_internal_v1_admin_archive_post",
+        "summary": "Reset Location",
+        "operationId": "reset_location_internal_v1_locations__location_id__reset_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Location Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationReset"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Archive Internal V1 Admin Archive Post"
+                  "$ref": "#/components/schemas/LocationPurged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/internal/v1/submissions": {
@@ -126,7 +158,7 @@
                   },
                   "metadata": {
                     "type": "string",
-                    "description": "SubmissionMetadata v1 JSON, trusted Guide identity/context"
+                    "description": "SubmissionMetadata v2 JSON, trusted Guide identity/context"
                   }
                 }
               }
@@ -185,29 +217,6 @@
             }
           }
         }
-      }
-    },
-    "/internal/v1/guide-transcriptions": {
-      "post": {
-        "summary": "Submit",
-        "operationId": "submit_internal_v1_guide_transcriptions_post",
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubmissionStatus"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/internal/v1/submissions/{reference}": {
@@ -1017,16 +1026,10 @@
             ],
             "title": "Revision"
           },
-          "published_revision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Revision"
+          "content_epoch": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Content Epoch"
           },
           "restaurants": {
             "items": {
@@ -1042,9 +1045,46 @@
         "required": [
           "id",
           "slug",
-          "name"
+          "name",
+          "content_epoch"
         ],
         "title": "LocationContext"
+      },
+      "LocationPurged": {
+        "properties": {
+          "purged": {
+            "type": "boolean",
+            "const": true,
+            "title": "Purged"
+          },
+          "content_epoch": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Content Epoch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purged",
+          "content_epoch"
+        ],
+        "title": "LocationPurged"
+      },
+      "LocationReset": {
+        "properties": {
+          "content_epoch": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Content Epoch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content_epoch"
+        ],
+        "title": "LocationReset"
       },
       "RestaurantContext": {
         "properties": {
@@ -1109,8 +1149,7 @@
               "transcription_failed",
               "transcription_unknown",
               "analysis_failed",
-              "analysis_unknown",
-              "archived"
+              "analysis_unknown"
             ],
             "title": "State"
           },

@@ -14,6 +14,15 @@ class DTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class LocationReset(DTO):
+    content_epoch: StrictInt = Field(ge=1)
+
+
+class LocationPurged(DTO):
+    purged: Literal[True]
+    content_epoch: StrictInt = Field(ge=1)
+
+
 class OpeningHours(DTO):
     timezone: str
     week: list[list[tuple[str, str]]] = Field(min_length=7, max_length=7)
@@ -52,21 +61,20 @@ class LocationContext(DTO):
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=200)
     name: str
     revision: str | None = None
-    published_revision: str | None = None
+    content_epoch: int = Field(ge=1)
     restaurants: list[RestaurantContext] = Field(default_factory=list, max_length=200)
 
 
 class SubmissionMetadata(DTO):
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     location: LocationContext
     visitor: str = Field(min_length=32, max_length=200)
     idempotency_key: UUID
-    ip_fingerprint: str = Field(min_length=32, max_length=200)
-    user_agent: str = Field(default="", max_length=500)
+    ip: str = Field(min_length=1, max_length=200)
+    user_agent: str = Field(default="", max_length=10000)
     widget_version: Literal["1"] = "1"
     language: str = Field(default="", max_length=40)
     timezone: str = Field(default="", max_length=100)
-    actor: Literal["visitor", "admin"] = "visitor"
     correlation_id: UUID
 
 
@@ -122,7 +130,6 @@ class SubmissionStatus(DTO):
         "transcription_unknown",
         "analysis_failed",
         "analysis_unknown",
-        "archived",
     ]
     run: int = Field(ge=1)
     transcript: str | None
@@ -133,7 +140,7 @@ class SubmissionStatus(DTO):
 
 
 class OutboxEvent(DTO):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     event_id: UUID
     sequence: int = Field(ge=1)
     kind: Literal["transcript_ready", "analysis_ready", "processing_failed"]

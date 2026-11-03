@@ -1,3 +1,5 @@
+> Архитектурные положения этого документа заменены [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md). Текущая реализация: [CURRENT_STATE.md](CURRENT_STATE.md); переход: [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md).
+
 # Границы первой версии
 
 ## Сделано

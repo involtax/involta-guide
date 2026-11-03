@@ -1,4 +1,3 @@
-import hashlib
 import json
 import subprocess
 from uuid import uuid4
@@ -6,7 +5,6 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-from involta_voice.archive import copy_archive
 from involta_voice.provider import FakeProvider
 from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
@@ -104,27 +102,6 @@ def test_revalidation_and_new_run_are_idempotent_and_keep_snapshots(voice_databa
             ).scalar_one()
             == 1
         )
-
-
-def test_archive_is_sha_checked_read_only_and_has_no_processing_jobs(voice_database):
-    settings, engine = voice_database
-    service = VoiceService(engine, settings)
-    content = recording()
-    sha = hashlib.sha256(content).hexdigest()
-    source = uuid4()
-    meta = metadata()
-    legacy = {"sha256": sha, "original_text": "Старый текст", "moderation": "rejected"}
-    first = copy_archive(service, source, meta, content, "audio/wav", legacy)
-    assert copy_archive(service, source, meta, content, "audio/wav", legacy) == first
-    assert service.status(first["reference"])["state"] == "archived"
-    with pytest.raises(ValueError, match="чтения"):
-        service.new_run(first["reference"])
-    with pytest.raises(ValueError, match="SHA"):
-        copy_archive(service, source, meta, content + b"x", "audio/wav", legacy)
-    with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM stages")).scalar_one() == 0
-        assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 0
-        assert conn.execute(text("SELECT count(*) FROM archive_map")).scalar_one() == 1
 
 
 @pytest.mark.parametrize(

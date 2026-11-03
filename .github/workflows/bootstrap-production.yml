@@ -97,7 +97,6 @@ jobs:
           BOOTSTRAP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
-          BOOTSTRAP_ALEX_SECRET: ${{ secrets.ALEX_SECRET }}
         run: bash deploy/ssh-release.sh bootstrap | tee bootstrap-output.log
       - name: Verify HTTPS from outside the server
         run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA" external

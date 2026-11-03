@@ -124,6 +124,13 @@ restore_previous() {
   if [[ -f "$DEPLOY_ROOT/releases/$target_sha/voice-initial-rollout.json" ]]; then
     compose "$target_sha" "$target_image" stop --timeout 240 voice-api voice-worker voice-consumer || return 1
   fi
+  local compatibility
+  compatibility=$(compose "$target_sha" "$target_image" run --rm --no-deps -T web python -m involta_guide.infrastructure.persistence.release_backup compatibility) || return 1
+  if [[ "$compatibility" == beta ]] && ! docker run --rm --entrypoint python "$previous_image" -c 'import involta_guide.infrastructure.beta_reset' >/dev/null 2>&1; then
+    compose "$target_sha" "$target_image" stop --timeout 240 web worker voice-api voice-worker voice-consumer || true
+    echo 'Image-only rollback across beta_core is incompatible. Restore matching Guide + Voice databases/files under the deployment lock, or deploy a forward fix. See docs/BETA_CORE_RUNBOOK.md.' >&2
+    return 1
+  fi
   restore_cutover_database || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
@@ -233,7 +240,10 @@ trap 'failed 130' INT
 changed=1
 if [[ -n "$previous_sha" ]]; then stop_guide_writers "$previous_sha" "$previous_image"; fi
 needs_backup=$(compose "$target_sha" "$target_image" run --rm --no-deps -T web python -m involta_guide.infrastructure.persistence.release_backup needed)
-if [[ "$needs_backup" == yes ]]; then
+if [[ "$needs_backup" == manual-beta-transition ]]; then
+  echo 'beta_core requires one coordinated Guide + Voice database/file transition with all writers stopped. Automatic migration refused. See docs/BETA_CORE_RUNBOOK.md; then rerun this immutable release.' >&2
+  false
+elif [[ "$needs_backup" == yes ]]; then
   compose "$target_sha" "$target_image" run --rm --no-deps -T web \
     python -m involta_guide.infrastructure.persistence.release_backup backup > "$release_dir/pre-cutover.$deployment_id.dump.tmp"
   [[ -s "$release_dir/pre-cutover.$deployment_id.dump.tmp" ]] || { echo 'Empty database backup; migration refused' >&2; false; }

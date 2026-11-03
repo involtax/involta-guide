@@ -1,5 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -12,7 +13,6 @@ from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.background import resume_generation
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 from involta_guide.main import create_app
 
 from .editor_fixture import enqueue_fixture
@@ -25,9 +25,7 @@ def configured(database, handler, *, location_query=None):
     if location_query:
         location = queries.directory(query=location_query)["rows"][0]
     settings = settings.model_copy(update={"openai_api_key": SecretStr("fake-background-key")})
-    provider = OpenAIProvider(
-        settings, engine, FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    )
+    provider = OpenAIProvider(settings, engine)
     provider.client.close()
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     service.provider = provider
@@ -110,6 +108,7 @@ def test_restart_and_repeated_poll_failures_never_repeat_post(database):
         assert calls == ["POST"] + ["GET"] * 5
         assert len(queries.rows("ai_usage")) == 1
         assert len([r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]) == 1
+        assert queries.get("jobs", job["id"])["applied"]
         assert task(engine, job)["request_json"]["input"][1]["content"] == sent_prompt
         assert queries.get("locations", location["id"])["revision"]
         saved = task(engine, job)
@@ -290,6 +289,7 @@ def test_saved_response_can_be_revalidated_without_network(database, monkeypatch
         assert calls == ["POST"]
         assert queries.get("jobs", job["id"])["status"] == "done"
         assert len([r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]) == 1
+        assert queries.get("jobs", job["id"])["applied"]
     finally:
         provider.close()
 
@@ -358,10 +358,8 @@ def test_rollback_pauses_remote_work_without_deleting_response_identity(database
 
 
 def test_editor_change_preserved_but_remote_answer_still_collected(database):
+    from involta_guide.application.services.locations import LocationService
     from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
-
-    from .editor_fixture import FixtureEditor as EditorialService
-    from .test_editorial import CONTENT
 
     calls = []
 
@@ -376,106 +374,17 @@ def test_editor_change_preserved_but_remote_answer_still_collected(database):
     )
     try:
         Worker(queue, service).once()
-        editor_version = EditorialService(lambda: PostgresUow(engine)).save(
-            location["id"], CONTENT, None
+        LocationService(lambda: PostgresUow(engine)).save_intro(
+            location["id"], "Сохранить ручное вступление", None, str(uuid4())
         )
+        editor_version = queries.get("locations", location["id"])["revision"]
         due(engine)
         Worker(queue, service).once()
         assert calls == ["POST", "GET"]
         assert task(engine, job)["state"] == "completed"
         assert queries.get("jobs", job["id"])["status"] == "failed"
         assert queries.get("locations", location["id"])["revision"] == editor_version
-        assert len([r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]) == 1
-    finally:
-        provider.close()
-
-
-def test_successful_public_response_can_be_reprocessed_without_network_or_duplicates(database):
-    calls = []
-
-    def handler(request):
-        calls.append(request.method)
-        return httpx.Response(200, json=envelope())
-
-    settings, engine, queries, location, service, queue, provider, job = configured(
-        database, handler
-    )
-    try:
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO audit(id,action,target,detail) VALUES(gen_random_uuid(),'temporary_public_fill',:job,:location)"
-                ),
-                {"job": job["id"], "location": location["id"]},
-            )
-        assert Worker(queue, service).once()
-        initial = queries.get("locations", location["id"])["revision"]
-        original_response = task(engine, job)["response_json"]
-        restaurant_id = queries.rows("restaurants")[0]["id"]
-        with TestClient(create_app(settings)) as client:
-            assert client.post("/guide/admin/actions/reprocess-generation").status_code == 401
-            login(client)
-            page = client.get("/guide/logs/ivanovo/1")
-            assert "Переобработать тот же ответ" in page.text
-            assert AIAudit(engine, settings).detail(job["id"])["job"]["can_reprocess"]
-            result = client.post(
-                "/guide/admin/actions/reprocess-generation",
-                data={
-                    "_csrf": token(page.text),
-                    "log_slug": "ivanovo",
-                    "log_number": "1",
-                    "expected": initial,
-                },
-                headers={"Origin": "http://testserver"},
-            )
-            assert result.status_code == 200
-        service.public_fill_enabled = False
-        provider.client.close()
-        assert Worker(queue, service).once()
-        assert calls == ["POST"]
-        assert len(queries.rows("jobs")) == len(queries.rows("ai_usage")) == 1
-        assert len(queries.rows("restaurants")) == 1
-        assert queries.rows("restaurants")[0]["id"] == restaurant_id
-        assert len(queries.rows("jobs")[0]["changes"]) >= 1
-        assert queries.get("locations", location["id"])["revision"] != initial
-        assert queries.get("jobs", job["id"])["status"] == "done"
-        assert task(engine, job)["response_json"] == original_response
-        assert AIAudit(engine, settings).detail(job["id"])["changes"]
-    finally:
-        provider.close()
-
-
-def test_cached_reprocess_rejects_stale_page_and_later_edits(database):
-    from involta_guide.domain.entities import Conflict
-    from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
-
-    from .editor_fixture import FixtureEditor as EditorialService
-
-    calls = []
-
-    def handler(request):
-        calls.append(request.method)
-        return httpx.Response(200, json=envelope())
-
-    settings, engine, queries, location, service, queue, provider, job = configured(
-        database, handler
-    )
-    try:
-        Worker(queue, service).once()
-        current = queries.get("locations", location["id"])["revision"]
-        with pytest.raises(Conflict):
-            resume_generation(engine, job["id"], 3600, reprocess=True, expected_version=None)
-        resume_generation(engine, job["id"], 3600, reprocess=True, expected_version=current)
-        editor = EditorialService(lambda: PostgresUow(engine))
-        editor.save(
-            location["id"],
-            {**queries.location(location["id"])["content"], "intro": "Сохранить ручное изменение"},
-            current,
-        )
-        provider.client.close()
-        Worker(queue, service).once()
-        assert queries.get("jobs", job["id"])["status"] == "failed"
-        assert queries.public(location["slug"])["content"]["intro"] == "Сохранить ручное изменение"
-        assert calls == ["POST"]
+        assert len(queries.rows("audit", {"action": "manual_intro"})) == 1
+        assert not queries.get("jobs", job["id"])["applied"]
     finally:
         provider.close()
