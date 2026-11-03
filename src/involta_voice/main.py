@@ -19,11 +19,12 @@ from .config import Settings
 from .contracts import LocationContext, SubmissionMetadata, SubmissionStatus
 from .db import database, encoded, execute, row, snapshot
 from .errors import VoiceError
+from .evaluation import AsrRun, Evaluation
 from .service import VoiceService
 from .worker import Worker
 
 MODELS = {
-    "transcription": ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"],
+    "transcription": ["gigaam", "parakeet"],
     "analysis": ["gpt-4.1-mini", "gpt-4.1", "gpt-6.1-sol"],
 }
 
@@ -172,6 +173,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
 
     @app.post(
+        "/internal/v1/guide-transcriptions",
+        dependencies=dependencies,
+        status_code=202,
+        response_model=SubmissionStatus,
+    )
+    @app.post(
         "/internal/v1/submissions",
         dependencies=dependencies,
         status_code=202,
@@ -215,6 +222,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not isinstance(audio, UploadFile):
                 raise VoiceError("Аудиозапись обязательна")
             metadata = SubmissionMetadata.model_validate_json(str(form.get("metadata") or ""))
+            purpose = (
+                "guide_transcription"
+                if request.url.path.endswith("/guide-transcriptions")
+                else "review"
+            )
+            if purpose == "review" and metadata.actor != "visitor":
+                raise VoiceError("Публичные отзывы не предоставляют прав администратора")
             from starlette.concurrency import run_in_threadpool
 
             return await run_in_threadpool(
@@ -222,6 +236,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 metadata,
                 await audio.read(),
                 (audio.content_type or "").split(";")[0],
+                purpose,
             )
         except ValueError as exc:
             if isinstance(exc, VoiceError):
@@ -341,6 +356,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         after = service.status(str(reference), admin=True)
         audit_admin(request, "revalidate", {"reference": str(reference), "run": number}, after)
         return after
+
+    @app.get("/internal/v1/admin/submissions/{reference}/asr", dependencies=dependencies)
+    def asr_report(reference: UUID) -> Any:
+        from .evaluation import report
+
+        return report(engine, str(reference))
+
+    @app.post(
+        "/internal/v1/admin/submissions/{reference}/asr-runs",
+        dependencies=dependencies,
+        status_code=202,
+    )
+    def asr_run(request: Request, reference: UUID, body: AsrRun) -> Any:
+        from .evaluation import queue_evaluation
+
+        result = queue_evaluation(
+            engine,
+            settings,
+            str(reference),
+            str(body.idempotency_key),
+            body.force,
+        )
+        audit_admin(request, "asr-evaluation-run", {"reference": str(reference)}, result)
+        return result
+
+    @app.post(
+        "/internal/v1/admin/submissions/{reference}/asr-runs/{number}/evaluation",
+        dependencies=dependencies,
+    )
+    def asr_vote(request: Request, reference: UUID, number: int, body: Evaluation) -> Any:
+        from .evaluation import evaluate
+
+        session = request.headers.get("x-guide-session")
+        if not session:
+            raise HTTPException(403, "Требуется сессия редактора")
+        return evaluate(engine, str(reference), number, body, str(UUID(session)))
 
     @app.get("/internal/v1/admin/settings", dependencies=dependencies)
     def get_settings() -> Any:

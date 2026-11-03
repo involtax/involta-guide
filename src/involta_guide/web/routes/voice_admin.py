@@ -38,6 +38,7 @@ def routes(prefix: str) -> APIRouter:
         remote = None
         unavailable = ""
         pending = []
+        asr_comparison = None
         if ctx.settings.voice_service_secret.get_secret_value():
             try:
                 remote_settings = voice_client(request).json("GET", "/admin/settings")
@@ -48,6 +49,10 @@ def routes(prefix: str) -> APIRouter:
                         remote = voice_client(request).json(
                             "GET", f"/admin/submissions/{ref}/runs/{run}"
                         )
+                if detail and detail["asr_reference"]:
+                    asr_comparison = voice_client(request).json(
+                        "GET", "/admin/submissions/" + detail["asr_reference"] + "/asr"
+                    )
                 if not detail:
                     remote_rows = voice_client(request).json(
                         "GET", "/admin/submissions", params={"page": listing["page"]}
@@ -65,6 +70,10 @@ def routes(prefix: str) -> APIRouter:
                 "consumer_health": read.consumer_health(),
                 "v": detail,
                 "remote": remote,
+                "asr_comparison": asr_comparison,
+                "asr_action": ctx.settings.path("/admin/voice/decision/" + review_id)
+                if review_id
+                else "",
                 "run_log": run is not None,
                 "pending_voice": pending,
                 "voice_settings": remote_settings,
@@ -92,7 +101,50 @@ def routes(prefix: str) -> APIRouter:
     def unimported(request: Request, reference: UUID) -> Response:
         require_admin(request)
         data = voice_client(request).json("GET", "/admin/submissions/" + str(reference))
-        return render(request, "voice_pending.html", {"tab": "voice", "pending": data})
+        comparison = voice_client(request).json(
+            "GET", "/admin/submissions/" + str(reference) + "/asr"
+        )
+        return render(
+            request,
+            "voice_pending.html",
+            {
+                "tab": "voice",
+                "pending": data,
+                "asr_comparison": comparison,
+                "new_key": lambda: str(uuid4()),
+                "asr_action": context(request).settings.path(
+                    "/admin/voice/submission/" + str(reference)
+                ),
+            },
+        )
+
+    def asr_action(request: Request, reference: str, form: FormData, session: Any) -> None:
+        action = str(form.get("action") or "")
+        if action not in ("asr-run", "asr-evaluate"):
+            raise HTTPException(400, "Неизвестное действие сравнения")
+        path = "/admin/submissions/" + reference + "/asr-runs"
+        payload: dict[str, Any] = {"idempotency_key": str(UUID(str(form.get("idempotency_key"))))}
+        if action == "asr-evaluate":
+            path += "/" + str(int(str(form.get("asr_run")))) + "/evaluation"
+            payload.update(
+                revision=int(str(form.get("asr_revision"))),
+                candidates_digest=str(form.get("candidates_digest") or ""),
+                preferred_engine=str(form.get("preferred_engine") or "") or None,
+                reference_text=str(form.get("reference_text") or "").strip() or None,
+                note=str(form.get("note") or ""),
+            )
+        else:
+            payload["force"] = form.get("force") == "yes"
+        voice_client(request).json("POST", path, json=payload, actor_session=session)
+
+    @router.post(base + "/submission/{reference}")
+    def unimported_action(
+        request: Request, reference: UUID, form: FormData = Depends(form_data)
+    ) -> Response:
+        principal = require_admin(request)
+        check_csrf(request, form)
+        asr_action(request, str(reference), form, principal["id"])
+        return RedirectResponse(base + "/submission/" + str(reference), status_code=303)
 
     @router.get(base + "/{slug}/{number}")
     def numbered(request: Request, slug: str, number: int) -> Response:
@@ -163,6 +215,16 @@ def routes(prefix: str) -> APIRouter:
         read = VoiceReadModel(ctx.engine)
         detail = read.detail(str(review_id))
         action = str(form.get("action") or "")
+        if action in ("asr-run", "asr-evaluate"):
+            reference = detail["asr_reference"]
+            if not reference:
+                from involta_guide.infrastructure.voice.backfill import ensure_copy
+
+                reference = ensure_copy(
+                    ctx.settings, ctx.engine, str(review_id), voice_client(request)
+                )
+            asr_action(request, reference, form, principal["id"])
+            return RedirectResponse(ctx.settings.path(detail["path"]), status_code=303)
         if action in ("new-run", "revalidate"):
             if not detail["link"]:
                 raise HTTPException(409, "Старая запись обрабатывается прежним исполнителем")

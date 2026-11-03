@@ -50,7 +50,7 @@ def test_provider_errors_are_saved_without_automatic_duplicate_unknown_post(
 
 def test_daily_budget_stops_analysis_without_losing_transcript(voice_database):
     settings, engine = voice_database
-    settings = settings.model_copy(update={"daily_calls": 1})
+    settings = settings.model_copy(update={"daily_budget_usd": 1})
     service = VoiceService(engine, settings)
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())

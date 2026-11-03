@@ -121,6 +121,9 @@ restore_cutover_database() {
 restore_previous() {
   export VOICE_INTAKE=false
   [[ -n "$previous_sha" ]] || return 1
+  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/voice-initial-rollout.json" ]]; then
+    compose "$target_sha" "$target_image" stop --timeout 240 voice-api voice-worker voice-consumer || return 1
+  fi
   restore_cutover_database || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
@@ -134,7 +137,7 @@ restore_previous() {
   # Roll back Voice executors as well, retaining their current volumes/schema.
   # The gateway-compatible baseline may predate the overlay, so reuse the current
   # service definition with its reviewed previous image and no dependency recreation.
-  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/compose.voice.yaml" ]]; then
+  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/compose.voice.yaml" ]] && docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' >/dev/null 2>&1; then
     compose "$target_sha" "$previous_image" up -d --no-build --no-deps voice-api voice-worker voice-consumer || return 1
     wait_health "$target_sha" "$previous_image" voice-api || return 1
     wait_health "$target_sha" "$previous_image" voice-worker || return 1
@@ -184,9 +187,15 @@ if [[ "$VOICE_STACK" == 1 ]]; then
   voice_template=compose.voice.yaml
   [[ "$NETWORK_MODE" != host ]] || voice_template=compose.voice.host.yaml
   install -m 600 "$script_dir/$voice_template" "$release_dir/compose.voice.yaml"
-  # An automatic rollback to a pre-Voice image would break persisted voice: references.
-  if [[ -n "$previous_sha" ]]; then
-    docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Rollback image must support Voice before enabling the stack' >&2; exit 2; }
+  # A first Voice release is allowed with an explicit private pre-change backup.
+  if [[ -n "$previous_sha" ]] && ! docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' >/dev/null 2>&1; then
+    python3 - "$release_dir/voice-initial-rollout.json" "$previous_sha" "$target_sha" <<'VOICE_BACKUP'
+import hashlib, json, pathlib, sys
+marker = json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert marker["previous_sha"] == sys.argv[2] and marker["target_sha"] == sys.argv[3]
+backup = pathlib.Path(marker["backup"]) / "guide.dump"
+assert backup.is_file() and hashlib.sha256(backup.read_bytes()).hexdigest() == marker["guide_sha256"]
+VOICE_BACKUP
   fi
 fi
 timeout 300 docker pull "$target_image" >/dev/null
@@ -236,6 +245,7 @@ compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade hea
 if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" up -d --no-build voice-db
   compose "$target_sha" "$target_image" run --rm voice-migrate
+  compose "$target_sha" "$target_image" run --rm voice-prepare-model
   compose "$target_sha" "$target_image" up -d --no-build voice-api voice-worker voice-consumer
   wait_health "$target_sha" "$target_image" voice-api
   wait_health "$target_sha" "$target_image" voice-worker

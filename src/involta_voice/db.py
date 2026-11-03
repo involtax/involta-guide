@@ -47,15 +47,33 @@ def migrate(engine: Engine) -> None:
         exists = row(conn, "SELECT to_regclass('voice_schema_versions') AS name")
         if not exists or not exists["name"]:
             conn.exec_driver_sql((Path(__file__).parent / "migrations/001_initial.sql").read_text())
+        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=2"):
+            conn.exec_driver_sql(
+                (Path(__file__).parent / "migrations/002_guide_transcription.sql").read_text()
+            )
+        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=3"):
+            conn.exec_driver_sql(
+                (Path(__file__).parent / "migrations/003_asr_beta.sql").read_text()
+            )
 
 
 def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
     saved = {
         r["key"]: r["value"] for r in conn.execute(text("SELECT * FROM voice_settings")).mappings()
     }
+    from .asr import MODELS, options
+
+    selected = saved.get("transcription_model", settings.transcription_model)
+    if selected not in MODELS:
+        selected = settings.transcription_model
+
     return {
+        "transcription": options(settings.model_copy(update={"transcription_model": selected})),
+        "asr_models": {e: options(settings, e) for e in MODELS},
+        "asr_beta": settings.asr_beta_enabled,
+        "fake_provider": settings.fake_provider,
         "schema_version": 1,
-        "transcription_model": saved.get("transcription_model", settings.transcription_model),
+        "transcription_model": selected,
         "analysis_model": saved.get("analysis_model", settings.analysis_model),
         "prompt": saved.get("prompt", DEFAULT_PROMPT),
         "prices": saved.get("prices", {}),

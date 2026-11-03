@@ -266,11 +266,92 @@ class OpenAIProvider:
         return self._structured(prompt, AlexCommands if alex else Analysis, job_id)
 
     def transcribe(self, path: str, mime: str, job_id: str) -> str:
-        result = self._request(
-            "audio/transcriptions",
-            job_id,
-            self.settings.transcription_model,
-            files={"file": (path, self.storage.read(path), mime)},
-            data={"model": self.settings.transcription_model, "language": "ru"},
+        # All audio is queued to the single local Voice worker. Guide never loads
+        # another multi-GB model and never sends audio to OpenAI.
+        from uuid import UUID
+
+        from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+        from involta_guide.infrastructure.security import Security
+        from involta_guide.infrastructure.voice.client import VoiceClient
+        from involta_voice.contracts import LocationContext, RestaurantContext, SubmissionMetadata
+
+        with self.engine.connect() as conn:
+            source = (
+                conn.execute(
+                    text(
+                        "SELECT j.review_id,l.id,l.slug,l.name,r.visitor,r.ip_hash,r.device,r.admin_session_id,r.alex_session_id FROM jobs j JOIN locations l ON l.id=j.location_id JOIN reviews r ON r.id=j.review_id WHERE j.id=:id"
+                    ),
+                    {"id": job_id},
+                )
+                .mappings()
+                .one()
+            )
+            restaurants = [
+                RestaurantContext(id=r["id"], name=r["name"])
+                for r in conn.execute(
+                    text(
+                        "SELECT r.id,r.name FROM restaurants r JOIN restaurant_locations x ON x.restaurant_id=r.id WHERE x.location_id=:location ORDER BY r.id LIMIT 200"
+                    ),
+                    {"location": source["id"]},
+                ).mappings()
+            ]
+        identity = Security(self.settings, lambda: PostgresUow(self.engine))
+        metadata = SubmissionMetadata(
+            location=LocationContext(
+                id=source["id"], slug=source["slug"], name=source["name"], restaurants=restaurants
+            ),
+            visitor=identity.fingerprint("guide-speech:" + source["visitor"]),
+            ip_fingerprint=identity.fingerprint(source["ip_hash"]),
+            user_agent=source["device"],
+            idempotency_key=UUID(str(source["review_id"])),
+            correlation_id=UUID(job_id),
+            actor="admin" if source["admin_session_id"] or source["alex_session_id"] else "visitor",
         )
-        return str(result.get("text", ""))
+        client = VoiceClient(self.settings)
+        result = client.json(
+            "POST",
+            "/guide-transcriptions",
+            data={"metadata": metadata.model_dump_json()},
+            files={"audio": ("recording", self.storage.read(path), mime)},
+        )
+        reference = result["reference"]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO voice_archives(source_review,reference,sha256) VALUES(:source,:reference,:sha) ON CONFLICT(source_review) DO NOTHING"
+                ),
+                {
+                    "source": str(source["review_id"]),
+                    "reference": reference,
+                    "sha": hashlib.sha256(self.storage.read(path)).hexdigest(),
+                },
+            )
+
+        self.audit.record(
+            job_id,
+            "local_transcription_queued",
+            {"reference": reference, "provider": "local-asr"},
+        )
+        deadline = time.monotonic() + 900
+        while True:
+            if result.get("transcript"):
+                self.audit.record(
+                    job_id,
+                    "local_transcription_response",
+                    {
+                        "reference": reference,
+                        "text": result["transcript"],
+                        "provider": "local-asr",
+                    },
+                )
+                return str(result["transcript"])
+            if result.get("error"):
+                raise ProviderUnavailable("Локальное распознавание: " + str(result["error"]))
+            if time.monotonic() > deadline:
+                raise ProviderUnavailable(
+                    "Локальное ASR ещё обрабатывает запись; повтор использует то же задание"
+                )
+            time.sleep(2)
+            result = client.json(
+                "GET", "/submissions/" + reference, params={"visitor": metadata.visitor}
+            )

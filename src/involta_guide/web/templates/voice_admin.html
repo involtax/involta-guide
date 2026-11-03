@@ -71,6 +71,7 @@
 <form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('exclude-proposal',p)}}<button>Убрать ошибочную правку из пакета</button></form>
 {%endif%}</article>{%else%}<p>Предложений нет. Это не мешает принять сам отзыв.</p>{%endfor%}
 {%endif%}
+{%include 'asr_comparison.html'%}
 {%if v.link and v.text%}
 <h3>Обработки</h3><form method="post" action="{{settings.path('/admin/voice/decision/'+v.review.id|string)}}">{{decision_fields('new-run')}}<button>Новая обработка с текущими настройками</button></form>
 {%if remote and remote.stages%}{%for number in remote.stages|map(attribute='run')|unique%}<p><a href="{{settings.path(v.path)}}/runs/{{number}}">Технический лог обработки {{number}} ↗</a></p>{%endfor%}{%endif%}
@@ -85,7 +86,7 @@
 {%else%}<h2>Выберите отзыв</h2><p>Текст сохраняется до дополнительного анализа. Предложенные действия необязательны.</p>{%endif%}
 </section></div>
 {%if voice_settings%}<details><summary>Модели и промпт голоса</summary><form method="post" action="{{settings.path('/admin/voice/settings')}}" class="stack">{{csrf()}}
-{%for field,label,category in [('transcription_model','Расшифровка','transcription'),('analysis_model','Разбор','analysis')]%}<label>{{label}}<select name="{{field}}">{%for model in voice_settings.models[category]%}<option value="{{model}}" {%if voice_settings[field]==model%}selected{%endif%}>{{model}} · {%if model in voice_settings.prices%}{{voice_settings.prices[model]}}{%else%}стоимость неизвестна{%endif%}</option>{%endfor%}</select></label>{%endfor%}
+{%for field,label,category in [('transcription_model','Расшифровка','transcription'),('analysis_model','Разбор','analysis')]%}<label>{{label}}<select name="{{field}}">{%for model in voice_settings.models[category]%}<option value="{{model}}" {%if voice_settings[field]==model%}selected{%endif%}>{{model}} · {%if category=="transcription"%}локальный ASR{%elif model in voice_settings.prices%}{{voice_settings.prices[model]}}{%else%}стоимость неизвестна{%endif%}</option>{%endfor%}</select></label>{%endfor%}
 <p>Каталог: {{voice_settings.prices_checked}}. Неизвестная стоимость не считается нулевой.</p><label>Промпт разбора<textarea name="prompt" rows="12">{{voice_settings.prompt}}</textarea></label><button>Сохранить настройки новых обработок</button></form></details>{%endif%}
 </main>
 {%endblock%}

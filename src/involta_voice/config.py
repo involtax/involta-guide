@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,7 +13,10 @@ class Settings(BaseSettings):
     service_secret: SecretStr
     openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
     data_dir: Path = Path("var/voice")
-    transcription_model: str = "gpt-4o-mini-transcribe"
+    transcription_model: Literal["gigaam", "parakeet"] = "gigaam"
+    asr_models_dir: Path = Path("var/asr-models")
+    asr_cpu_threads: int = Field(default=2, ge=1, le=64)
+    asr_beta_enabled: bool = True
     analysis_model: str = "gpt-4.1"
     max_audio_bytes: int = 10 * 1024 * 1024
     min_free_bytes: int = 64 * 1024 * 1024

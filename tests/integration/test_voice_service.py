@@ -45,6 +45,7 @@ def voice_database(tmp_path):
         data_dir=tmp_path,
         min_free_bytes=0,
         fake_provider=True,
+        asr_beta_enabled=False,
     )
     engine = database(settings)
     try:

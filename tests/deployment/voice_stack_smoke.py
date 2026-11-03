@@ -56,7 +56,14 @@ env = {
 )
 (root / "override.json").write_text(
     json.dumps(
-        {"services": {"web": {"container_name": "involta-guide-review-" + uuid.uuid4().hex}}}
+        {
+            "services": {
+                "web": {"container_name": "involta-guide-review-" + uuid.uuid4().hex},
+                "voice-prepare-model": {
+                    "command": ["python", "-c", "print('fake-provider: model load not required')"]
+                },
+            }
+        }
     )
 )
 for p in [root / ".env.production", root / ".env.voice"]:

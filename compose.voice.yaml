@@ -46,10 +46,14 @@ services:
     environment:
       VOICE_DATA_DIR: /app/var/voice
       VOICE_HEARTBEAT_FILE: /tmp/involta-voice-worker
+      VOICE_ASR_MODELS_DIR: /app/var/asr-models
     command: [voice-worker]
+    # Offline serving: weights must be prepared before worker startup.
     stop_grace_period: 120s
-    volumes: [voice-audio:/app/var/voice]
+    volumes: [voice-audio:/app/var/voice, asr-models:/app/var/asr-models:ro]
     depends_on:
+      voice-prepare-model:
+        condition: service_completed_successfully
       voice-migrate:
         condition: service_completed_successfully
     healthcheck:
@@ -58,6 +62,17 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+  voice-prepare-model:
+    image: ${VOICE_IMAGE:-involta-voice:local}
+    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    environment:
+      VOICE_ASR_MODELS_DIR: /app/var/asr-models
+      HF_HOME: /tmp/huggingface
+      HF_HUB_DISABLE_XET: "1"
+    command: [voice, prepare-model]
+    volumes: [asr-models:/app/var/asr-models]
+    restart: "no"
 volumes:
   voice-postgres:
   voice-audio:
+  asr-models:

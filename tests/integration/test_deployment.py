@@ -51,6 +51,8 @@ if args[0]=='inspect':
  service=state.get('services',{}).get(target,{})
  print('unhealthy' if service.get('sha')==os.getenv('FAKE_FAIL_SHA') else 'healthy')
  sys.exit(0)
+if args[0]=='run' and '--entrypoint' in args:
+ sys.exit(1 if os.getenv('FAKE_PRE_VOICE_IMAGE') in args else 0)
 if args[0]=='compose':
  command=next(x for x in args if x in ('up','ps','stop','rm','logs','run'))
  if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
@@ -334,3 +336,40 @@ def test_cutover_dump_precedes_migration_and_restores_before_old_image(tmp_path)
     )
     assert backup_pos < migration < restore < restored_web
     assert (root / "current-release").read_text().split()[0] == A
+
+
+def test_first_voice_release_requires_backup_and_rolls_back_without_old_voice_worker(tmp_path):
+    import hashlib
+
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    with (root / "deploy.env").open("a") as output:
+        output.write("VOICE_STACK=1\n")
+    (root / ".env.voice").write_text("VOICE_POSTGRES_IMAGE=postgres@sha256:" + "4" * 64 + "\n")
+    legacy = {**env, "FAKE_PRE_VOICE_IMAGE": IMAGES[A]}
+    rejected = deploy(root, legacy, B, "2-1")
+    assert rejected.returncode != 0
+    assert (root / "current-release").read_text().split()[0] == A
+    backup = root / "prevoice"
+    backup.mkdir()
+    (backup / "guide.dump").write_bytes(b"private-snapshot")
+    (root / "releases" / B / "voice-initial-rollout.json").write_text(
+        json.dumps(
+            {
+                "previous_sha": A,
+                "target_sha": B,
+                "backup": str(backup),
+                "guide_sha256": hashlib.sha256(b"private-snapshot").hexdigest(),
+            }
+        )
+    )
+    failed = deploy(root, {**legacy, "FAKE_MIGRATION_FAIL": "1", "FAKE_CUTOVER": "yes"}, B, "3-1")
+    assert failed.returncode != 0 and "Rollback to " + A + " succeeded" in failed.stderr
+    assert (root / "current-release").read_text().split()[0] == A
+    calls = [json.loads(line)[1] for line in Path(str(state) + ".log").read_text().splitlines()]
+    assert any("voice-worker" in args and "stop" in args for args in calls)
+    assert not any("voice-worker" in args and "up" in args for args in calls)
+    assert any(
+        "restore" in args and "involta_guide.infrastructure.persistence.release_backup" in args
+        for args in calls
+    )

@@ -26,7 +26,19 @@ if Path(sys.argv[0]).name=='ssh':
 
 
 @pytest.mark.parametrize(
-    "mode", ["deploy", "rollback", "bootstrap", "bootstrap-rollback", "inspect", "admin-password"]
+    "mode",
+    [
+        "deploy",
+        "rollback",
+        "bootstrap",
+        "bootstrap-rollback",
+        "inspect",
+        "admin-password",
+        "voice-prepare",
+        "voice-activate",
+        "voice-backfill",
+        "voice-report",
+    ],
 )
 @pytest.mark.parametrize("pin", [None, "", "-", "example.test ssh-ed25519 test-public-key"])
 def test_host_pin_policy_applies_to_every_connection(tmp_path, mode, pin):

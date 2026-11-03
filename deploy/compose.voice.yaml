@@ -48,7 +48,7 @@
       ],
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice"
       },
@@ -87,7 +87,7 @@
       ],
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice"
       },
@@ -143,12 +143,16 @@
       ],
       "env_file": "${DEPLOY_ROOT:?}/.env.voice",
       "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
-        "VOICE_DATA_DIR": "/app/var/voice"
+        "VOICE_DATA_DIR": "/app/var/voice",
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
+        "HF_HOME": "/tmp/huggingface",
+        "HF_HUB_OFFLINE": "1"
       },
       "volumes": [
-        "voice-audio:/app/var/voice"
+        "voice-audio:/app/var/voice",
+        "asr-models:/app/var/asr-models:ro"
       ],
       "command": [
         "voice-worker"
@@ -156,6 +160,9 @@
       "stop_grace_period": "120s",
       "depends_on": {
         "voice-migrate": {
+          "condition": "service_completed_successfully"
+        },
+        "voice-prepare-model": {
           "condition": "service_completed_successfully"
         }
       },
@@ -168,7 +175,9 @@
         "interval": "15s",
         "timeout": "5s",
         "retries": 4
-      }
+      },
+      "mem_limit": "3g",
+      "cpus": 1.5
     },
     "voice-consumer": {
       "image": "${IMAGE_REF:?}",
@@ -221,11 +230,49 @@
         "frontend",
         "voice-private"
       ]
+    },
+    "voice-prepare-model": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "no",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "networks": [
+        "voice-private"
+      ],
+      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice",
+        "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
+        "HF_HOME": "/tmp/huggingface",
+        "HF_HUB_DISABLE_XET": "1"
+      },
+      "volumes": [
+        "asr-models:/app/var/asr-models"
+      ],
+      "command": [
+        "voice",
+        "prepare-model"
+      ],
+      "depends_on": {}
     }
   },
   "volumes": {
     "voice-postgres": {},
-    "voice-audio": {}
+    "voice-audio": {},
+    "asr-models": {}
   },
   "networks": {
     "voice-private": {

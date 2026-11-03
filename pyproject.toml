@@ -7,14 +7,18 @@ dependencies = [
  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "jinja2>=3.1,<4",
  "sqlalchemy>=2.0,<3", "alembic>=1.15,<2", "psycopg[binary]>=3.2,<4",
  "pydantic-settings>=2.8,<3", "httpx>=0.28,<1", "python-multipart>=0.0.20",
- "argon2-cffi>=23.1", "python-dotenv>=1.0",
+ "argon2-cffi>=23.1", "python-dotenv>=1.0", "rapidfuzz>=3.14,<4",
 ]
+[project.optional-dependencies]
+voice-local = ["onnx-asr[cpu,hub]>=0.9,<1", "av>=14,<16"]
+
 [project.scripts]
 guide = "involta_guide.cli:main"
 guide-worker = "involta_guide.infrastructure.jobs.worker:main"
 voice = "involta_voice.cli:main"
 voice-worker = "involta_voice.worker:main"
 guide-voice-consumer = "involta_guide.infrastructure.voice.consumer:main"
+guide-voice-asr-backfill = "involta_guide.infrastructure.voice.backfill:main"
 [dependency-groups]
 dev = ["pytest>=8", "pytest-cov>=6", "ruff>=0.11", "mypy>=1.15", "playwright>=1.50", "types-requests"]
 [build-system]
