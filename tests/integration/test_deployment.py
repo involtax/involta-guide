@@ -58,6 +58,7 @@ if args[0]=='compose':
  if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
   operation=args[-1]
   if operation=='needed':print(os.getenv('FAKE_CUTOVER','no'))
+  elif operation=='compatibility':print(os.getenv('FAKE_COMPATIBILITY','previous'))
   elif operation=='backup':print('test-dump')
   elif operation=='restore':sys.stdin.read()
   sys.exit(0)

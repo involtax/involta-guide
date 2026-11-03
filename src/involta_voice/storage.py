@@ -15,7 +15,7 @@ class AudioStorage:
         self.settings = settings
         self.root = settings.data_dir / "audio"
 
-    def save(self, content: bytes, mime: str) -> tuple[str, float]:
+    def save(self, content: bytes, mime: str, *, name: str | None = None) -> tuple[str, float]:
         formats = {
             "audio/webm": ("webm", content[:4] == b"\x1aE\xdf\xa3"),
             "audio/ogg": ("ogg", content[:4] == b"OggS"),
@@ -29,7 +29,8 @@ class AudioStorage:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if shutil.disk_usage(self.root).free < self.settings.min_free_bytes + len(content):
             raise VoiceError("Недостаточно места для надёжного сохранения", "storage", 503)
-        name = f"{uuid4()}.{formats[mime][0]}"
+        name = name or f"{uuid4()}.{formats[mime][0]}"
+        self.path(name)
         temporary = self.root / (name + ".upload")
         target = self.root / name
         try:

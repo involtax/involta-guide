@@ -279,8 +279,8 @@ def main():
                 )
             )
         elif action == "backfill":
-            for service, cli in (("web", "guide-voice-asr-backfill"), ("voice-api", "voice")):
-                args = [cli] if service == "web" else [cli, "asr-backfill"]
+            for service, cli in (("voice-api", "voice"),):
+                args = [cli, "asr-backfill"]
                 for execute in (False, True):
                     result = json.loads(
                         run(

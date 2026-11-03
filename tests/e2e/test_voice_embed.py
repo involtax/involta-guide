@@ -22,7 +22,7 @@ def test_widget_permission_html_error_reload_and_lost_202():
         elif path == "/widget.v1.js":
             route.fulfill(content_type="application/javascript", body=widget)
         elif path.endswith("/identity"):
-            route.fulfill(content_type="application/json", body='{"ready":true}')
+            route.fulfill(content_type="application/json", body='{"ready":true,"content_epoch":1}')
         elif path.endswith("/mine"):
             route.fulfill(content_type="application/json", body='{"rows":[]}')
         elif path.endswith("/submissions"):

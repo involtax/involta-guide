@@ -11,7 +11,7 @@ from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
 from .test_background_generation import configured, envelope, task
-from .test_web import login, token
+from .test_web import login
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/pereslavl-generation-response.json"
 
@@ -30,38 +30,18 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
     )
     try:
         Worker(queue, service).once()
-        initial = queries.get("locations", location["id"])["revision"]
         cached = task(engine, job)["response_json"]
-        with engine.begin() as conn:
-            # Existing pages from the former parser can still contain raw citation text.
-            for card in raw["restaurants"]:
-                conn.execute(
-                    text("UPDATE restaurants SET description=:description WHERE name=:name"),
-                    {"description": card["description"], "name": card["name"]},
-                )
-        assert "](" in queries.public(location["slug"])["content"]["restaurants"][0]["description"]
         with TestClient(create_app(settings)) as client:
             login(client)
             page = client.get("/guide/logs/" + location["slug"] + "/1")
             assert "Поиск неполный" in page.text
             assert "Бояре" in page.text and "Нужно проверить" in page.text
-            response = client.post(
-                "/guide/admin/actions/reprocess-generation",
-                data={
-                    "_csrf": token(page.text),
-                    "log_slug": location["slug"],
-                    "log_number": 1,
-                    "expected": initial,
-                },
-                headers={"origin": "http://testserver"},
-            )
-            assert response.status_code == 200
-        provider.client.close()
-        Worker(queue, service).once()
+            assert "Переобработать тот же ответ" not in page.text
+            assert "reset-and-fill" not in page.text
         assert requests == ["POST"]
         assert raw == original and task(engine, job)["response_json"] == cached
         assert len(queries.rows("restaurants")) == 2
-        public = queries.public(location["slug"])["content"]
+        public = queries.location(location["id"])["content"]
         assert all("](" not in card["description"] for card in public["restaurants"])
         assert public["qualityReport"]["status"] == "partial"
         assert len(public["candidateReview"]) == 10

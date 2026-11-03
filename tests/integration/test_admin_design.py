@@ -136,7 +136,6 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         "logs": "/logs",
         "city-logs": "/logs/ivanovo",
         "log": log["path"],
-        "alex": "/alex",
     }
     from pathlib import Path
 

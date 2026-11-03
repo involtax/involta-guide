@@ -43,14 +43,21 @@ class VoiceEditorial:
                 return dict(previous["result"])
             from datetime import UTC, datetime
 
-            session = require(repo, "admin_sessions", session_id, lock=True)
+            session = row(
+                conn, "SELECT * FROM admin_sessions WHERE id=:id FOR SHARE", id=session_id
+            )
+            if not session:
+                raise RuleViolation("Сессия не найдена")
             if session["revoked"] or session["expires_at"] <= datetime.now(UTC):
                 raise RuleViolation("Сессия редактора завершена")
             review = require(repo, "reviews", review_id)
-            if review["alex_session_id"] or review.get("admin_session_id"):
-                raise RuleViolation("Редакторская голосовая команда обрабатывается отдельно")
-            execute(conn, "SELECT id FROM locations ORDER BY id FOR UPDATE")
             location = require(repo, "locations", review["location_id"], lock=True)
+            if (
+                location["reset_pending"]
+                or location["is_hub"]
+                or review["content_epoch"] != location["content_epoch"]
+            ):
+                raise Conflict("Цикл локации изменился или сброс не завершён")
             review = require(repo, "reviews", review_id, lock=True)
             text = require(repo, "review_texts", review_id, lock=True)
             link = repo.get("voice_links", review_id, lock=True)
@@ -70,13 +77,13 @@ class VoiceEditorial:
             if command.action == "edit-text":
                 if command.text is None or not command.text.strip():
                     raise RuleViolation("Текст отзыва не может быть пустым")
+                if command.text == text["editorial_text"]:
+                    return {"review_revision": text["revision"], "unchanged": True}
                 repo.change("review_texts", review_id, {"editorial_text": command.text})
             elif command.action in ("bind", "bind-fragment"):
                 if command.restaurant_id is not None:
                     restaurant = require(repo, "restaurants", str(command.restaurant_id))
-                    if restaurant["location_id"] != location["id"] and not repo.allowed(
-                        restaurant["id"], location["id"]
-                    ):
+                    if restaurant["location_id"] != location["id"]:
                         raise RuleViolation("Ресторан не относится к локации")
                 binding = str(command.restaurant_id) if command.restaurant_id else None
                 if command.action == "bind-fragment":
@@ -111,6 +118,8 @@ class VoiceEditorial:
                     )
                     result.update(fragment=command.fragment_number, restaurant_id=binding)
                 else:
+                    if binding == text["restaurant_id"]:
+                        return {"review_revision": text["revision"], "unchanged": True}
                     repo.change("review_texts", review_id, {"restaurant_id": binding})
             elif command.action in ("approve", "reject", "fraud", "reset"):
                 decision = {
@@ -183,7 +192,10 @@ class VoiceEditorial:
                 if command.action == "edit-proposal":
                     payload["changes"] = command.changes
                     if command.restaurant_id:
-                        payload["restaurantId"] = str(command.restaurant_id)
+                        target = require(repo, "restaurants", str(command.restaurant_id))
+                        if target["location_id"] != location["id"]:
+                            raise RuleViolation("Ресторан принадлежит другой локации")
+                        repo.change("proposals", proposal["id"], {"restaurant_id": target["id"]})
                 repo.change(
                     "proposals",
                     proposal["id"],
@@ -285,7 +297,6 @@ class VoiceEditorial:
             if identity in excluded:
                 repo.change("proposals", identity, {"status": "rejected"})
         proposals = [p for p in proposals if str(p["id"]) not in excluded]
-        changed_ids = set()
         for proposal in proposals:
             payload = proposal["payload"]
             changes = payload.get("changes", {})
@@ -298,7 +309,7 @@ class VoiceEditorial:
                 "openingHours",
             }:
                 raise RuleViolation("Недопустимое поле пакета")
-            target = payload.get("restaurantId")
+            target = str(proposal["restaurant_id"]) if proposal["restaurant_id"] else None
             current = next((r for r in content["restaurants"] if r.get("id") == target), None)
             if proposal["kind"] == "edit" and current is None:
                 raise RuleViolation("Ресторан правки не найден")
@@ -314,26 +325,7 @@ class VoiceEditorial:
                     raise RuleViolation("Для нового ресторана нужен телефон")
                 content["restaurants"].append(validated)
             else:
-                changed_ids.add(current["id"])
                 current.update(validated)
-        # Shared canonical cards change every page that includes them. Fence the whole package.
-        affected = [
-            dict(r)
-            for r in conn.execute(
-                sql_text(
-                    "SELECT l.* FROM locations l WHERE l.id<>:id AND EXISTS "
-                    "(SELECT 1 FROM jsonb_array_elements(l.page_data->'restaurants') card "
-                    "WHERE card->>'id'=ANY(CAST(:ids AS text[]))) ORDER BY l.id"
-                ),
-                {"ids": list(changed_ids), "id": location["id"]},
-            ).mappings()
-        ]
-        if any(
-            (str(item["revision"]) if item["revision"] else None)
-            != command.affected_revisions.get(str(item["id"]))
-            for item in affected
-        ):
-            raise Conflict("Связанные страницы изменились. Обновите сравнение.")
         if content != original_content:
             save(repo, location["id"], content, expected, review_id=review_id)
         for proposal in proposals:

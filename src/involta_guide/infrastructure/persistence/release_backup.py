@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlsplit
 
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.pq import Conninfo
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 
 from involta_guide.config import Settings
 from involta_guide.infrastructure.persistence.unit_of_work import create_database
@@ -55,25 +55,22 @@ def owned_tables(settings: Settings) -> set[str]:
         re.findall(
             r"CREATE TABLE (\w+)", (settings.root_dir / "migrations/current_schema.sql").read_text()
         )
-    ) | {
-        "alembic_version",
-        "schema_migrations",
-        "versions",
-        "version_reviews",
-        "voice_page_drafts",
-        "voice_candidate_proposals",
-    }
+    ) | {"alembic_version", "beta_cleanup_files", "beta_transition_report", "ai_daily_usage"}
 
 
 def main() -> None:
     settings = Settings()
     mode = sys.argv[1]
-    if mode == "needed":
+    if mode in ("needed", "compatibility"):
         engine = create_database(settings)
         try:
             with engine.connect() as conn:
-                legacy = conn.execute(text("SELECT to_regclass('versions') IS NOT NULL")).scalar()
-                print("yes" if legacy else "no")
+                tables = set(inspect(conn).get_table_names(schema=settings.database_schema))
+                beta = "beta_transition_report" in tables
+                if mode == "compatibility":
+                    print("beta" if beta else "previous" if "locations" in tables else "empty")
+                else:
+                    print("manual-beta-transition" if "locations" in tables and not beta else "no")
         finally:
             engine.dispose()
         return
@@ -163,8 +160,7 @@ def main() -> None:
                 owned = owned_tables(settings)
                 added = (present & owned) - archived
                 quote = engine.dialect.identifier_preparer.quote_identifier
-                # A pre-Voice backup does not know about the newly added FKs on
-                # reviews/alex_changes. Remove owned FKs before pg_restore drops PKs.
+                # Remove owned FKs before pg_restore drops referenced primary keys.
                 # All statements below share psql's single transaction with restore.
                 prefix = ""
                 inspector = inspect(conn)

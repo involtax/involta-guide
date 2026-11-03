@@ -10,10 +10,9 @@ from involta_guide.application.services.jobs import JobService
 from involta_guide.config import Settings
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.ai.audit import AIAudit
-from involta_guide.infrastructure.ai.errors import GenerationPending
-from involta_guide.infrastructure.ai.openai import OpenAIProvider, ProviderUnavailable
+from involta_guide.infrastructure.ai.errors import GenerationPending, ProviderUnavailable
+from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 from .queue import JobQueue
 
@@ -22,6 +21,10 @@ class Worker:
     def __init__(self, queue: JobQueue, service: JobService) -> None:
         self.queue = queue
         self.service = service
+        if service.reset_handler is None:
+            from involta_guide.infrastructure.beta_reset import BetaReset
+
+            service.reset_handler = BetaReset(queue.engine, queue.settings, service).perform
         self.stop = threading.Event()
         self.audit = AIAudit(queue.engine, queue.settings)
 
@@ -86,9 +89,7 @@ class Worker:
                     "traceback": traceback.format_exc(),
                 },
             )
-            self.queue.fail(
-                job, str(exc), retry=exc.retryable and not job.get("_temporary_public_fill", False)
-            )
+            self.queue.fail(job, str(exc), retry=False)
         except Exception:
             self.audit.record(
                 job["id"],
@@ -99,7 +100,9 @@ class Worker:
                 },
             )
             self.queue.fail(
-                job, "Internal processing error; inspect server diagnostics", retry=True
+                job,
+                "Internal processing error; inspect server diagnostics",
+                retry=job["kind"] == "reset",
             )
             logging.exception("Worker processing failed")
         finally:
@@ -117,14 +120,12 @@ class Worker:
 def main() -> None:
     settings = Settings()
     engine = create_database(settings)
-    storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-    provider = OpenAIProvider(settings, engine, storage)
+    provider = OpenAIProvider(settings, engine)
     worker = Worker(
         JobQueue(engine, settings),
         JobService(
             lambda: PostgresUow(engine),
             provider,
-            storage,
             public_fill_enabled=settings.temporary_public_fill_enabled,
         ),
     )

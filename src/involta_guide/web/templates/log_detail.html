@@ -31,22 +31,18 @@
 <small>Без новой генерации OpenAI. Этот лог и исходный ответ сохраняются.</small>
 </form>
 {%endif%}
-{%if d.job.kind=='generate'%}
+{%if d.job.kind=='generate' and not log_location.initialized_at and not log_location.reset_pending%}
 <form method="post" action="{{settings.path('/admin/actions/regenerate')}}" class="stack">{{csrf()}}
 <input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}">
 {{generation_model_picker('Модель нового запроса',generation_model)}}
 <small>* Сравнение цен и моделей — в «Настройках наполнения».</small>
 <button {%if d.job.status in ['queued','running']%}disabled{%endif%}>Повторить новым запросом</button></form>
-{%elif d.job.status=='failed'%}
-<form method="post" action="{{settings.path('/admin/actions/retry')}}">{{csrf()}}<input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}"><button>Повторить</button></form>
+{%elif log_location.initialized_at%}<p>Подборка уже наполнена. <a href="{{settings.path('/admin/locations/'+d.job.location_slug)}}">Очистить локацию и наполнить заново ↗</a></p>
 {%endif%}
 {%endif%}
 {%if not d.trace_available%}<p class="notice">Полный ответ провайдера не записан. Доступные данные запроса приведены ниже.</p>{%endif%}
 <details><summary>Данные запроса и исходный промт</summary><pre class="audit-json">{{d.job|tojson(indent=2)}}</pre></details>
-{%if d.review and logs_admin%}
-<details><summary>Отзыв, расшифровка и результат</summary><pre class="audit-json">{{d.review|tojson(indent=2)}}</pre></details>
-<audio controls preload="none" src="{{settings.path(d.job.log_path+'/audio')}}"></audio>
-{%endif%}
+
 <h3>Обращения к OpenAI</h3>
 <p>Одно обращение — одна генерация. GET в хронологии только проверяет тот же ответ. done означает, что полный ответ сохранён; публикация показана отдельно выше. Пока статистика OpenAI не получена, нули токенов не означают отсутствие расходов.</p>
 {%for c in d.calls%}<details open><summary>{{c.created_at}} · {{c.model}} · {{c.operation}} · {{c.status}}</summary><pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>{%else%}<p>Обращений к провайдеру нет.</p>{%endfor%}

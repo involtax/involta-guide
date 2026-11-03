@@ -100,7 +100,8 @@ def test_domain_has_no_external_imports():
 def test_external_urls_and_numeric_review_scales():
     from pydantic import ValidationError
 
-    from involta_guide.application.commands.schemas import RestaurantInput, ReviewEntryInput
+    from involta_guide.application.commands.schemas import RestaurantInput
+    from involta_voice.contracts import ReviewFragment
 
     with pytest.raises(ValidationError):
         RestaurantInput(
@@ -121,7 +122,7 @@ def test_external_urls_and_numeric_review_scales():
         "topics": [],
         "experience": "unknown",
     }
+    entry.update(start=0, end=1, sentiment=-10, recommendation=10, rating=0)
+    assert ReviewFragment.model_validate(entry).rating == 0
     with pytest.raises(ValidationError):
-        ReviewEntryInput.model_validate(entry)
-    entry.update(sentiment=-10, recommendation=10, rating=0)
-    assert ReviewEntryInput.model_validate(entry).rating == 0
+        ReviewFragment.model_validate({**entry, "rating": 11})

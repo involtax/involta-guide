@@ -69,17 +69,10 @@
           "default": null,
           "title": "Revision"
         },
-        "published_revision": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Published Revision"
+        "content_epoch": {
+          "minimum": 1,
+          "title": "Content Epoch",
+          "type": "integer"
         },
         "restaurants": {
           "items": {
@@ -93,16 +86,53 @@
       "required": [
         "id",
         "slug",
-        "name"
+        "name",
+        "content_epoch"
       ],
       "title": "LocationContext",
+      "type": "object"
+    },
+    "LocationPurged": {
+      "additionalProperties": false,
+      "properties": {
+        "purged": {
+          "const": true,
+          "title": "Purged",
+          "type": "boolean"
+        },
+        "content_epoch": {
+          "minimum": 1,
+          "title": "Content Epoch",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "purged",
+        "content_epoch"
+      ],
+      "title": "LocationPurged",
+      "type": "object"
+    },
+    "LocationReset": {
+      "additionalProperties": false,
+      "properties": {
+        "content_epoch": {
+          "minimum": 1,
+          "title": "Content Epoch",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "content_epoch"
+      ],
+      "title": "LocationReset",
       "type": "object"
     },
     "OutboxEvent": {
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "const": 1,
+          "const": 2,
           "title": "Schema Version",
           "type": "integer"
         },
@@ -418,8 +448,8 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "const": 1,
-          "default": 1,
+          "const": 2,
+          "default": 2,
           "title": "Schema Version",
           "type": "integer"
         },
@@ -437,15 +467,15 @@
           "title": "Idempotency Key",
           "type": "string"
         },
-        "ip_fingerprint": {
+        "ip": {
           "maxLength": 200,
-          "minLength": 32,
-          "title": "Ip Fingerprint",
+          "minLength": 1,
+          "title": "Ip",
           "type": "string"
         },
         "user_agent": {
           "default": "",
-          "maxLength": 500,
+          "maxLength": 10000,
           "title": "User Agent",
           "type": "string"
         },
@@ -467,15 +497,6 @@
           "title": "Timezone",
           "type": "string"
         },
-        "actor": {
-          "default": "visitor",
-          "enum": [
-            "visitor",
-            "admin"
-          ],
-          "title": "Actor",
-          "type": "string"
-        },
         "correlation_id": {
           "format": "uuid",
           "title": "Correlation Id",
@@ -486,7 +507,7 @@
         "location",
         "visitor",
         "idempotency_key",
-        "ip_fingerprint",
+        "ip",
         "correlation_id"
       ],
       "title": "SubmissionMetadata",
@@ -513,8 +534,7 @@
             "transcription_failed",
             "transcription_unknown",
             "analysis_failed",
-            "analysis_unknown",
-            "archived"
+            "analysis_unknown"
           ],
           "title": "State",
           "type": "string"
@@ -641,6 +661,12 @@
     },
     {
       "$ref": "#/$defs/AnalysisResult"
+    },
+    {
+      "$ref": "#/$defs/LocationReset"
+    },
+    {
+      "$ref": "#/$defs/LocationPurged"
     }
   ]
 }

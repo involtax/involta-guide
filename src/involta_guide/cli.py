@@ -1,7 +1,6 @@
 import argparse
 import getpass
 import json
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from argon2 import PasswordHasher
@@ -10,7 +9,6 @@ from sqlalchemy import inspect, text
 from involta_guide.config import Settings
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.seed import seed
-from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
 
 def main() -> None:
@@ -21,7 +19,7 @@ def main() -> None:
             "seed",
             "schema-audit",
             "hash-password",
-            "retain-audio",
+            "beta-cleanup-files",
             "worker-health",
             "voice-consumer-health",
         ],
@@ -68,30 +66,13 @@ def main() -> None:
                         ),
                     }
             print(json.dumps(result, ensure_ascii=False, indent=2))
-        else:
-            storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
-            cutoff = datetime.now(UTC) - timedelta(days=settings.audio_retention_days)
-            with PostgresUow(engine) as uow:
-                active = {
-                    row["review_id"]
-                    for row in uow.repo.rows("jobs", limit=100000)
-                    if row["status"] in ("queued", "running")
-                }
-                reviews = [
-                    row
-                    for row in uow.repo.rows("reviews", limit=100000)
-                    if row["created_at"] < cutoff
-                    and row["status"] != "pending"
-                    and row["id"] not in active
-                    and not row["audio"].startswith("voice:")
-                ]
-                print(
-                    f"Audio eligible: {len(reviews)}; mode: {'execute' if args.execute else 'dry-run'}"
-                )
-                if args.execute:
-                    for row in reviews:
-                        storage.delete(row["audio"])
-                        uow.repo.change("reviews", row["id"], {"deleted_at": datetime.now(UTC)})
-                        uow.repo.audit("audio_deleted", row["id"], "Retention policy")
+        elif args.command == "beta-cleanup-files":
+            from involta_guide.infrastructure.beta_reset import cleanup_files
+
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT count(*) FROM beta_cleanup_files")).scalar()
+            print(f"Files pending: {count}; mode: {'execute' if args.execute else 'dry-run'}")
+            if args.execute:
+                cleanup_files(engine, settings)
     finally:
         engine.dispose()

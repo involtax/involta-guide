@@ -72,6 +72,9 @@ def routes(prefix: str) -> APIRouter:
             {
                 "tab": "reviews",
                 "queue": listing,
+                "failed_deliveries": ctx.queries.rows(
+                    "voice_inbox", {"state": "failed"}, limit=100
+                ),
                 "consumer_health": read.consumer_health(),
                 "v": detail,
                 "remote": remote,
@@ -198,6 +201,26 @@ def routes(prefix: str) -> APIRouter:
             headers={"Cache-Control": "private,no-store"},
         )
 
+    @router.post(base + "/inbox/{event_id}/retry")
+    def retry_delivery(
+        request: Request, event_id: UUID, form: FormData = Depends(form_data)
+    ) -> Response:
+        require_admin(request)
+        check_csrf(request, form)
+        from involta_guide.infrastructure.voice.consumer import Consumer
+
+        try:
+            Consumer(context(request).engine, voice_client(request)).retry(str(event_id))
+            message = "Повтор доставки выполнен"
+        except ValueError as exc:
+            message = str(exc)
+        return RedirectResponse(
+            context(request).settings.path("/admin/reviews")
+            + "?"
+            + urlencode({"message": message}),
+            status_code=303,
+        )
+
     @router.post(old_base + "/settings")
     @router.post(base + "/settings")
     def settings(request: Request, form: FormData = Depends(form_data)) -> Response:
@@ -253,8 +276,7 @@ def routes(prefix: str) -> APIRouter:
                 media_type=remote.headers.get("content-type", "application/octet-stream"),
                 headers={"Cache-Control": "private,no-store"},
             )
-        content, mime = ctx.reviews.audio(review_id)
-        return Response(content, media_type=mime, headers={"Cache-Control": "private,no-store"})
+        raise HTTPException(404, "Аудио недоступно")
 
     @router.post(old_base + "/decision/{review_id}")
     def decision(
@@ -269,11 +291,7 @@ def routes(prefix: str) -> APIRouter:
         if action in ("asr-run", "asr-evaluate"):
             reference = detail["asr_reference"]
             if not reference:
-                from involta_guide.infrastructure.voice.backfill import ensure_copy
-
-                reference = ensure_copy(
-                    ctx.settings, ctx.engine, str(review_id), voice_client(request)
-                )
+                raise HTTPException(409, "Нет голосовой записи")
             asr_action(request, reference, form, principal["id"])
             return RedirectResponse(ctx.settings.path(detail["path"]), status_code=303)
         if action in ("new-run", "revalidate"):
@@ -295,9 +313,7 @@ def routes(prefix: str) -> APIRouter:
                     "slug": location["slug"],
                     "name": location["name"],
                     "revision": str(location["revision"]) if location["revision"] else None,
-                    "published_revision": str(location["revision"])
-                    if location["revision"]
-                    else None,
+                    "content_epoch": location["content_epoch"],
                     "restaurants": [
                         {
                             "id": str(r["id"]),
@@ -404,7 +420,6 @@ def routes(prefix: str) -> APIRouter:
             if form.get("page_revision")
             else None,
             changes=changes,
-            affected_revisions=json.loads(str(form.get("affected_revisions") or "{}")),
             run=int(str(form.get("run"))) if form.get("run") else None,
             fragment_number=int(str(form.get("fragment_number")))
             if form.get("fragment_number") is not None

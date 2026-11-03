@@ -47,10 +47,7 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
         assert client.get("/guide/logs/ivanovo-new/1").status_code == 200
         old_path = client.get("/guide/logs/ivanovo/1", follow_redirects=False)
         assert old_path.status_code == 404
-        assert (
-            client.get("/guide/logs/" + job["id"], follow_redirects=False).headers["location"]
-            == "/guide/logs/ivanovo-new/1"
-        )
+        assert client.get("/guide/logs/" + job["id"]).status_code == 404
         login(client)
         admin = client.get("/guide/admin")
         assert 'href="/guide/logs"' in admin.text and "Аудит ИИ" not in admin.text
@@ -61,20 +58,21 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
         assert 'name="log_slug" value="ivanovo-new"' in log.text
 
 
-def test_concurrent_private_requests_receive_distinct_persisted_numbers(database):
-    settings, engine, uow, queries, location, service, queue = setup(database)
+def test_concurrent_completed_requests_receive_monotonic_persisted_numbers(database):
+    _, _, uow, queries, location, _, _ = setup(database)
 
     def enqueue(_):
         job_id = str(uuid4())
         with uow() as tx:
-            tx.repo.queue({"id": job_id, "kind": "review", "location_id": location["id"]})
+            tx.repo.queue(
+                {
+                    "id": job_id,
+                    "kind": "generate",
+                    "status": "failed",
+                    "location_id": location["id"],
+                }
+            )
             return tx.repo.log_reference(job_id)["number"]
 
     with ThreadPoolExecutor(4) as pool:
         assert sorted(pool.map(enqueue, range(4))) == [1, 2, 3, 4]
-    with TestClient(create_app(settings)) as client:
-        assert client.get("/guide/logs/ivanovo/1").status_code == 404
-        assert client.get("/guide/logs/ivanovo/1/audio").status_code == 401
-        login(client)
-        assert client.get("/guide/logs/ivanovo/1").status_code == 200
-        assert client.get("/guide/logs/ivanovo/1.json").status_code == 200

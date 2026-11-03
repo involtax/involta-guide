@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from involta_guide.infrastructure.ai.openai import ProviderUnavailable
+from involta_guide.infrastructure.ai.errors import ProviderUnavailable
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
@@ -63,7 +63,7 @@ def test_parallel_public_clicks_queue_one_job(database):
         states = list(pool.map(lambda _: service.enqueue_public_fill(location["id"]), range(6)))
     assert all(state["state"] == "queued" for state in states)
     assert len(queries.rows("jobs")) == 1
-    assert len(queries.rows("audit", {"action": "temporary_public_fill"})) == 1
+    assert queries.rows("jobs")[0]["public_log"] is True
 
 
 def test_current_manual_data_is_never_overwritten(database):
@@ -132,9 +132,10 @@ def test_public_provider_failure_waits_for_manual_retry(database):
     job = queries.rows("jobs")[0]
     assert job["status"] == "failed" and job["attempts"] == 1
     state = service.public_fill_state(location["id"])
-    assert state["state"] == "failed" and state["can_start"]
+    assert state["state"] == "failed" and not state["can_start"]
     assert "429" in state["message"]
-    assert service.enqueue_public_fill(location["id"])["state"] == "queued"
+    assert service.enqueue_public_fill(location["id"])["state"] == "failed"
+    service.regenerate(job["id"])
     assert len(queries.rows("jobs")) == 2
 
 
@@ -155,7 +156,7 @@ def test_unpublishable_result_does_not_partially_write_or_publish(database, publ
     assert queries.rows("jobs")[0]["status"] == "failed"
     assert [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]] == []
     assert queries.rows("restaurants") == []
-    assert service.public_fill_state(location["id"])["can_start"]
+    assert not service.public_fill_state(location["id"])["can_start"]
 
 
 def test_disabled_feature_and_cross_origin_do_not_queue(database):
@@ -177,13 +178,12 @@ def test_disabled_feature_and_cross_origin_do_not_queue(database):
     assert queries.rows("jobs") == []
 
 
-def test_disabling_feature_stops_pending_public_jobs(database):
+def test_disabling_public_intake_does_not_discard_already_accepted_job(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     service.enqueue_public_fill(location["id"])
     service.public_fill_enabled = False
     assert Worker(queue, service).once()
-    assert queries.rows("jobs")[0]["status"] == "failed"
-    assert [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]] == []
+    assert queries.rows("jobs")[0]["status"] == "done"
 
 
 def test_html_form_works_without_login_or_javascript(database):

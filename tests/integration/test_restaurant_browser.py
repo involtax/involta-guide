@@ -64,7 +64,7 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
             ("pending", 0, 10),
             ("approved", 1, 1),
         ]:
-            uow.repo.add(
+            review = uow.repo.add(
                 "reviews",
                 {
                     "id": str(uuid4()),
@@ -73,8 +73,8 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
                     "audio": "test.webm",
                     "mime": "audio/webm",
                     "hash": "test",
-                    "ip_hash": "test",
-                    "device": "test",
+                    "ip": "test",
+                    "user_agent": "test",
                     "status": "processed",
                     "moderation": moderation,
                     "fraud": fraud,
@@ -87,6 +87,22 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
                             }
                         ]
                     },
+                },
+            )
+            uow.session.execute(
+                text(
+                    "INSERT INTO voice_links(review_id,reference,location_id,number,active_run,metadata) VALUES(:id,:id,:loc,:n,1,'{}')"
+                ),
+                {"id": review["id"], "loc": ivanovo["id"], "n": rating},
+            )
+            uow.session.execute(
+                text(
+                    "INSERT INTO voice_fragments(review_id,run,number,restaurant_id,fragment) VALUES(:id,1,0,:restaurant,CAST(:fragment AS jsonb))"
+                ),
+                {
+                    "id": review["id"],
+                    "restaurant": leader["id"],
+                    "fragment": __import__("json").dumps(review["result"]["entries"][0]),
                 },
             )
     result = queries.restaurant_browser(location_id=ivanovo["id"])

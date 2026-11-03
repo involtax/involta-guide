@@ -11,23 +11,17 @@ from sqlalchemy import Engine, text
 
 from involta_guide.config import Settings
 
-HISTORY = """WITH numbered AS (
- SELECT j.*,l.name location_name,r.location_slug,r.number ordinal,r.path log_path,
+HISTORY = """WITH history AS (
+ SELECT j.*,l.name location_name,r.location_slug,r.number run_number,r.path log_path,
  g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
- (g.response_json IS NOT NULL) has_saved_response,
- (SELECT a.detail::jsonb->'data' FROM audit a WHERE a.action='generation_quality' AND a.target=j.id::text ORDER BY a.created_at DESC,a.id DESC LIMIT 1) quality_report,
- EXISTS(SELECT 1 FROM audit published WHERE published.action='ai_result' AND published.target=j.id::text
-   AND published.detail::jsonb->'data'->>'revision'=l.revision::text) result_published,
- (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
- (SELECT u.model FROM ai_usage u WHERE u.job_id=j.id ORDER BY u.created_at,u.id LIMIT 1) actual_model
+ (g.response_json IS NOT NULL) has_saved_response,(j.report->'qualityReport') || jsonb_build_object('candidateReview',coalesce(j.report->'candidateReview','[]'::jsonb)) quality_report,
+ j.applied result_published,
+ jsonb_build_object('model',j.model,'public_log',j.public_log,'baseline_revision',j.baseline_revision) generation_config,
+ j.model model_name,l.initialized_at,l.content_epoch current_epoch,l.reset_pending
  FROM jobs j JOIN request_logs r ON r.job_id=j.id JOIN locations l ON l.slug=r.location_slug
  LEFT JOIN generation_requests g ON g.job_id=j.id
-), history AS (
- SELECT *,ordinal run_number,
- coalesce(generation_config->>'model',actual_model,'') model_name FROM numbered
 ) """
-PUBLIC_GENERATION = """j.kind='generate' AND j.review_id IS NULL AND
- (j.generation_config->>'public_log'='true' OR EXISTS(SELECT 1 FROM audit a WHERE a.action='temporary_public_fill' AND a.target=j.id::text))"""
+PUBLIC_GENERATION = "j.kind='generate' AND j.public_log"
 
 
 class AIAudit:
@@ -79,6 +73,14 @@ class AIAudit:
             {"event": event, "call_id": call_id, "release": self.settings.release_sha, "data": data}
         )
         with self.engine.begin() as conn:
+            valid = conn.execute(
+                text(
+                    "SELECT l.id FROM locations l JOIN jobs j ON j.location_id=l.id WHERE j.id=:id AND j.content_epoch=l.content_epoch AND (NOT l.reset_pending OR j.kind='reset') FOR SHARE OF l"
+                ),
+                {"id": job_id},
+            ).first()
+            if not valid:
+                return
             conn.execute(
                 text(
                     "INSERT INTO audit(id,action,target,detail) VALUES(:id,'ai_trace',:job,:detail)"
@@ -166,12 +168,18 @@ class AIAudit:
             job["stage_label"] = "Поиск неполный"
         job["can_reprocess"] = (
             job["kind"] == "generate"
-            and job["status"] in ("done", "failed", "cancelled")
+            and job["status"] in ("failed", "cancelled")
+            and not job.get("initialized_at")
+            and not job.get("reset_pending")
+            and job.get("content_epoch") == job.get("current_epoch")
             and state == "completed"
             and bool(job.get("has_saved_response"))
         )
         job["can_resume"] = (
             job["status"] == "failed"
+            and not job.get("initialized_at")
+            and not job.get("reset_pending")
+            and job.get("content_epoch") == job.get("current_epoch")
             and not job["applied"]
             and bool(job.get("response_id"))
             and state in ("completed", "paused", "unavailable", "queued", "in_progress")
@@ -201,7 +209,7 @@ class AIAudit:
                         HISTORY
                         + """SELECT j.kind,j.status,j.error,j.applied,
                 j.generation_state,j.response_id,j.poll_count,j.result_published,j.log_path,
-                j.location_slug FROM history j WHERE j.id=:id"""
+                j.location_slug,j.initialized_at,j.reset_pending,j.content_epoch,j.current_epoch FROM history j WHERE j.id=:id"""
                         + (" AND " + PUBLIC_GENERATION if public_only else "")
                     ),
                     {"id": job_id},
@@ -223,19 +231,7 @@ class AIAudit:
             )
             if job is None:
                 return None
-            if public_only and (
-                job["kind"] != "generate"
-                or job["review_id"] is not None
-                or not (
-                    (job["generation_config"] or {}).get("public_log")
-                    or conn.execute(
-                        text(
-                            "SELECT 1 FROM audit WHERE target=:id AND action='temporary_public_fill' LIMIT 1"
-                        ),
-                        {"id": job_id},
-                    ).first()
-                )
-            ):
+            if public_only and (job["kind"] != "generate" or not job["public_log"]):
                 return None
             calls = (
                 conn.execute(
@@ -254,14 +250,6 @@ class AIAudit:
                 .all()
             )
             review = None
-            if job["review_id"]:
-                review = (
-                    conn.execute(
-                        text("SELECT * FROM reviews WHERE id=:id"), {"id": job["review_id"]}
-                    )
-                    .mappings()
-                    .first()
-                )
             events = []
             for row in rows:
                 try:

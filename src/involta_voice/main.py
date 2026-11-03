@@ -12,11 +12,18 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.requests import Request as StarletteRequest
 
 from .config import Settings
-from .contracts import LocationContext, SubmissionMetadata, SubmissionStatus
+from .contracts import (
+    LocationContext,
+    LocationPurged,
+    LocationReset,
+    SubmissionMetadata,
+    SubmissionStatus,
+)
 from .db import database, encoded, execute, row, snapshot
 from .errors import VoiceError
 from .evaluation import AsrRun, Evaluation
@@ -93,7 +100,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health/ready")
     def ready() -> dict[str, str]:
         with engine.connect() as conn:
-            execute(conn, "SELECT version FROM voice_schema_versions")
+            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=4") or row(
+                conn, "SELECT 1 FROM purge_files WHERE content_epoch=1 LIMIT 1"
+            ):
+                raise HTTPException(
+                    503, "Переход Voice не завершён: проверьте миграции и очистку файлов"
+                )
         return {"status": "ready"}
 
     @app.get("/widget.v1.js")
@@ -106,78 +118,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     dependencies = [Depends(authorized)]
 
-    @app.post("/internal/v1/admin/archive", dependencies=dependencies)
-    async def archive(request: Request) -> Any:
-        from starlette.concurrency import run_in_threadpool
-
-        from .archive import copy_archive
-
-        chunks = []
-        size = 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > settings.max_audio_bytes + 200_000:
-                raise VoiceError("Запись слишком велика", "too_large", 413)
-            chunks.append(chunk)
-
-        async def receive() -> dict[str, Any]:
-            return {"type": "http.request", "body": b"".join(chunks), "more_body": False}
-
-        form = await StarletteRequest(request.scope, receive).form(
-            max_files=1, max_fields=3, max_part_size=settings.max_audio_bytes
-        )
-        try:
-            audio = form.get("audio")
-            if not isinstance(audio, UploadFile):
-                raise VoiceError("Нужна исходная аудиозапись")
-            meta = SubmissionMetadata.model_validate_json(str(form.get("metadata") or ""))
-            source = UUID(str(form.get("source_review") or ""))
-            import json
-
-            legacy = json.loads(str(form.get("legacy") or ""))
-            if set(legacy) - {
-                "sha256",
-                "source_review",
-                "created_at",
-                "moderation",
-                "fraud",
-                "result",
-                "original_text",
-                "editorial_text",
-            }:
-                raise VoiceError("Неизвестное поле архива")
-            return await run_in_threadpool(
-                copy_archive,
-                service,
-                source,
-                meta,
-                await audio.read(),
-                (audio.content_type or "").split(";")[0],
-                legacy,
-            )
-        finally:
-            await form.close()
-
     def audit_admin(request: Request, action: str, before: Any, after: Any) -> None:
         session = request.headers.get("x-guide-session")
         session_id = str(UUID(session)) if session else None
         with engine.begin() as conn:
+            reference = request.path_params.get("reference")
+            location = None
+            if reference:
+                submission = row(
+                    conn,
+                    "SELECT location_id,content_epoch FROM submissions WHERE reference=:id",
+                    id=str(reference),
+                )
+                if not submission:
+                    return
+                from .reset import lock_epoch
+
+                lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
+                location = submission
             execute(
                 conn,
-                "INSERT INTO admin_events(id,action,session_id,before_data,after_data) VALUES(:id,:action,:session,CAST(:before AS jsonb),CAST(:after AS jsonb))",
+                "INSERT INTO admin_events(id,action,session_id,before_data,after_data,location_id,content_epoch) VALUES(:id,:action,:session,CAST(:before AS jsonb),CAST(:after AS jsonb),:location,:epoch)",
                 id=str(uuid4()),
                 action=action,
                 session=session_id,
                 before=encoded(before),
                 after=encoded(after),
+                location=location["location_id"] if location else None,
+                epoch=location["content_epoch"] if location else None,
             )
 
     @app.post(
-        "/internal/v1/guide-transcriptions",
+        "/internal/v1/locations/{location_id}/reset",
         dependencies=dependencies,
-        status_code=202,
-        response_model=SubmissionStatus,
+        response_model=LocationPurged,
     )
+    def reset_location(location_id: UUID, body: LocationReset) -> Any:
+        from .reset import purge
+
+        return purge(service, str(location_id), body.content_epoch)
+
     @app.post(
         "/internal/v1/submissions",
         dependencies=dependencies,
@@ -195,7 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 "audio": {"type": "string", "format": "binary"},
                                 "metadata": {
                                     "type": "string",
-                                    "description": "SubmissionMetadata v1 JSON, trusted Guide identity/context",
+                                    "description": "SubmissionMetadata v2 JSON, trusted Guide identity/context",
                                 },
                             },
                         }
@@ -222,21 +202,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not isinstance(audio, UploadFile):
                 raise VoiceError("Аудиозапись обязательна")
             metadata = SubmissionMetadata.model_validate_json(str(form.get("metadata") or ""))
-            purpose = (
-                "guide_transcription"
-                if request.url.path.endswith("/guide-transcriptions")
-                else "review"
-            )
-            if purpose == "review" and metadata.actor != "visitor":
-                raise VoiceError("Публичные отзывы не предоставляют прав администратора")
-            from starlette.concurrency import run_in_threadpool
-
             return await run_in_threadpool(
                 service.submit,
                 metadata,
                 await audio.read(),
                 (audio.content_type or "").split(";")[0],
-                purpose,
             )
         except ValueError as exc:
             if isinstance(exc, VoiceError):

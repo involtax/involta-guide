@@ -120,15 +120,15 @@ def test_intro_is_atomic_isolated_escaped_and_conflict_preserves_input(database,
         assert submit("<script>alert(1)</script> Новый текст").status_code == 200
         current = queries.get("locations", city["id"])
         assert current["revision"] != revision
-        assert current["page_data"] == before["page_data"]
+        assert current["initialized_at"] == before["initialized_at"]
         assert queries.rows("restaurants") == restaurants
         assert "<script>alert(1)</script>" not in client.get("/guide/ivanovo").text
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in client.get("/guide/ivanovo").text
         events = queries.rows("audit", {"action": "manual_intro", "target": city["id"]})
         assert len(events) == 1
         diff = json.loads(events[0]["detail"])
-        assert diff["fields"] == [
-            {"field": "intro", "before": before["intro"], "after": current["intro"]}
+        assert diff["diff"] == [
+            {"path": ["intro"], "before": before["intro"], "after": current["intro"]}
         ]
         assert "token" not in events[0]["detail"]
         assert submit(current["intro"], current["revision"]).status_code == 200
@@ -212,13 +212,6 @@ def test_restaurant_numbers_concurrent_stable_and_slug_updates_log_path(database
     assert len(set(numbers + [first["number"]])) == 26 and min(numbers) > 0
     with factory() as tx:
         tx.repo.change("restaurants", first["id"], {"name": "Переименованный"})
-        tx.repo.link(
-            "restaurant_locations",
-            {
-                "restaurant_id": first["id"],
-                "location_id": queries.directory(query="Казань")["rows"][0]["id"],
-            },
-        )
         tx.repo.queue({"id": str(uuid4()), "kind": "generate", "location_id": city["id"]})
         tx.repo.change("locations", city["id"], {"slug": "ivanovo-new"})
     assert queries.get("restaurants", first["id"])["number"] == first["number"]
@@ -228,7 +221,9 @@ def test_restaurant_numbers_concurrent_stable_and_slug_updates_log_path(database
         assert second_page.status_code == 200
         assert second_page.text.count('<article class="restaurant-record">') == 6
         page = client.get("/guide/admin/restaurants/" + str(first["number"]))
-        assert page.status_code == 200 and "Переименованный" in page.text and "Казань" in page.text
+        assert (
+            page.status_code == 200 and "Переименованный" in page.text and "Казань" not in page.text
+        )
         assert "/admin/locations/ivanovo-new" in page.text
         assert client.get("/guide/admin/locations/ivanovo").status_code == 404
         assert client.get("/guide/admin/locations/ivanovo-new").status_code == 200
@@ -318,43 +313,3 @@ def test_location_create_settings_slug_validation_and_relationships(database):
         )
         data["name"] = ""
         assert client.post("/guide/admin/locations", data=data, headers=HEADERS).status_code == 200
-
-
-def test_upgrade_populated_current_state_preserves_records(database, monkeypatch):
-    from involta_guide.infrastructure.persistence.unit_of_work import create_database
-
-    settings, admin_engine = database
-    schema = "admin_upgrade_" + uuid4().hex
-    with admin_engine.begin() as conn:
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-    engine = create_database(settings.model_copy(update={"database_schema": schema}))
-    monkeypatch.setenv("DATABASE_SCHEMA", schema)
-    config = Config(str(settings.root_dir / "alembic.ini"))
-    city, restaurant = str(uuid4()), str(uuid4())
-    try:
-        command.upgrade(config, "current_state")
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO locations(id,name,region,slug,intro) VALUES(:id,'Город','Регион','upgrade-city','Сохранить вступление')"
-                ),
-                {"id": city},
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,phone,alex_star) VALUES(:id,:city,'Ресторан','Кухня','Описание','https://example.com','+74951234567',true)"
-                ),
-                {"id": restaurant, "city": city},
-            )
-            before = dict(conn.execute(text("SELECT * FROM restaurants")).mappings().one())
-            location = dict(conn.execute(text("SELECT * FROM locations")).mappings().one())
-        command.upgrade(config, "head")
-        with engine.connect() as conn:
-            after = dict(conn.execute(text("SELECT * FROM restaurants")).mappings().one())
-            assert after.pop("number") > 0 and after == before
-            assert dict(conn.execute(text("SELECT * FROM locations")).mappings().one()) == location
-        command.upgrade(config, "head")
-    finally:
-        engine.dispose()
-        with admin_engine.begin() as conn:
-            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))

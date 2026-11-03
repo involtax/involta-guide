@@ -38,12 +38,12 @@ class Security:
     def csrf(self, token: str) -> str:
         return self.fingerprint("csrf:" + token)
 
-    def principal(self, token: str | None, *, alex: bool = False) -> Record | None:
+    def principal(self, token: str | None) -> Record | None:
         if not token or len(token) > 200:
             return None
         with self.uow() as uow:
             rows = uow.repo.rows(
-                "alex_sessions" if alex else "admin_sessions",
+                "admin_sessions",
                 {"token_hash": digest(token)},
                 limit=1,
             )
@@ -78,12 +78,6 @@ class Security:
             uow.repo.audit("admin_login", "admin")
         return token
 
-    def admin_shortcut(self, secret: str) -> str | None:
-        expected = self.settings.alex_secret.get_secret_value()
-        if not expected or not hmac.compare_digest(secret.encode(), expected.encode()):
-            return None
-        return self._admin_session()
-
     def renew_admin(self, token: str) -> bool:
         session = self.principal(token)
         now = datetime.now(UTC)
@@ -102,28 +96,8 @@ class Security:
             )
         return True
 
-    def alex_login(self, secret: str) -> str | None:
-        expected = self.settings.alex_secret.get_secret_value()
-        if not expected or not hmac.compare_digest(
-            secret.encode("utf-8"), expected.encode("utf-8")
-        ):
-            return None
-        token = secrets.token_hex(32)
-        with self.uow() as uow:
-            key = str(uuid4())
-            uow.repo.add(
-                "alex_sessions",
-                {
-                    "id": key,
-                    "token_hash": digest(token),
-                    "expires_at": datetime.now(UTC) + timedelta(days=30),
-                },
-            )
-            uow.repo.audit("alex_login", key)
-        return token
-
-    def revoke(self, token: str, *, alex: bool = False, all_sessions: bool = False) -> None:
-        table = "alex_sessions" if alex else "admin_sessions"
+    def revoke(self, token: str, *, all_sessions: bool = False) -> None:
+        table = "admin_sessions"
         with self.uow() as uow:
             rows = (
                 uow.repo.rows(table, {"revoked": False}, limit=10000)

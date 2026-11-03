@@ -4,15 +4,15 @@
   if (!window.InvoltaVoice) {
     const instances = new Map();
     const allowed = {
-      idle: ["permission_pending"], permission_pending: ["recording", "error"],
-      recording: ["preview", "error"], preview: ["permission_pending", "uploading"],
+      idle: ["permission_pending", "error"], permission_pending: ["recording", "error"],
+      recording: ["preview", "error"], preview: ["permission_pending", "uploading", "error"],
       uploading: ["accepted", "error"], accepted: ["permission_pending"],
       error: ["permission_pending", "uploading", "preview"],
     };
     class Diagnostics {
-      constructor(root, { key, api, role = 'visitor', location = '' }) {
-        this.key = `${key}:${role}:${location}`; this.api = api; this.role = role;
-        this.report = { version: 1, browser: navigator.userAgent, role, location, events: [] };
+      constructor(root, { key, api, location = '' }) {
+        this.key = `${key}:visitor:${location}`; this.api = api; this.location = location; this.epoch = null;
+        this.report = { version: 2, browser: navigator.userAgent, location, events: [] };
         this.panel = document.createElement('details'); this.panel.open = true;
         const title = document.createElement('summary'); title.textContent = 'Диагностика записи · бета';
         this.info = document.createElement('pre'); this.info.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:32em;overflow:auto';
@@ -57,10 +57,10 @@
         this.download.download = `voice-${id}.${blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`;
         this.download.hidden = false;
       }
-      async save(blob, id, seconds) {
-        this.showAudio(blob, id);
-        this.report.draft = { id, bytes: blob.size, mime: blob.type, seconds, local_copy_saved: false };
-        try { await this.store('put', { key: this.key, id, blob, seconds, role: this.role, updated: Date.now() }); this.report.draft.local_copy_saved = true; }
+      async save(blob, id, seconds, epoch) {
+        this.epoch = epoch; this.showAudio(blob, id);
+        this.report.draft = { id, bytes: blob.size, mime: blob.type, seconds, content_epoch: epoch, local_copy_saved: false };
+        try { await this.store('put', { key: this.key, id, blob, seconds, content_epoch: epoch, location: this.location, updated: Date.now() }); this.report.draft.local_copy_saved = true; }
         catch (e) { this.report.storage_error = e.message; }
         this.render();
       }
@@ -85,7 +85,10 @@
           let data;
           try { data = JSON.parse(body); }
           catch { throw new Error(`Сервер вернул неожиданный ответ (HTTP ${response.status}). Запись сохранена; полный ответ — в диагностике ниже.`); }
-          if (!response.ok) throw new Error((typeof data.error === 'string' ? data.error : data.error?.message) || (typeof data.detail === 'string' ? data.detail : `Не удалось отправить запись (HTTP ${response.status}).`));
+          if (!response.ok) {
+            const failure = new Error((typeof data.error === 'string' ? data.error : data.error?.message) || (typeof data.detail === 'string' ? data.detail : data.detail?.message || `Не удалось отправить запись (HTTP ${response.status}).`));
+            failure.code = data.error?.code || data.detail?.code; throw failure;
+          }
           return data;
         } catch (error) {
           entry.elapsed_ms = Math.round(performance.now() - start); entry.exception = { name: error.name, message: error.message };
@@ -95,7 +98,7 @@
       async publish() {
         if (!this.id) return;
         try {
-          const response = await fetch(`${this.api}/debug/${this.id}`, {
+          const response = await fetch(`${this.api}/debug/${this.id}?location=${encodeURIComponent(this.location)}&content_epoch=${this.epoch || 0}`, {
             method: 'POST', credentials: 'same-origin', signal: AbortSignal.timeout(5000), headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...this.report, server: undefined })
           });
@@ -107,7 +110,7 @@
       async serverTrace() {
         if (!this.id) return;
         try {
-          const r = await fetch(`${this.api}/debug/${this.id}`, { credentials: 'same-origin', signal: AbortSignal.timeout(5000) });
+          const r = await fetch(`${this.api}/debug/${this.id}?location=${encodeURIComponent(this.location)}&content_epoch=${this.epoch || 0}`, { credentials: 'same-origin', signal: AbortSignal.timeout(5000) });
           if (r.ok) this.report.server = await r.json();
           else this.report.server_trace_status = r.status;
         } catch (e) { this.report.server_trace_error = e.message; }
@@ -145,7 +148,34 @@
       const currentText = document.createElement("p");
       panel.append(heading, description, controls, status, error, currentText, history);
       root.replaceChildren(style, panel);
-      const diagnostics = new Diagnostics(panel, { key: 'voice', api: api.href, role: options.actor || 'visitor', location: options.location || '' });
+      const diagnostics = new Diagnostics(panel, { key: 'voice', api: api.href, location: options.location || '' });
+      let intentEpoch = null;
+      let knownEpoch = Number(options.contentEpoch) || null;
+      async function identity() {
+        const response = await fetch(api.href + '/identity?location=' + encodeURIComponent(options.location || ''), {method:'POST', credentials:'same-origin'});
+        const data = await response.json();
+        if (!response.ok || !data.ready || !Number.isInteger(data.content_epoch)) {
+          const failure = new Error(data.detail?.message || 'Локация временно недоступна. Дождитесь завершения сброса.');
+          failure.code = data.detail?.code; throw failure;
+        }
+        knownEpoch = data.content_epoch; return knownEpoch;
+      }
+      async function discardStale(epoch) {
+        const db = await diagnostics.db();
+        try {
+          await new Promise((resolve,reject) => {
+            const tx = db.transaction('drafts','readwrite'); const store=tx.objectStore('drafts');
+            const all=store.getAll(); all.onsuccess=()=>{for(const draft of all.result) {
+              if ((draft.location===options.location || draft.key.endsWith(':'+options.location)) && draft.content_epoch!==epoch) store.delete(draft.key);
+            }};
+            tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+          });
+        } finally {db.close();}
+      }
+      async function stale() {
+        await diagnostics.clear(); clearBlob(); intentEpoch = null;
+        fail('Локация сброшена. Устаревшая запись удалена из очереди браузера. Запишите новый отзыв.');
+      }
       function button(label, action, disabled = false) {
         const b = document.createElement("button"); b.type = "button"; b.textContent = label;
         b.disabled = disabled; b.addEventListener("click", action); return b;
@@ -187,6 +217,12 @@
           fail("Запись недоступна. Нужен современный браузер и HTTPS."); return;
         }
         try {
+          try { intentEpoch = await identity(); await discardStale(intentEpoch); }
+          catch (problem) {
+            if (problem.code==='stale_epoch') {await stale(); return;}
+            if (!knownEpoch) {fail(problem.message); return;}
+            intentEpoch=knownEpoch;
+          }
           const incoming = await navigator.mediaDevices.getUserMedia({ audio: true });
           if (disposed) { incoming.getTracks().forEach(t => t.stop()); return; }
           stream = incoming; clearBlob();
@@ -204,7 +240,7 @@
           recorder.onstop = async () => {
             release(); if (disposed || machine.state !== "recording") return;
             blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-            key = crypto.randomUUID(); await diagnostics.save(blob, key, Math.floor((performance.now() - started) / 1000));
+            key = crypto.randomUUID(); await diagnostics.save(blob, key, Math.floor((performance.now() - started) / 1000), intentEpoch);
             status.textContent = diagnostics.report.draft?.local_copy_saved ? "Запись сохранена в браузере и готова к прослушиванию." : "Запись готова. Не удалось сохранить её в браузере — скачайте аудио перед закрытием страницы."; transition("preview");
           };
           recorder.start(250); started = performance.now(); transition("recording");
@@ -222,14 +258,13 @@
         if (!blob || !key) return;
         error.textContent = ""; transition("uploading");
         diagnostics.begin();
-        const params = new URLSearchParams({ location: options.location || '', idempotency_key: key, language: navigator.language || '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '' });
+        const params = new URLSearchParams({ location: options.location || '', idempotency_key: key, content_epoch: String(intentEpoch || 0), language: navigator.language || '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '' });
         try {
-          const identity = await diagnostics.request(api.href + "/identity", { method: "POST", credentials: "same-origin" });
-          if (!identity.ready) throw new Error("Не удалось подготовить отправку записи.");
-          if (identity.actor && identity.actor !== diagnostics.role) throw new Error("Режим входа изменился. Вернитесь в прежний режим — запись сохранена.");
+          const currentEpoch = await identity();
+          if (!intentEpoch || currentEpoch!==intentEpoch) {await stale(); return;}
           const data = await diagnostics.request(api.href + "/submissions?" + params, {
             method: "POST", credentials: "same-origin", body: blob,
-            headers: { 'Content-Type': blob.type || 'audio/webm', 'X-CSRF-Token': identity.csrf_token || '' }
+            headers: { 'Content-Type': blob.type || 'audio/webm' }
           });
           if (!data.reference || typeof data.reference !== 'string') throw new Error('Сервер не подтвердил сохранение. Запись остаётся в браузере.');
           if (disposed) return;
@@ -237,6 +272,7 @@
           status.textContent = "Запись доставлена. Расшифровываем ваш отзыв."; delay = 2000;
           schedule();
         } catch (e) {
+          if (e.code==='stale_epoch') {await stale(); return;}
           if (!disposed) fail(e.name === 'TypeError' ? "Связь прервалась. Запись сохранена — повторите отправку." : e.message || "Не удалось отправить запись.");
           await diagnostics.publish(); await diagnostics.serverTrace();
         }
@@ -290,15 +326,20 @@
       }
       const instance = { unmount, get state() { return machine.state; } };
       instances.set(target, instance); render(); loadHistory();
-      diagnostics.restore().then(saved => {
-        if (!disposed && saved?.blob && machine.state === 'idle') {
-          blob = saved.blob; key = saved.id; machine.state = 'preview';
-          status.textContent = 'Восстановлена неотправленная запись. Можно прослушать и отправить её.'; render();
+      diagnostics.restore().then(async saved => {
+        if (disposed) return;
+        let epoch;
+        try {epoch=await identity(); await discardStale(epoch);}
+        catch {epoch=knownEpoch;}
+        if (saved?.blob && (!epoch || saved.content_epoch!==epoch)) {await stale(); return;}
+        if (saved?.blob && machine.state==='idle') {
+          blob=saved.blob; key=saved.id; intentEpoch=saved.content_epoch; diagnostics.epoch=intentEpoch;
+          machine.state='preview'; status.textContent='Восстановлена неотправленная запись. Можно прослушать и отправить её.'; render();
         }
       });
       return instance;
     }
     window.InvoltaVoice = { mount, unmount(target) { instances.get(typeof target === "string" ? document.getElementById(target) : target)?.unmount(); }, Machine };
   }
-  if (script?.dataset.target) window.InvoltaVoice.mount(script.dataset.target, { apiBase: script.dataset.apiBase, location: script.dataset.location, actor: script.dataset.actor });
+  if (script?.dataset.target) window.InvoltaVoice.mount(script.dataset.target, { apiBase: script.dataset.apiBase, location: script.dataset.location, contentEpoch: script.dataset.contentEpoch });
 })();

@@ -1,4 +1,3 @@
-import json
 import secrets
 from typing import Any
 from urllib.parse import urlencode
@@ -8,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from starlette.datastructures import FormData
 
-from involta_guide.application.commands.schemas import RestaurantInput
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
@@ -37,24 +35,6 @@ def key(form: FormData, name: str) -> str:
 
 def uid(value: str) -> str:
     return str(UUID(value))
-
-
-def card_from_form(form: FormData, prefix: str = "") -> dict[str, Any]:
-    def value(name: str) -> str:
-        return key(form, prefix + name)
-
-    data: dict[str, Any] = {
-        name: value(name) for name in ("name", "cuisine", "description", "mapsUrl", "phone")
-    }
-    data["phone"] = "".join(c for c in data["phone"] if c not in " ()-")
-    for name in ("id", "locationId"):
-        if value(name):
-            data[name] = uid(value(name))
-    for name in ("latitude", "longitude"):
-        data[name] = float(value(name)) if value(name) else None
-    data["openingHours"] = json.loads(value("openingHours")) if value("openingHours") else None
-    data["sources"] = [s.strip() for s in value("sources").splitlines() if s.strip()]
-    return RestaurantInput.model_validate(data).model_dump(mode="json", exclude_none=True)
 
 
 def render(request: Request, name: str, data: dict[str, Any]) -> Response:
@@ -168,7 +148,7 @@ def routes(prefix: str) -> APIRouter:
             if request.headers.get("HX-Request") == "true":
                 return Response(headers={"HX-Redirect": target})
             return RedirectResponse(target, status_code=308)
-        if tab not in ("overview", "reviews", "ratings", "contacts") or (
+        if tab not in ("overview", "ratings", "contacts") or (
             tab == "overview" and ("tab" in params or "location" in params or "city" in params)
         ):
             raise HTTPException(404, "Раздел перенесён на отдельный адрес")
@@ -231,12 +211,6 @@ def routes(prefix: str) -> APIRouter:
         check_csrf(request, form)
         ctx = context(request)
         try:
-            if action == "retry":
-                job_id = submitted_log(request, form)
-                ctx.jobs.retry(job_id)
-                detail = AIAudit(ctx.engine, ctx.settings).detail(job_id)
-                assert detail is not None
-                return log_redirect(request, detail["job"]["log_path"])
             if action == "regenerate":
                 new_id = ctx.jobs.regenerate(
                     submitted_log(request, form), model=key(form, "model") or None
@@ -265,31 +239,9 @@ def routes(prefix: str) -> APIRouter:
                 detail = store.detail(job_id)
                 assert detail is not None
                 return log_redirect(request, detail["job"]["log_path"])
-            if action == "moderate":
-                ctx.editorial.moderate(
-                    uid(key(form, "review_id")), key(form, "decision"), key(form, "reason")
-                )
-                return redirect(
-                    request, "reviews", "Решение сохранено", review=key(form, "review_id")
-                )
-            if action == "proposal":
-                ctx.editorial.proposal(
-                    uid(key(form, "proposal_id")),
-                    None if key(form, "decision") == "reject" else card_from_form(form),
-                )
-                return redirect(
-                    request,
-                    "reviews",
-                    "Решение сохранено; принятые изменения применены на сайте",
-                    review=key(form, "review_id"),
-                )
             if action == "revoke-admin":
                 ctx.security.revoke(admin_token(request), all_sessions=True)
                 return redirect(request, message="Сессии завершены")
-            if action == "revoke-alex":
-                ctx.security.revoke("", alex=True, all_sessions=True)
-                ctx.security.revoke(admin_token(request), all_sessions=True)
-                return RedirectResponse(ctx.settings.path("/alex"), status_code=303)
             raise HTTPException(404, "Неизвестное действие")
         except ValueError as exc:
             message = (
@@ -307,57 +259,5 @@ def routes(prefix: str) -> APIRouter:
                         request, detail["job"]["log_path"] + "?" + urlencode({"message": message})
                     )
             return redirect(request, message=message)
-
-    @router.get(prefix + "/alex")
-    def alex(request: Request) -> Response:
-        ctx = context(request)
-        principal = ctx.security.principal(request.cookies.get("guide_alex"), alex=True)
-        admin = ctx.security.principal(admin_token(request))
-        changes = ctx.queries.rows("alex_changes") if principal or admin else []
-        for change in changes:
-            change["location_name"] = ctx.queries.get("locations", change["location_id"])["name"]
-            change["changes"] = (
-                ctx.queries.get("reviews", change["review_id"])["changes"]
-                if change["review_id"]
-                else []
-            )
-        transcripts = (
-            {
-                row["id"]: row["transcript"]
-                for row in ctx.queries.rows("reviews")
-                if row["alex_session_id"] or row.get("admin_session_id")
-            }
-            if principal or admin
-            else {}
-        )
-        token = admin_token(request) if admin else request.cookies.get("guide_alex", "")
-        return render(
-            request,
-            "alex.html",
-            {
-                "alex": principal,
-                "admin": admin,
-                "sessions": ctx.queries.rows("alex_sessions") if principal or admin else [],
-                "changes": changes,
-                "transcripts": transcripts,
-                "csrf_token": ctx.security.csrf(token),
-            },
-        )
-
-    @router.post(prefix + "/alex/logout")
-    def alex_logout(request: Request, form: FormData = Depends(form_data)) -> Response:
-        ctx = context(request)
-        admin = ctx.security.principal(admin_token(request))
-        if not admin and not ctx.security.principal(request.cookies.get("guide_alex"), alex=True):
-            raise HTTPException(401)
-        check_csrf(request, form, alex=not bool(admin))
-        if admin:
-            ctx.security.revoke(admin_token(request))
-        else:
-            ctx.security.revoke(request.cookies["guide_alex"], alex=True)
-        response = RedirectResponse(ctx.settings.path("/"), status_code=303)
-        response.delete_cookie("guide_alex", path=prefix)
-        response.delete_cookie("guide_admin", path=prefix)
-        return response
 
     return router

@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from uuid import uuid4
 
 import pytest
 
@@ -70,66 +69,12 @@ def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
     editor, queries, uow = services(database)
     first = queries.directory(query="Иваново")["rows"][0]
     second = queries.directory(query="Шуя")["rows"][0]
-    version = editor.save(first["id"], CONTENT, None)
+    editor.save(first["id"], CONTENT, None)
     card = queries.location(first["id"])["content"]["restaurants"][0]
     with pytest.raises(RuleViolation):
         editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
-    LocationService(uow).attach(card["id"], second["id"])
-    editor.save(second["id"], {"intro": "", "restaurants": [card]}, None)
-    new = {**card, "description": "Обновлённое описание"}
-    editor.save(first["id"], {"intro": "", "restaurants": [new]}, version)
-    assert (
-        queries.public(second["slug"])["content"]["restaurants"][0]["description"]
-        == "Обновлённое описание"
-    )
+    assert queries.location(second["id"])["content"]["restaurants"] == []
     assert queries.get("restaurants", card["id"])["location_id"] == first["id"]
-
-
-def test_proposal_atomic_and_only_once(database):
-    editor, queries, uow = services(database)
-    key = queries.directory(query="Иваново")["rows"][0]["id"]
-    editor.save(key, CONTENT, None)
-    card = queries.location(key)["content"]["restaurants"][0]
-    review_id, proposal_id = str(uuid4()), str(uuid4())
-    with uow() as work:
-        work.repo.add(
-            "reviews",
-            {
-                "id": review_id,
-                "location_id": key,
-                "visitor": "v",
-                "audio": "test.wav",
-                "mime": "audio/wav",
-                "hash": "h",
-                "ip_hash": "ip",
-                "device": "test",
-            },
-        )
-        work.repo.add(
-            "proposals",
-            {
-                "id": proposal_id,
-                "location_id": key,
-                "review_id": review_id,
-                "kind": "edit",
-                "payload": {"restaurantId": card["id"]},
-            },
-        )
-    with pytest.raises(RuleViolation):
-        editor.proposal(proposal_id, {**card, "description": "Правка"})
-    editor.moderate(review_id, "approved", "ok")
-    editor.proposal(proposal_id, {**card, "description": "Правка"})
-    assert queries.location(key)["content"]["restaurants"][0]["description"] == "Правка"
-    with pytest.raises(Conflict):
-        editor.proposal(proposal_id, card)
-    with uow() as work:
-        assert work.repo.get("reviews", review_id)["changes"][0]["diff"] == [
-            {
-                "path": ["restaurants", card["id"], "description"],
-                "before": "Описание",
-                "after": "Правка",
-            }
-        ]
 
 
 def test_location_alias_cycles_visibility_and_shared_direction(database):
@@ -167,9 +112,10 @@ def test_location_alias_cycles_visibility_and_shared_direction(database):
         service.save(moscow["id"], changed)
     editor.save(key, CONTENT, None)
     parent = queries.location(moscow["id"])
-    assert any(r["name"] == CARD["name"] for r in parent["available"])
+    assert parent["available"] == []
     snapshot = queries.location(key)["content"]["restaurants"][0]
-    editor.save(moscow["id"], {"intro": "Направление", "restaurants": [snapshot]}, None)
+    with pytest.raises(Conflict):
+        editor.save(moscow["id"], {"intro": "Направление", "restaurants": [snapshot]}, None)
     assert queries.get("restaurants", snapshot["id"])["location_id"] == key
     assert len(queries.rows("restaurants")) == 1
 

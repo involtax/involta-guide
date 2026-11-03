@@ -18,7 +18,7 @@
       return;
     }
     busy = data.state === 'queued' || data.state === 'running';
-    button.disabled = busy;
+    button.disabled = busy || data.can_start === false;
     message.textContent = data.message;
     clearTimeout(timer);
     if (busy) timer = setTimeout(poll, 3000);

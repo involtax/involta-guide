@@ -1,5 +1,4 @@
 from urllib.parse import urlencode
-from uuid import UUID
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
@@ -8,7 +7,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse,
 from involta_guide.domain.hours import DAYS, opening_status
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
-from involta_guide.web.http import admin_token, check_origin, context, require_admin
+from involta_guide.infrastructure.voice.read_model import VoiceReadModel
+from involta_guide.web.http import admin_token, check_origin, context
 from involta_guide.web.routes.admin import render
 
 
@@ -29,25 +29,6 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix + "/")
     def directory(request: Request, q: str = "", page: str = "1") -> Response:
         ctx = context(request)
-        pairs = list(request.query_params.multi_items())
-        if len(pairs) == 1 and not pairs[0][1]:
-            token = ctx.security.admin_shortcut(pairs[0][0])
-            if token:
-                response = RedirectResponse(
-                    ctx.settings.path("/"),
-                    status_code=302,
-                    headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
-                )
-                response.set_cookie(
-                    "guide_admin",
-                    token,
-                    max_age=365 * 86400,
-                    path=prefix,
-                    httponly=True,
-                    secure=ctx.settings.cookie_secure,
-                    samesite="lax",
-                )
-                return response
         try:
             page_number = int(page)
         except ValueError as exc:
@@ -200,15 +181,6 @@ def routes(prefix: str) -> APIRouter:
             raise HTTPException(404, "Журнал не найден")
         return JSONResponse({"job": job}, headers={**log_headers, "Vary": "Cookie"})
 
-    @router.get(prefix + "/logs/{slug}/{number}/audio")
-    def log_audio(request: Request, slug: str, number: int) -> Response:
-        require_admin(request)
-        detail = numbered_detail(request, slug, number)
-        if not detail["review"]:
-            raise HTTPException(404, "Аудиозапись не найдена")
-        data, mime = context(request).reviews.audio(detail["review"]["id"])
-        return Response(data, media_type=mime, headers={"Cache-Control": "private, no-store"})
-
     @router.get(prefix + "/logs/{slug}/{number}")
     def numbered_log(
         request: Request, slug: str, number: int, page: int = 1, q: str = "", status: str = ""
@@ -219,37 +191,12 @@ def routes(prefix: str) -> APIRouter:
             return RedirectResponse(canonical, status_code=308, headers=log_headers)
         return log_page(request, detail["job"]["id"], q, page, status)
 
-    @router.get(prefix + "/logs/{job_id}.json")
-    def public_log_json(request: Request, job_id: UUID) -> Response:
-        detail = log_store(request).detail(
-            str(job_id),
-            public_only=not bool(context(request).security.principal(admin_token(request))),
-        )
-        if detail is None:
-            raise HTTPException(404, "Публичный журнал не найден")
-        return RedirectResponse(
-            context(request).settings.path(detail["job"]["log_path"]) + ".json",
-            status_code=308,
-            headers=log_headers,
-        )
-
-    @router.get(prefix + "/logs/{job_id}")
-    def public_log(request: Request, job_id: str, page: int = 1) -> Response:
-        try:
-            identifier = str(UUID(job_id))
-        except ValueError:
-            return log_page(request, None, job_id, page)
-        detail = log_store(request).detail(
-            identifier,
-            public_only=not bool(context(request).security.principal(admin_token(request))),
-        )
-        if detail is None:
-            raise HTTPException(404, "Публичный журнал не найден")
-        return RedirectResponse(
-            context(request).settings.path(detail["job"]["log_path"]),
-            status_code=308,
-            headers=log_headers,
-        )
+    @router.get(prefix + "/logs/{slug}")
+    def city_logs(request: Request, slug: str, page: int = 1, status: str = "") -> Response:
+        city = context(request).queries.public(slug)
+        if city is None:
+            raise HTTPException(404, "Локация не найдена")
+        return log_page(request, None, slug, page, status)
 
     @router.post(prefix + "/api/locations/{slug}/fill")
     def public_fill(request: Request, slug: str) -> Response:
@@ -302,11 +249,6 @@ def routes(prefix: str) -> APIRouter:
         c = data["location"]
         if data["redirect"]:
             return RedirectResponse(ctx.settings.path("/" + c["slug"]), status_code=308)
-        alex_token = request.cookies.get("guide_alex", "")
-        admin = ctx.security.principal(admin_token(request))
-        alex = admin or ctx.security.principal(alex_token, alex=True)
-        from involta_guide.infrastructure.voice.read_model import VoiceReadModel
-
         public_reviews = VoiceReadModel(ctx.engine).public_texts(c["id"])
         title = "Где поесть " + (c["in_phrase"] or "в " + c["name"])
         breadcrumbs = [{"name": "Все локации", "slug": ""}, *data["parents"], c]
@@ -366,11 +308,11 @@ def routes(prefix: str) -> APIRouter:
                 "kinds": KINDS,
                 "days": DAYS,
                 "opening_status": opening_status,
-                "alex": alex,
                 "public_reviews": public_reviews,
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
-                and not c["page_data"].get("restaurants")
+                and not c["is_hub"]
+                and c["initialized_at"] is None
                 else None,
                 "structured": structured,
             },

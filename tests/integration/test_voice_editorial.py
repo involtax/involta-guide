@@ -25,10 +25,14 @@ def imported(database):
     from involta_voice.contracts import LocationContext
 
     meta = metadata().model_copy(
-        update={"location": LocationContext(id=city["id"], slug=city["slug"], name=city["name"])}
+        update={
+            "location": LocationContext(
+                id=city["id"], slug=city["slug"], name=city["name"], content_epoch=1
+            )
+        }
     )
     event = {
-        "schema_version": 1,
+        "schema_version": 2,
         "event_id": str(uuid4()),
         "sequence": 1,
         "kind": "transcript_ready",
@@ -87,28 +91,14 @@ def test_admin_ui_moderates_text_without_analysis_and_guards_stale_screen(databa
         assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 3
 
 
-@pytest.mark.parametrize("shared", [False, True])
 @pytest.mark.parametrize("repair", [False, True])
 def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_application(
-    database, repair, shared
+    database, repair
 ):
     settings, engine, uow, queries, city, ref, event = imported(database)
     editor = EditorialService(uow)
     version = editor.save(city["id"], CONTENT, None)
     card = queries.location(city["id"])["content"]["restaurants"][0]
-    affected = {}
-    other = None
-    if shared:
-        other = queries.directory(query="Шуя")["rows"][0]
-        with uow() as tx:
-            tx.repo.link(
-                "restaurant_locations", {"restaurant_id": card["id"], "location_id": other["id"]}
-            )
-        other_version = editor.save(
-            other["id"], {"intro": "Shared card", "restaurants": [card]}, None
-        )
-        affected[other["id"]] = other_version
-
     from involta_voice.contracts import RestaurantContext
 
     event["metadata"]["location"]["restaurants"] = [
@@ -153,7 +143,6 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
         processing_run=1,
         action="approve",
         page_revision=version,
-        affected_revisions=affected,
     )
     from pydantic import ValidationError
 
@@ -188,7 +177,11 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
     )
     with pytest.raises(Conflict):
         service.decide(ref, command, principal["id"])
-    newer = editor.save(city["id"], queries.location(city["id"])["content"], version)
+    newer = editor.save(
+        city["id"],
+        {**queries.location(city["id"])["content"], "intro": "Конкурентная правка"},
+        version,
+    )
     command = command.model_copy(update={"review_revision": 3})
     with pytest.raises(Conflict):
         service.decide(ref, command, principal["id"])
@@ -196,15 +189,6 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
     result = service.decide(ref, command, principal["id"])
     assert service.decide(ref, command, principal["id"]) == result
     assert len(queries.location(city["id"])["content"]["restaurants"]) == (2 if repair else 1)
-    if other:
-        assert queries.get("locations", other["id"])["revision"] != other_version
-        shared_diff = next(
-            c for c in queries.get("reviews", ref)["changes"] if c["location_id"] == other["id"]
-        )
-        assert any(
-            d["path"][-1] == "phone" and d["before"] != d["after"] for d in shared_diff["diff"]
-        )
-        assert queries.location(other["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
 
     assert queries.get("locations", city["id"])["revision"] != newer
     assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
@@ -216,70 +200,3 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
             ).scalar_one()
             == 1
         )
-
-
-def test_admin_cookie_marks_trusted_voice_and_shortcut_sets_same_admin_cookie(database):
-    settings, engine, uow, queries, city, _, _ = setup(database)
-    with TestClient(create_app(settings)) as client:
-        csrf = login(client)
-        response = client.post(
-            "/guide/api/reviews",
-            data={"locationId": city["id"], "_csrf": csrf},
-            files={"audio": ("recording.wav", recording(), "audio/wav")},
-            headers={"origin": "http://testserver"},
-        )
-        assert response.status_code == 201, response.text
-        review = queries.get("reviews", response.json()["id"])
-        assert review["admin_session_id"] is not None and review["alex_session_id"] is None
-        assert client.get("/guide/ivanovo").text.count("Режим Алекса:") == 1
-        assert (
-            client.post(
-                "/guide/api/reviews",
-                data={"locationId": city["id"]},
-                files={"audio": ("x.wav", recording(), "audio/wav")},
-                headers={"origin": "http://testserver"},
-            ).status_code
-            == 403
-        )
-
-
-def test_consumer_diagnostics_blocked_event_and_recovery(database, caplog):
-    settings, engine, _, _, _, ref, event = imported(database)
-    from involta_guide.infrastructure.voice.client import VoiceUnavailable
-    from involta_guide.infrastructure.voice.consumer import Consumer
-    from involta_guide.infrastructure.voice.read_model import VoiceReadModel
-
-    event = {**event, "sequence": 2, "event_id": str(uuid4())}
-
-    class Source:
-        mode = "outage"
-
-        def json(self, method, path, **kwargs):
-            if self.mode == "outage":
-                raise VoiceUnavailable("Private diagnostic must not appear in logs")
-            if path == "/events/ack":
-                return {"acknowledged": True}
-            return {"events": [{**event, "transcript": ""} if self.mode == "invalid" else event]}
-
-    source = Source()
-    consumer = Consumer(engine, source)
-    with pytest.raises(VoiceUnavailable):
-        consumer.once()
-    assert VoiceReadModel(engine).consumer_health()["error_type"] == "VoiceUnavailable"
-    source.mode = "invalid"
-    with pytest.raises(ValueError):
-        consumer.once()
-    diagnostic = VoiceReadModel(engine).consumer_health()
-    assert diagnostic["sequence"] == 2 and not diagnostic["healthy"]
-    assert "Private diagnostic" not in caplog.text
-    with engine.connect() as conn:
-        assert (
-            conn.execute(
-                text("SELECT sequence FROM voice_cursor WHERE consumer='voice'")
-            ).scalar_one()
-            == 1
-        )
-    source.mode = "valid"
-    assert consumer.once() == 1
-    assert VoiceReadModel(engine).consumer_health()["healthy"]
-    assert consumer.once() == 0
