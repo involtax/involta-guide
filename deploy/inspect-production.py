@@ -42,6 +42,15 @@ def main():
         "uid": os.geteuid(),
         "hostname": socket.gethostname(),
         "architecture": platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "memory_kib": {
+            line.split(":")[0]: int(line.split()[1])
+            for line in Path("/proc/meminfo").read_text().splitlines()
+            if line.startswith(("MemTotal:", "MemAvailable:"))
+        },
+        "nvidia_gpu": run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]
+        )[1].strip(),
         "python": platform.python_version(),
     }
     report["os_release"] = {

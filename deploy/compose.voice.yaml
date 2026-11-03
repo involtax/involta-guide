@@ -145,10 +145,12 @@
       "environment": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
-        "VOICE_DATA_DIR": "/app/var/voice"
+        "VOICE_DATA_DIR": "/app/var/voice",
+        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
       },
       "volumes": [
-        "voice-audio:/app/var/voice"
+        "voice-audio:/app/var/voice",
+        "voice-models:/app/var/voice-models:ro"
       ],
       "command": [
         "voice-worker"
@@ -156,6 +158,9 @@
       "stop_grace_period": "120s",
       "depends_on": {
         "voice-migrate": {
+          "condition": "service_completed_successfully"
+        },
+        "voice-prepare-model": {
           "condition": "service_completed_successfully"
         }
       },
@@ -221,11 +226,56 @@
         "frontend",
         "voice-private"
       ]
+    },
+    "voice-prepare-model": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "no",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "networks": [
+        "voice-private"
+      ],
+      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:?}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice",
+        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
+      },
+      "volumes": [
+        "voice-models:/app/var/voice-models"
+      ],
+      "command": [
+        "voice",
+        "prepare-model"
+      ],
+      "depends_on": {}
+    },
+    "worker": {
+      "environment": {
+        "VOICE_WHISPER_MODELS_DIR": "/app/var/voice-models"
+      },
+      "volumes": [
+        "audio:/app/var",
+        "voice-models:/app/var/voice-models:ro"
+      ]
     }
   },
   "volumes": {
     "voice-postgres": {},
-    "voice-audio": {}
+    "voice-audio": {},
+    "voice-models": {}
   },
   "networks": {
     "voice-private": {

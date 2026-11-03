@@ -211,6 +211,7 @@ compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade hea
 if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" up -d --no-build voice-db
   compose "$target_sha" "$target_image" run --rm voice-migrate
+  compose "$target_sha" "$target_image" run --rm voice-prepare-model
   compose "$target_sha" "$target_image" up -d --no-build voice-api voice-worker voice-consumer
   wait_health "$target_sha" "$target_image" voice-api
   wait_health "$target_sha" "$target_image" voice-worker

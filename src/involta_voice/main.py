@@ -23,7 +23,7 @@ from .service import VoiceService
 from .worker import Worker
 
 MODELS = {
-    "transcription": ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"],
+    "transcription": ["large-v3-russian", "large-v3"],
     "analysis": ["gpt-4.1-mini", "gpt-4.1", "gpt-6.1-sol"],
 }
 

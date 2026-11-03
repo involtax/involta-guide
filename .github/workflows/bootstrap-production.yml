@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   inspect:
-    if: github.ref == 'refs/heads/main' && inputs.inspect_only
+    if: inputs.inspect_only
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: prod

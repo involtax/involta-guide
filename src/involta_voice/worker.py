@@ -1,7 +1,7 @@
 import json
 import signal
 from datetime import UTC, datetime
-from threading import Event
+from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
@@ -11,7 +11,7 @@ from .config import Settings
 from .contracts import AnalysisResult, LocationContext, validate_analysis
 from .db import database, encoded, execute, row
 from .errors import VoiceError
-from .provider import FakeProvider, OpenAIProvider, ProviderFailure
+from .provider import FakeProvider, ProviderFailure, VoiceProvider
 from .service import VoiceService
 
 
@@ -21,7 +21,7 @@ class Worker:
         self.settings = settings
         self.service = VoiceService(engine, settings)
         self.provider = provider or (
-            FakeProvider() if settings.fake_provider else OpenAIProvider(settings)
+            FakeProvider() if settings.fake_provider else VoiceProvider(settings)
         )
 
     def claim(self) -> dict[str, Any] | None:
@@ -30,17 +30,21 @@ class Worker:
             # A saved response can be replayed. An interrupted external POST without one is unknown.
             execute(
                 conn,
-                """UPDATE stages SET state=CASE WHEN raw_response IS NULL THEN 'unknown' ELSE 'queued' END,
-                error=CASE WHEN raw_response IS NULL THEN 'Исполнитель прерван; исход OpenAI неизвестен' ELSE NULL END,
+                """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN request->>'engine'='faster-whisper' AND attempts<3 THEN 'queued' WHEN request->>'engine'='faster-whisper' THEN 'failed' ELSE 'unknown' END,
+                error=CASE WHEN raw_response IS NOT NULL THEN NULL WHEN request->>'engine'='faster-whisper' THEN 'Локальный исполнитель прерван; ограниченный повтор' ELSE 'Исполнитель прерван; исход OpenAI неизвестен' END,
                 lease_token=NULL,lease_until=NULL WHERE state='running' AND lease_until<now()""",
             )
             running = row(conn, "SELECT count(*) n FROM stages WHERE state='running'")
             if running and running["n"] >= self.settings.concurrency:
                 return None
+            local_running = row(
+                conn, "SELECT 1 FROM stages WHERE kind='transcription' AND state='running'"
+            )
             stage = row(
                 conn,
-                """SELECT s.* FROM stages s WHERE state='queued' AND available_at<=now()
+                """SELECT s.* FROM stages s WHERE state='queued' AND available_at<=now() AND (:local_busy=false OR kind<>'transcription')
                 ORDER BY available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                local_busy=bool(local_running),
             )
             if not stage:
                 return None
@@ -126,11 +130,7 @@ class Worker:
         context = LocationContext.model_validate(run["snapshot"]["location"])
         snapshot = run["snapshot"]
         if kind == "transcription":
-            request = {
-                "model": snapshot["transcription_model"],
-                "language": "ru",
-                "response_format": "json",
-            }
+            request = snapshot.get("transcription") or {"model": snapshot["transcription_model"]}
         else:
             request = {
                 "model": snapshot["analysis_model"],
@@ -164,16 +164,17 @@ class Worker:
                 execute(conn, "SELECT pg_advisory_xact_lock(47032005)")
                 count = row(
                     conn,
-                    "SELECT count(*) n FROM provider_calls WHERE created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+                    "SELECT count(*) n FROM provider_calls WHERE kind='analysis' AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
                 )
-                if count and count["n"] >= self.settings.daily_calls:
+                if kind == "analysis" and count and count["n"] >= self.settings.daily_calls:
                     raise ProviderFailure("Дневной лимит обращений Voice к OpenAI исчерпан")
                 reserved = row(
                     conn,
-                    "SELECT coalesce(sum(coalesce(cost_usd,reserved_usd)),0) usd FROM provider_calls WHERE created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+                    "SELECT coalesce(sum(coalesce(cost_usd,reserved_usd)),0) usd FROM provider_calls WHERE kind='analysis' AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
                 )
                 if (
-                    reserved
+                    kind == "analysis"
+                    and reserved
                     and reserved["usd"] + self.settings.per_call_reserve_usd
                     > self.settings.daily_budget_usd
                 ):
@@ -186,7 +187,7 @@ class Worker:
                     n=number,
                     kind=kind,
                     request=encoded(self.clean(request)),
-                    reserve=self.settings.per_call_reserve_usd,
+                    reserve=self.settings.per_call_reserve_usd if kind == "analysis" else 0,
                 )
                 execute(
                     conn,
@@ -202,7 +203,36 @@ class Worker:
                     if kind == "transcription"
                     else b""
                 )
-                raw = self.provider.call(kind, request, audio, submission["mime"])
+                if kind == "transcription":
+                    stop_heartbeat = Event()
+
+                    def renew() -> None:
+                        while not stop_heartbeat.wait(min(10, self.settings.lease_seconds / 3)):
+                            try:
+                                with self.engine.begin() as conn:
+                                    execute(
+                                        conn,
+                                        "UPDATE stages SET lease_until=now()+make_interval(secs=>:lease) WHERE submission=:id AND run=:run AND kind='transcription' AND state='running' AND lease_token=:token",
+                                        lease=self.settings.lease_seconds,
+                                        id=reference,
+                                        run=number,
+                                        token=stage["lease_token"],
+                                    )
+                                self.settings.heartbeat_file.write_text(
+                                    datetime.now(UTC).isoformat()
+                                )
+                            except Exception:
+                                return
+
+                    heartbeat = Thread(target=renew, daemon=True)
+                    heartbeat.start()
+                    try:
+                        raw = self.provider.call(kind, request, audio, submission["mime"])
+                    finally:
+                        stop_heartbeat.set()
+                        heartbeat.join(timeout=2)
+                else:
+                    raw = self.provider.call(kind, request, audio, submission["mime"])
             except (ProviderFailure, OSError) as exc:
                 with self.engine.begin() as conn:
                     execute(
@@ -223,7 +253,7 @@ class Worker:
                 except (ValueError, AttributeError):
                     pass
                 prices = snapshot["prices"].get(request["model"], {})
-                cost = None
+                cost = 0.0 if kind == "transcription" else None
                 if (
                     "input" in prices
                     and "output" in prices
@@ -450,6 +480,8 @@ def main() -> None:
     settings = Settings()
     engine = database(settings)
     worker = Worker(engine, settings)
+    if isinstance(worker.provider, VoiceProvider):
+        worker.provider.whisper.warmup()
     stopped = Event()
 
     def stop(signum: int, frame: Any) -> None:

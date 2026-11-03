@@ -22,6 +22,6 @@ def test_shared_openai_key_alias_and_missing_key(monkeypatch):
     provider = OpenAIProvider(empty)
     try:
         with pytest.raises(ProviderFailure, match="OPENAI_API_KEY"):
-            provider.call("transcription", {}, b"", "audio/wav")
+            provider.call("analysis", {}, b"", "audio/wav")
     finally:
         provider.close()

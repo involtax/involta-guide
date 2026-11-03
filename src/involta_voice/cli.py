@@ -9,7 +9,9 @@ from .main import create_app, worker_health
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["migrate", "worker-health", "openapi", "orphan-audio"])
+    parser.add_argument(
+        "command", choices=["migrate", "worker-health", "openapi", "orphan-audio", "prepare-model"]
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     if args.command == "worker-health":
@@ -18,6 +20,11 @@ def main() -> None:
     settings = Settings()
     if args.command == "openapi":
         print(json.dumps(create_app(settings).openapi(), ensure_ascii=False, indent=2))
+        return
+    if args.command == "prepare-model":
+        from .whisper import prepare
+
+        print(prepare(settings))
         return
     engine = database(settings)
     try:

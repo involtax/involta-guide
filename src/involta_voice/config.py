@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,7 +13,11 @@ class Settings(BaseSettings):
     service_secret: SecretStr
     openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
     data_dir: Path = Path("var/voice")
-    transcription_model: str = "gpt-4o-mini-transcribe"
+    transcription_model: Literal["large-v3", "large-v3-russian"] = "large-v3-russian"
+    whisper_models_dir: Path = Path("var/voice-models")
+    whisper_device: Literal["cpu", "cuda"] = "cpu"
+    whisper_compute_type: Literal["int8", "float16", "int8_float16"] = "int8"
+    whisper_cpu_threads: int = Field(default=4, ge=1, le=64)
     analysis_model: str = "gpt-4.1"
     max_audio_bytes: int = 10 * 1024 * 1024
     min_free_bytes: int = 64 * 1024 * 1024
@@ -27,6 +32,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def secrets(self) -> "Settings":
+        if self.whisper_device == "cpu" and self.whisper_compute_type != "int8":
+            raise ValueError("Whisper on CPU requires int8")
         if len(self.service_secret.get_secret_value()) < 32:
             raise ValueError("VOICE_SERVICE_SECRET requires at least 32 characters")
         if not self.database_url.get_secret_value().startswith(

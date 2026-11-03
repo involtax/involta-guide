@@ -266,11 +266,32 @@ class OpenAIProvider:
         return self._structured(prompt, AlexCommands if alex else Analysis, job_id)
 
     def transcribe(self, path: str, mime: str, job_id: str) -> str:
-        result = self._request(
-            "audio/transcriptions",
-            job_id,
-            self.settings.transcription_model,
-            files={"file": (path, self.storage.read(path), mime)},
-            data={"model": self.settings.transcription_model, "language": "ru"},
-        )
-        return str(result.get("text", ""))
+        # Trusted admin commands use the same local recognizer; only text analysis
+        # uses the OpenAI client. No audio, keys or Guide DB credentials leave here.
+        from involta_voice.config import Settings as SpeechSettings
+        from involta_voice.provider import ProviderFailure
+        from involta_voice.whisper import LocalWhisper, options
+
+        speech = getattr(self, "_speech", None)
+        if speech is None:
+            local = SpeechSettings(
+                _env_file=None,
+                database_url="postgresql://unused:unused@localhost/unused",
+                service_secret="unused-local-speech-settings-" + "x" * 32,
+                transcription_model=self.settings.voice_transcription_model,
+                whisper_models_dir=self.settings.voice_whisper_models_dir,
+                whisper_device=self.settings.voice_whisper_device,
+                whisper_compute_type=self.settings.voice_whisper_compute_type,
+                whisper_cpu_threads=self.settings.voice_whisper_cpu_threads,
+            )
+            speech = LocalWhisper(local)
+            self._speech = speech
+        request = options(speech.settings)
+        self.audit.record(job_id, "local_transcription_request", request)
+        try:
+            raw = speech.call(request, self.storage.read(path))
+        except ProviderFailure as exc:
+            raise ProviderUnavailable(str(exc)) from None
+        result = json.loads(raw["body"])
+        self.audit.record(job_id, "local_transcription_response", result)
+        return str(result["text"])

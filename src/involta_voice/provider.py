@@ -19,22 +19,16 @@ class OpenAIProvider:
         self.client = httpx.Client(timeout=httpx.Timeout(90, connect=15))
 
     def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
+        if kind != "analysis":
+            raise ProviderFailure("Аудио распознаётся только локальным Whisper")
         key = self.settings.openai_api_key.get_secret_value()
         if not key:
             raise ProviderFailure("OPENAI_API_KEY не настроен")
         headers = {"Authorization": "Bearer " + key}
         try:
-            if kind == "transcription":
-                response = self.client.post(
-                    "https://api.openai.com/v1/audio/transcriptions",
-                    headers=headers,
-                    data=request,
-                    files={"file": ("recording", audio, mime)},
-                )
-            else:
-                response = self.client.post(
-                    "https://api.openai.com/v1/responses", headers=headers, json=request
-                )
+            response = self.client.post(
+                "https://api.openai.com/v1/responses", headers=headers, json=request
+            )
         except httpx.HTTPError as exc:
             raise ProviderFailure(
                 "Сетевой исход OpenAI неизвестен; автоматический повтор остановлен", unknown=True
@@ -82,3 +76,19 @@ class FakeProvider:
 
     def close(self) -> None:
         pass
+
+
+class VoiceProvider:
+    def __init__(self, settings: Settings) -> None:
+        from .whisper import LocalWhisper
+
+        self.whisper = LocalWhisper(settings)
+        self.analysis = OpenAIProvider(settings)
+
+    def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
+        if kind == "transcription":
+            return self.whisper.call(request, audio)
+        return self.analysis.call(kind, request, b"", mime)
+
+    def close(self) -> None:
+        self.analysis.close()

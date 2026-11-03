@@ -53,9 +53,16 @@ def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
     saved = {
         r["key"]: r["value"] for r in conn.execute(text("SELECT * FROM voice_settings")).mappings()
     }
+    from .whisper import MODELS, options
+
+    selected = saved.get("transcription_model", settings.transcription_model)
+    if selected not in MODELS:
+        selected = settings.transcription_model
+
     return {
+        "transcription": options(settings.model_copy(update={"transcription_model": selected})),
         "schema_version": 1,
-        "transcription_model": saved.get("transcription_model", settings.transcription_model),
+        "transcription_model": selected,
         "analysis_model": saved.get("analysis_model", settings.analysis_model),
         "prompt": saved.get("prompt", DEFAULT_PROMPT),
         "prices": saved.get("prices", {}),
