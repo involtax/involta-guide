@@ -217,7 +217,7 @@ class OpenAIProvider:
                 },
                 {"role": "user", "content": prompt},
             ],
-            "max_output_tokens": 10000,
+            "max_output_tokens": 15000 if search else 10000,
             "text": {
                 "format": {
                     "type": "json_schema",
