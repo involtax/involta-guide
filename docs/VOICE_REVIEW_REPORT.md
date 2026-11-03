@@ -51,3 +51,12 @@ restaurant across two cities: both receive immutable versions, while previous
 snapshots retain their original phone. Production Compose contracts validate
 host and bridge modes, immutable application/DB image references, private API,
 all seven service definitions, healthchecks and the shared OpenAI variable.
+
+The isolated **production host Compose** smoke passed with generated fake
+credentials: Guide and Voice migrations, API upload, Voice worker transcription,
+consumer import, admin login and whole-review approval, visible text, then
+Voice API shutdown with HTML/history/status still readable. No paid calls.
+The reproducible manual harness is tests/deployment/voice_stack_smoke.py; use a
+built local VOICE_TEST_IMAGE and a disposable TEST_DATABASE_URL. Host test ports
+33080/13100/55439 must be free. Bridge mode has Compose contract validation, not
+a full runtime smoke here. Real production deployment was not executed.

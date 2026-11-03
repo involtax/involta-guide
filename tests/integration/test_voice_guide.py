@@ -159,6 +159,14 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         assert history.json()["rows"][0]["reference"] == reference
         assert history.json()["rows"][0]["transcript"]
         assert client.get("/guide/voice/api/v1/submissions/" + reference).json()["transcript"]
+        app.state.context.settings.voice_enabled = False
+        assert (
+            client.post(
+                "/guide/voice/api/v1/submissions", headers={"origin": "http://testserver"}
+            ).status_code
+            == 503
+        )
+        assert client.get("/guide/voice/api/v1/submissions/" + reference).json()["transcript"]
 
 
 def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_moderation(

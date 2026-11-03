@@ -214,3 +214,15 @@ Keep current Voice processes running if the baseline did not yet include them.
 Production Compose validation is included in CI for both network modes. Local
 isolated stack checks use generated test credentials and a fake provider; real
 keys and production data are not used. Remaining limits: VOICE_REVIEW_REPORT.md.
+
+Repeat the isolated host runtime smoke with a disposable PostgreSQL test server
+and a locally built image (never production credentials/data):
+
+```bash
+VOICE_TEST_IMAGE=involta-guide:voice-review TEST_DATABASE_URL=postgresql://TEST_ROLE:TEST_PASSWORD@127.0.0.1:TEST_PORT/TEST_DB uv run python tests/deployment/voice_stack_smoke.py
+```
+
+It provisions/removes only its uniquely named schema/Compose project/volumes,
+uses a fake provider and leaves generated temporary env files private for diagnosis.
+Free ports 33080, 13100 and 55439 first. If the runtime injects an HTTP proxy,
+include local/private service addresses in NO_PROXY.
