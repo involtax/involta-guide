@@ -161,18 +161,22 @@ def test_one_gateway_preserves_roles_retries_audio_and_private_debug(database, v
             "/guide/voice/api/v1/debug/" + trace_id,
             headers=headers,
             json={
+                "timeline": [{"name": "stop_requested", "reason": "silence"}],
+                "vad": {"state": "ready"},
                 "events": [
                     {
                         "status": 502,
                         "response_body": "<html>full proxy response</html>",
                         "csrf_token": identity["csrf_token"],
                     }
-                ]
+                ],
             },
         )
         assert browser_report.json()["saved"]
         events = client.get("/guide/voice/api/v1/debug/" + trace_id).json()["events"]
         assert events[-1]["stage"] == "browser"
+        assert events[-1]["report"]["timeline"][0]["reason"] == "silence"
+        assert events[-1]["report"]["vad"]["state"] == "ready"
         assert "full proxy response" in str(events[-1])
         assert identity["csrf_token"] not in str(events[-1])
         page = client.get("/guide/" + city["slug"])

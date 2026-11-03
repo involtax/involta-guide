@@ -340,3 +340,15 @@ def test_permission_wait_is_not_audio_duration(widget_page):
         next(e["duration_ms"] for e in report(widget)["timeline"] if e["name"] == "stop_requested")
         == 4999
     )
+
+
+def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
+    page, widget, uploads = widget_page
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    page.evaluate("__recorders[0].stop()")
+    page.clock.run_for(1)
+    state(widget, "preview")
+    assert report(widget)["draft"]["durationMs"] == 5100
+    assert not uploads

@@ -744,7 +744,15 @@
           String(waiting || primary.disabled),
         );
         const icon = recording ? square : waiting ? spinner : mic;
-        if (primary.innerHTML !== icon) primary.innerHTML = icon;
+        const iconState = recording
+          ? "stop"
+          : waiting
+            ? "waiting"
+            : "microphone";
+        if (primary.dataset.icon !== iconState) {
+          primary.dataset.icon = iconState;
+          primary.innerHTML = icon;
+        }
         caption.textContent = recording
           ? "Стоп"
           : waiting
@@ -756,9 +764,11 @@
           recording && session
             ? Math.max(0, performance.now() - session.started)
             : 0;
-        timerText.textContent = recording
+        const timerValue = recording
           ? `${String(Math.floor(elapsed / 60000)).padStart(2, "0")}:${String(Math.floor(elapsed / 1000) % 60).padStart(2, "0")}`
           : "";
+        if (timerText.textContent !== timerValue)
+          timerText.textContent = timerValue;
         hint.textContent = recording ? "Минимум 5 секунд" : "От 5 секунд";
         hint.style.gridRow = recording ? "4" : "3";
         hint.classList.toggle(
@@ -842,14 +852,14 @@
           s.context = new Audio();
           void s.context
             .resume()
-            .catch(() => vadFallback(s, "audio_context_suspended"));
+            .catch((error) => vadFallback(s, "audio_context_suspended", error));
           s.source = s.context.createMediaStreamSource(s.stream);
           s.analyser = s.context.createAnalyser();
           s.analyser.fftSize = 512;
           s.source.connect(s.analyser);
           void startVad(s);
-        } catch {
-          vadFallback(s, "audio_context_unavailable");
+        } catch (error) {
+          vadFallback(s, "audio_context_unavailable", error);
         }
       }
       async function startVad(s) {
@@ -1090,6 +1100,19 @@
             });
           };
           s.recorder.onstop = () => {
+            if (!s.ending && session === s) {
+              s.ending = true;
+              s.reason =
+                machine.state === "recording"
+                  ? "recorder_stopped"
+                  : "recorder_error";
+              s.duration = Math.max(0, performance.now() - s.started);
+              diagnostics.mark("stop_requested", {
+                reason: s.reason,
+                duration_ms: s.duration,
+              });
+              transition("stopping");
+            }
             void finalize(s);
           };
           s.started = performance.now();
@@ -1179,6 +1202,7 @@
         if (
           s.reason === "size" ||
           s.reason === "recorder_error" ||
+          !Number.isFinite(s.duration) ||
           !recorded.size
         ) {
           error.textContent =
