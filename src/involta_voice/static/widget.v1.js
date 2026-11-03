@@ -432,6 +432,7 @@
         reference,
         poll,
         historyPoll,
+        drag = null,
         delay = 2000,
         blocked = false;
       const style = document.createElement("style");
@@ -463,6 +464,7 @@
           text-wrap: balance;
         }
         .stage {
+          padding-block-start: 64px;
           min-block-size: 248px;
           display: grid;
           grid-template-rows: 80px 28px 28px 28px 44px;
@@ -482,9 +484,23 @@
           padding: 0;
           display: grid;
           place-items: center;
-          touch-action: manipulation;
+          touch-action: none;
+          -webkit-tap-highlight-color: transparent;
+          -webkit-user-select: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+          transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
+          transition:
+            transform 240ms cubic-bezier(0.2, 0.85, 0.3, 1.15),
+            box-shadow 180ms ease;
           cursor: pointer;
           isolation: isolate;
+        }
+        .primary.dragging {
+          transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0) scale(1.03);
+          box-shadow: 0 14px 30px #0002;
+          transition: box-shadow 180ms ease;
+          will-change: transform;
         }
         .primary::before {
           content: "";
@@ -643,6 +659,17 @@
           }
           .primary.recording::before {
             transform: none;
+          }
+          .primary,
+          .primary.dragging {
+            transition: none;
+            box-shadow: none;
+          }
+          .primary.dragging {
+            transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
+          }
+          .primary.waiting svg {
+            animation: none;
           }
         }
       `;
@@ -803,6 +830,7 @@
         const state = machine.state,
           recording = state === "recording",
           waiting = state === "starting" || state === "stopping";
+        if (!["starting", "recording"].includes(state)) resetDrag(state);
         target.dataset.voiceState = state;
         const showingPreview =
           !!blob && ["preview", "retry", "uploading"].includes(state);
@@ -1361,9 +1389,66 @@
         else if (["idle", "accepted", "error"].includes(machine.state))
           void start();
       }
+      function resetDrag(reason = "released") {
+        const previous = drag;
+        drag = null;
+        primary.classList.remove("dragging");
+        primary.style.removeProperty("--drag-x");
+        primary.style.removeProperty("--drag-y");
+        if (previous && primary.hasPointerCapture(previous.id))
+          primary.releasePointerCapture(previous.id);
+        if (previous)
+          diagnostics.mark("gesture_end", {
+            reason,
+            held_ms: performance.now() - previous.started,
+            lift_px: previous.lift,
+          });
+      }
       primary.addEventListener("pointerdown", (event) => {
-        if (!event.isPrimary || event.button !== 0) return;
+        if (!event.isPrimary || event.button !== 0 || primary.disabled || drag)
+          return;
+        if (["idle", "accepted", "error"].includes(machine.state)) {
+          // Only the original start gesture follows the finger. Its release must
+          // never activate the stop that has appeared on this same button.
+          drag = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            started: performance.now(),
+            lift: 0,
+          };
+          primary.classList.add("dragging");
+          try {
+            primary.setPointerCapture(event.pointerId);
+          } catch {
+            // Synthetic activations have no native pointer to capture.
+          }
+        }
         primaryAction();
+        if (drag)
+          diagnostics.mark("gesture_start", { pointer: event.pointerType });
+      });
+      primary.addEventListener("pointermove", (event) => {
+        if (!drag || event.pointerId !== drag.id) return;
+        const dx = event.clientX - drag.x,
+          dy = event.clientY - drag.y,
+          verticalLimit = dy < 0 ? 80 : 16;
+        drag.lift = Math.max(drag.lift, -dy);
+        // Follow small movements directly, then resist long drags. The reserved
+        // space above the circle keeps even the maximum lift clear of the request.
+        primary.style.setProperty("--drag-x", `${36 * Math.tanh(dx / 36)}px`);
+        primary.style.setProperty(
+          "--drag-y",
+          `${verticalLimit * Math.tanh(dy / verticalLimit)}px`,
+        );
+      });
+      primary.addEventListener("pointerup", (event) => {
+        if (drag?.id === event.pointerId) resetDrag();
+      });
+      primary.addEventListener("lostpointercapture", (event) => {
+        if (drag?.id !== event.pointerId) return;
+        resetDrag("capture_lost");
+        interrupt("pointer_capture_lost");
       });
       primary.addEventListener("click", (event) => {
         if (event.detail === 0) primaryAction();
@@ -1372,9 +1457,11 @@
         if (event.repeat && ["Enter", " "].includes(event.key))
           event.preventDefault();
       });
-      primary.addEventListener("pointercancel", () =>
-        interrupt("pointercancel"),
-      );
+      primary.addEventListener("pointercancel", (event) => {
+        if (drag && event.pointerId !== drag.id) return;
+        resetDrag("pointercancel");
+        interrupt("pointercancel");
+      });
       cancel.onclick = cancelAttempt;
       const escape = (event) => {
         if (event.key === "Escape" && activeCapture === instance) {
@@ -1566,6 +1653,7 @@
       }
       function unmount() {
         if (disposed) return;
+        resetDrag("unmount");
         if (machine.state === "recording") stop("unmount");
         else if (machine.state === "starting") cancelAttempt();
         disposed = true;

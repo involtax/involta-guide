@@ -44,7 +44,7 @@ def browser():
 @pytest.fixture
 def widget_page(browser):
     context = browser.new_context(
-        permissions=["microphone"], viewport={"width": 390, "height": 844}
+        permissions=["microphone"], viewport={"width": 390, "height": 844}, has_touch=True
     )
     context.add_init_script(FAKE_RECORDER)
     page = context.new_page()
@@ -102,6 +102,7 @@ def press(page, widget):
     widget.locator(".primary").dispatch_event(
         "pointerdown", {"isPrimary": True, "button": 0, "pointerType": "touch"}
     )
+    widget.locator(".primary").dispatch_event("pointerup")
 
 
 def state(widget, value):
@@ -110,6 +111,148 @@ def state(widget, value):
 
 def report(widget):
     return json.loads(widget.locator("details pre").first.text_content())
+
+
+def touch(cdp, kind, x=0, y=0):
+    cdp.send(
+        "Input.dispatchTouchEvent",
+        {"type": kind, "touchPoints": [] if kind == "touchEnd" else [{"x": x, "y": y, "id": 1}]},
+    )
+
+
+@pytest.mark.parametrize("hold_ms", [0, 3000, 7000])
+def test_native_upward_drag_after_holding_continues_one_recording(widget_page, hold_ms):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    primary.evaluate(
+        "e=>e.addEventListener('pointerdown',event=>window.__dragPointer=event.pointerId)"
+    )
+    if hold_ms == 7000:
+        page.emulate_media(reduced_motion="reduce")
+    touch(cdp, "touchStart", x, y)
+    state(widget, "recording")
+    page.clock.run_for(hold_ms)
+    touch(cdp, "touchMove", x + 20, y - 140)
+    offset = primary.evaluate("e=>parseFloat(e.style.getPropertyValue('--drag-y'))")
+    assert -80 < offset < -60
+    assert primary.evaluate("e=>e.hasPointerCapture(window.__dragPointer)")
+    assert (
+        primary.bounding_box()["y"]
+        >= widget.locator("h2").bounding_box()["y"] + widget.locator("h2").bounding_box()["height"]
+    )
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    if hold_ms == 7000:
+        assert primary.evaluate("e=>getComputedStyle(e).transitionDuration") == "0s"
+    assert primary.evaluate("e=>getComputedStyle(e).webkitTapHighlightColor") == "rgba(0, 0, 0, 0)"
+    assert primary.evaluate("e=>getComputedStyle(e).touchAction") == "none"
+    touch(cdp, "touchEnd")
+    state(widget, "recording")
+    assert primary.evaluate(
+        "e=>!e.classList.contains('dragging') && !e.style.getPropertyValue('--drag-y')"
+    )
+    assert page.evaluate("__recorders.length===1 && !__recorders[0].stops")
+    assert not uploads
+    gesture = next(e for e in report(widget)["timeline"] if e["name"] == "gesture_end")
+    assert gesture["reason"] == "released" and gesture["lift_px"] == 140
+    expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
+    page.keyboard.press("Escape")
+
+
+def test_native_drag_owns_its_touch_but_outside_scroll_does_not_stop_recording(widget_page):
+    page, widget, uploads = widget_page
+    page.add_style_tag(content="body{margin:0;min-height:4000px}")
+    events = []
+    page.expose_function("capturePointerEvent", lambda event: events.append(event))
+    primary = widget.locator(".primary")
+    primary.evaluate(
+        "e=>{for(const t of ['pointerdown','pointercancel','pointerup'])e.addEventListener(t,event=>capturePointerEvent(event.type))}"
+    )
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    touch(cdp, "touchStart", x, y)
+    state(widget, "recording")
+    for delta in [20, 60, 100, 150]:
+        touch(cdp, "touchMove", x, y - delta)
+    touch(cdp, "touchEnd")
+    assert page.evaluate("scrollY") == 0
+    assert events == ["pointerdown", "pointerup"]
+    touch(cdp, "touchStart", 12, 700)
+    for delta in [20, 60, 100, 200]:
+        touch(cdp, "touchMove", 12, 700 - delta)
+    touch(cdp, "touchEnd")
+    assert page.evaluate("scrollY") > 0
+    state(widget, "recording")
+    assert not uploads
+    page.keyboard.press("Escape")
+
+
+def test_late_permission_drag_release_never_cancels_or_restarts_capture(widget_page):
+    page, widget, uploads = widget_page
+    page.evaluate("window.__delayPermission=true")
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    touch(cdp, "touchStart", x, y)
+    state(widget, "starting")
+    wait_expression(page, "!!window.__latePermission")
+    page.clock.run_for(7000)
+    touch(cdp, "touchMove", x, y - 140)
+    touch(cdp, "touchEnd")
+    state(widget, "starting")
+    page.evaluate("__latePermission();window.__delayPermission=false")
+    state(widget, "recording")
+    assert page.evaluate("__recorders.length") == 1
+    assert not uploads
+    page.keyboard.press("Escape")
+
+
+def test_lost_capture_resets_drag_and_finalizes_valid_audio_once(widget_page):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    primary.dispatch_event("pointerdown", {"isPrimary": True, "button": 0, "pointerId": 4})
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    primary.dispatch_event("pointermove", {"pointerId": 4, "clientY": -120})
+    primary.dispatch_event("lostpointercapture", {"pointerId": 4})
+    primary.dispatch_event("pointercancel", {"pointerId": 4})
+    page.clock.run_for(1)
+    state(widget, "preview")
+    assert page.evaluate("__recorders[0].stops") == 1
+    assert not primary.evaluate("e=>e.classList.contains('dragging')")
+    assert not uploads
+
+
+@pytest.mark.parametrize("ending", ["escape", "limit", "unmount"])
+def test_ending_while_finger_is_held_releases_capture_without_restarting(widget_page, ending):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    cdp = page.context.new_cdp_session(page)
+    primary.evaluate(
+        "e=>{window.__heldButton=e;e.addEventListener('pointerdown',event=>window.__heldPointer=event.pointerId)}"
+    )
+    touch(cdp, "touchStart", box["x"] + 40, box["y"] + 40)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    if ending == "escape":
+        page.keyboard.press("Escape")
+    elif ending == "limit":
+        page.clock.fast_forward(120000)
+    else:
+        page.evaluate("InvoltaVoice.unmount('a')")
+    page.clock.run_for(1)
+    touch(cdp, "touchEnd")
+    assert page.evaluate(
+        "!__heldButton.hasPointerCapture(__heldPointer) && !__heldButton.classList.contains('dragging')"
+    )
+    assert page.evaluate("__recorders.length===1 && __recorders[0].stops===1")
+    assert page.evaluate("__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
+    assert not uploads
 
 
 def test_gate_exact_pause_reset_unknown_frames_and_no_speech(widget_page):
