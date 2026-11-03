@@ -87,14 +87,14 @@ prompt, permission/revision checks and immediate application rules.
 
 ## Review operation
 
-Open `/guide/admin/voice` after administrator login. The queue includes existing
+Open `/guide/admin/reviews` after administrator login. The queue includes existing
 Guide history and imported Voice reviews; accepted Voice audio waiting for a
 transcript is visible while the service is reachable. Original transcript and
 editable text are separate. Rejection/fraud never delete either text or audio.
 Approval makes the text visible and applies the entire checked package immediately.
 Edit or exclude mistaken candidates before approval; there is no separate publication.
 
-Use `/guide/admin/voice/{slug}/{number}` and its `/runs/{run}` link. Numbers and
+Use `/guide/admin/reviews/{slug}/{number}` and its `/runs/{run}` link. Numbers and
 run identities are persisted. Renamed slugs redirect to the current canonical
 slug. Existing `/guide/logs/...` identities are untouched.
 

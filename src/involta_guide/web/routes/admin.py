@@ -20,6 +20,7 @@ from involta_guide.infrastructure.ai.catalog import (
     PRICING_URL,
 )
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE
+from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.web.http import (
     admin_token,
     check_csrf,
@@ -67,6 +68,7 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
             "fragment": request.headers.get("HX-Request") == "true"
             and request.headers.get("HX-History-Restore-Request") != "true",
             "admin_ui": True,
+            "review_path": lambda key: ctx.settings.path(VoiceReadModel(ctx.engine).path(str(key))),
             "csrf_token": ctx.security.csrf(token),
             "kinds": KINDS,
             "factors": FACTORS,
@@ -84,16 +86,19 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
 
 
 def redirect(request: Request, tab: str = "overview", message: str = "", **params: str) -> Response:
-    if tab == "overview":
-        return RedirectResponse(
-            context(request).settings.path("/admin") + "?" + urlencode({"message": message}),
-            status_code=303,
+    ctx = context(request)
+    if tab == "reviews":
+        path = (
+            VoiceReadModel(ctx.engine).path(params.pop("review"))
+            if params.get("review")
+            else "/admin/reviews"
         )
+    else:
+        path = {"overview": "/admin", "ratings": "/admin/ratings", "contacts": "/admin/contacts"}[
+            tab
+        ]
     return RedirectResponse(
-        context(request).settings.path("/admin")
-        + "?"
-        + urlencode({"tab": tab, "message": message, **params}),
-        status_code=303,
+        ctx.settings.path(path) + "?" + urlencode({"message": message, **params}), status_code=303
     )
 
 
@@ -121,6 +126,8 @@ def routes(prefix: str) -> APIRouter:
     router = APIRouter()
 
     @router.get(prefix + "/admin")
+    @router.get(prefix + "/admin/ratings")
+    @router.get(prefix + "/admin/contacts")
     def admin(request: Request) -> Response:
         ctx = context(request)
         if not ctx.security.principal(admin_token(request)):
@@ -144,7 +151,23 @@ def routes(prefix: str) -> APIRouter:
             )
             return response
         params = request.query_params
-        tab = params.get("tab", "overview")
+        tab = {prefix + "/admin/ratings": "ratings", prefix + "/admin/contacts": "contacts"}.get(
+            request.url.path, params.get("tab", "overview")
+        )
+        if "tab" in params and tab in ("reviews", "ratings", "contacts"):
+            if tab == "reviews":
+                path = (
+                    VoiceReadModel(ctx.engine).path(uid(params["review"]))
+                    if params.get("review")
+                    else "/admin/reviews"
+                )
+            else:
+                path = "/admin/" + tab
+            filters = {k: v for k, v in params.items() if k not in ("tab", "review")}
+            target = ctx.settings.path(path) + ("?" + urlencode(filters) if filters else "")
+            if request.headers.get("HX-Request") == "true":
+                return Response(headers={"HX-Redirect": target})
+            return RedirectResponse(target, status_code=308)
         if tab not in ("overview", "reviews", "ratings", "contacts") or (
             tab == "overview" and ("tab" in params or "location" in params or "city" in params)
         ):
@@ -157,32 +180,8 @@ def routes(prefix: str) -> APIRouter:
             "overview": ctx.queries.overview(),
             "q": q,
             "status": status,
-            "selected": None,
-            "review_detail": None,
-            "add_card": params.get("add") == "1",
         }
-        if tab == "reviews":
-            moderation = params.get("moderation", "")
-            data["moderation"] = moderation
-            data["reviews"] = ctx.queries.rows(
-                "reviews", {"moderation": moderation} if moderation else None
-            )
-            if params.get("review"):
-                detail = ctx.queries.review(uid(params["review"]))
-                data["review_detail"] = detail
-                content = ctx.queries.location(detail["review"]["location_id"])["content"]
-                data["proposal_before"] = {
-                    p["id"]: next(
-                        (
-                            r
-                            for r in content["restaurants"]
-                            if r.get("id") == p["payload"].get("restaurantId")
-                        ),
-                        None,
-                    )
-                    for p in detail["proposals"]
-                }
-        elif tab == "ratings":
+        if tab == "ratings":
             from involta_guide.domain.rules import aggregate_scores
 
             data["ratings"] = aggregate_scores(ctx.queries.rows("reviews", limit=10000))

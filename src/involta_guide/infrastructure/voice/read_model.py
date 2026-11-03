@@ -62,6 +62,16 @@ class VoiceReadModel:
             )
         if repeat:
             clauses.append("coalesce((v.metadata->'repeat_signals'->>'same_audio')::integer,0)>0")
+        if stage == "waiting-text":
+            clauses.append("t.review_id IS NULL")
+        elif stage == "text-ready":
+            clauses.append("t.review_id IS NOT NULL")
+        elif stage == "analysis-ready":
+            clauses.append(
+                "r.result IS NOT NULL AND (v.reference IS NULL OR EXISTS(SELECT 1 FROM voice_results a WHERE a.review_id=r.id AND a.run=v.active_run))"
+            )
+        elif stage == "failed":
+            clauses.append("(r.error IS NOT NULL OR r.status='failed')")
         joins = (
             "FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN voice_links v ON v.review_id=r.id LEFT JOIN review_texts t ON t.review_id=r.id WHERE "
             + " AND ".join(clauses)
@@ -75,7 +85,7 @@ class VoiceReadModel:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT r.*,l.name location_name,l.slug location_slug,v.number,v.active_run,t.editorial_text "
+                        "SELECT r.*,l.name location_name,l.slug location_slug,v.active_run,t.editorial_text "
                         + joins
                         + " ORDER BY r.created_at DESC,r.id LIMIT 30 OFFSET :offset"
                     ),
@@ -83,29 +93,38 @@ class VoiceReadModel:
                 ).mappings()
             ]
         for item in items:
-            item["path"] = (
-                "/admin/voice/" + item["location_slug"] + "/" + str(item["number"])
-                if item["number"]
-                else "/admin/voice/legacy/" + str(item["id"])
-            )
-        if stage == "waiting-text":
-            clauses.append("t.review_id IS NULL")
-        elif stage == "text-ready":
-            clauses.append("t.review_id IS NOT NULL")
-        elif stage == "analysis-ready":
-            clauses.append(
-                "r.result IS NOT NULL AND (v.reference IS NULL OR EXISTS(SELECT 1 FROM voice_results a WHERE a.review_id=r.id AND a.run=v.active_run))"
-            )
-        elif stage == "failed":
-            clauses.append("(r.error IS NOT NULL OR r.status='failed')")
+            item["path"] = "/admin/reviews/" + item["location_slug"] + "/" + str(item["number"])
         return {"rows": items, "page": page, "pages": max(1, (total + 29) // 30), "total": total}
+
+    def path(self, review_id: str) -> str:
+        with self.engine.connect() as conn:
+            item = row(
+                conn,
+                "SELECT r.number,l.slug FROM reviews r JOIN locations l ON l.id=r.location_id WHERE r.id=:id",
+                id=review_id,
+            )
+        if item is None:
+            raise NotFound("Отзыв не найден")
+        return "/admin/reviews/" + item["slug"] + "/" + str(item["number"])
+
+    def imported_path(self, slug: str, number: int) -> str:
+        with self.engine.connect() as conn:
+            item = row(
+                conn,
+                "SELECT v.review_id FROM voice_links v JOIN locations l ON l.id=v.location_id WHERE l.slug=:slug AND v.number=:n",
+                slug=slug,
+                n=number,
+            )
+        if item is None:
+            raise NotFound("Отзыв не найден")
+        return self.path(str(item["review_id"]))
 
     def resolve(self, slug: str, number: int) -> tuple[str, str]:
         with self.engine.connect() as conn:
             item = row(
                 conn,
-                """SELECT v.review_id,l.slug FROM voice_links v JOIN locations l ON l.id=v.location_id
-                WHERE v.number=:n AND (l.slug=:slug OR l.id IN (SELECT location_id FROM location_slug_redirects WHERE slug=:slug))""",
+                """SELECT r.id AS review_id,l.slug FROM reviews r JOIN locations l ON l.id=r.location_id
+                WHERE r.number=:n AND l.slug=:slug""",
                 n=number,
                 slug=slug,
             )
@@ -232,7 +251,5 @@ class VoiceReadModel:
             "legacy_jobs": legacy_jobs,
             "analysis": analysis,
             "changes": review["changes"],
-            "path": "/admin/voice/" + location["slug"] + "/" + str(link["number"])
-            if link
-            else "/admin/voice/legacy/" + review_id,
+            "path": "/admin/reviews/" + location["slug"] + "/" + str(review["number"]),
         }

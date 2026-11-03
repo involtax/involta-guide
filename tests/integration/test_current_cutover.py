@@ -107,6 +107,7 @@ def test_cutover_keeps_current_data_and_discards_page_history(database, monkeypa
         assert queries.setting("generation_model") == "gpt-5"
         assert queries.rows("jobs", {"kind": "generate"}) == []
         assert queries.get("jobs", voice_job)["status"] == "queued"
+        assert queries.get("reviews", review_id)["number"] == 1
         assert (
             queries.get("review_texts", review_id)["original_text"] == "Был в Огоньке, было вкусно"
         )
@@ -116,7 +117,7 @@ def test_cutover_keeps_current_data_and_discards_page_history(database, monkeypa
         with engine.connect() as conn:
             assert (
                 conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "admin_routes"
+                == "review_urls"
             )
             assert (
                 conn.execute(

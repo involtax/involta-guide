@@ -281,16 +281,27 @@ def test_guide_beta_panel_and_admin_archive_preserve_reviews_commands_and_csrf(
     assert worker.once() and worker.once()
     app = guide_app(settings)
     app.state.voice_client = remote
-    path = "/guide/admin/voice/legacy/" + review
+    path = "/guide/admin/reviews/ivanovo/" + str(before["number"])
     with TestClient(app) as client:
         assert client.get(path).status_code == 401
         login(client)
         # The production regression hid trusted recordings from the only queue link.
-        queue = client.get("/guide/admin/voice")
+        queue = client.get("/guide/admin/reviews")
         assert queue.status_code == 200
         assert path in queue.text and "Запись администратора" in queue.text
-        page = client.get(path)
+        old_query = "/guide/admin?tab=reviews&review=" + review
+        moved = client.get(old_query, follow_redirects=False)
+        assert moved.status_code == 308 and moved.headers["location"] == path
+        old_uuid = client.get("/guide/admin/voice/legacy/" + review, follow_redirects=False)
+        assert old_uuid.status_code == 308 and old_uuid.headers["location"] == path
+        page = client.get(old_query)
+        assert str(page.url).endswith(path)
         assert page.status_code == 200 and "GigaAM" in page.text and "Parakeet" in page.text
+        assert "admin-workspace" in page.text and "admin.css" in page.text
+        assert "?tab=reviews" not in page.text and "/legacy/" not in page.text
+        assert path + "/audio" in page.text and path + "/actions" in page.text
+        assert "Одобрить весь пакет" not in page.text
+        assert client.get(path + "/audio").content == recording()
         assert "В Огоньке вкусно." in page.text and "В огне вкусно." in page.text
         assert page.text.index("Бета: GigaAM / Parakeet") < page.text.index("Исходный текст отзыва")
         trial = report(ve, reference)["runs"][0]
@@ -303,7 +314,7 @@ def test_guide_beta_panel_and_admin_archive_preserve_reviews_commands_and_csrf(
             preferred_engine="parakeet",
             reference_text="В Огоньке вкусно.",
         )
-        decision = "/guide/admin/voice/decision/" + review
+        decision = path + "/actions"
         assert (
             client.post(decision, data=data, headers={"origin": "http://testserver"}).status_code
             == 403

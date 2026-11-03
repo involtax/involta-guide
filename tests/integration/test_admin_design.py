@@ -126,14 +126,12 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         "restaurants": "/admin/restaurants?location=ivanovo",
         "restaurant": "/admin/restaurants/" + str(restaurant["number"]),
         "filling": "/admin/settings/filling",
-        "voice": "/admin/voice",
-        "voice-review": "/admin/voice/ivanovo/1",
-        "voice-run": "/admin/voice/ivanovo/1/runs/1",
-        "voice-pending": "/admin/voice/submission/" + pending_ref,
-        "reviews": "/admin?tab=reviews",
-        "review": "/admin?tab=reviews&review=" + ref,
-        "ratings": "/admin?tab=ratings",
-        "contacts": "/admin?tab=contacts",
+        "voice": "/admin/reviews",
+        "voice-review": "/admin/reviews/ivanovo/1",
+        "voice-run": "/admin/reviews/ivanovo/1/runs/1",
+        "voice-pending": "/admin/reviews/submission/" + pending_ref,
+        "ratings": "/admin/ratings",
+        "contacts": "/admin/contacts",
         "sessions": "/admin/sessions",
         "logs": "/logs",
         "city-logs": "/logs/ivanovo",
@@ -215,6 +213,17 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                         == 1
                     )
                     assert page.locator(".admin-list-item.selected").count() == 1
+                    assert page.locator(".asr-comparison .admin-compare > article").count() == 2
+                    assert (
+                        page.locator(".asr-comparison .admin-compare article article").count() == 0
+                    )
+                    assert (
+                        page.get_by_role("navigation", name="Администрирование")
+                        .get_by_role("link", name="Отзывы", exact=True)
+                        .count()
+                        == 1
+                    )
+                    assert "?tab=" not in page.locator(".admin-tabs").inner_html()
                 if name == "log":
                     assert (
                         page.locator(".logs-content").evaluate(
