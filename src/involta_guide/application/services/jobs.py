@@ -264,9 +264,11 @@ class JobService:
             saved_prompt = (
                 uow.repo.generation_prompt(job["id"]) if job["kind"] == "generate" else None
             )
+            config = self.generation_config(uow.repo, job["id"])
+            reprocess = bool(config.get("reprocess_saved_response"))
             is_public = job["kind"] == "generate" and self._is_public_fill(uow.repo, job["id"])
             job["_temporary_public_fill"] = is_public
-            if is_public and saved_prompt is None:
+            if is_public and saved_prompt is None and not reprocess:
                 if not self.public_fill_enabled:
                     raise RuleViolation("Временное наполнение отключено")
                 if self._has_data(uow.repo, location):
@@ -278,7 +280,6 @@ class JobService:
             known = uow.repo.known(location["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
             review = require(uow.repo, "reviews", job["review_id"]) if job["review_id"] else None
-            config = self.generation_config(uow.repo, job["id"])
             generation_model = config.get("model", self.provider.model)
             baseline_changed = (
                 job["kind"] == "generate"
@@ -325,9 +326,23 @@ class JobService:
                 raise Conflict(
                     "Ответ сохранён, но страница изменена после постановки запроса. Автоматическое применение отменено."
                 )
-            if is_public and not self.public_fill_enabled:
+            if is_public and not self.public_fill_enabled and not reprocess:
                 raise RuleViolation("Ответ сохранён; временное наполнение отключено")
             result = rank(generated, location["top_limit"])
+            if reprocess:
+                for card in result["restaurants"]:
+                    existing = next(
+                        (
+                            r
+                            for r in content["restaurants"]
+                            if r["mapsUrl"] == card["mapsUrl"]
+                            and r["name"].casefold().strip() == card["name"].casefold().strip()
+                        ),
+                        None,
+                    )
+                    if existing:
+                        card["id"] = existing["id"]
+                        card["locationId"] = existing.get("locationId", location["id"])
             with self.uow() as uow:
                 previous = uow.repo.get("versions", baseline) if baseline else None
                 if previous and previous["source"] == "intro":
@@ -338,8 +353,10 @@ class JobService:
                 repo = uow.repo
                 if not repo.lease_valid(job["id"], job["lease_owner"]):
                     raise Conflict("Worker lease lost")
-                if is_public and self._has_data(
-                    repo, require(repo, "locations", location["id"], lock=True)
+                if (
+                    is_public
+                    and not reprocess
+                    and self._has_data(repo, require(repo, "locations", location["id"], lock=True))
                 ):
                     raise Conflict(
                         "На странице уже появились данные; автоматическая перезапись отменена"
@@ -349,7 +366,7 @@ class JobService:
                     location["id"],
                     result,
                     baseline,
-                    source="public_fill" if is_public else "ai",
+                    source="reprocess" if reprocess else "public_fill" if is_public else "ai",
                     prompt=prompt,
                     model=generation_model,
                     inherit=False,

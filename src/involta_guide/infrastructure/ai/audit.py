@@ -14,6 +14,7 @@ from involta_guide.config import Settings
 HISTORY = """WITH numbered AS (
  SELECT j.*,l.name location_name,r.location_slug,r.number ordinal,r.path log_path,
  g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
+ (g.response_json IS NOT NULL) has_saved_response,
  EXISTS(SELECT 1 FROM audit published WHERE published.action='ai_result' AND published.target=j.id::text
    AND published.detail::jsonb->'data'->>'version_id'=l.published_version::text) result_published,
  (SELECT a.detail::jsonb FROM audit a WHERE a.action='generation_run' AND a.target=j.id::text ORDER BY a.created_at LIMIT 1) generation_config,
@@ -160,6 +161,12 @@ class AIAudit:
                 }.get(state, job["stage_label"])
                 if job["status"] == "failed" and state in ("queued", "in_progress"):
                     job["stage_label"] = "Обработка остановлена; запрос OpenAI сохранён"
+        job["can_reprocess"] = (
+            job["kind"] == "generate"
+            and job["status"] in ("done", "failed", "cancelled")
+            and state == "completed"
+            and bool(job.get("has_saved_response"))
+        )
         job["can_resume"] = (
             job["status"] == "failed"
             and not job["applied"]

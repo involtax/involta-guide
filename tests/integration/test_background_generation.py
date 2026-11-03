@@ -271,7 +271,7 @@ def test_saved_response_can_be_revalidated_without_network(database, monkeypatch
             )
             login(client)
             page = client.get("/guide/logs/ivanovo/1")
-            assert "Проверить сохранённый ответ повторно" in page.text
+            assert "Переобработать тот же ответ" in page.text
             csrf = token(page.text)
             response = client.post(
                 url,
@@ -381,5 +381,91 @@ def test_editor_change_preserved_but_remote_answer_still_collected(database):
         assert queries.get("jobs", job["id"])["status"] == "failed"
         assert queries.get("locations", location["id"])["draft_version"] == editor_version
         assert len(queries.rows("versions")) == 1
+    finally:
+        provider.close()
+
+
+def test_successful_public_response_can_be_reprocessed_without_network_or_duplicates(database):
+    calls = []
+
+    def handler(request):
+        calls.append(request.method)
+        return httpx.Response(200, json=envelope())
+
+    settings, engine, queries, location, service, queue, provider, job = configured(
+        database, handler
+    )
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO audit(id,action,target,detail) VALUES(gen_random_uuid(),'temporary_public_fill',:job,:location)"
+                ),
+                {"job": job["id"], "location": location["id"]},
+            )
+        assert Worker(queue, service).once()
+        initial = queries.get("locations", location["id"])["published_version"]
+        original_response = task(engine, job)["response_json"]
+        restaurant_id = queries.rows("restaurants")[0]["id"]
+        with TestClient(create_app(settings)) as client:
+            assert client.post("/guide/admin/actions/reprocess-generation").status_code == 401
+            login(client)
+            page = client.get("/guide/logs/ivanovo/1")
+            assert "Переобработать тот же ответ" in page.text
+            assert AIAudit(engine, settings).detail(job["id"])["job"]["can_reprocess"]
+            result = client.post(
+                "/guide/admin/actions/reprocess-generation",
+                data={
+                    "_csrf": token(page.text),
+                    "log_slug": "ivanovo",
+                    "log_number": "1",
+                    "expected": initial,
+                },
+                headers={"Origin": "http://testserver"},
+            )
+            assert result.status_code == 200
+        service.public_fill_enabled = False
+        provider.client.close()
+        assert Worker(queue, service).once()
+        assert calls == ["POST"]
+        assert len(queries.rows("jobs")) == len(queries.rows("ai_usage")) == 1
+        assert len(queries.rows("restaurants")) == 1
+        assert queries.rows("restaurants")[0]["id"] == restaurant_id
+        assert len(queries.rows("versions")) == 2
+        assert queries.get("locations", location["id"])["published_version"] != initial
+        assert queries.get("jobs", job["id"])["status"] == "done"
+        assert task(engine, job)["response_json"] == original_response
+        assert len(AIAudit(engine, settings).detail(job["id"])["versions"]) == 2
+    finally:
+        provider.close()
+
+
+def test_cached_reprocess_rejects_stale_page_and_later_edits(database):
+    from involta_guide.application.services.editorial import EditorialService
+    from involta_guide.domain.entities import Conflict
+    from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+
+    calls = []
+
+    def handler(request):
+        calls.append(request.method)
+        return httpx.Response(200, json=envelope())
+
+    settings, engine, queries, location, service, queue, provider, job = configured(
+        database, handler
+    )
+    try:
+        Worker(queue, service).once()
+        current = queries.get("locations", location["id"])["published_version"]
+        with pytest.raises(Conflict):
+            resume_generation(engine, job["id"], 3600, reprocess=True, expected_version=None)
+        resume_generation(engine, job["id"], 3600, reprocess=True, expected_version=current)
+        editor = EditorialService(lambda: PostgresUow(engine))
+        editor.save_intro(location["id"], "Сохранить ручное изменение", current, current)
+        provider.client.close()
+        Worker(queue, service).once()
+        assert queries.get("jobs", job["id"])["status"] == "failed"
+        assert queries.public(location["slug"])["content"]["intro"] == "Сохранить ручное изменение"
+        assert calls == ["POST"]
     finally:
         provider.close()
