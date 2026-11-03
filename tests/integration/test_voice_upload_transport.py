@@ -142,11 +142,25 @@ def test_all_roles_share_normal_flow_retries_audio_and_private_debug(database, v
             client.post(
                 debug_path,
                 headers=headers,
-                json={"events": [{"response_body": "<html>proxy full response</html>"}]},
+                json={
+                    "timeline": [{"name": "stop_requested", "reason": "silence"}],
+                    "vad": {"state": "ready"},
+                    "events": [
+                        {
+                            "response_body": "<html>proxy full response</html>",
+                            "csrf_token": "test-private-token",
+                        }
+                    ],
+                },
             ).status_code
             == 200
         )
-        assert "proxy full response" in str(client.get(debug_path).json())
+        browser_report = client.get(debug_path).json()
+        assert "proxy full response" in str(browser_report)
+        assert "test-private-token" not in str(browser_report)
+        event = browser_report["events"][-1]
+        assert event["report"]["timeline"][0]["reason"] == "silence"
+        assert event["report"]["vad"]["state"] == "ready"
         assert upload().json()["reference"] == second.json()["reference"]
         with ve.connect() as conn:
             values = list(conn.execute(text("SELECT metadata FROM submissions")).scalars())

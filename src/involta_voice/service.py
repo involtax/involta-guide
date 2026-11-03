@@ -102,7 +102,9 @@ class VoiceService:
                         "audio/wav": "wav",
                     }.get(mime, "invalid")
                     name = f"{location}.{epoch}.{reference}.{extension}"
-                    name, duration = self.storage.save(content, mime, name=name)
+                    name, duration = self.storage.save(
+                        content, mime, name=name, min_duration_seconds=5
+                    )
                     execute(
                         conn,
                         """INSERT INTO submissions(reference,location_id,content_epoch,visitor,idempotency_key,

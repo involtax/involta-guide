@@ -46,3 +46,16 @@ Guide-исполнителя нет. ЧПУ карточки Guide `/admin/revie
 не получает свежую метку: очередь очищается при следующем контакте, пользователь
 видит сообщение и может сознательно записать новый отзыв. Сервер не удаляет файлы
 из закрытого чужого браузера, но не принимает их повторно в новый цикл.
+
+## Minimum duration for new reviews
+
+New review intake measures audio with ffprobe before submission/queue creation.
+Minimum is 5.0 seconds; short uploads return HTTP 422 with
+`{"error":{"code":"audio_too_short","message":"…","min_duration_seconds":5,"duration_seconds":4.999}}`.
+The same-origin gateway preserves this response. Encoder padding does not extend
+the measured audio duration. Accepted idempotent submissions resolve before new
+validation; historical >=1-second OutboxEvent records remain readable.
+
+The centered microphone/stop UI, silence detection, demo and pinned browser assets
+are described in [VOICE_WIDGET_UX_IMPLEMENTATION.md](VOICE_WIDGET_UX_IMPLEMENTATION.md).
+The widget retains each recording's original content_epoch across all retries.

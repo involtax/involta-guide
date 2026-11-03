@@ -165,7 +165,16 @@ def routes(prefix: str) -> APIRouter:
                 "visitor": visitor,
                 "report": {
                     key: report[key]
-                    for key in ("version", "browser", "role", "location", "draft", "events")
+                    for key in (
+                        "version",
+                        "browser",
+                        "role",
+                        "location",
+                        "draft",
+                        "events",
+                        "timeline",
+                        "vad",
+                    )
                     if key in report
                 },
             },
