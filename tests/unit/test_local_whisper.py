@@ -72,3 +72,31 @@ def test_model_is_prepared_explicitly_never_downloaded_during_upload(tmp_path):
     local = LocalWhisper(settings(tmp_path))
     with pytest.raises(ProviderFailure, match="prepare-model"):
         local.call(options(local.settings), b"fixture")
+
+
+@pytest.mark.parametrize(
+    "extension,codec",
+    [("wav", "pcm_s16le"), ("webm", "libopus"), ("ogg", "libopus"), ("m4a", "aac")],
+)
+def test_real_browser_container_decoding_without_model_or_network(tmp_path, extension, codec):
+    import io
+    import subprocess
+    import wave
+
+    from faster_whisper.audio import decode_audio
+
+    stream = io.BytesIO()
+    with wave.open(stream, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8000)
+        wav.writeframes(b"\0\0" * 16000)
+    target = tmp_path / ("sample." + extension)
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "wav", "-i", "pipe:0", "-c:a", codec, str(target)],
+        input=stream.getvalue(),
+        capture_output=True,
+        check=True,
+    )
+    decoded = decode_audio(io.BytesIO(target.read_bytes()), sampling_rate=16000)
+    assert 1.9 <= len(decoded) / 16000 <= 2.2

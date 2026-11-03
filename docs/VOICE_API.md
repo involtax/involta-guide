@@ -127,3 +127,15 @@ proposals atomically and immediately. `review_revision` is the package revision;
 proposal edit/exclusion and newly imported analysis invalidate stale decisions.
 `page_revision` and `affected_revisions` fence current and shared-card city data.
 No proposals means no empty page version. See VOICE_REVIEW_REPORT.md.
+
+## Local ASR and trusted Guide speech
+
+Speech is local faster-whisper; OpenAI receives text for optional analysis only.
+POST `/internal/v1/guide-transcriptions` is an authenticated internal multipart
+endpoint with `audio` + `SubmissionMetadata` JSON, returning the same status DTO.
+Its purpose is forced server-side. Guide/admin tasks use the single Voice worker,
+have no analysis stage/outbox event, and never create a second imported review.
+They are hidden from visitor/admin review listings; original Guide session roles
+and command decisions stay in Guide. Actor `admin` is accepted only on this
+internal Guide route; ordinary submission routes still require actor `visitor`.
+See LOCAL_WHISPER.md for pinned weights, preparation and measured limits.
