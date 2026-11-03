@@ -181,11 +181,9 @@ def routes(prefix: str) -> APIRouter:
                     "id": str(location["id"]),
                     "slug": location["slug"],
                     "name": location["name"],
-                    "revision": str(location["draft_version"])
-                    if location["draft_version"]
-                    else None,
-                    "published_revision": str(location["published_version"])
-                    if location["published_version"]
+                    "revision": str(location["revision"]) if location["revision"] else None,
+                    "published_revision": str(location["revision"])
+                    if location["revision"]
                     else None,
                     "restaurants": [
                         {
@@ -297,10 +295,6 @@ def routes(prefix: str) -> APIRouter:
             run=int(str(form.get("run"))) if form.get("run") else None,
             fragment_number=int(str(form.get("fragment_number")))
             if form.get("fragment_number") is not None
-            else None,
-            version_id=UUID(str(form.get("version_id"))) if form.get("version_id") else None,
-            published_revision=UUID(str(form.get("published_revision")))
-            if form.get("published_revision")
             else None,
         )
         try:

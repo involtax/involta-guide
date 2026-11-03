@@ -168,22 +168,8 @@ def routes(prefix: str) -> APIRouter:
         job_id = store.resolve(slug, number, public_only=public_only) if number > 0 else None
         detail = store.detail(job_id, public_only=public_only) if job_id else None
         if detail is None:
-            raise HTTPException(404, "Версия журнала не найдена")
+            raise HTTPException(404, "Запрос не найден")
         return detail
-
-    @router.get(prefix + "/logs/history/{location_id}")
-    def page_history(request: Request, location_id: UUID) -> Response:
-        require_admin(request)
-        selected = context(request).queries.location(str(location_id))
-        return render(
-            request,
-            "page_history.html",
-            {
-                "selected": selected,
-                "tab": "logs",
-                "title": "История данных города",
-            },
-        )
 
     @router.get(prefix + "/logs/{slug}/{number}.json")
     def numbered_json(request: Request, slug: str, number: int) -> Response:
@@ -388,7 +374,7 @@ def routes(prefix: str) -> APIRouter:
                 "public_reviews": public_reviews,
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
-                and not (c["published_version"] or c["draft_version"] or c["draft"])
+                and not c["page_data"].get("restaurants")
                 else None,
                 "structured": structured,
             },

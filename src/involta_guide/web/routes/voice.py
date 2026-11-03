@@ -44,11 +44,8 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
     text = ctx.queries.get("review_texts", reference)
     location = ctx.queries.get("locations", review["location_id"])
     state = "fraud" if review["fraud"] else review["moderation"]
-    versions = ctx.queries.rows("version_reviews", {"review_id": reference})
-    if versions and review["moderation"] == "approved" and not review["fraud"]:
-        linked = {v["version_id"] for v in versions}
-        if location and location["published_version"] in linked:
-            state = "published"
+    if review["changes"] and review["moderation"] == "approved" and not review["fraud"]:
+        state = "published"
     if text and text["public"] and review["moderation"] == "approved" and not review["fraud"]:
         state = "published"
     return {
@@ -146,8 +143,8 @@ def routes(prefix: str) -> APIRouter:
                     id=location["id"],
                     slug=location["slug"],
                     name=location["name"],
-                    revision=location["draft_version"],
-                    published_revision=location["published_version"],
+                    revision=location["revision"],
+                    published_revision=location["revision"],
                     restaurants=[
                         RestaurantContext(
                             id=r["id"],

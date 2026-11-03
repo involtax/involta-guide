@@ -58,7 +58,7 @@ uv run voice-worker
 
 Guide's `.env.local` keeps its existing DATABASE_URL. Add the same
 VOICE_SERVICE_SECRET, `VOICE_URL=http://127.0.0.1:3100`, and leave
-`VOICE_ENABLED=false` until the consumer is ready. Apply the additive Guide
+`VOICE_ENABLED=false` until the consumer is ready. Apply the Guide
 migration and start existing processes plus the consumer:
 
 ```bash
@@ -124,6 +124,12 @@ resuming. Retain inbox/outbox and cursor; do not reset sequence identities while
 keeping a consumer cursor from another backup.
 
 ## Rollback
+
+The `current_state` cutover additionally requires restoring the private Guide-table
+backup before starting an old image; the release controller performs this automatically.
+It pauses the Guide consumer during conversion/restore, preserving the separate Voice
+outbox and database. See CURRENT_STATE.md. The steps below describe feature rollback
+within a compatible Guide schema.
 
 1. Disable `VOICE_ENABLED` and restart Guide web. This only routes new uploads
    back to the compatible widget; do not stop Voice worker/consumer for already

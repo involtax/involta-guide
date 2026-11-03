@@ -26,14 +26,7 @@
 {%set quality_report=selected.content.get('qualityReport')%}{%set candidate_review=selected.content.get('candidateReview')%}{%include 'generation_quality.html'%}
 <section class="panel location-intro-panel" aria-labelledby="location-intro-heading">
 <h3 id="location-intro-heading">Вступление</h3>
-<p class="restaurant-muted">Изменения сразу появятся на сайте.</p>
-<form method="post" action="{{settings.path('/admin/actions/intro')}}" class="stack" id="location-intro-form">{{csrf()}}
-<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="expected" value="{{c.published_version or ''}}">
-<input type="hidden" name="expected_published" value="{{c.published_version or ''}}">
-<label for="location-intro">Вступление</label><textarea id="location-intro" name="intro" rows="6" maxlength="4000">{{selected.content.intro}}</textarea>
-<button>Сохранить вступление</button>
-</form>
+<p>{{selected.content.intro}}</p>
 </section>
 {%endif%}
 <section class="panel">
@@ -100,41 +93,6 @@ checked
 <small>* Сравнительные цены и описание моделей — на вкладке «Наполнение».</small>
 <button>Наполнить через GPT ↗</button>
 </form>
-<form method="post" action="{{settings.path('/admin/actions/content')}}" class="stack">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="expected" value="{{c.published_version or ''}}">
-<input type="hidden" name="rankingReport" value="{{selected.content.get('rankingReport')|tojson}}">
-
-<div id="cards">
-{%for r in selected.content.restaurants%}
-{{restaurant(r,'r'~loop.index)}}
-{%endfor%}
-{%if add_card%}
-{{restaurant({},'new')}}
-{%endif%}
-</div>
-<button type="button" hx-get="{{settings.path('/admin/card')}}" hx-target="#cards" hx-select="unset" hx-swap="beforeend">+ Ресторан</button>
-<noscript>
-<a href="?tab=locations&amp;location={{c.id}}&amp;add=1">Добавить ресторан</a>
-</noscript>
-<button>Сохранить рестораны</button>
-</form>
-{%if selected.available%}
-<h3>Из других локаций направления</h3>
-<form method="post" action="{{settings.path('/admin/actions/select-restaurant')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<input type="hidden" name="expected" value="{{c.published_version or ''}}">
-<select name="restaurant_id" aria-label="Ресторан из дочерних локаций">
-{%for r in selected.available%}
-<option value="{{r.id}}">{{r.name}}</option>
-{%endfor%}
-</select>
-<button>Добавить на страницу</button>
-</form>
-{%endif%}
-<form method="post" action="{{settings.path('/admin/actions/attach')}}">{{csrf()}}<input type="hidden" name="location_id" value="{{c.id}}">
-<label>Связать ресторан (UUID)<input name="restaurant_id" required>
-</label>
-<button>Связать</button>
-</form>
 {%if selected.content.rankingReport%}
 <h3>Рейтинг кандидатов</h3>
 <table>
@@ -165,7 +123,7 @@ checked
 </details>
 {%endif%}
 </section>
-<p><a href="{{settings.path('/logs/history/'+c.id)}}" hx-boost="false">Логи и восстановление данных города ↗</a></p>
+<p><a href="{{settings.path('/logs')+'?q='+c.slug}}" hx-boost="false">Логи наполнения города ↗</a></p>
 {%endif%}
 {%endif%}
 {%if selected is none%}<section class="restaurant-empty"><h2>Выберите город</h2><p>В списке слева — города с опубликованными подборками.</p></section>{%endif%}

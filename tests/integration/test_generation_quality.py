@@ -1,11 +1,8 @@
 import copy
-import importlib.util
 import json
 from pathlib import Path
 
 import httpx
-from alembic.migration import MigrationContext
-from alembic.operations import Operations
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -14,7 +11,6 @@ from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
 from .test_background_generation import configured, envelope, task
-from .test_jobs import setup
 from .test_web import login, token
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/pereslavl-generation-response.json"
@@ -34,7 +30,7 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
     )
     try:
         Worker(queue, service).once()
-        initial = queries.get("locations", location["id"])["published_version"]
+        initial = queries.get("locations", location["id"])["revision"]
         cached = task(engine, job)["response_json"]
         with engine.begin() as conn:
             # Existing pages from the former parser can still contain raw citation text.
@@ -69,7 +65,7 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
         assert all("](" not in card["description"] for card in public["restaurants"])
         assert public["qualityReport"]["status"] == "partial"
         assert len(public["candidateReview"]) == 10
-        assert len(queries.rows("versions")) == 2
+        assert queries.get("jobs", job["id"])["changes"]
         assert AIAudit(engine, settings).detail(job["id"])["job"]["stage_label"] == "Поиск неполный"
         with TestClient(create_app(settings)) as client:
             login(client)
@@ -78,22 +74,6 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
                     "/guide/admin", params={"tab": tab, "location": location["id"]}
                 ).text
                 assert "Полнота поиска" in html and "Поиск неполный" in html and "Бояре" in html
-            current = queries.get("locations", location["id"])["published_version"]
-            intro = client.post(
-                "/guide/admin/actions/intro",
-                data={
-                    "_csrf": token(client.get("/guide/admin?tab=locations").text),
-                    "location_id": location["id"],
-                    "expected": current,
-                    "expected_published": current,
-                    "intro": "Авторское вступление",
-                },
-                headers={"origin": "http://testserver"},
-            )
-            assert intro.status_code == 200
-            assert (
-                queries.location(location["id"])["content"]["qualityReport"]["status"] == "partial"
-            )
     finally:
         provider.close()
 
@@ -121,41 +101,6 @@ def test_generation_prompt_has_candidate_limit_without_display_limit(database):
         assert "candidateReview" in sent
     finally:
         provider.close()
-
-
-def test_prompt_migration_preserves_custom_edits_and_original_queued_prompt(database):
-    settings, engine = database
-    legacy = "Авторский стиль и важная география. Размер подборки определяется полем {лимит}, заданным редактором. Твой результат — черновик. Решение о публикации принимает человек."
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE settings SET value=:value WHERE key='prompt'"), {"value": legacy})
-    _, _, _, queries, location, service, _ = setup(database)
-    service.enqueue(location["id"])
-    queued = queries.rows("jobs")[0]
-    with engine.begin() as conn:
-        spec = importlib.util.spec_from_file_location(
-            "coverage_migration", Path("migrations/versions/0006_generation_coverage.py")
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        with Operations.context(MigrationContext.configure(conn)):
-            module.upgrade()
-            first = conn.execute(text("SELECT value FROM settings WHERE key='prompt'")).scalar_one()
-            module.upgrade()
-        assert first.startswith("Авторский стиль и важная география.")
-        assert "Размер подборки определяется" not in first and "{лимит}" not in first
-        assert "Твой результат — черновик" not in first and "candidateReview" in first
-        backup = conn.execute(
-            text("SELECT value FROM settings WHERE key='prompt_before_coverage_v2'")
-        ).scalar_one()
-        assert backup == legacy
-        assert (
-            conn.execute(
-                text("SELECT count(*) FROM audit WHERE action='prompt_upgrade'")
-            ).scalar_one()
-            == 1
-        )
-
-    assert queries.get("jobs", queued["id"])["prompt"] == legacy
 
 
 def test_partial_coverage_is_readable_in_browser_and_on_mobile(database, tmp_path):

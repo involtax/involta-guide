@@ -26,7 +26,7 @@ RUN --mount=type=secret,id=proxy_ca \
 FROM base AS runtime
 # ffprobe is required to measure uploaded audio; no compiler or uv in this stage.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates postgresql-client \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 guide \
     && useradd --uid 10001 --gid 10001 --create-home --no-log-init \

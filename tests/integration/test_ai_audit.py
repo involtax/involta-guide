@@ -71,7 +71,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     assert failure["data"]["validation_errors"][0]["loc"] == ["restaurants", 0, "phone"]
     assert "wrong phone" in failure["data"]["traceback"]
     assert detail["calls"][0]["input_tokens"] == 125
-    assert not queries.rows("versions")
+    assert not [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]
     assert "sk-private" not in json.dumps(detail)
     assert "private-cookie" not in json.dumps(detail)
 
@@ -100,8 +100,8 @@ def test_audit_preserves_each_attempt_success_and_legacy_data(database):
     assert Worker(queue, service).once()
     detail = audit.detail(job["id"])
     assert detail["job"]["status"] == "done"
-    assert detail["versions"][0]["published"]
-    assert detail["versions"][0]["content"]["restaurants"]
+    assert detail["changes"][0]["diff"]
+    assert "versions" not in detail
     audit.record(job["id"], "job_started", {"attempt": 2})
     assert len(audit.detail(job["id"])["events"]) == len(detail["events"]) + 1
     assert audit.listing(999, "Иваново")["total"] == 1

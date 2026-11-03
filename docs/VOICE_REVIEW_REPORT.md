@@ -9,18 +9,15 @@ analysis invalidate older screens. `processing_run`, `page_revision`,
 `affected_revisions`, session/CSRF and `idempotency_key` fence approval. Existing
 readable URLs are retained for the admin agent to reorganize separately.
 
-`approve` validates and applies all remaining proposals in one Guide transaction,
-marks the review visible and approved, links actual versions and appends one
-before/after decision. An invalid item rolls everything back. Exclusion/edit is
-an audited change to the review package, never independent acceptance. Text-only
-approval creates no empty page version. Repeated confirmation returns the stored
-JSON result. Shared restaurants fence all affected city revisions and preserve
-snapshots/links for every affected city. Historical snapshots are not rewritten.
+`approve` validates all remaining proposals in one transaction, marks the review
+visible and approved, and appends field diffs to `reviews.changes`. The manual
+decision records the review/package operation without full page content. An invalid
+item rolls everything back. Text-only approval does not touch page state. Repeated
+confirmation returns the stored JSON result. Shared restaurants fence all affected
+cities and append their diffs to the same source review.
 
-No running code uses candidate-page pointers or separate publication. The old
-0006 tables are retained as inert audit data; additive 0007 also merges the
-0006_coverage migration from main and introduces consumer diagnostic state.
-No applied migrations were edited and no production database was accessed.
+Pages have only current state. The current-state cutover removes the retired
+candidate-page tables and all publication snapshots; see CURRENT_STATE.md.
 
 Consumer keeps cursor/inbox/import atomic, ACK follows commit. A bad event blocks
 progress and retains its safe identity/type/stack frames. Payloads, exception
@@ -42,13 +39,12 @@ Validation so far: full local regression 243 passed before the extra diagnostic,
 key/config and composition cases; targeted package/config/consumer checks passed.
 The added whole-package scenarios verify two valid changes together, atomic
 rollback for an invalid new restaurant, audited repair/exclusion, stale package
-and page conflict, and identical replay without another version/decision.
+and page conflict, and identical replay without another application/decision.
 `proposal_edits` and `excluded_proposals` may also be supplied in the approval
 DTO itself; their changes share the same approval transaction and audit.
 
 Additional local checks: 10 focused cases passed, including edits to a shared
-restaurant across two cities: both receive immutable versions, while previous
-snapshots retain their original phone. Production Compose contracts validate
+restaurant across two cities: both change immediately and the source review records their phone diffs. Production Compose contracts validate
 host and bridge modes, immutable application/DB image references, private API,
 all seven service definitions, healthchecks and the shared OpenAI variable.
 

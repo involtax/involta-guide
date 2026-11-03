@@ -57,7 +57,7 @@ class VoiceEditorial:
             active = link["active_run"] if link else 0
             if command.review_revision != text["revision"] or command.processing_run != active:
                 raise Conflict("Отзыв или выбранная обработка изменились. Обновите сравнение.")
-            page_revision = location["published_version"]
+            page_revision = location["revision"]
             before = {
                 "text": copy.deepcopy(text),
                 "moderation": review["moderation"],
@@ -65,7 +65,6 @@ class VoiceEditorial:
                 "result": review["result"],
                 "run": active,
                 "page_revision": page_revision,
-                "published_revision": location["published_version"],
             }
             result: dict[str, Any] = {}
             if command.action == "edit-text":
@@ -241,7 +240,6 @@ class VoiceEditorial:
                         "review_revision": command.review_revision,
                         "proposal_revision": command.proposal_revision,
                         "page_revision": command.page_revision,
-                        "published_revision": command.published_revision,
                         "run": command.processing_run,
                     }
                 ),
@@ -270,10 +268,10 @@ class VoiceEditorial:
             ).mappings()
         ]
         expected = str(command.page_revision) if command.page_revision else None
-        if expected != location["published_version"]:
+        if expected != location["revision"]:
             raise Conflict("Страница изменилась. Обновите сравнение.")
         content = current_content(repo, location)
-        before["content"] = copy.deepcopy(content)
+        original_content = copy.deepcopy(content)
         before["package"] = copy.deepcopy(proposals)
         ids = {str(p["id"]) for p in proposals}
         excluded = {str(value) for value in command.excluded_proposals}
@@ -318,40 +316,26 @@ class VoiceEditorial:
             else:
                 changed_ids.add(current["id"])
                 current.update(validated)
-        # Shared cards affect all linked cities. Lock and snapshot every affected page
-        # before writing global restaurant fields; history is never overlaid at read time.
+        # Shared canonical cards change every page that includes them. Fence the whole package.
         affected = [
             dict(r)
             for r in conn.execute(
                 sql_text(
-                    "SELECT DISTINCT l.* FROM locations l JOIN restaurant_locations x ON x.location_id=l.id WHERE x.restaurant_id = ANY(CAST(:ids AS uuid[])) AND l.id<>:id ORDER BY l.id"
+                    "SELECT l.* FROM locations l WHERE l.id<>:id AND EXISTS "
+                    "(SELECT 1 FROM jsonb_array_elements(l.page_data->'restaurants') card "
+                    "WHERE card->>'id'=ANY(CAST(:ids AS text[]))) ORDER BY l.id"
                 ),
                 {"ids": list(changed_ids), "id": location["id"]},
             ).mappings()
         ]
-        if affected and {
-            str(item["id"]): str(item["published_version"]) if item["published_version"] else None
+        if any(
+            (str(item["revision"]) if item["revision"] else None)
+            != command.affected_revisions.get(str(item["id"]))
             for item in affected
-        } != {
-            str(item["id"]): command.affected_revisions.get(str(item["id"])) for item in affected
-        }:
+        ):
             raise Conflict("Связанные страницы изменились. Обновите сравнение.")
-        before["affected"] = {str(item["id"]): current_content(repo, item) for item in affected}
-        versions = {}
-        if content != before["content"]:
-            version = save(repo, location["id"], content, expected, source="review")
-            repo.link("version_reviews", {"version_id": version, "review_id": review_id})
-            versions[location["id"]] = version
-            for other in affected:
-                version = save(
-                    repo,
-                    str(other["id"]),
-                    current_content(repo, other),
-                    str(other["published_version"]) if other["published_version"] else None,
-                    source="review",
-                )
-                repo.link("version_reviews", {"version_id": version, "review_id": review_id})
-                versions[str(other["id"])] = version
+        if content != original_content:
+            save(repo, location["id"], content, expected, review_id=review_id)
         for proposal in proposals:
             repo.change("proposals", proposal["id"], {"status": "approved"})
-        return {"versions": versions, "applied_package": proposals, "content_after": content}
+        return {"applied_proposals": [str(p["id"]) for p in proposals]}

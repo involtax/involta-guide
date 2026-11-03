@@ -6,7 +6,7 @@
 <input type="hidden" name="review_revision" value="{{v.text.revision}}">
 <input type="hidden" name="processing_run" value="{{v.link.active_run if v.link else 0}}">
 <input type="hidden" name="affected_revisions" value='{{v.affected_revisions|tojson}}'>
-<input type="hidden" name="page_revision" value="{{v.location.draft_version or ''}}">
+<input type="hidden" name="page_revision" value="{{v.location.revision or ''}}">
 {%if proposal%}<input type="hidden" name="proposal_id" value="{{proposal.id}}"><input type="hidden" name="proposal_revision" value="{{proposal.revision}}">{%endif%}
 {%endmacro%}
 {%block body%}
@@ -79,6 +79,8 @@
 {%endif%}
 {%for job in v.legacy_jobs%}<p><a href="{{settings.path(job.path)}}" hx-boost="false">Существующий лог обработки ↗</a></p>{%endfor%}
 {%if remote%}<details {%if run_log%}open{%endif%}><summary>Технический статус и полный лог</summary><pre class="audit-json">{{remote|tojson(indent=2)}}</pre></details>{%endif%}
+<h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre>
+<h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre>
 <h3>Журнал ручных решений</h3>{%for event in v.decisions%}<details><summary>{{event.created_at}} · {{event.actor}} · {{event.action}}</summary><p>Сессия {{event.session_id}} · {{event.reason}}</p><h4>До</h4><pre class="audit-json">{{event.before_data|tojson(indent=2)}}</pre><h4>После</h4><pre class="audit-json">{{event.after_data|tojson(indent=2)}}</pre></details>{%else%}<p>Ручных решений пока нет.</p>{%endfor%}
 {%else%}<h2>Выберите отзыв</h2><p>Текст сохраняется до дополнительного анализа. Предложенные действия необязательны.</p>{%endif%}
 </section></div>

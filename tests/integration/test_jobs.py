@@ -4,7 +4,6 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.application.services.jobs import JobService
 from involta_guide.application.services.locations import Queries
 from involta_guide.domain.entities import Conflict
@@ -15,6 +14,7 @@ from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_guide.infrastructure.security import Security
 from involta_guide.infrastructure.storage.audio import FileAudioStorage
 
+from .editor_fixture import FixtureEditor as EditorialService
 from .test_editorial import CARD, CONTENT
 
 
@@ -128,7 +128,7 @@ def test_queue_concurrent_claim_lease_fencing_and_recovery(database):
     service.process(new)
     assert queries.get("jobs", old["id"])["status"] == "done"
     stored = queries.get("locations", location["id"])
-    assert stored["published_version"] == stored["draft_version"]
+    assert stored["revision"] == stored["revision"]
     assert queries.location(location["id"])["content"]["rankingReport"][0]["totalScore"] == 8
 
 
@@ -216,14 +216,13 @@ def test_review_generates_proposals_without_publication(database):
     review = queries.get("reviews", review_id)
     assert review["status"] == "processed" and review["moderation"] == "pending"
     assert len(queries.rows("proposals", {"review_id": review_id})) == 1
-    assert queries.get("locations", location["id"])["draft_version"] is None
+    assert queries.get("locations", location["id"])["revision"] is None
 
 
 def test_alex_authority_star_rollback_and_revocation(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
     editor = EditorialService(uow)
-    version = editor.save(location["id"], CONTENT, None)
-    editor.publish(location["id"], version, None)
+    editor.save(location["id"], CONTENT, None)
     card = queries.location(location["id"])["content"]["restaurants"][0]
     service.provider.restaurant_id = card["id"]
     security = Security(settings, uow)
@@ -277,7 +276,7 @@ def test_alex_authority_star_rollback_and_revocation(database):
         service.process(queue_review())
     manual = queries.location(location["id"])
     manual["content"]["restaurants"][0]["alexStar"] = False
-    editor.save(location["id"], manual["content"], manual["location"]["draft_version"])
+    editor.save(location["id"], manual["content"], manual["location"]["revision"])
     assert queries.get("restaurants", card["id"])["alex_star"]
 
 
@@ -391,6 +390,6 @@ def test_provider_429_reason_persisted_without_response_secrets(database, code):
         assert responses[0]["data"]["status"] == 429
         assert code in responses[0]["data"]["body"]
         assert "sk-private" not in responses[0]["data"]["body"]
-        assert not queries.rows("versions")
+        assert not [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]
     finally:
         provider.close()

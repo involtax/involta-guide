@@ -59,7 +59,7 @@ def test_public_admin_htmx_and_csrf(database):
             ).status_code
             == 403
         )
-        assert client.get("/guide/admin/card").status_code == 200
+        assert client.get("/guide/admin/card").status_code == 404
         for tab in ("fill", "reviews", "restaurants", "ratings", "contacts", "sessions"):
             response = client.get("/guide/admin?tab=" + tab)
             assert response.status_code == 200, response.text[:300]

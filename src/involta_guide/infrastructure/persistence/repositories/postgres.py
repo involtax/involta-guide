@@ -2,7 +2,7 @@ import time
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from involta_guide.domain.rules import KINDS, similarity
 
 from ..models import Base
 
-PUBLIC = """(l.listed OR l.id IN (WITH RECURSIVE useful AS (SELECT id,parent_id FROM locations WHERE active=1 AND published_version IS NOT NULL UNION SELECT p.id,p.parent_id FROM locations p JOIN useful u ON p.id=u.parent_id WHERE p.active=1) SELECT id FROM useful))"""
+PUBLIC = """(l.listed OR l.id IN (WITH RECURSIVE useful AS (SELECT id,parent_id FROM locations WHERE active=1 AND jsonb_array_length(page_data->'restaurants')>0 UNION SELECT p.id,p.parent_id FROM locations p JOIN useful u ON p.id=u.parent_id WHERE p.active=1) SELECT id FROM useful))"""
 
 
 def row_dict(row: Any) -> Record:
@@ -140,21 +140,14 @@ class PostgresRepository:
         if options.get("public_only"):
             clauses.append(PUBLIC)
         if options.get("filled_only"):
-            clauses.append(
-                "EXISTS (SELECT 1 FROM versions v WHERE v.id=l.published_version "
-                "AND jsonb_array_length(v.content->'restaurants')>0)"
-            )
+            clauses.append("jsonb_array_length(l.page_data->'restaurants')>0")
         if status in ("active", "inactive"):
             clauses.append("l.active=:active")
             params["active"] = int(status == "active")
         elif status == "empty":
-            clauses.append("l.draft='[]'")
-        elif status == "draft":
-            clauses.append(
-                "l.draft_version IS NOT NULL AND l.draft_version IS DISTINCT FROM l.published_version"
-            )
+            clauses.append("l.page_data->'restaurants'='[]'::jsonb")
         elif status == "published":
-            clauses.append("l.published_version IS NOT NULL AND l.draft<>'[]'::jsonb")
+            clauses.append("jsonb_array_length(l.page_data->'restaurants')>0")
         elif status == "hidden":
             clauses.append("NOT l.listed")
         if q:
@@ -217,34 +210,18 @@ class PostgresRepository:
         for key in set(related):
             self.link("location_relations", {"location_id": location_id, "related_id": key})
 
-    def next_version(self, location_id: str) -> int:
-        table = self.table("versions")
-        return int(
-            self.session.scalar(
-                select(func.coalesce(func.max(table.c.number), 0) + 1).where(
-                    table.c.location_id == location_id
-                )
-            )
-            or 1
-        )
-
-    def inherit_reviews(self, source: str, target: str) -> None:
-        self.session.execute(
-            text(
-                "INSERT INTO version_reviews(version_id,review_id) SELECT :target,review_id FROM version_reviews WHERE version_id=:source ON CONFLICT DO NOTHING"
-            ),
-            {"source": source, "target": target},
-        )
+    def lock_locations(self) -> list[Record]:
+        return self.query("SELECT * FROM locations ORDER BY id FOR UPDATE")
 
     def available(self, location_id: str) -> list[Record]:
         result: dict[str, Record] = {}
         for area in self.tree(location_id):
-            if not area["active"] or not area["published_version"]:
+            if not area["active"] or not area["page_data"].get("restaurants"):
                 continue
-            version = self.get("versions", area["published_version"])
-            if version:
-                for card in version["content"]["restaurants"]:
-                    result[card["id"]] = card
+            from involta_guide.application.services.editorial import current_content
+
+            for card in current_content(self, area)["restaurants"]:
+                result[card["id"]] = card
         for relation in self.rows(
             "restaurant_locations", {"location_id": location_id}, limit=10000
         ):
@@ -273,9 +250,9 @@ class PostgresRepository:
 
     def restaurant_cities(self, query: str) -> list[Record]:
         return self.query(
-            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.published_version,l.draft_version,
+            """SELECT l.id,l.name,l.region,l.slug,l.kind,l.revision,l.page_data,
                 count(DISTINCT r.id) restaurant_count,
-                (SELECT max(v.created_at) FROM versions v WHERE v.location_id=l.id) filled_at
+                l.updated_at filled_at
             FROM locations l JOIN (
                 SELECT location_id,restaurant_id FROM restaurant_locations
                 UNION SELECT location_id,id FROM restaurants
@@ -320,7 +297,7 @@ class PostgresRepository:
 
     def summary(self) -> Record:
         result = self.query(
-            "SELECT count(*) total,count(*) FILTER (WHERE draft='[]') empty,count(*) FILTER (WHERE published_version IS NOT NULL) published FROM locations"
+            "SELECT count(*) total,count(*) FILTER (WHERE page_data->'restaurants'='[]'::jsonb) empty,count(*) FILTER (WHERE jsonb_array_length(page_data->'restaurants')>0) published FROM locations"
         )[0]
         result["pending_reviews"] = self.query(
             "SELECT count(*) n FROM reviews WHERE status='pending'"

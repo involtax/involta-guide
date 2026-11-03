@@ -13,17 +13,16 @@
  · <a href="#log-requests">К списку запросов ↑</a>
 </header>
 {%set quality_report=d.job.quality_report%}
-{%set candidate_review=d.versions[0].content.get('candidateReview') if d.versions else []%}
+{%set candidate_review=quality_report.get('candidateReview',[]) if quality_report else []%}
 {%include 'generation_quality.html'%}
-{%for v in d.versions%}<p>Результат запроса: версия страницы №{{v.number}}.</p>{%endfor%}
-{%if not d.versions and d.job.kind=='generate' and d.job.status=='failed'%}<p>Новая версия страницы не создана.</p>{%endif%}
+{%if d.changes%}<h3>Применённые изменения</h3><pre class="audit-json">{{d.changes|tojson(indent=2)}}</pre>{%elif d.job.kind=='generate' and d.job.status=='done'%}<p>Ответ обработан. Новых изменений нет.</p>{%elif d.job.kind=='generate' and d.job.status=='failed'%}<p>Данные страницы не изменены.</p>{%endif%}
 {%if logs_admin%}
 {%if d.job.can_reprocess%}
 <form method="post" action="{{settings.path('/admin/actions/reprocess-generation')}}">{{csrf()}}
 <input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}">
-<input type="hidden" name="expected" value="{{log_location.published_version or ''}}">
+<input type="hidden" name="expected" value="{{log_location.revision or ''}}">
 <button>Переобработать тот же ответ</button>
-<small>Используется сохранённый ответ без обращения к OpenAI. Результат заново проверится и обновит данные страницы; исходный ответ и история сохранятся.</small>
+<small>Используется сохранённый ответ без обращения к OpenAI. Результат заново проверится и обновит данные страницы; исходный ответ и журнал обработки сохранятся.</small>
 </form>
 {%elif d.job.can_resume%}
 <form method="post" action="{{settings.path('/admin/actions/resume-generation')}}">{{csrf()}}
@@ -42,7 +41,7 @@
 <form method="post" action="{{settings.path('/admin/actions/retry')}}">{{csrf()}}<input type="hidden" name="log_slug" value="{{d.job.location_slug}}"><input type="hidden" name="log_number" value="{{d.job.run_number}}"><button>Повторить</button></form>
 {%endif%}
 {%endif%}
-{%if not d.trace_available%}<p class="notice">Старый запрос: полные ответы тогда не сохранялись. Восстановить их нельзя. Доступные данные приведены ниже.</p>{%endif%}
+{%if not d.trace_available%}<p class="notice">Полный ответ провайдера не записан. Доступные данные запроса приведены ниже.</p>{%endif%}
 <details><summary>Данные запроса и исходный промт</summary><pre class="audit-json">{{d.job|tojson(indent=2)}}</pre></details>
 {%if d.review and logs_admin%}
 <details><summary>Отзыв, расшифровка и результат</summary><pre class="audit-json">{{d.review|tojson(indent=2)}}</pre></details>
@@ -52,20 +51,10 @@
 <p>Одно обращение — одна генерация. GET в хронологии только проверяет тот же ответ. done означает, что полный ответ сохранён; публикация показана отдельно выше. Пока статистика OpenAI не получена, нули токенов не означают отсутствие расходов.</p>
 {%for c in d.calls%}<details open><summary>{{c.created_at}} · {{c.model}} · {{c.operation}} · {{c.status}}</summary><pre class="audit-json">{{c|tojson(indent=2)}}</pre></details>{%else%}<p>Обращений к провайдеру нет.</p>{%endfor%}
 <h3>Хронология</h3>
-{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Запрос к OpenAI: метод указан ниже','response':'Полный ответ OpenAI','provider_error':'Ошибка связи с OpenAI','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Сохранена версия страницы','generation_status':'Состояние генерации OpenAI','generation_resumed':'Продолжение без новой генерации','generation_reprocessed':'Повторная обработка сохранённого ответа без новой генерации','response_validated':'Ответ прошёл проверку','generation_quality':'Полнота поиска и очистка описаний'}%}
+{%set labels={'generation_run':'Номер запроса и выбранная модель','job_started':'Начало обработки','request':'Запрос к OpenAI: метод указан ниже','response':'Полный ответ OpenAI','provider_error':'Ошибка связи с OpenAI','job_failed':'Ошибка обработки: поля и подробности','job_completed':'Обработка завершена','result_saved':'Обновлены данные страницы','generation_status':'Состояние генерации OpenAI','generation_resumed':'Продолжение без новой генерации','generation_reprocessed':'Повторная обработка сохранённого ответа без новой генерации','response_validated':'Ответ прошёл проверку','generation_quality':'Полнота поиска и очистка описаний'}%}
 {%for e in d.events%}
 <details open><summary>{{e.time}} · {{labels.get(e.payload.event,e.payload.event|default('Событие'))}}</summary>
 {%if e.response_body is defined%}<pre class="audit-json">{{e.response_meta|tojson(indent=2)}}</pre><pre class="audit-json">{{e.response_body}}</pre>
 {%else%}<pre class="audit-json">{{e.payload|tojson(indent=2)}}</pre>{%endif%}
 </details>
 {%endfor%}
-{%for v in d.versions%}<details><summary>Версия страницы №{{v.number}}</summary><pre class="audit-json">{{v|tojson(indent=2)}}</pre></details>{%endfor%}
-
-{%if logs_admin and log_location%}
-<p><a href="{{settings.path('/logs/history/'+log_location.id)}}">История данных и восстановление города ↗</a></p>
-{%for v in d.versions%}<form method="post" action="{{settings.path('/admin/actions/restore')}}">{{csrf()}}
-<input type="hidden" name="location_id" value="{{log_location.id}}">
-<input type="hidden" name="version_id" value="{{v.id}}">
-<input type="hidden" name="expected" value="{{log_location.published_version or ''}}">
-<button>Восстановить данные из этого лога</button></form>{%endfor%}
-{%endif%}

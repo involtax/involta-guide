@@ -85,12 +85,6 @@ class Queries:
             return {
                 "location": location,
                 "content": current_content(repo, location),
-                "published_intro": (
-                    require(repo, "versions", location["published_version"])["content"]["intro"]
-                    if location["published_version"]
-                    else None
-                ),
-                "versions": repo.rows("versions", {"location_id": key}),
                 "available": repo.available(key),
                 "related_ids": [row["id"] for row in repo.related(key)],
                 "parents": repo.tree(key, ancestors=True),
@@ -98,7 +92,11 @@ class Queries:
 
     def ready_locations(self, query: str = "") -> list[Record]:
         with self.uow() as uow:
-            return [city for city in uow.repo.restaurant_cities(query) if city["published_version"]]
+            return [
+                city
+                for city in uow.repo.restaurant_cities(query)
+                if city["page_data"].get("restaurants")
+            ]
 
     def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
         from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score
@@ -118,16 +116,11 @@ class Queries:
             if selected is None:
                 return result
             cards = repo.city_restaurants(selected["id"])
-            versions = repo.rows("versions", {"location_id": selected["id"]}, limit=100000)
             location = require(repo, "locations", selected["id"])
-            current = next((v for v in versions if v["id"] == location["published_version"]), None)
-            report = (current["content"] if current else {}).get("rankingReport") or []
-            result["generation_quality"] = (current["content"] if current else {}).get(
-                "qualityReport"
-            )
-            result["candidate_review"] = (current["content"] if current else {}).get(
-                "candidateReview"
-            )
+            content = current_content(repo, location)
+            report = content.get("rankingReport") or []
+            result["generation_quality"] = content.get("qualityReport")
+            result["candidate_review"] = content.get("candidateReview")
 
             def normalize(name: str) -> str:
                 return " ".join(name.casefold().split())
@@ -156,29 +149,6 @@ class Queries:
                 card["review_count"] = len(approved)
                 card["ranking"] = candidate
                 card["score"] = score(candidate["scores"]) if candidate else None
-                card["snapshots"] = [
-                    {
-                        "version": v["number"],
-                        "created_at": v["created_at"].isoformat(),
-                        "source": v["source"],
-                        "model": v["model"],
-                        "published": v["id"] == location["published_version"],
-                        "current": v["id"] == location["published_version"],
-                        "restaurant": r,
-                        "ranking": next(
-                            (
-                                item
-                                for item in v["content"].get("rankingReport") or []
-                                if normalize(item["name"]) == normalize(r["name"])
-                                and (not item.get("mapsUrl") or item["mapsUrl"] == r.get("mapsUrl"))
-                            ),
-                            None,
-                        ),
-                    }
-                    for v in versions
-                    for r in v["content"].get("restaurants", [])
-                    if r.get("id") == card["id"]
-                ]
             cards.sort(
                 key=lambda c: (
                     c["score"] is None,
@@ -201,7 +171,7 @@ class Queries:
                 return None
             location, redirect = found
             tree = repo.tree(location["id"])
-            useful = {r["id"] for r in tree if r["published_version"]}
+            useful = {r["id"] for r in tree if r["page_data"].get("restaurants")}
             # Hidden locations are visible only if their subtree has published content.
             for item in reversed(tree):
                 if item["id"] in useful and item["parent_id"]:
@@ -217,16 +187,14 @@ class Queries:
                 child["child_count"] = sum(
                     r["parent_id"] == child["id"] and r["active"] for r in tree
                 )
-            version = (
-                repo.get("versions", location["published_version"])
-                if location["published_version"]
-                else None
-            )
             related = [
                 r
                 for r in repo.related(location["id"])
                 if r["active"]
-                and (r["listed"] or any(item["published_version"] for item in repo.tree(r["id"])))
+                and (
+                    r["listed"]
+                    or any(item["page_data"].get("restaurants") for item in repo.tree(r["id"]))
+                )
             ]
             return {
                 "location": location,
@@ -234,7 +202,6 @@ class Queries:
                 "parents": repo.tree(location["id"], ancestors=True),
                 "children": children,
                 "related": related,
-                "version": version,
                 "content": current_content(repo, location),
                 "indexable": bool(useful),
             }
@@ -242,7 +209,7 @@ class Queries:
     def sitemap(self) -> list[Record]:
         with self.uow() as uow:
             rows = uow.repo.rows("locations", {"active": 1}, limit=100000)
-            useful = {row["id"] for row in rows if row["published_version"]}
+            useful = {row["id"] for row in rows if row["page_data"].get("restaurants")}
             parents = {row["id"]: row["parent_id"] for row in rows}
             for key in list(useful):
                 parent = parents.get(key)
@@ -266,13 +233,7 @@ class Queries:
     def visitor(self, visitor: str, location_id: str) -> list[Record]:
         with self.uow() as uow:
             repo = uow.repo
-            location = require(repo, "locations", location_id)
-            links = (
-                repo.rows("version_reviews", {"version_id": location["published_version"]})
-                if location["published_version"]
-                else []
-            )
-            published = {row["review_id"] for row in links}
+            require(repo, "locations", location_id)
             return [
                 {key: review[key] for key in ("id", "moderation", "status", "fraud", "created_at")}
                 | {
@@ -280,7 +241,9 @@ class Queries:
                         {"status": p["status"], "kind": p["kind"]}
                         for p in repo.rows("proposals", {"review_id": review["id"]})
                     ],
-                    "published": review["id"] in published,
+                    "published": bool(review["changes"])
+                    and review["moderation"] == "approved"
+                    and not review["fraud"],
                 }
                 for review in repo.rows(
                     "reviews", {"visitor": visitor, "location_id": location_id}, limit=30

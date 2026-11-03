@@ -2,13 +2,13 @@ import json
 import secrets
 from typing import Any
 from urllib.parse import urlencode
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from starlette.datastructures import FormData
 
-from involta_guide.application.commands.schemas import ContentInput, LocationInput, RestaurantInput
+from involta_guide.application.commands.schemas import LocationInput, RestaurantInput
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
@@ -262,12 +262,6 @@ def routes(prefix: str) -> APIRouter:
             request, "jobs.html", {"jobs": AIAudit(ctx.engine, ctx.settings).listing(1)["rows"]}
         )
 
-    @router.get(prefix + "/admin/card")
-    def card(request: Request) -> Response:
-        require_admin(request)
-        template = request.app.state.templates.env.get_template("macros.html")
-        return Response(template.module.restaurant({}, "r" + uuid4().hex), media_type="text/html")
-
     @router.get(prefix + "/admin/contacts")
     def contacts(request: Request) -> Response:
         require_admin(request)
@@ -279,7 +273,7 @@ def routes(prefix: str) -> APIRouter:
         check_csrf(request, form)
         ctx = context(request)
         location = key(form, "location_id")
-        expected = key(form, "expected") or None
+        key(form, "expected") or None
         try:
             if action == "location":
                 fields: dict[str, Any] = {
@@ -313,75 +307,10 @@ def routes(prefix: str) -> APIRouter:
                     uid(key(form, "id")) if key(form, "id") else None, validated
                 )
                 return redirect(request, "locations", "Локация сохранена", location=location)
-            if action == "intro":
-                ctx.editorial.save_intro(
-                    uid(location),
-                    key(form, "intro"),
-                    expected,
-                    uid(key(form, "expected_published"))
-                    if key(form, "expected_published")
-                    else None,
-                )
-                return redirect(
-                    request,
-                    "locations",
-                    "Вступление сохранено и обновлено на сайте.",
-                    location=location,
-                )
-            if action == "content":
-                existing_content = ctx.queries.location(uid(location))["content"]
-                content = {
-                    "intro": existing_content["intro"],
-                    "candidateReview": existing_content.get("candidateReview"),
-                    "qualityReport": existing_content.get("qualityReport"),
-                    "restaurants": [
-                        card_from_form(form, str(k) + "_") for k in form.getlist("card")
-                    ],
-                }
-                report = json.loads(key(form, "rankingReport") or "null")
-                if report is not None:
-                    content["rankingReport"] = report
-                validated = ContentInput.model_validate(content).model_dump(
-                    mode="json", exclude_none=True
-                )
-                ctx.editorial.save(uid(location), validated, expected)
-                return redirect(
-                    request,
-                    "locations",
-                    "Данные сохранены и обновлены на сайте.",
-                    location=location,
-                )
-            if action == "publish":
-                ctx.editorial.publish(uid(location), uid(key(form, "version_id")), expected)
-                return redirect(request, "locations", "Версия опубликована", location=location)
-            if action == "restore":
-                ctx.editorial.restore(uid(location), uid(key(form, "version_id")), expected)
-                return redirect(
-                    request,
-                    "locations",
-                    "Данные восстановлены и обновлены на сайте",
-                    location=location,
-                )
             if action == "attach":
                 ctx.locations.attach(uid(key(form, "restaurant_id")), uid(location))
                 return redirect(
                     request, "locations", "Ресторан связан с локацией", location=location
-                )
-            if action == "select-restaurant":
-                selected = ctx.queries.location(uid(location))
-                item = next(
-                    (r for r in selected["available"] if r["id"] == key(form, "restaurant_id")),
-                    None,
-                )
-                if item is None:
-                    raise RuleViolation("Ресторан недоступен")
-                content = selected["content"]
-                if any(r.get("id") == item["id"] for r in content["restaurants"]):
-                    raise RuleViolation("Ресторан уже в подборке")
-                content["restaurants"].append(item)
-                ctx.editorial.save(location, content, expected)
-                return redirect(
-                    request, "locations", "Ресторан добавлен на страницу", location=location
                 )
             if action == "prompt":
                 ctx.jobs.set_prompt(key(form, "prompt"))
@@ -479,23 +408,6 @@ def routes(prefix: str) -> APIRouter:
                     return log_redirect(
                         request, detail["job"]["log_path"] + "?" + urlencode({"message": message})
                     )
-            if action == "intro" and location:
-                selected = ctx.queries.location(uid(location))
-                selected["content"]["intro"] = key(form, "intro")
-                return render(
-                    request,
-                    "admin.html",
-                    {
-                        "tab": "locations",
-                        "selected": selected,
-                        "q": "",
-                        "add_card": False,
-                        "location_cities": ctx.queries.ready_locations(),
-                        "message": "Вступление не сохранено. "
-                        + message
-                        + " Ваш текст оставлен в поле редактора.",
-                    },
-                )
             return redirect(
                 request,
                 "locations" if location else "overview",
@@ -509,6 +421,12 @@ def routes(prefix: str) -> APIRouter:
         principal = ctx.security.principal(request.cookies.get("guide_alex"), alex=True)
         admin = ctx.security.principal(admin_token(request))
         changes = ctx.queries.rows("alex_changes") if principal or admin else []
+        for change in changes:
+            change["changes"] = (
+                ctx.queries.get("reviews", change["review_id"])["changes"]
+                if change["review_id"]
+                else []
+            )
         transcripts = (
             {
                 row["id"]: row["transcript"]

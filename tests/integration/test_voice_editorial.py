@@ -5,13 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from involta_guide.application.services.editorial import EditorialService
 from involta_guide.domain.entities import Conflict
 from involta_guide.infrastructure.security import Security
 from involta_guide.infrastructure.voice.consumer import Consumer
 from involta_guide.infrastructure.voice.editorial import Decision, VoiceEditorial
 from involta_guide.main import create_app
 
+from .editor_fixture import FixtureEditor as EditorialService
 from .test_editorial import CONTENT
 from .test_jobs import setup
 from .test_voice_service import metadata, recording
@@ -95,7 +95,6 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
     settings, engine, uow, queries, city, ref, event = imported(database)
     editor = EditorialService(uow)
     version = editor.save(city["id"], CONTENT, None)
-    editor.publish(city["id"], version, None)
     card = queries.location(city["id"])["content"]["restaurants"][0]
     affected = {}
     other = None
@@ -160,7 +159,7 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
 
     with pytest.raises((ValidationError, ValueError)):
         service.decide(ref, command, principal["id"])
-    assert queries.get("locations", city["id"])["published_version"] == version
+    assert queries.get("locations", city["id"])["revision"] == version
     assert all(p["status"] == "pending" for p in queries.rows("proposals"))
     assert queries.get("reviews", ref)["moderation"] == "pending"
     invalid = next(p for p in proposals if p["kind"] == "restaurant")
@@ -198,14 +197,16 @@ def test_package_atomic_rollback_exclusion_conflict_and_idempotent_immediate_app
     assert service.decide(ref, command, principal["id"]) == result
     assert len(queries.location(city["id"])["content"]["restaurants"]) == (2 if repair else 1)
     if other:
-        assert queries.get("locations", other["id"])["published_version"] != other_version
-        assert (
-            queries.get("versions", other_version)["content"]["restaurants"][0]["phone"]
-            != "+74951234568"
+        assert queries.get("locations", other["id"])["revision"] != other_version
+        shared_diff = next(
+            c for c in queries.get("reviews", ref)["changes"] if c["location_id"] == other["id"]
+        )
+        assert any(
+            d["path"][-1] == "phone" and d["before"] != d["after"] for d in shared_diff["diff"]
         )
         assert queries.location(other["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
 
-    assert queries.get("locations", city["id"])["published_version"] != newer
+    assert queries.get("locations", city["id"])["revision"] != newer
     assert queries.location(city["id"])["content"]["restaurants"][0]["phone"] == "+74951234568"
     assert queries.get("review_texts", ref)["original_text"] == event["transcript"]
     with engine.connect() as conn:
