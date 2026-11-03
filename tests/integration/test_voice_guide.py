@@ -118,6 +118,7 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         result = upload()
         assert result.status_code == 202, result.text
         reference = result.json()["reference"]
+        owner_cookie = client.cookies.get("guide_visitor")
         assert upload().json()["reference"] == reference
         assert client.get("/guide/voice/api/v1/submissions/" + reference).status_code == 200
         client.cookies.clear()
@@ -135,6 +136,29 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         assert meta["actor"] == "visitor"
         assert "attacker" not in json.dumps(meta)
     assert queries.rows("jobs") == []
+    worker = Worker(voice_engine, voice_settings, FakeProvider())
+    assert worker.once() and worker.once()
+    Consumer(engine, client_for(settings, voice_settings)).once()
+    # Imported history remains usable with its location filter when Voice is down.
+    from involta_guide.infrastructure.voice.client import VoiceUnavailable
+
+    class Unavailable:
+        def json(self, *args, **kwargs):
+            raise VoiceUnavailable("Offline")
+
+        def request(self, *args, **kwargs):
+            raise VoiceUnavailable("Offline")
+
+    app.state.voice_client = Unavailable()
+    with TestClient(app) as client:
+        client.cookies.set("guide_visitor", owner_cookie)
+        history = client.get(
+            "/guide/voice/api/v1/submissions/mine", params={"location": city["slug"]}
+        )
+        assert history.status_code == 200
+        assert history.json()["rows"][0]["reference"] == reference
+        assert history.json()["rows"][0]["transcript"]
+        assert client.get("/guide/voice/api/v1/submissions/" + reference).json()["transcript"]
 
 
 def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_moderation(
