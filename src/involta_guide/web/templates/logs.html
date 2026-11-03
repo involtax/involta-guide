@@ -19,10 +19,8 @@
 </select></label><button>Найти</button></form>
 <nav aria-label="Список запросов">
 {%for j in audit_jobs.rows%}
-<a class="log-request {{'selected' if audit_detail and audit_detail.job.log_path==j.log_path else ''}}" href="{{settings.path(j.log_path)}}?{{audit_page(audit_jobs.page)}}" {%if audit_detail and audit_detail.job.log_path==j.log_path%}aria-current="page"{%endif%}>
-<strong>{{j.location_name}} / {{j.run_number}}</strong>
-<span>{{j.location_slug}}/{{j.run_number}} · {{j.stage_label}}</span>
-<small>{{j.model_name or j.kind}} · {{j.created_at}}</small>
+<a title="{{j.location_name}} / {{j.run_number}} · {{j.stage_label}}" class="log-request {{'selected' if audit_detail and audit_detail.job.log_path==j.log_path else ''}}" href="{{settings.path(j.log_path)}}?{{audit_page(audit_jobs.page)}}" {%if audit_detail and audit_detail.job.log_path==j.log_path%}aria-current="page"{%endif%}>
+<strong>{{j.location_name}} / {{j.run_number}}</strong> · <span>{{j.stage_label}}</span>
 </a>
 {%else%}<p>Запросов пока нет.</p>{%endfor%}
 </nav>

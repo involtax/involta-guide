@@ -969,8 +969,11 @@ pre.audit-json {
 #logs-main .admin-tabs { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
 #logs-main input, #logs-main select { min-width: 0; max-width: 100%; }
 .log-request {
-  display: grid;
-  gap: 6px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
   padding: 14px 10px;
   border-bottom: 1px solid #ddd;
   overflow-wrap: anywhere;
@@ -989,3 +992,64 @@ pre.audit-json {
   .logs-sidebar, .logs-content { width: 100%; }
   .logs-content { order: -1; }
 }
+
+/* Restaurant database: city navigation and complete restaurant records. */
+.restaurant-browser { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 36px; margin-top: 32px; align-items: start; }
+.restaurant-sidebar { position: sticky; top: 20px; border: 1px solid var(--line); background: white; padding: 20px; max-height: calc(100vh - 40px); overflow-y: auto; }
+.restaurant-sidebar-heading, .restaurant-results-heading, .restaurant-record-heading { display: flex; align-items: start; gap: 18px; justify-content: space-between; }
+.restaurant-sidebar-heading h2 { margin: 0 0 20px; font-size: 23px; }
+.restaurant-sidebar-heading > span { color: #777; font-size: 14px; }
+.restaurant-search { display: flex; flex-wrap: wrap; gap: 10px; }
+.restaurant-search label { width: 100%; font-size: 12px; }
+#admin-main .restaurant-search input { width: 100%; min-width: 0; box-sizing: border-box; }
+.restaurant-search button { font-size: 12px; padding: 8px 12px; }
+.restaurant-muted, .restaurant-sort-note { color: #6a6a64; font-size: 13px; line-height: 1.6; }
+.restaurant-city { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; padding: 17px 12px; border-top: 1px solid var(--line); text-decoration: none; overflow-wrap: anywhere; }
+.restaurant-city small { grid-column: 1 / -1; color: #777; font-size: 11px; }
+.restaurant-city span { font-size: 11px; color: #777; }
+.restaurant-city.selected { background: #f3f2ec; box-shadow: inset 3px 0 #25251f; }
+.restaurant-city:hover { background: #f8f7f2; }
+.restaurant-results { min-width: 0; }
+.restaurant-results-heading h2 { font-size: 42px; letter-spacing: -1.5px; margin: 0; }
+.restaurant-results-heading > a { font-size: 12px; margin-top: 27px; }
+.restaurant-eyebrow { text-transform: uppercase; font-size: 10px; letter-spacing: 1.4px; color: #777; margin-top: 0; }
+.restaurant-results-heading p:not(.restaurant-eyebrow) { color: #777; font-size: 13px; }
+.restaurant-sort-note { border-block: 1px solid var(--line); padding: 16px 0; margin: 16px 0 28px; }
+.restaurant-record { border: 1px solid var(--line); padding: 28px; margin-bottom: 24px; overflow-wrap: anywhere; }
+.restaurant-record-heading h3 { margin: 0; font-size: 27px; line-height: 1.2; }
+.restaurant-record-heading > div:nth-child(2) { flex: 1; min-width: 0; }
+.restaurant-record-heading p { color: #777; font-size: 13px; margin: 8px 0; }
+.restaurant-position { font-size: 12px; color: #888; padding-top: 7px; }
+.restaurant-score { text-align: right; display: grid; gap: 4px; }
+.restaurant-score strong { font-size: 32px; font-weight: 500; line-height: 1; }
+.restaurant-score span { font-size: 10px; color: #777; }
+.restaurant-badges { display: flex; gap: 7px; flex-wrap: wrap; }
+.restaurant-badges span { background: #f3f2ec; font-size: 10px; padding: 4px 8px; }
+.restaurant-description { font-size: 15px; line-height: 1.75; margin: 24px 0; }
+.restaurant-facts, .restaurant-factor-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin: 0; }
+.restaurant-facts dt, .restaurant-factor-grid dt { color: #777; font-size: 11px; margin-bottom: 6px; }
+.restaurant-facts dd, .restaurant-factor-grid dd { font-size: 13px; margin: 0; line-height: 1.7; }
+.restaurant-detail-section { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; }
+.restaurant-detail-section h4 { font-size: 13px; margin: 0 0 16px; }
+.restaurant-detail-section summary { font-size: 12px; cursor: pointer; }
+.restaurant-detail-section .audit-json { font-size: 11px; max-height: 500px; overflow: auto; }
+.restaurant-hours { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.restaurant-hours dt { color: #777; font-size: 11px; }
+.restaurant-hours dd { margin: 5px 0 0; font-size: 12px; }
+.restaurant-factor-grid { grid-template-columns: repeat(4,minmax(0,1fr)); margin-bottom: 20px; }
+.restaurant-factor-grid dd { font-size: 20px; }
+.restaurant-sources { font-size: 12px; padding-left: 18px; line-height: 1.9; }
+.restaurant-empty { padding: 24px 0; font-size: 14px; color: #777; }
+@media (max-width: 900px) { .restaurant-browser { grid-template-columns: 230px minmax(0,1fr); gap: 20px; } .restaurant-record { padding: 20px; } .restaurant-factor-grid, .restaurant-hours { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 650px) { .restaurant-browser { display: block; } .restaurant-sidebar { position: static; max-height: 360px; margin-bottom: 28px; } .restaurant-results-heading { flex-wrap: wrap; gap: 0; } .restaurant-results-heading > a { margin: 0 0 14px; } .restaurant-results-heading h2 { font-size: 34px; } .restaurant-record { padding: 16px; } .restaurant-record-heading { gap: 10px; flex-wrap: wrap; } .restaurant-record-heading h3 { font-size: 22px; } .restaurant-facts { grid-template-columns: 1fr; } .restaurant-score strong { font-size: 25px; } }
+.restaurant-admin { max-width: 1440px; padding-top: 32px; padding-bottom: 64px; }
+.restaurant-admin .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; gap: 20px; }
+.restaurant-admin .admin-header h1 { font-size: 42px; letter-spacing: -2px; margin: 0; }
+.restaurant-admin .admin-header button { padding: 8px 14px; font-size: 12px; background: white; color: var(--black); border-color: var(--line); }
+.restaurant-admin .admin-tabs { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.restaurant-admin .admin-tabs a { font-size: 13px; padding-bottom: 6px; }
+.restaurant-admin .admin-tabs a.selected { border-bottom: 2px solid var(--black); }
+.restaurant-evidence { padding: 16px 0; font-size: 12px; }
+.restaurant-evidence p { margin: 8px 0; }
+.restaurant-evidence a { display: block; font-size: 11px; }
+@media (max-width: 650px) { .restaurant-admin .admin-header h1 { font-size: 30px; letter-spacing: -1px; } }

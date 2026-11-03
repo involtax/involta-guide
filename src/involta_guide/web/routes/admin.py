@@ -194,7 +194,11 @@ def routes(prefix: str) -> APIRouter:
                     for p in detail["proposals"]
                 }
         elif tab == "restaurants":
-            data["restaurants"] = ctx.queries.rows("restaurants", limit=1000)
+            data.update(
+                ctx.queries.restaurant_browser(
+                    q, uid(params["location"]) if params.get("location") else None
+                )
+            )
         elif tab == "ratings":
             from involta_guide.domain.rules import aggregate_scores
 
