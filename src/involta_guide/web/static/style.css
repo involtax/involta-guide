@@ -1053,3 +1053,17 @@ pre.audit-json {
 .restaurant-evidence p { margin: 8px 0; }
 .restaurant-evidence a { display: block; font-size: 11px; }
 @media (max-width: 650px) { .restaurant-admin .admin-header h1 { font-size: 30px; letter-spacing: -1px; } }
+.voice-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 2.5fr);
+  gap: 32px;
+  align-items: start;
+}
+.voice-admin-layout > * { min-width: 0; }
+.voice-admin-layout article { overflow-wrap: anywhere; margin: 20px 0; }
+.voice-admin-layout audio, .voice-admin-layout textarea { max-width: 100%; width: 100%; }
+.voice-admin-layout blockquote { white-space: pre-wrap; overflow-wrap: anywhere; }
+.voice-admin-layout input, .voice-admin-layout select { max-width: 100%; }
+@media (max-width: 760px) {
+  .voice-admin-layout { grid-template-columns: minmax(0, 1fr); }
+}

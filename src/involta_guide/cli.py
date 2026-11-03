@@ -71,6 +71,7 @@ def main() -> None:
                     if row["created_at"] < cutoff
                     and row["status"] != "pending"
                     and row["id"] not in active
+                    and not row["audio"].startswith("voice:")
                 ]
                 print(
                     f"Audio eligible: {len(reviews)}; mode: {'execute' if args.execute else 'dry-run'}"

@@ -1,0 +1,2 @@
+{%extends 'base.html'%}
+{%block body%}<main><h1>{{pending.location.name}} · голосовой отзыв</h1><a href="{{settings.path('/admin/voice')}}">К очереди отзывов</a><p>{{pending.state}}</p><audio controls preload="none" src="{{settings.path('/admin/voice/media/audio/'+pending.reference)}}"></audio>{%if pending.transcript%}<blockquote>{{pending.transcript}}</blockquote><p>Текст сохранён в Voice и ожидает доставки в Guide.</p>{%else%}<p>Аудиозапись сохранена; расшифровка ещё не готова.</p>{%endif%}<p role="alert">{{pending.error or ''}}</p></main>{%endblock%}

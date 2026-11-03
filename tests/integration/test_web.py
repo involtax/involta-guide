@@ -185,9 +185,9 @@ def test_alex_accepts_short_unicode_and_special_character_secrets(database):
             response = client.get("/guide/?" + quote(secret, safe=""), follow_redirects=False)
             assert response.status_code == 302
             assert response.headers["location"] == "/guide/"
-            token = client.cookies.get("guide_alex")
+            token = client.cookies.get("guide_admin")
             assert token
-            assert client.app.state.context.security.principal(token, alex=True) is not None
+            assert client.app.state.context.security.principal(token) is not None
     empty = settings.model_copy(
         update={"alex_secret": SecretStr(""), "alex_secret_base64": SecretStr("")}
     )

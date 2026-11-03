@@ -432,6 +432,7 @@ def routes(prefix: str) -> APIRouter:
                 return redirect(request, message="Сессии завершены")
             if action == "revoke-alex":
                 ctx.security.revoke("", alex=True, all_sessions=True)
+                ctx.security.revoke(admin_token(request), all_sessions=True)
                 return RedirectResponse(ctx.settings.path("/alex"), status_code=303)
             raise HTTPException(404, "Неизвестное действие")
         except ValueError as exc:
@@ -455,7 +456,7 @@ def routes(prefix: str) -> APIRouter:
             {
                 row["id"]: row["transcript"]
                 for row in ctx.queries.rows("reviews")
-                if row["alex_session_id"]
+                if row["alex_session_id"] or row.get("admin_session_id")
             }
             if principal or admin
             else {}
@@ -477,12 +478,17 @@ def routes(prefix: str) -> APIRouter:
     @router.post(prefix + "/alex/logout")
     def alex_logout(request: Request, form: FormData = Depends(form_data)) -> Response:
         ctx = context(request)
-        if not ctx.security.principal(request.cookies.get("guide_alex"), alex=True):
+        admin = ctx.security.principal(admin_token(request))
+        if not admin and not ctx.security.principal(request.cookies.get("guide_alex"), alex=True):
             raise HTTPException(401)
-        check_csrf(request, form, alex=True)
-        ctx.security.revoke(request.cookies["guide_alex"], alex=True)
+        check_csrf(request, form, alex=not bool(admin))
+        if admin:
+            ctx.security.revoke(admin_token(request))
+        else:
+            ctx.security.revoke(request.cookies["guide_alex"], alex=True)
         response = RedirectResponse(ctx.settings.path("/"), status_code=303)
         response.delete_cookie("guide_alex", path=prefix)
+        response.delete_cookie("guide_admin", path=prefix)
         return response
 
     return router

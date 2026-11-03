@@ -19,6 +19,7 @@ that review. Original text is immutable; edits have their own revision/history.
 
 | Method | Route under `/guide/voice/api/v1` | Contract |
 |---|---|---|
+| POST | `/identity` | Origin-checked cookie bootstrap before upload; no processing or audio data |
 | POST | `/submissions` | multipart `audio`, `location`, `idempotency_key`; 202 only after durable file + submission/run/queue commit |
 | GET | `/submissions/mine` | paginated current visitor's history; never all visitors |
 | GET | `/submissions/{reference}` | owner-only processing + Guide moderation/publication status |
@@ -64,7 +65,7 @@ are defined in `involta_voice.contracts`.
 * POST `/events/ack`: acknowledges a committed Guide cursor, never deletes events.
 
 Events have `schema_version=1`, immutable `event_id`, monotonic `sequence`,
-`kind` (`transcript_ready`, `analysis_ready`), submission reference, run number,
+`kind` (`transcript_ready`, `analysis_ready`, diagnostic `processing_failed`), submission reference, run number,
 metadata snapshot, exact transcript, and optional validated analysis. Analysis
 events also contain the transcript so out-of-order delivery can create the base
 review. Guide inbox event uniqueness, review/proposal import and cursor update

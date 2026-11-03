@@ -142,6 +142,8 @@ class EditorialService:
         if decision not in ("approved", "rejected", "fraud", "reset"):
             raise RuleViolation("Неизвестное решение")
         with self.uow() as uow:
+            if uow.repo.get("voice_links", review_id):
+                raise Conflict("Используйте карточку голосового отзыва с проверкой версии")
             require(uow.repo, "reviews", review_id, lock=True)
             uow.repo.change(
                 "reviews",
@@ -162,6 +164,8 @@ class EditorialService:
         with self.uow() as uow:
             repo = uow.repo
             p = require(repo, "proposals", proposal_id, lock=True)
+            if repo.get("voice_proposals", proposal_id):
+                raise Conflict("Используйте карточку голосового отзыва с проверкой версии")
             review = require(repo, "reviews", p["review_id"], lock=True)
             if edited is None:
                 if p["status"] != "pending":
@@ -210,7 +214,13 @@ class EditorialService:
     ) -> None:
         from datetime import UTC, datetime
 
-        session = require(repo, "alex_sessions", review["alex_session_id"], lock=True)
+        admin_session = review.get("admin_session_id")
+        session = require(
+            repo,
+            "admin_sessions" if admin_session else "alex_sessions",
+            admin_session or review["alex_session_id"],
+            lock=True,
+        )
         if session["revoked"] or session["expires_at"] <= datetime.now(UTC):
             raise RuleViolation("Сессия Алекса завершена")
         location = require(repo, "locations", review["location_id"], lock=True)

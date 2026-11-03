@@ -167,6 +167,9 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     page.get_by_role("button", name="Запарсить эти данные", exact=True)
                 ).to_have_count(0)
                 expect(page.locator("[data-consent]")).to_have_count(0)
+                # Visitor review uses an anonymous browser session; admin cookie now marks commands.
+                context.clear_cookies()
+                page.goto(base + "/ivanovo")
                 page.get_by_role("button", name="● Записать отзыв").click()
                 time.sleep(2.2)
                 page.get_by_role("button", name="Остановить", exact=False).click()
@@ -175,6 +178,9 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     timeout=10000
                 )
                 review = queries.rows("reviews")[0]
+                page.goto(base + "/admin")
+                page.get_by_label("Пароль редакции").fill("test-password-123456")
+                page.get_by_role("button", name="Войти ↗").click()
                 page.goto(base + "/admin?tab=reviews&review=" + review["id"])
                 page.get_by_role("button", name="Одобрить отзыв", exact=True).click()
                 expect(page.get_by_role("status")).to_contain_text("Решение сохранено")

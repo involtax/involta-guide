@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     alex_secret: SecretStr = SecretStr("")
     alex_secret_base64: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+    voice_enabled: bool = False
+    voice_url: str = "http://voice-api:3100"
+    voice_service_secret: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1"
     transcription_model: str = "gpt-4o-mini-transcribe"
     site_url: str = "http://localhost:3000/guide"
@@ -71,6 +74,18 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_secrets(self) -> "Settings":
         from urllib.parse import urlsplit
+
+        voice_url = urlsplit(self.voice_url)
+        if (
+            voice_url.scheme not in ("http", "https")
+            or not voice_url.hostname
+            or voice_url.username
+            or voice_url.query
+            or voice_url.fragment
+        ):
+            raise ValueError("VOICE_URL must be an HTTP(S) service URL without credentials/query")
+        if self.voice_enabled and len(self.voice_service_secret.get_secret_value()) < 32:
+            raise ValueError("VOICE_SERVICE_SECRET requires at least 32 characters")
 
         encoded_alex = self.alex_secret_base64.get_secret_value()
         if encoded_alex:

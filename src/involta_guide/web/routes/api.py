@@ -7,7 +7,14 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.requests import Request as StarletteRequest
 
-from involta_guide.web.http import check_csrf, check_origin, client_ip, context, require_admin
+from involta_guide.web.http import (
+    admin_token,
+    check_csrf,
+    check_origin,
+    client_ip,
+    context,
+    require_admin,
+)
 
 
 def routes(prefix: str) -> APIRouter:
@@ -45,7 +52,10 @@ def routes(prefix: str) -> APIRouter:
             alex = await run_in_threadpool(
                 ctx.security.principal, request.cookies.get("guide_alex"), alex=True
             )
-            if alex:
+            admin = await run_in_threadpool(ctx.security.principal, admin_token(request))
+            if admin:
+                check_csrf(request, form)
+            elif alex:
                 check_csrf(request, form, alex=True)
             mime = (audio.content_type or "").split(";")[0]
             data = await audio.read()
@@ -57,7 +67,8 @@ def routes(prefix: str) -> APIRouter:
                 request.headers.get("user-agent", ""),
                 data,
                 mime,
-                alex["id"] if alex else None,
+                alex["id"] if alex and not admin else None,
+                admin["id"] if admin else None,
             )
             response = JSONResponse({"id": key}, status_code=201)
             response.set_cookie(
@@ -85,6 +96,9 @@ def routes(prefix: str) -> APIRouter:
         except ValueError:
             return JSONResponse([])
         rows = ctx.queries.visitor(visitor, key)
+        from involta_guide.web.routes.voice import visitor_identity
+
+        rows += ctx.queries.visitor(visitor_identity(request, visitor), key)
         for row in rows:
             row["created_at"] = row["created_at"].strftime("%Y-%m-%d %H:%M:%S")
         return JSONResponse(jsonable_encoder(rows), headers={"Cache-Control": "no-store"})
@@ -96,7 +110,21 @@ def routes(prefix: str) -> APIRouter:
             review_id = str(UUID(review_id))
         except ValueError:
             raise HTTPException(404, "Запись не найдена") from None
-        data, mime = context(request).reviews.audio(review_id)
+        ctx = context(request)
+        review = ctx.queries.get("reviews", review_id)
+        if review and review["audio"].startswith("voice:"):
+            from involta_guide.web.routes.voice import voice_client
+
+            remote = voice_client(request).request(
+                "GET", "/admin/submissions/" + review_id + "/audio"
+            )
+            return Response(
+                remote.content,
+                status_code=remote.status_code,
+                media_type=remote.headers.get("content-type", "application/octet-stream"),
+                headers={"Cache-Control": "private,no-store"},
+            )
+        data, mime = ctx.reviews.audio(review_id)
         return Response(
             data,
             media_type=mime,
