@@ -147,13 +147,4 @@ def routes(prefix: str) -> APIRouter:
             headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
 
-    @router.get(prefix + "/api/admin/locations-export")
-    @router.get(prefix + "/admin/api/locations-export")
-    def export(request: Request) -> Response:
-        require_admin(request)
-        return JSONResponse(
-            jsonable_encoder(context(request).queries.rows("locations", limit=100000)),
-            headers={"Cache-Control": "no-store"},
-        )
-
     return router

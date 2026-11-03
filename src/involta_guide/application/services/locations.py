@@ -1,9 +1,10 @@
 import json
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 from involta_guide.application.ports.repositories import Record, UowFactory
-from involta_guide.domain.entities import RuleViolation
+from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
 
 from .editorial import current_content, require
 
@@ -18,6 +19,10 @@ class LocationService:
             target = key or str(uuid4())
             data = values.copy()
             related = data.pop("related_ids", [])
+            if data["slug"] in {"new", "export"}:
+                raise RuleViolation("Этот URL зарезервирован для служебного раздела")
+            if any(row["id"] != target for row in repo.rows("locations", {"slug": data["slug"]})):
+                raise RuleViolation("Этот URL уже занят другой локацией")
             if key:
                 require(repo, "locations", key, lock=True)
             if data["parent_id"] == target or target in related:
@@ -41,6 +46,38 @@ class LocationService:
             repo.replace_relations(target, related)
             repo.audit("location", target, json.dumps(values, ensure_ascii=False))
             return target
+
+    def save_intro(self, key: str, text: str, expected: str | None, actor: str) -> bool:
+        if len(text) > 30000 or "\x00" in text:
+            raise RuleViolation("Вступление: до 30000 символов, без нулевого символа")
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", key, lock=True)
+            if location["revision"] != expected:
+                raise Conflict("Город изменён другим действием. Сравните тексты и сохраните снова.")
+            if location["intro"] == text:
+                return False
+            repo.change(
+                "locations",
+                key,
+                {
+                    "intro": text,
+                    "revision": str(uuid4()),
+                    "updated_at": datetime.now(UTC),
+                },
+            )
+            repo.audit(
+                "manual_intro",
+                key,
+                json.dumps(
+                    {
+                        "admin_session_id": actor,
+                        "fields": [{"field": "intro", "before": location["intro"], "after": text}],
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+            return True
 
     def attach(self, restaurant_id: str, location_id: str) -> None:
         with self.uow() as uow:
@@ -90,13 +127,28 @@ class Queries:
                 "parents": repo.tree(key, ancestors=True),
             }
 
-    def ready_locations(self, query: str = "") -> list[Record]:
+    def admin_location(self, slug: str) -> Record:
         with self.uow() as uow:
-            return [
-                city
-                for city in uow.repo.restaurant_cities(query)
-                if city["page_data"].get("restaurants")
-            ]
+            rows = uow.repo.rows("locations", {"slug": slug}, limit=1)
+            if not rows:
+                raise NotFound("Локация не найдена")
+            key = rows[0]["id"]
+            events = uow.repo.rows("audit", {"action": "manual_intro", "target": key}, limit=1000)
+            for event in events:
+                event["data"] = json.loads(event["detail"])
+        return {**self.location(key), "intro_events": events}
+
+    def restaurant(self, number: int) -> Record:
+        with self.uow() as uow:
+            rows = uow.repo.rows("restaurants", {"number": number}, limit=1)
+            if not rows:
+                raise NotFound("Ресторан не найден")
+            card = rows[0]
+        result = self.restaurant_browser(location_id=card["location_id"])
+        result["restaurant_cards"] = [
+            r for r in result["restaurant_cards"] if r["id"] == card["id"]
+        ]
+        return result
 
     def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
         from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score

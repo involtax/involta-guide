@@ -131,26 +131,52 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 expect(page.get_by_role("heading", name="Рабочий стол.")).to_be_visible()
                 queries = Queries(lambda: PostgresUow(engine))
                 location = queries.directory(query="Иваново")["rows"][0]
-                page.goto(base + "/admin?tab=fill")
-                model_form = page.locator('form[action$="/generation-model"]')
-                model_form.get_by_label("Модель для новых запросов наполнения").select_option(
+                page.goto(base + "/admin/settings/filling")
+                model_form = page.locator('form[action$="/settings/filling"]')
+                model_form.get_by_label("Модель новых запросов наполнения").select_option(
                     "gpt-6.1-sol"
                 )
                 expect(page.get_by_role("region", name="Сравнение моделей и цен")).to_contain_text(
                     "$0.12"
                 )
-                model_form.get_by_role("button", name="Сохранить модель наполнения").click()
-                expect(page.get_by_role("status")).to_contain_text("Модель наполнения сохранена")
+                model_form.get_by_role("button", name="Сохранить настройки наполнения").click()
+                expect(page.get_by_role("status")).to_contain_text("Настройки сохранены")
                 assert queries.setting("generation_model") == "gpt-6.1-sol"
-                page.goto(base + "/admin?tab=locations&location=" + location["id"])
+                page.goto(base + "/admin/locations/" + location["slug"])
                 # Current content is applied by generation/review services, not direct snapshot forms.
                 from integration.editor_fixture import FixtureEditor
                 from integration.test_editorial import CONTENT
 
                 FixtureEditor(lambda: PostgresUow(engine)).save(location["id"], CONTENT, None)
                 page.reload()
-                expect(page.get_by_role("button", name="Наполнить через GPT ↗")).to_be_visible()
-                expect(page.get_by_role("button", name="Сохранить вступление")).to_have_count(0)
+                expect(page.get_by_role("button", name="Наполнить через GPT ↗")).to_have_count(0)
+                expect(page.get_by_role("button", name="Сохранить вступление")).to_be_visible()
+                intro_form = page.locator('form[action$="/intro"]')
+                intro_form.get_by_role("textbox", name="Вступление", exact=True).fill(
+                    "Ручное вступление из браузера"
+                )
+                intro_form.get_by_role("button", name="Сохранить вступление").click()
+                expect(page.get_by_role("status")).to_contain_text("Вступление сохранено")
+                page.reload()
+                expect(page.get_by_role("textbox", name="Вступление", exact=True)).to_have_value(
+                    "Ручное вступление из браузера"
+                )
+                page.screenshot(path=tmp_path / "admin-location-desktop.png", full_page=True)
+                page.set_viewport_size({"width": 390, "height": 844})
+                assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                page.screenshot(path=tmp_path / "admin-location-mobile.png", full_page=True)
+                page.set_viewport_size({"width": 1365, "height": 900})
+                page.get_by_role("link", name="Настройки наполнения", exact=True).click()
+                expect(page).to_have_url(base + "/admin/settings/filling")
+                page.go_back()
+                expect(page.get_by_role("textbox", name="Вступление", exact=True)).to_have_value(
+                    "Ручное вступление из браузера"
+                )
+                page.go_forward()
+                expect(
+                    page.get_by_role("heading", name="Настройки наполнения", exact=True)
+                ).to_be_visible()
+
                 page.goto(base + "/ivanovo")
                 expect(
                     page.get_by_role(
@@ -179,8 +205,10 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                 page.goto(base + "/admin?tab=reviews&review=" + review["id"])
                 page.get_by_role("button", name="Одобрить отзыв", exact=True).click()
                 expect(page.get_by_role("status")).to_contain_text("Решение сохранено")
-                page.get_by_role("link", name="Наполнение", exact=True).click()
-                expect(page.get_by_role("heading", name="Наполнение", exact=True)).to_be_visible()
+                page.get_by_role("link", name="Настройки наполнения", exact=True).click()
+                expect(
+                    page.get_by_role("heading", name="Настройки наполнения", exact=True)
+                ).to_be_visible()
                 assert page.locator("#admin-main").count() == 1
                 job = queries.rows("jobs", {"review_id": review["id"]})[0]
                 AIAudit(engine, settings).record(
@@ -230,7 +258,7 @@ def test_browser_public_htmx_microphone_and_alex(database, tmp_path):
                     )
                     tx.repo.change("jobs", failed_id, {"status": "failed", "error": "old failure"})
                     tx.repo.audit("temporary_public_fill", failed_id, location["id"])
-                page.goto(base + "/admin?tab=fill")
+                page.goto(base + "/logs/ivanovo/2")
                 repeat = page.locator('form[action$="/regenerate"]')
                 repeat.get_by_label("Модель нового запроса").select_option("gpt-6-astra")
                 repeat.get_by_role("button", name="Повторить новым запросом").click()

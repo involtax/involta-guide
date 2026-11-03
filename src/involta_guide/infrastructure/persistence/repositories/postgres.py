@@ -146,7 +146,7 @@ class PostgresRepository:
             params["active"] = int(status == "active")
         elif status == "empty":
             clauses.append("l.page_data->'restaurants'='[]'::jsonb")
-        elif status == "published":
+        elif status in ("published", "filled"):
             clauses.append("jsonb_array_length(l.page_data->'restaurants')>0")
         elif status == "hidden":
             clauses.append("NOT l.listed")
@@ -182,6 +182,8 @@ class PostgresRepository:
         if q:
             params["exact"] = q.lower().replace("ё", "е")
             order = "CASE WHEN translate(lower(l.name),'ё','е')=:exact THEN 0 WHEN EXISTS(SELECT 1 FROM unnest(l.aliases) a WHERE translate(lower(a),'ё','е')=:exact) THEN 1 ELSE 2 END,"
+        if options.get("admin_order"):
+            order += "l.updated_at DESC NULLS LAST,"
         params.update(size=size, offset=(page - 1) * size)
         rows = self.query(
             f"SELECT l.*,p.name parent_name,(SELECT count(*) FROM locations c WHERE c.parent_id=l.id AND c.active=1) child_count FROM locations l LEFT JOIN locations p ON p.id=l.parent_id {where} ORDER BY {order}CASE l.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,l.name,l.id LIMIT :size OFFSET :offset",

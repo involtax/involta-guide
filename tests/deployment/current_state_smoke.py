@@ -119,7 +119,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "current_state"
+                    == "admin_routes"
                 )
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)

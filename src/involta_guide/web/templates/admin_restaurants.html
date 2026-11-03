@@ -1,16 +1,16 @@
 <section class="restaurant-browser" aria-label="База ресторанов">
 <aside class="restaurant-sidebar">
 <div class="restaurant-sidebar-heading"><h2>Города</h2><span>{{restaurant_cities|length}}</span></div>
-<form method="get" action="{{settings.path('/admin')}}" class="restaurant-search" role="search">
-<input type="hidden" name="tab" value="restaurants">
+<form method="get" action="{{settings.path('/admin/restaurants')}}" class="restaurant-search" role="search">
+
 <label for="restaurant-city-search">Поиск города</label>
-<input id="restaurant-city-search" type="search" name="q" value="{{q}}" placeholder="Название или регион" hx-get="{{settings.path('/admin')}}" hx-trigger="input changed delay:350ms, search" hx-include="closest form">
+<input id="restaurant-city-search" type="search" name="q" value="{{q}}" placeholder="Название или регион" hx-get="{{settings.path('/admin/restaurants')}}" hx-trigger="input changed delay:350ms, search" hx-push-url="true" hx-include="closest form">
 <button type="submit">Найти</button>
 </form>
 <p class="restaurant-muted">Только наполненные · сначала свежие</p>
 <nav class="restaurant-city-list" aria-label="Наполненные города">
 {%for city in restaurant_cities%}
-<a class="restaurant-city {{'selected' if restaurant_city and city.id==restaurant_city.id else ''}}" href="{{settings.path('/admin')}}?tab=restaurants&amp;location={{city.id}}&amp;q={{q|urlencode}}" {%if restaurant_city and city.id==restaurant_city.id%}aria-current="page"{%endif%}>
+<a class="restaurant-city {{'selected' if restaurant_city and city.id==restaurant_city.id else ''}}" href="{{settings.path('/admin/restaurants')}}?location={{city.slug}}&amp;q={{q|urlencode}}" {%if restaurant_city and city.id==restaurant_city.id%}aria-current="page"{%endif%}>
 <strong>{{city.name}}</strong><span>{{city.restaurant_count}} рест.</span>
 <small>{{city.region}}</small>
 <small>{%if city.filled_at%}Обновлено {{city.filled_at.strftime('%d.%m.%Y %H:%M')}} UTC{%else%}Дата наполнения не сохранена{%endif%}</small>
@@ -20,12 +20,12 @@
 </aside>
 <div class="restaurant-results">
 {%if restaurant_city%}
-<header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{restaurant_cards|length}} ресторанов в базе</p></div><a href="{{settings.path('/admin')}}?tab=locations&amp;location={{restaurant_city.id}}">Редактировать подборку ↗</a></header>
+<header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{listing.total if listing is defined else restaurant_cards|length}} ресторанов в базе</p></div><a href="{{settings.path('/admin/locations/'+restaurant_city.slug)}}">Редактировать подборку ↗</a></header>
 {%set quality_report=generation_quality%}{%include 'generation_quality.html'%}
 <p class="restaurant-sort-note">По убыванию оценки по 8 критериям текущей подборки. При равенстве или отсутствии оценки — по оценке одобренных отзывов, затем звезде Алекса и названию. Отсутствующие оценки не считаются нулём.</p>
 {%for r in restaurant_cards%}
 <article class="restaurant-record">
-<header class="restaurant-record-heading"><span class="restaurant-position">{{'%02d'|format(loop.index)}}</span><div><h3>{{r.name}}</h3><p>{{r.cuisine or 'Кухня не указана'}} · {{r.location_name}}</p><div class="restaurant-badges"><span>{{'Активен' if r.active else 'Неактивен'}}</span>{%if r.alex_star%}<span>★ Звезда Алекса</span>{%endif%}</div></div><div class="restaurant-score"><strong>{{'%.2f'|format(r.score) if r.score is not none else '—'}}</strong><span>/ 10 · 8 критериев</span></div></header>
+<header class="restaurant-record-heading"><span class="restaurant-position">{{'%02d'|format(loop.index)}}</span><div><h3><a href="{{settings.path('/admin/restaurants/'+r.number|string)}}">{{r.name}} / {{r.number}}</a></h3><p>{{r.cuisine or 'Кухня не указана'}} · {{r.location_name}}</p><div class="restaurant-badges"><span>{{'Активен' if r.active else 'Неактивен'}}</span>{%if r.alex_star%}<span>★ Звезда Алекса</span>{%endif%}</div></div><div class="restaurant-score"><strong>{{'%.2f'|format(r.score) if r.score is not none else '—'}}</strong><span>/ 10 · 8 критериев</span></div></header>
 <p class="restaurant-description">{{r.description or 'Описание не сохранено.'}}</p>
 <dl class="restaurant-facts">
 <div><dt>Телефон</dt><dd>{%if r.phone%}<a href="tel:{{r.phone}}">{{r.phone}}</a>{%else%}Не указан{%endif%}</dd></div>
@@ -33,7 +33,7 @@
 <div><dt>Координаты</dt><dd>{{r.latitude if r.latitude is not none else '—'}}, {{r.longitude if r.longitude is not none else '—'}}</dd></div>
 <div><dt>Оценка посетителей</dt><dd>{{'%.2f'|format(r.review_scores.rating) if r.review_scores.rating is not none else 'Нет оценки'}} · одобренных записей: {{r.review_count}}</dd></div>
 <div><dt>Тональность / рекомендация</dt><dd>{{'%.2f'|format(r.review_scores.sentiment) if r.review_scores.sentiment is not none else '—'}} / {{'%.2f'|format(r.review_scores.recommendation) if r.review_scores.recommendation is not none else '—'}}</dd></div>
-<div><dt>Подборки</dt><dd>{%for c in r.collections or []%}<a href="{{settings.path('/admin')}}?tab=locations&amp;location={{c.id}}">{{c.name}}</a>{{', ' if not loop.last}}{%endfor%}</dd></div>
+<div><dt>Подборки</dt><dd>{%for c in r.collections or []%}<a href="{{settings.path('/admin/locations/'+c.slug)}}">{{c.name}}</a>{{', ' if not loop.last}}{%endfor%}</dd></div>
 </dl>
 <section class="restaurant-detail-section"><h4>Режим работы</h4>
 {%if r.opening_hours%}<p class="restaurant-muted">{{r.opening_hours.timezone}}</p><dl class="restaurant-hours">{%for slots in r.opening_hours.week%}<div><dt>{{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][loop.index0]}}</dt><dd>{%for slot in slots%}{{'Круглосуточно' if slot[0]==slot[1] else slot[0]+'–'+slot[1]}}{{' (след. день)' if slot[0]>slot[1] else ''}}{{', ' if not loop.last}}{%else%}Закрыто{%endfor%}</dd></div>{%endfor%}</dl>{%if r.opening_hours.exceptions%}<h5>Исключения</h5>{%for date,slots in r.opening_hours.exceptions.items()%}<p>{{date}}: {%for slot in slots%}{{'Круглосуточно' if slot[0]==slot[1] else slot[0]+'–'+slot[1]}}{{' (след. день)' if slot[0]>slot[1] else ''}}{{', ' if not loop.last}}{%else%}Закрыто{%endfor%}</p>{%endfor%}{%endif%}{%else%}<p class="restaurant-muted">Не сохранён.</p>{%endif%}
@@ -47,10 +47,11 @@
 </section>
 <section class="restaurant-detail-section"><h4>Источники</h4><ul class="restaurant-sources">{%for url in r.sources%}<li>{%if url.startswith('https://') or url.startswith('http://')%}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url}}</a>{%else%}{{url}}{%endif%}</li>{%else%}<li class="restaurant-muted">Не сохранены.</li>{%endfor%}</ul></section>
 {%if r.reviews%}<details class="restaurant-detail-section"><summary>Отзывы и оценки · {{r.reviews|length}}</summary>{%for review in r.reviews%}<section><p><a href="{{settings.path('/admin')}}?tab=reviews&amp;review={{review.id}}">{{review.created_at}} ↗</a> · {{review.moderation}}{{' · фрод' if review.fraud}}</p><p>{{review.transcript or 'Нет расшифровки'}}</p><pre class="audit-json">{{review.entries|tojson(indent=2)}}</pre></section>{%endfor%}</details>{%endif%}
-<details class="restaurant-detail-section"><summary>Все поля записи в базе</summary><pre class="audit-json">{%for key,value in r.items() if key not in ['reviews','ranking','score','review_scores','review_count']%}{{key}}: {{value|tojson}}
+<details class="restaurant-detail-section"><summary>Поля записи в базе</summary><pre class="audit-json">{%for key,value in r.items() if key not in ['id','location_id','reviews','ranking','score','review_scores','review_count','collections']%}{{key}}: {{value|tojson}}
 {%endfor%}</pre></details>
 </article>
 {%endfor%}
-{%else%}<div class="restaurant-empty"><h2>Выберите город</h2><p>Слева появятся города, в базе которых уже есть рестораны.</p>{%if q%}<a href="{{settings.path('/admin')}}?tab=restaurants">Сбросить поиск</a>{%endif%}</div>{%endif%}
+{%if listing is defined%}<nav aria-label="Страницы ресторанов">{%for n in range(1,listing.pages+1)%}<a href="{{settings.path('/admin/restaurants')}}?location={{restaurant_city.slug}}&amp;q={{q|urlencode}}&amp;page={{n}}" {{'aria-current=page' if n==listing.page}}>{{n}}</a> {%endfor%}</nav>{%endif%}
+{%else%}<div class="restaurant-empty"><h2>Выберите город</h2><p>Слева появятся города, в базе которых уже есть рестораны.</p>{%if q%}<a href="{{settings.path('/admin/restaurants')}}">Сбросить поиск</a>{%endif%}</div>{%endif%}
 </div>
 </section>

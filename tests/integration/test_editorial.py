@@ -158,7 +158,7 @@ def test_location_alias_cycles_visibility_and_shared_direction(database):
     key = service.save(None, data)
     data["slug"] = "new-bay-canonical"
     service.save(key, data)
-    assert queries.public("new-bay")["redirect"]
+    assert queries.public("new-bay") is None
     changed = LocationInput.model_validate(
         {k: v for k, v in moscow.items() if k in LocationInput.model_fields}
     ).model_dump(mode="json")

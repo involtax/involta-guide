@@ -116,7 +116,7 @@ def test_cutover_keeps_current_data_and_discards_page_history(database, monkeypa
         with engine.connect() as conn:
             assert (
                 conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "current_state"
+                == "admin_routes"
             )
             assert (
                 conn.execute(

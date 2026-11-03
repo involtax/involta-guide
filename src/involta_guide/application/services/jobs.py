@@ -59,6 +59,15 @@ class JobService:
             uow.repo.set_setting("generation_model", value)
             uow.repo.audit("generation_model", "generation", value)
 
+    def save_filling_settings(self, prompt: str, model: str) -> None:
+        if not 50 <= len(prompt) <= 30000 or "\x00" in prompt:
+            raise RuleViolation("Промпт: 50–30000 символов")
+        model = self._model(model)
+        with self.uow() as uow:
+            uow.repo.set_setting("prompt", prompt)
+            uow.repo.set_setting("generation_model", model)
+            uow.repo.audit("filling_settings", "generation", json.dumps({"model": model}))
+
     @staticmethod
     def generation_config(repo: Repository, job_id: str) -> Record:
         rows = repo.rows("audit", {"action": "generation_run", "target": job_id}, limit=1)
@@ -74,14 +83,16 @@ class JobService:
         previous_job: str | None = None,
     ) -> str | None:
         # The DB assigns the canonical city/number key atomically for every request.
-        chosen = self._model(model or repo.setting("generation_model", self.provider.model))
+        # Read prompt/model in one statement so concurrent settings saves cannot mix the pair.
+        settings = {row["key"]: row["value"] for row in repo.rows("settings", limit=1000)}
+        chosen = self._model(model or settings.get("generation_model", self.provider.model))
         job_id = str(uuid4())
         if not repo.queue(
             {
                 "id": job_id,
                 "kind": "generate",
                 "location_id": location["id"],
-                "prompt": repo.setting("prompt"),
+                "prompt": settings.get("prompt", ""),
             }
         ):
             return None
@@ -163,34 +174,6 @@ class JobService:
             self._queue_generation(repo, location, public_fill=True)
             return self._public_state(repo, location)
 
-    def enqueue(
-        self, location_id: str | None = None, scope: str = "empty", *, model: str | None = None
-    ) -> int:
-        if scope not in ("empty", "all"):
-            raise RuleViolation("Выберите область наполнения")
-        with self.uow() as uow:
-            repo = uow.repo
-            rows = (
-                [require(repo, "locations", location_id)]
-                if location_id
-                else repo.rows("locations", {"active": 1}, limit=100000)
-            )
-            count = 0
-            for location in sorted(rows, key=lambda row: row["id"]):
-                if not location_id and (
-                    (not location["listed"] and not location["revision"])
-                    or (scope == "empty" and self._has_data(repo, location))
-                ):
-                    continue
-                location = require(repo, "locations", location["id"], lock=True)
-                if not location_id and scope == "empty" and self._has_data(repo, location):
-                    continue
-                count += self._queue_generation(repo, location, model=model) is not None
-            repo.audit(
-                "queue_generation", "all" if location_id is None else location_id, str(count)
-            )
-            return count
-
     def regenerate(self, job_id: str, *, model: str | None = None) -> str:
         with self.uow() as uow:
             old = require(uow.repo, "jobs", job_id)
@@ -236,17 +219,6 @@ class JobService:
             if row["review_id"]:
                 uow.repo.change("reviews", row["review_id"], {"status": "pending", "error": None})
             uow.repo.audit("job_retry", job_id)
-
-    def cancel(self) -> None:
-        with self.uow() as uow:
-            for row in uow.repo.rows("jobs", {"status": "queued"}, limit=100000):
-                # Deferred background work is already executing at OpenAI.
-                if row["kind"] == "generate" and row["started_at"]:
-                    continue
-                uow.repo.change(
-                    "jobs", row["id"], {"status": "cancelled", "finished_at": datetime.now(UTC)}
-                )
-            uow.repo.audit("jobs_cancel", "queued")
 
     def set_prompt(self, prompt: str) -> None:
         if not 50 <= len(prompt) <= 30000:

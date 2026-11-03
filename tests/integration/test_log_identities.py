@@ -46,10 +46,7 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
     with TestClient(create_app(settings)) as client:
         assert client.get("/guide/logs/ivanovo-new/1").status_code == 200
         old_path = client.get("/guide/logs/ivanovo/1", follow_redirects=False)
-        assert (
-            old_path.status_code == 308
-            and old_path.headers["location"] == "/guide/logs/ivanovo-new/1"
-        )
+        assert old_path.status_code == 404
         assert (
             client.get("/guide/logs/" + job["id"], follow_redirects=False).headers["location"]
             == "/guide/logs/ivanovo-new/1"
@@ -58,7 +55,7 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
         admin = client.get("/guide/admin")
         assert 'href="/guide/logs"' in admin.text and "Аудит ИИ" not in admin.text
         old = client.get("/guide/admin?tab=ai-audit&job=" + job["id"], follow_redirects=False)
-        assert old.status_code == 308 and old.headers["location"] == "/guide/logs/ivanovo-new/1"
+        assert old.status_code == 404
         log = client.get("/guide/logs/ivanovo-new/1")
         assert 'name="job_id"' not in log.text
         assert 'name="log_slug" value="ivanovo-new"' in log.text
