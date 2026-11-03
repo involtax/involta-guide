@@ -109,6 +109,15 @@ restore_previous() {
   [[ -n "$previous_sha" ]] || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
+  # Roll back Voice executors as well, retaining their current volumes/schema.
+  # The gateway-compatible baseline may predate the overlay, so reuse the current
+  # service definition with its reviewed previous image and no dependency recreation.
+  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/compose.voice.yaml" ]]; then
+    compose "$target_sha" "$previous_image" up -d --no-build --no-deps voice-api voice-worker voice-consumer || return 1
+    wait_health "$target_sha" "$previous_image" voice-api || return 1
+    wait_health "$target_sha" "$previous_image" voice-worker || return 1
+    wait_health "$target_sha" "$previous_image" voice-consumer || return 1
+  fi
   compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
   wait_health "$previous_sha" "$previous_image" web || return 1
   check_local "$previous_sha" || return 1
