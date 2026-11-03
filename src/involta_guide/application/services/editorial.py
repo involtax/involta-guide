@@ -88,7 +88,9 @@ def save(
                 "sources": card.get("sources", []),
                 "phone": card.get("phone", ""),
                 "opening_hours": card.get("openingHours"),
-                "alex_star": card["alexStar"] if alex else bool(previous and previous["alex_star"]),
+                "alex_star": card["alexStar"]
+                if alex or source == "restore"
+                else bool(previous and previous["alex_star"]),
                 "latitude": card.get("latitude"),
                 "longitude": card.get("longitude"),
             }
@@ -96,7 +98,7 @@ def save(
                 repo.change("restaurants", card["id"], values)
             else:
                 repo.add("restaurants", {"id": card["id"], **values})
-        if alex and previous:
+        if (alex or source == "restore") and previous:
             repo.change("restaurants", card["id"], {"alex_star": card["alexStar"]})
         repo.link("restaurant_locations", {"restaurant_id": card["id"], "location_id": location_id})
     version = str(uuid4())
