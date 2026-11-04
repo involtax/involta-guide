@@ -55,7 +55,13 @@ def owned_tables(settings: Settings) -> set[str]:
         re.findall(
             r"CREATE TABLE (\w+)", (settings.root_dir / "migrations/current_schema.sql").read_text()
         )
-    ) | {"alembic_version", "beta_cleanup_files", "beta_transition_report", "ai_daily_usage"}
+    ) | {
+        "alembic_version",
+        "beta_cleanup_files",
+        "beta_transition_report",
+        "ai_daily_usage",
+        "audience_daily",
+    }
 
 
 def main() -> None:

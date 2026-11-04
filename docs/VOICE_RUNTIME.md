@@ -76,7 +76,7 @@ Release посылает stop всем процессам одновременн
    схемы; обновление версии выполняется отдельно, после backup.
 7. Применяет Voice v9, запускает `voice` и `voice-worker`, проверяет API/доставку,
    затем web/worker и HTTPS. Guide мигрируется одной цепочкой
-   filling_v3 → filling_top3 → review_stream → review_publication.
+   filling_v3 → filling_top3 → review_stream → review_publication → audience_stats.
 
 Rollback использует **Compose snapshot предыдущего релиза вместе с его образом**.
 При неудачном обновлении сначала восстанавливаются исходная версия Voice и Guide из снимков
@@ -162,7 +162,7 @@ BPE-словарь подсказок создаётся детерминиро�
 Порядок выпуска: собрать/проверить образ → штатный полный release, который
 останавливает writers, сохраняет Voice schema dump для версий <9, применяет
 `voice migrate` (9), выполняет `voice prepare-model`, запускает все компоненты
-из одного SHA. Guide Alembic остаётся review_publication. Production Compose
+из одного SHA. Guide Alembic — audience_stats (подробнее [AUDIENCE.md](AUDIENCE.md)). Production Compose
 явно включает полный профиль беты в voice, voice-worker и voice-prepare-model;
 отдельного выключенного Sherpa-флага нет.
 

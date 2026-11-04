@@ -77,6 +77,8 @@ class SubmissionMetadata(DTO):
     language: str = Field(default="", max_length=40)
     timezone: str = Field(default="", max_length=100)
     correlation_id: UUID
+    # Older accepted submissions have no reliable administrative identity.
+    statistics_excluded: bool = True
 
 
 class ReviewFragment(DTO):

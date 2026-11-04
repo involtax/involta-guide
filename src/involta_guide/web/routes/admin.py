@@ -1,4 +1,5 @@
 import secrets
+from itertools import groupby
 from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
@@ -25,6 +26,7 @@ from involta_guide.web.http import (
     form_data,
     require_admin,
 )
+from involta_stats import daily_stats
 
 
 def key(form: FormData, name: str) -> str:
@@ -121,6 +123,20 @@ def routes(prefix: str) -> APIRouter:
                 "message": request.query_params.get("message", ""),
                 "overview": ctx.queries.overview(),
             },
+        )
+
+    @router.get(prefix + "/admin/stats")
+    def statistics(request: Request) -> Response:
+        require_admin(request)
+        days = daily_stats(context(request).engine)
+        months = [
+            (month, len(list(group)))
+            for month, group in groupby(days, key=lambda day: day.day.strftime("%m.%Y"))
+        ]
+        return render(
+            request,
+            "admin_stats.html",
+            {"active_section": "stats", "stats": days, "stats_months": months},
         )
 
     @router.get(prefix + "/admin/ratings")
