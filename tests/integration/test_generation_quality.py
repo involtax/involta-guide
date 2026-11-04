@@ -51,7 +51,7 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
             login(client)
             for path in [
                 "/guide/admin/locations/" + location["slug"],
-                "/guide/admin/restaurants?location=" + location["slug"],
+                "/guide/admin/restaurants/" + location["slug"],
             ]:
                 html = client.get(path).text
                 assert "Полнота поиска" in html and "Поиск неполный" in html and "Бояре" in html
@@ -116,7 +116,7 @@ def test_partial_coverage_is_readable_in_browser_and_on_mobile(database, tmp_pat
 
             page.route("**/*", respond)
             page.goto(
-                "http://testserver/guide/admin/restaurants?location=" + location["slug"],
+                "http://testserver/guide/admin/restaurants/" + location["slug"],
                 wait_until="networkidle",
             )
             quality = page.get_by_role("region", name="Полнота поиска")

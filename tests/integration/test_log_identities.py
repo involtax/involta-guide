@@ -52,7 +52,7 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
         admin = client.get("/guide/admin")
         assert 'href="/guide/logs"' in admin.text and "Аудит ИИ" not in admin.text
         old = client.get("/guide/admin?tab=ai-audit&job=" + job["id"], follow_redirects=False)
-        assert old.status_code == 404
+        assert old.status_code == 200 and "Рабочий стол." in old.text
         log = client.get("/guide/logs/ivanovo-new/1")
         assert 'name="job_id"' not in log.text
         assert 'name="log_slug" value="ivanovo-new"' in log.text
