@@ -160,11 +160,12 @@ class VoiceService:
             id=reference,
             snapshot=encoded(frozen),
         )
-        execute(
-            conn,
-            "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'transcription')",
-            id=reference,
-        )
+        if not frozen["asr_beta"]:
+            execute(
+                conn,
+                "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'transcription')",
+                id=reference,
+            )
         if frozen["asr_beta"]:
             for kind in frozen["sherpa_models"]:
                 execute(
@@ -194,13 +195,23 @@ class VoiceService:
                 id=reference,
                 n=submission["active_run"],
             )
+            from .variants import primary_kind, primary_variant
+
+            frozen = run["snapshot"] if run else {}
             primary_text = row(
                 conn,
-                "SELECT transcript FROM asr_candidates WHERE submission=:id AND engine='gigaam' AND variant='onnx' ORDER BY run DESC LIMIT 1",
+                "SELECT transcript FROM asr_candidates WHERE submission=:id AND engine='gigaam' AND variant=:variant ORDER BY run DESC LIMIT 1",
                 id=reference,
+                variant=primary_variant(frozen),
             )
             # Historical fallback text is retained in storage, never exposed to visitors.
-            submission["transcript"] = primary_text["transcript"] if primary_text else None
+            submission["transcript"] = (
+                submission["transcript"]
+                if frozen.get("restore_dictionary_case") and primary_text
+                else primary_text["transcript"]
+                if primary_text
+                else None
+            )
             delivery = row(
                 conn,
                 "SELECT coalesce(max(sequence),0) n FROM outbox WHERE submission=:id AND run=:n",
@@ -223,6 +234,15 @@ class VoiceService:
             ),
             None,
         )
+        if primary_variant(frozen) != "onnx":
+            primary = next(
+                (
+                    s
+                    for s in stages
+                    if s["run"] == submission["active_run"] and s["kind"] == primary_kind(frozen)
+                ),
+                None,
+            )
         failed = primary if primary and primary["state"] in ("failed", "unknown") else None
         if submission["transcript"] is not None:
             state = (

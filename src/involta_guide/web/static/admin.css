@@ -145,3 +145,6 @@
 .review-actions { display: flex; flex-direction: column; gap: 4px; font-size: 11px; white-space: nowrap; }
 
 .review-actions .review-delete { color: var(--black); font-size: 11px; }
+
+.review-transcripts .recognition-before, .review-transcripts .recognition-after { margin: 0; }
+.review-transcripts .recognition-after { margin-top: 5px; }

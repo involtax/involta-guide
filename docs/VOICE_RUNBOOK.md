@@ -11,7 +11,7 @@ rollback описаны в [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Ста�
 
 Voice использует ту же PostgreSQL БД, что Guide, со схемой `voice` и отдельным
 аудиотомом. Контейнер `voice` запускает API и доставку результатов в Guide;
-`voice-worker` — семь локальных профилей GigaAM для новых отзывов. Internal API не публикуется через Nginx.
+`voice-worker` — пять локальных профилей GigaAM/Sherpa для новых отзывов. Internal API не публикуется через Nginx.
 [Устройство, остановка и перенос существующей БД](VOICE_RUNTIME.md).
 
 Для локальной сборки нужны Python 3.13 с development headers, uv, C++ compiler,
@@ -30,7 +30,7 @@ uv run voice-worker
 
 В изолированной проверочной установке `VOICE_FAKE_PROVIDER=true` исключает реальные
 платные вызовы. В production false; ASR GigaAM локальный, pinned weights
-и сравнение семи профилей — [VOICE_SHERPA_COMPARISON.md](VOICE_SHERPA_COMPARISON.md).
+и сравнение пяти профилей — [VOICE_SHERPA_COMPARISON.md](VOICE_SHERPA_COMPARISON.md).
 Распознавание и сравнение OpenAI не вызывают.
 `VOICE_ENABLED` в Guide включает приём для всех ролей. Чтение сохранённых отзывов и
 модерация не зависят от возможности принять новую запись.

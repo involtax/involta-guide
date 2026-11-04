@@ -42,7 +42,7 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     provider = Pair(failed)
     worker = Worker(engine, settings, provider)
-    assert all(worker.once() for _ in range(7))
+    assert all(worker.once() for _ in range(5))
     assert not worker.once()
     status = service.status(ref)
     assert status["transcript"] == (None if failed == "gigaam" else "Текст GigaAM")
@@ -50,10 +50,10 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     assert "parakeet" not in json.dumps(status).lower()
     pair = reports(engine, [ref])[ref]
     assert {r["engine"] for r in pair} == {"gigaam"}
-    assert len(pair) == 7
-    assert sum(r["state"] == "failed" for r in pair) == (7 if failed else 0)
-    assert len(report(engine, ref)["candidates"]) == (0 if failed else 7)
-    assert provider.calls == ["gigaam"] * 7
+    assert len(pair) == 5
+    assert sum(r["state"] == "failed" for r in pair) == (5 if failed else 0)
+    assert len(report(engine, ref)["candidates"]) == (0 if failed else 5)
+    assert provider.calls == ["gigaam"] * 5
     assert "parakeet" not in provider.calls
     with engine.connect() as conn:
         assert conn.execute(
@@ -72,11 +72,11 @@ def test_saved_secondary_response_recovers_without_provider(voice_database):
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())
     assert worker.once()
-    assert worker.claim()["kind"] == "sherpa_gigaam_hotwords"
+    assert worker.claim()["kind"] == "sherpa_gigaam_hotwords_strong"
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE stages SET raw_response=CAST(:raw AS jsonb),lease_until=now()-interval '1 second' WHERE kind='sherpa_gigaam_hotwords'"
+                "UPDATE stages SET raw_response=CAST(:raw AS jsonb),lease_until=now()-interval '1 second' WHERE kind='sherpa_gigaam_hotwords_strong'"
             ),
             {"raw": json.dumps({"status_code": 200, "body": '{"text":"Второй результат"}'})},
         )
@@ -118,7 +118,7 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
     voice_database, with_primary
 ):
     settings, engine = voice_database
-    settings = settings.model_copy(update={"asr_beta_enabled": True})
+    settings = settings.model_copy(update={"asr_beta_enabled": False})
     service = VoiceService(engine, settings)
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, Pair(None if with_primary else "gigaam"))
@@ -126,6 +126,9 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
         pass
     with engine.begin() as conn:
         # A database at released version 5 with a Parakeet fallback and human judgments.
+        conn.execute(
+            text("UPDATE runs SET snapshot=snapshot-'primary_variant'-'restore_dictionary_case'")
+        )
         conn.execute(text("DELETE FROM asr_candidates WHERE variant<>'onnx'"))
         conn.execute(text("DELETE FROM stages WHERE kind LIKE 'sherpa_%'"))
         conn.execute(text("ALTER TABLE asr_candidates DROP CONSTRAINT asr_candidates_pkey"))

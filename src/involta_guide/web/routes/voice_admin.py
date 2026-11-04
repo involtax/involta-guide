@@ -50,9 +50,13 @@ def routes(prefix: str) -> APIRouter:
                         "state": "unavailable" if unavailable else "not_scheduled",
                     }
                     for engine, variant in RESULTS
-                    if review["reference"] or variant == "onnx"
+                    if review["reference"]
                 ],
             )
+            if not review["reference"]:
+                review["pair"] = [
+                    {"name": "GigaAM", "text": review["transcript"], "state": "completed"}
+                ]
             review["pair"] = [
                 candidate for candidate in review["pair"] if candidate.get("name") == "GigaAM"
             ]
