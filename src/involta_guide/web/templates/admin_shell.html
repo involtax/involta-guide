@@ -2,12 +2,7 @@
 {%from 'macros.html' import csrf with context%}
 {%block body%}
 <main class="admin-workspace {{workspace_class|default('')}}" id="{{workspace_id|default('admin-main')}}" {%if workspace_boost|default(true)%}hx-boost="true" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML settle:0" hx-history="false"{%endif%}>
-{%if show_admin_header|default(true)%}
-<header class="admin-header">
-<h1>{{workspace_title|default('Рабочий стол.')}}</h1>
-{%if show_admin_logout|default(true)%}<form method="post" action="{{settings.path(logout_path|default('/admin/logout'))}}">{{csrf()}}<button>Выйти</button></form>{%endif%}
-</header>
-{%endif%}
+{%if workspace_title is defined%}<h1 class="admin-page-title">{{workspace_title}}</h1>{%endif%}
 {%if show_admin_nav|default(true)%}{%include 'admin_navigation.html'%}{%endif%}
 {%if message%}<p role="{{message_role|default('status')}}" class="notice {{'admin-error' if message_role|default('status')=='alert' else ''}}">{{message}}</p>{%endif%}
 <div class="admin-content">{%block admin_content%}{%endblock%}</div>

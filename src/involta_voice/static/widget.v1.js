@@ -625,15 +625,17 @@
       error.setAttribute("role", "alert");
       const vadStatus = document.createElement("p");
       vadStatus.className = "vad-status";
-      const history = document.createElement("div");
-      history.className = "history";
+      const existingFeed = target.parentElement.querySelector("[data-public-reviews]");
+      const history = existingFeed || document.createElement("div");
+      history.classList.add("history");
       const reviewsTitle = document.createElement("h3");
       reviewsTitle.textContent = "Отзывы";
-      const reviewList = document.createElement("div");
+      const reviewList = existingFeed?.querySelector(".reviews") || document.createElement("div");
       reviewList.className = "reviews";
-      history.append(reviewsTitle, reviewList);
-      history.hidden = true;
-      panel.append(kicker, heading, stage, status, error, vadStatus, history);
+      if (!existingFeed) history.append(reviewsTitle, reviewList);
+      history.hidden = !reviewList.children.length;
+      panel.append(kicker, heading, stage, status, error, vadStatus);
+      if (!existingFeed) panel.append(history);
       root.replaceChildren(style, panel);
       const diagnostics = new Diagnostics(root, {
         api: api.href,
@@ -1411,6 +1413,13 @@
         if (element.childNodes.length)
           element.append(document.createElement("br"));
         element.append(text);
+        if (data.log_url) {
+          const log = document.createElement("a");
+          log.href = data.log_url;
+          log.textContent = "Лог ↗";
+          log.className = "review-log";
+          element.append(log);
+        }
         element.dataset.processing = String(!data.transcript && !failed);
       }
       function upsertReview(data) {
@@ -1441,7 +1450,7 @@
         try {
           const response = await fetch(
             api.href +
-              "/submissions/mine?location=" +
+              "/reviews?location=" +
               encodeURIComponent(options.location || ""),
             { credentials: "same-origin", signal: AbortSignal.timeout(10000) },
           );
@@ -1477,8 +1486,8 @@
         } catch {
           /* Only reading statuses is repeated; audio is never resent. */
         }
-        if (!disposed && version === historyVersion && ongoing)
-          scheduleHistory();
+        if (!disposed && version === historyVersion)
+          scheduleHistory(ongoing ? 2000 : 15000);
       }
       function unmount() {
         if (disposed) return;

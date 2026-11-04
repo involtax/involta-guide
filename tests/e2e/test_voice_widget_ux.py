@@ -641,8 +641,8 @@ def test_transcription_updates_its_list_entry_while_another_recording_continues(
     page.clock.run_for(1)
     state(widget, "idle")
     pending = []
-    page.route("**/submissions/mine?*", lambda route: pending.append(route))
-    with page.expect_request("**/submissions/mine?*"):
+    page.route("**/reviews?*", lambda route: pending.append(route))
+    with page.expect_request("**/reviews?*"):
         page.clock.run_for(2000)
     press(page, widget)
     state(widget, "recording")
@@ -663,7 +663,7 @@ def test_transcription_updates_its_list_entry_while_another_recording_continues(
 def test_history_uses_creation_time_in_browser_timezone_instead_of_editor_status(widget_page):
     page, widget, uploads = widget_page
     page.route(
-        "**/submissions/mine?*",
+        "**/reviews?*",
         lambda route: route.fulfill(
             json={
                 "rows": [
@@ -715,7 +715,7 @@ def test_new_review_appears_as_transcribing_then_updates_in_place_once(widget_pa
     expect(entry.locator(".transcript")).to_have_text("Расшифровка…")
     original = entry.element_handle()
     page.route(
-        "**/submissions/mine?*",
+        "**/reviews?*",
         lambda route: route.fulfill(
             json={
                 "rows": [
@@ -783,8 +783,8 @@ def test_narrow_standalone_uses_container_width_and_survives_large_text(widget_p
 def test_late_list_snapshot_cannot_remove_a_newly_accepted_review(widget_page):
     page, widget, _ = widget_page
     pending = []
-    page.route("**/submissions/mine?*", lambda route: pending.append(route))
-    with page.expect_request("**/submissions/mine?*"):
+    page.route("**/reviews?*", lambda route: pending.append(route))
+    with page.expect_request("**/reviews?*"):
         page.evaluate(
             "InvoltaVoice.unmount('a');InvoltaVoice.mount('a',{location:'ivanovo',contentEpoch:1})"
         )
@@ -808,9 +808,7 @@ def test_reset_removes_pending_reviews_even_before_the_first_list_confirmation(w
     page.clock.run_for(1)
     state(widget, "idle")
     expect(widget.locator(".reviews p")).to_have_count(1)
-    page.route(
-        "**/submissions/mine?*", lambda route: route.fulfill(json={"rows": [], "content_epoch": 2})
-    )
+    page.route("**/reviews?*", lambda route: route.fulfill(json={"rows": [], "content_epoch": 2}))
     page.clock.run_for(2000)
     expect(widget.locator(".reviews p")).to_have_count(0)
     expect(widget.locator(".history")).to_be_hidden()
@@ -840,7 +838,7 @@ def test_two_pending_reviews_are_updated_without_duplicates(widget_page):
     expect(widget.locator(".reviews p")).to_have_count(2)
     rows[1].update(state="result_ready", transcript="Первый текст готов")
     page.route(
-        "**/submissions/mine?*",
+        "**/reviews?*",
         lambda route: route.fulfill(json={"rows": rows, "content_epoch": 1}),
     )
     page.clock.run_for(2000)

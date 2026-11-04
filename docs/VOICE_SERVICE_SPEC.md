@@ -1,3 +1,5 @@
+> Уточнение от 04.11.2026: ручная модерация/правки/привязки и оценка ASR отменены. Текущий контракт, GigaAM-only лента и переход БД: [ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
+
 > Архитектурные положения этого документа заменены [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md). Текущая реализация: [CURRENT_STATE.md](CURRENT_STATE.md); переход: [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md).
 
 # Голосовой сервис: аудит и ТЗ для Sol

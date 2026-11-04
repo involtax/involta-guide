@@ -260,38 +260,6 @@ class Queries:
                     parent = parents.get(parent)
             return [row for row in rows if row["id"] in useful]
 
-    def review(self, key: str) -> Record:
-        with self.uow() as uow:
-            repo = uow.repo
-            review = require(repo, "reviews", key)
-            proposals = repo.rows("proposals", {"review_id": key})
-            return {
-                "review": review,
-                "proposals": proposals,
-                "signals": repo.signals(review),
-                "location": require(repo, "locations", review["location_id"]),
-            }
-
-    def visitor(self, visitor: str, location_id: str) -> list[Record]:
-        with self.uow() as uow:
-            repo = uow.repo
-            require(repo, "locations", location_id)
-            return [
-                {key: review[key] for key in ("id", "moderation", "status", "fraud", "created_at")}
-                | {
-                    "proposals": [
-                        {"status": p["status"], "kind": p["kind"]}
-                        for p in repo.rows("proposals", {"review_id": review["id"]})
-                    ],
-                    "published": bool(review["changes"])
-                    and review["moderation"] == "approved"
-                    and not review["fraud"],
-                }
-                for review in repo.rows(
-                    "reviews", {"visitor": visitor, "location_id": location_id}, limit=30
-                )
-            ]
-
     def contacts(self) -> list[Record]:
         with self.uow() as uow:
             return uow.repo.phone_proposals()

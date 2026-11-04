@@ -63,6 +63,11 @@ if args[0]=='compose':
   for i,arg in enumerate(args):
    if arg=='-f':names.extend(json.loads(Path(args[i+1]).read_text()).get('services',{}))
   print('\n'.join(dict.fromkeys(names)));sys.exit(0)
+ if command=='run' and 'involta_guide.infrastructure.voice.release_backup' in args:
+  if args[-1]=='needed':print(os.getenv('FAKE_VOICE_BACKUP','no'))
+  elif args[-1]=='backup':print('test-voice-dump')
+  elif args[-1]=='restore':sys.stdin.read()
+  sys.exit(0)
  if command=='run' and 'involta_guide.infrastructure.voice.shared_database' in args:
   sys.exit(1 if os.getenv('FAKE_SHARED_FAIL') else 0)
  if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
@@ -456,6 +461,7 @@ def test_combined_voice_rollout_and_rollback_use_matching_topology(tmp_path, fai
     options = dict(env)
     if failure == "after_copy":
         options["FAKE_FAIL_SHA"] = B
+        options["FAKE_VOICE_BACKUP"] = "yes"
     elif failure == "during_copy":
         options["FAKE_SHARED_FAIL"] = "1"
     result = deploy(root, options, B, "2-1")
@@ -469,6 +475,12 @@ def test_combined_voice_rollout_and_rollback_use_matching_topology(tmp_path, fai
         assert "Rollback to " + A + " succeeded" in result.stderr, result.stderr
         assert services["voice-api"]["sha"] == A and services["voice-consumer"]["sha"] == A
         assert "voice" not in services
+    if failure == "after_copy":
+        calls = [json.loads(line)[1] for line in Path(str(state) + ".log").read_text().splitlines()]
+        assert any(
+            "involta_guide.infrastructure.voice.release_backup" in args and "restore" in args
+            for args in calls
+        )
     if failure == "during_copy":
         assert (root / ".env.voice").read_text() == source
         assert "voice-db" in services

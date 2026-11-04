@@ -129,7 +129,10 @@ def test_all_roles_share_normal_flow_retries_audio_and_private_debug(database, v
         assert second.status_code == 202, second.text
         assert upload().json()["reference"] == second.json()["reference"]
         assert queries.rows("reviews") == [] and queries.rows("jobs") == []
-        listing = client.get("/guide/voice/api/v1/submissions/mine?location=ivanovo").json()
+        from involta_guide.infrastructure.voice.consumer import Consumer
+
+        Consumer(engine, app.state.voice_client).once()
+        listing = client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()
         assert listing["content_epoch"] == 1
         history = listing["rows"]
         assert {r["reference"] for r in history} == {

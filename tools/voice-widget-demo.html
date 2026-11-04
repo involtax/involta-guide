@@ -68,7 +68,7 @@
           return json(
             options.method === "POST" ? { saved: true } : { events: [] },
           );
-        if (url.pathname.endsWith("/mine"))
+        if (url.pathname.endsWith("/reviews"))
           return json({
             content_epoch: 1,
             rows: [...submissions.values()].reverse().map((item) => ({

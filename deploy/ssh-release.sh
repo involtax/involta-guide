@@ -15,7 +15,7 @@ if [[ "$mode" != inspect && "$mode" != admin-password ]]; then
 fi
 DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT:-22}; DEPLOY_ROOT=${DEPLOY_ROOT:-/opt/involta-guide}
 PUBLIC_URL=${PUBLIC_URL:-https://involta.ru/guide/}
-[[ "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-backfill || "$mode" == voice-report ]] || exit 2
+[[ "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-report ]] || exit 2
 [[ "$DEPLOY_SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ && "$DEPLOY_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 2
 (( DEPLOY_SSH_PORT > 0 && DEPLOY_SSH_PORT < 65536 )) || exit 2
 [[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || exit 2

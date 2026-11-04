@@ -37,7 +37,6 @@ if Path(sys.argv[0]).name=='ssh':
         "admin-password",
         "voice-prepare",
         "voice-activate",
-        "voice-backfill",
         "voice-report",
     ],
 )

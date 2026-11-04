@@ -1,88 +1,34 @@
 {%extends 'admin_shell.html'%}
-{%from 'macros.html' import csrf with context%}
-{%macro decision_fields(action,proposal=None)%}
-{{csrf()}}<input type="hidden" name="idempotency_key" value="{{new_key()}}">
-<input type="hidden" name="action" value="{{action}}">
-<input type="hidden" name="review_revision" value="{{v.text.revision}}">
-<input type="hidden" name="processing_run" value="{{v.link.active_run if v.link else 0}}">
-<input type="hidden" name="page_revision" value="{{v.location.revision or ''}}">
-{%if proposal%}<input type="hidden" name="proposal_id" value="{{proposal.id}}"><input type="hidden" name="proposal_revision" value="{{proposal.revision}}">{%endif%}
-{%endmacro%}
-{%from 'admin_components.html' import status_label%}
 {%block admin_content%}
-<h2>Отзывы</h2>
-{%if voice_unavailable%}<p role="alert" class="notice admin-error">{{voice_unavailable}}. Сохранённые отзывы доступны ниже.</p>{%endif%}
-<details><summary>Доставка Voice: {{"работает" if consumer_health.healthy else "нет подтверждения / ошибка"}}</summary><pre>{{consumer_health|tojson(indent=2)}}</pre></details>
-{%if failed_deliveries%}<section class="panel"><h3>Ошибки доставки</h3>{%for event in failed_deliveries%}<article><p>Событие {{event.sequence}} · {{event.error}}</p><details><summary>Сохранённый вход для повтора</summary><pre class="audit-json">{{event.payload|tojson(indent=2)}}</pre></details><form method="post" action="{{settings.path('/admin/reviews/inbox/'+event.event_id+'/retry')}}">{{csrf()}}<button>Повторить доставку сохранённого события</button></form></article>{%endfor%}</section>{%endif%}
-<div class="voice-admin-layout">
-<aside class="admin-sidebar" aria-label="Очередь отзывов">
-<h2>Очередь · {{queue.total}}</h2>
-<form method="get" action="{{settings.path('/admin/reviews')}}" class="stack">
-<label>Локация<input name="q" value="{{q}}"></label>
-<label>Этап<select name="stage"><option value="">Все</option>{%for key,label in [('waiting-text','Ожидается текст'),('text-ready','Текст сохранён'),('analysis-ready','Анализ готов'),('failed','Ошибка обработки')]%}<option value="{{key}}" {%if stage_filter==key%}selected{%endif%}>{{label}}</option>{%endfor%}</select></label>
-<label>Модерация<select name="moderation"><option value="">Все</option>{%for value in ['pending','approved','rejected']%}<option value="{{value}}" {%if moderation==value%}selected{%endif%}>{{status_label(value)}}</option>{%endfor%}</select></label>
-<label>Предложение<select name="kind"><option value="">Все</option>{%for key,label in [('edit','Правка'),('restaurant','Новое заведение')]%}<option value="{{key}}" {%if proposal_kind==key%}selected{%endif%}>{{label}}</option>{%endfor%}</select></label>
-<label><input type="checkbox" name="repeat" value="1" {%if repeat_filter%}checked{%endif%}> Есть сигналы повторов</label><button>Найти</button>
+<section class="admin-browser review-browser" aria-label="Отзывы по городам">
+<aside class="admin-sidebar review-sidebar">
+<h2>Города</h2>
+<form method="get" action="{{settings.path('/admin/reviews')}}" role="search" class="stack">
+<label for="review-city-search">Поиск города</label>
+<input id="review-city-search" type="search" name="q" value="{{q}}" placeholder="Название города" hx-get="{{settings.path('/admin/reviews')}}" hx-trigger="input changed delay:350ms, search" hx-push-url="true">
 </form>
-{%for item in pending_voice%}<p><a href="{{settings.path('/admin/reviews/submission/'+item.reference)}}">{{item.location.name}} · {{status_label(item.state)}}</a></p>{%endfor%}
-{%for item in queue.rows%}
-<article class="admin-list-item {{'selected' if v and item.id|string==v.review.id|string else ''}}"><a href="{{settings.path(item.path)}}" {%if v and item.id|string==v.review.id|string%}aria-current="page"{%endif%}><strong>{{item.location_name}}{%if item.number%} / {{item.number}}{%endif%}</strong></a><p>{{item.created_at}} · {{status_label(item.moderation)}}</p><p>{{(item.editorial_text or item.transcript or 'Ожидается расшифровка')[:140]}}</p></article>
-{%else%}<p>Нет отзывов по выбранным условиям.</p>{%endfor%}
-<nav aria-label="Страницы отзывов">{%if queue.page>1%}<a href="?{{page_query(queue.page-1)}}">← Назад</a>{%endif%} {{queue.page}} / {{queue.pages}} {%if queue.page<queue.pages%}<a href="?{{page_query(queue.page+1)}}">Дальше →</a>{%endif%}</nav>
+<nav aria-label="Города с отзывами" class="review-cities">
+{%for city in feed.cities%}<a href="{{settings.path('/admin/reviews/'+city.slug)}}{%if q%}?q={{q|urlencode}}{%endif%}" class="review-city {{'selected' if feed.city and city.id==feed.city.id else ''}}" {%if feed.city and city.id==feed.city.id%}aria-current="page"{%endif%}><strong>{{city.name}}</strong><span>{{city.total}}</span></a>
+{%else%}<p class="admin-muted">{{'Города не найдены.' if q else 'Отзывов пока нет.'}}</p>{%endfor%}
+</nav>
 </aside>
-<section class="admin-detail" aria-label="Выбранный отзыв">
-{%if v%}
-<h2>{{v.location.name}} / {{v.review.number}}</h2>
-<p><a href="{{settings.path('/'+v.location.slug)}}" hx-boost="false">Открыть страницу ↗</a> · {{v.review.created_at}} · {{status_label(v.review.moderation)}}{%if v.review.fraud%} · Фрод{%endif%}</p>
-<audio controls preload="none" src="{{settings.path(v.path+'/audio')}}"></audio>
-{%include 'asr_comparison.html'%}<details><summary>Метаданные записи</summary><dl><dt>IP</dt><dd>{{v.review.ip}}</dd><dt>User-Agent</dt><dd>{{v.review.user_agent}}</dd><dt>guide_visitor</dt><dd>{{v.review.visitor}}</dd></dl></details>
-{%if v.text%}
-<section class="panel"><h3>Исходный текст отзыва</h3><blockquote>{{v.text.original_text}}</blockquote>
-<form method="post" action="{{settings.path(v.path+'/actions')}}" class="stack">{{decision_fields('edit-text')}}
-<label>Редакционная версия текста<textarea name="text" rows="5" required>{{v.text.editorial_text}}</textarea></label><button>Сохранить текст</button></form>
-<form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('bind')}}
-<label>Привязать отзыв к ресторану<select name="restaurant_id"><option value="">Ресторан пока не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id==v.text.restaurant_id%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку</button></form>
-</section><section class="panel"><h3>Решение по отзыву</h3><div class="button-row admin-decisions">{%for key,label in [('approve','Одобрить весь пакет'),('reject','Отклонить отзыв'),('fraud','Пометить фродом'),('reset','Вернуть на проверку')]%}
-<form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields(key)}}<label>Причина<input name="reason" maxlength="2000"></label><button class="{{'' if key=='approve' else 'secondary'}}">{{label}}</button></form>{%endfor%}</div>
-</section><section class="panel"><h3>Распознанные фрагменты и показатели</h3>
-{%for entry in (v.analysis or {}).get('entries',[])%}
-<article><h4>{{entry.restaurantName or 'Ресторан не определён'}}</h4><blockquote>{{entry.quote}}</blockquote>
-<p>Оценка: {{entry.rating if entry.rating is not none else 'не названа'}} · Тональность: {{entry.sentiment if entry.sentiment is not none else 'не определена'}} · Рекомендация: {{entry.recommendation if entry.recommendation is not none else 'не определена'}}</p><p>{{entry.experience}} · уверенность {{entry.confidence}}</p>
-{%if entry.candidates%}<p>Кандидаты: {%for r in v.restaurants%}{%if r.id|string in entry.candidates%}{{r.name}}; {%endif%}{%endfor%}</p>{%endif%}
-{%if v.link%}<form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('bind-fragment')}}<input type="hidden" name="fragment_number" value="{{loop.index0}}"><label>Ресторан этого фрагмента<select name="restaurant_id"><option value="">Не определён</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id|string==entry.restaurantId%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label><button>Сохранить привязку фрагмента</button></form>{%endif%}</article>
-{%else%}<p>Дополнительный анализ не содержит показателей. Текст отзыва сохранён и доступен для модерации.</p>{%endfor%}
-</section><h3>Необязательные предложения</h3>
-{%for p in v.proposals%}
-<article class="panel"><h4>{{'Новое заведение' if p.kind=='restaurant' else 'Правка карточки'}} · {{status_label(p.status)}} · обработка {{p.run}}</h4><p>{{p.payload.reason}}</p><blockquote>{{p.payload.quote or ''}}</blockquote>
-<dl>{%for field,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Ссылка на карту'),('phone','Телефон')]%}<dt>{{label}}: было</dt><dd>{{p.before.get('maps_url' if field=='mapsUrl' else field) or 'Не указано'}}</dd><dt>Предлагается</dt><dd>{{p.final.get(field) if p.final.get(field) is not none else 'Удалить значение'}}</dd>{%endfor%}</dl>
-{%if p.status=='pending' and (not v.link or p.run==v.link.active_run)%}
-<form method="post" action="{{settings.path(v.path+'/actions')}}" class="stack">{{decision_fields('edit-proposal',p)}}
-<label>Ресторан для правки<select name="restaurant_id"><option value="">{{'Создать новое заведение' if p.kind=='restaurant' else 'Выберите ресторан'}}</option>{%for r in v.restaurants%}<option value="{{r.id}}" {%if r.id|string==p.restaurant_id|string%}selected{%endif%}>{{r.name}}</option>{%endfor%}</select></label>
-{%for field,label in [('name','Название'),('cuisine','Кухня'),('description','Описание'),('mapsUrl','Ссылка на карту'),('phone','Телефон')]%}<label>{{label}} — конечное значение{%if field=='description'%}<textarea name="{{field}}">{{p.final.get(field) or ''}}</textarea>{%else%}<input name="{{field}}" value="{{p.final.get(field) or ''}}">{%endif%}</label>{%endfor%}
-<details><summary>Редактировать расписание</summary>
-<label><input type="checkbox" name="clear_hours" value="yes"> Удалить расписание</label>
-<label><input type="checkbox" name="hours_enabled" value="yes"> Применить интервалы ниже</label>
-{%set hours=p.final.openingHours or {}%}<label>Часовой пояс<input name="timezone" value="{{hours.get('timezone','Europe/Moscow')}}"></label>
-{%for day,label in [(0,'Понедельник'),(1,'Вторник'),(2,'Среда'),(3,'Четверг'),(4,'Пятница'),(5,'Суббота'),(6,'Воскресенье')]%}<fieldset><legend>{{label}}</legend>{%for slot in range(4)%}{%set pairs=hours.get('week',[[],[],[],[],[],[],[]])[day]%}<label>Начало {{slot+1}}<input type="time" name="hours_{{day}}_{{slot}}_start" value="{{pairs[slot][0] if pairs|length>slot else ''}}"></label><label>Конец {{slot+1}}<input type="time" name="hours_{{day}}_{{slot}}_end" value="{{pairs[slot][1] if pairs|length>slot else ''}}"></label>{%endfor%}</fieldset>{%endfor%}</details>
-<details><summary>Исключения по датам</summary>{%set exceptions=hours.get('exceptions',{}).items()|list%}
-{%for index in range([exceptions|length+1,11]|min)%}{%set date=exceptions[index][0] if index<exceptions|length else ''%}{%set pairs=exceptions[index][1] if index<exceptions|length else []%}
-<fieldset><legend>{{date or 'Добавить исключение'}}</legend><input type="hidden" name="exception_{{index}}_original" value="{{date}}"><label>Дата<input type="date" name="exception_{{index}}_date" value="{{date}}"></label><label><input type="checkbox" name="exception_{{index}}_remove" value="yes">Удалить исключение</label>{%for slot in range(4)%}<label>Начало<input type="time" name="exception_{{index}}_{{slot}}_start" value="{{pairs[slot][0] if pairs|length>slot else ''}}"></label><label>Конец<input type="time" name="exception_{{index}}_{{slot}}_end" value="{{pairs[slot][1] if pairs|length>slot else ''}}"></label>{%endfor%}</fieldset>{%endfor%}<p>Для применения исключений включите «Применить интервалы ниже» в расписании.</p></details>
-<label>Причина<input name="reason"></label><p>Редактируется пакет отзыва. Одобрение всего пакета сразу обновит страницу.</p><button>Сохранить правку пакета</button></form>
-<form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('exclude-proposal',p)}}<button>Убрать ошибочную правку из пакета</button></form>
-{%endif%}</article>{%else%}<p>Предложений нет. Это не мешает принять сам отзыв.</p>{%endfor%}
-{%else%}<section class="panel"><h3>Текст отзыва</h3><p>{{v.review.transcript or 'Ожидается расшифровка'}}</p>{%if v.review.error%}<p role="alert">{{v.review.error}}</p>{%endif%}</section>{%endif%}
-{%if v.link and v.text%}
-<section class="panel"><h3>Обработки</h3><form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('new-run')}}<button>Новая обработка с текущими настройками</button></form>
-{%if remote and remote.stages%}{%for number in remote.stages|map(attribute='run')|unique%}<p><a href="{{settings.path(v.path)}}/runs/{{number}}">Технический лог обработки {{number}} ↗</a></p>{%endfor%}{%endif%}
-{%for r in v.runs%}<p><a href="{{settings.path(v.path)}}/runs/{{r.run}}">Полный лог обработки {{r.run}} ↗</a></p><form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('activate-run')}}<input type="hidden" name="run" value="{{r.run}}"><button>Выбрать результат {{r.run}} для проверки</button></form>{%endfor%}
-<form method="post" action="{{settings.path(v.path+'/actions')}}">{{decision_fields('revalidate')}}<label>Номер обработки<input type="number" name="run" min="1" value="{{v.link.active_run}}" required></label><button>Проверить сохранённый ответ без OpenAI</button></form>
-</section>{%endif%}
-{%if remote%}<details {%if run_log%}open{%endif%}><summary>Технический статус и полный лог</summary><pre class="audit-json">{{remote|tojson(indent=2)}}</pre></details>{%endif%}
-<section class="panel"><h3>Применённые изменения страницы</h3><pre class="audit-json">{{v.changes|tojson(indent=2)}}</pre></section>
-<section class="panel"><h3>Журнал ручных решений</h3>{%for event in v.decisions%}<details><summary>{{event.created_at}} · {{event.actor}} · {{event.action}}</summary><p>Сессия {{event.session_id}} · {{event.reason}}</p><h4>До</h4><pre class="audit-json">{{event.before_data|tojson(indent=2)}}</pre><h4>После</h4><pre class="audit-json">{{event.after_data|tojson(indent=2)}}</pre></details>{%else%}<p>Ручных решений пока нет.</p>{%endfor%}
-</section>{%else%}<div class="admin-empty"><h2>Выберите отзыв</h2><p>Текст сохраняется до дополнительного анализа. Предложенные действия необязательны.</p></div>{%endif%}
-</section></div>
-{%if voice_settings%}<details class="panel admin-settings"><summary>Модели и промпт голоса</summary><form method="post" action="{{settings.path('/admin/reviews/settings')}}" class="stack">{{csrf()}}
-{%for field,label,category in [('transcription_model','Расшифровка','transcription'),('analysis_model','Разбор','analysis')]%}<label>{{label}}<select name="{{field}}">{%for model in voice_settings.models[category]%}<option value="{{model}}" {%if voice_settings[field]==model%}selected{%endif%}>{{model}}{{" · локальный ASR" if category=="transcription"}}</option>{%endfor%}</select></label>{%endfor%}
-<label>Промпт разбора<textarea name="prompt" rows="12">{{voice_settings.prompt}}</textarea></label><button>Сохранить настройки новых обработок</button></form></details>{%endif%}
+<div class="review-feed">
+{%if feed.city%}
+<header class="review-feed-heading"><div><h2>{{feed.city.name}}</h2><p class="admin-muted">{{feed.total}} {{'отзыв' if feed.total%10==1 and feed.total%100!=11 else 'отзыва' if feed.total%10 in [2,3,4] and feed.total%100 not in [12,13,14] else 'отзывов'}} · сначала новые</p></div><a href="{{settings.path('/'+feed.city.slug)}}" target="_blank" rel="noopener" hx-boost="false">Страница города ↗</a></header>
+{%if voice_unavailable%}<p role="status" class="admin-muted">Voice временно недоступен. Показаны сохранённые тексты GigaAM.</p>{%endif%}
+{%for review in feed.rows%}
+<article class="review-card" id="review-{{review.number}}" aria-label="Отзыв № {{review.number}}">
+<header class="review-top"><div class="review-label"><h3>Отзыв № {{review.number}}</h3><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}} UTC</time></div>
+{%if review.reference%}<audio controls preload="none" aria-label="Аудио отзыва № {{review.number}}" src="{{settings.path(review.path+'/audio')}}"></audio>{%else%}<span class="admin-muted">Аудио недоступно</span>{%endif%}
+<div class="review-actions"><a href="{{settings.path(review.log_path)}}" hx-boost="false" target="_blank" rel="noopener">Лог ↗</a><form method="post" action="{{settings.path(review.path+'/delete')}}">{{csrf()}}<button class="review-delete" aria-label="Удалить отзыв № {{review.number}}">Удалить</button></form></div></header>
+<dl class="review-transcripts">
+{%for candidate in review.pair%}<div><dt>{{candidate.name}}</dt><dd>{%if candidate.text%}{{candidate.text}}{%else%}<span class="admin-muted">{%if candidate.state=='running'%}Распознаётся…{%elif candidate.state=='queued'%}В очереди{%elif candidate.state in ['failed','unknown']%}Не удалось распознать. Подробности в логе.{%elif candidate.state=='unavailable'%}Временно недоступно{%else%}Результата пока нет{%endif%}</span>{%endif%}</dd></div>{%endfor%}
+</dl>
+<footer class="review-metadata">{{review.browser}} · {{review.ip}}{%if review.duration_seconds%} · {{review.duration_seconds|round(1)}} с{%endif%}</footer>
+</article>
+{%else%}<p class="admin-empty">В этом городе пока нет отзывов.</p>{%endfor%}
+{%if feed.pages>1%}<nav class="review-pagination" aria-label="Страницы отзывов">{%if feed.page>1%}<a href="{{settings.path('/admin/reviews/'+feed.city.slug)}}?{{page_query(feed.page-1)}}">← Новее</a>{%endif%}<span>{{feed.page}} / {{feed.pages}}</span>{%if feed.page<feed.pages%}<a href="{{settings.path('/admin/reviews/'+feed.city.slug)}}?{{page_query(feed.page+1)}}">Ещё отзывы ↓</a>{%endif%}</nav>{%endif%}
+{%else%}<p class="admin-empty">{{'Измените поиск города.' if q else 'Здесь появятся сохранённые голосовые отзывы.'}}</p>{%endif%}
+</div>
+</section>
 {%endblock%}

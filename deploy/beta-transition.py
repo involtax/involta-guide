@@ -375,11 +375,11 @@ e.dispose()
                 assert pending == 0, result
             self.log(service=service, pending_files=pending)
         current = self.guide_inventory(self.new)
-        assert current["revision"] == "filling_top3", current
+        assert current["revision"] == "review_stream", current
 
         for key in ("locations", "owned_restaurants", "stars"):
             assert current[key] == self.inventory[key], f"Inventory changed: {key}"
-        assert self.voice_sql("SELECT max(version) FROM voice_schema_versions").strip() == "5"
+        assert self.voice_sql("SELECT max(version) FROM voice_schema_versions").strip() == "6"
         assert self.voice_sql("SELECT count(*) FROM purge_files").strip() == "0"
         self.log(inventory=current)
 

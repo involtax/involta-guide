@@ -19,7 +19,7 @@ def login(client):
         headers={"origin": "http://testserver"},
     )
     assert result.status_code == 200, result.text
-    assert "Рабочий стол." in result.text
+    assert 'class="admin-tabs"' in result.text
     return token(result.text)
 
 

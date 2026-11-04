@@ -136,46 +136,45 @@ try:
         assert r.status_code == 202, r.text
         ref = r.json()["reference"]
         for _ in range(40):
-            status = c.get("/guide/voice/api/v1/submissions/" + ref).json()
-            if status.get("transcript") and status.get("editorial_state") == "pending":
+            rows = c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"]
+            status = next((r for r in rows if r["reference"] == ref), {})
+            if status.get("transcript"):
                 break
             time.sleep(1)
         assert status.get("transcript"), status
-        login = c.get("/guide/admin").text
-        csrf = re.search(r'name="_csrf" value="([^"]+)"', login).group(1)
-        r = c.post(
-            "/guide/admin/login",
-            headers={"origin": "http://127.0.0.1:33080"},
-            data={"_csrf": csrf, "password": "review-smoke-password"},
-        )
-        assert r.status_code in [200, 303], r.text
-        listing = c.get("/guide/admin/reviews").text
-        review_path = re.search(r'href="(/guide/admin/reviews/ivanovo/\d+)"', listing).group(1)
-        page = c.get(review_path).text
-        csrf = re.search(r'name="_csrf" value="([^"]+)"', page).group(1)
-        revision = re.search(r'name="review_revision" value="([^"]+)"', page).group(1)
-        r = c.post(
-            review_path + "/actions",
-            headers={"origin": "http://127.0.0.1:33080"},
-            data={
-                "_csrf": csrf,
-                "idempotency_key": str(uuid.uuid4()),
-                "review_revision": revision,
-                "processing_run": "1",
-                "action": "approve",
-            },
-        )
-        assert r.status_code in [200, 303], r.text
-        assert status.get("transcript"), status in c.get("/guide/ivanovo").text
+        assert status["transcript"] in c.get("/guide/ivanovo").text
+        assert c.get(status["log_url"]).status_code == 200
         stopping = time.monotonic()
         run(compose + ["stop", "voice"])
         elapsed = time.monotonic() - stopping
         print(f"Combined voice stopped in {elapsed:.2f}s")
         assert elapsed < 15
         assert c.get("/guide/ivanovo").status_code == 200
-        assert c.get("/guide/voice/api/v1/submissions/" + ref).json()["transcript"]
+        assert c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"][0]["transcript"]
+        login = c.get("/guide/admin").text
+        csrf = re.search(r'name="_csrf" value="([^"]+)"', login).group(1)
+        assert (
+            c.post(
+                "/guide/admin/login",
+                headers={"origin": "http://127.0.0.1:33080"},
+                data={"_csrf": csrf, "password": "review-smoke-password"},
+            ).status_code
+            == 200
+        )
+        listing = c.get("/guide/admin/reviews/ivanovo").text
+        csrf = re.search(r'name="_csrf" value="([^"]+)"', listing).group(1)
+        deletion = re.search(r'action="(/guide/admin/reviews/ivanovo/\d+/delete)"', listing).group(
+            1
+        )
+        assert (
+            c.post(
+                deletion, headers={"origin": "http://127.0.0.1:33080"}, data={"_csrf": csrf}
+            ).status_code
+            == 200
+        )
+        assert c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"] == []
         print(
-            "PASS: production host Compose, migrations, worker, consumer, review approval and offline history/HTML. Fake provider only."
+            "PASS: production host Compose, migrations, worker, consumer, public reviews, public logs, admin deletion and offline HTML. Fake provider only."
         )
 except Exception:
     subprocess.run(compose + ["logs", "--no-color", "--tail", "35"], env=environ)

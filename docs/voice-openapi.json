@@ -564,117 +564,6 @@
         }
       }
     },
-    "/internal/v1/admin/submissions/{reference}/runs": {
-      "post": {
-        "summary": "New Run",
-        "operationId": "new_run_internal_v1_admin_submissions__reference__runs_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "reference",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Reference"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true,
-                "title": "Body"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response New Run Internal V1 Admin Submissions  Reference  Runs Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/v1/admin/submissions/{reference}/runs/{number}/revalidate": {
-      "post": {
-        "summary": "Revalidate",
-        "operationId": "revalidate_internal_v1_admin_submissions__reference__runs__number__revalidate_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "reference",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Reference"
-            }
-          },
-          {
-            "name": "number",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response Revalidate Internal V1 Admin Submissions  Reference  Runs  Number  Revalidate Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/internal/v1/admin/submissions/{reference}/asr": {
       "get": {
         "summary": "Asr Report",
@@ -720,156 +609,19 @@
         }
       }
     },
-    "/internal/v1/admin/submissions/{reference}/asr-runs": {
+    "/internal/v1/admin/recognitions": {
       "post": {
-        "summary": "Asr Run",
-        "operationId": "asr_run_internal_v1_admin_submissions__reference__asr_runs_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "reference",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Reference"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AsrRun"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response Asr Run Internal V1 Admin Submissions  Reference  Asr Runs Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/v1/admin/submissions/{reference}/asr-runs/{number}/evaluation": {
-      "post": {
-        "summary": "Asr Vote",
-        "operationId": "asr_vote_internal_v1_admin_submissions__reference__asr_runs__number__evaluation_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "reference",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Reference"
-            }
-          },
-          {
-            "name": "number",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Evaluation"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response Asr Vote Internal V1 Admin Submissions  Reference  Asr Runs  Number  Evaluation Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/v1/admin/settings": {
-      "get": {
-        "summary": "Get Settings",
-        "operationId": "get_settings_internal_v1_admin_settings_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response Get Settings Internal V1 Admin Settings Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "put": {
-        "summary": "Put Settings",
-        "operationId": "put_settings_internal_v1_admin_settings_put",
+        "summary": "Recognitions",
+        "operationId": "recognitions_internal_v1_admin_recognitions_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
                 "title": "Body"
               }
             }
@@ -882,7 +634,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Put Settings Internal V1 Admin Settings Put"
+                  "title": "Response Recognitions Internal V1 Admin Recognitions Post"
                 }
               }
             }
@@ -908,83 +660,6 @@
   },
   "components": {
     "schemas": {
-      "AsrRun": {
-        "properties": {
-          "idempotency_key": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Idempotency Key"
-          },
-          "force": {
-            "type": "boolean",
-            "title": "Force",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "idempotency_key"
-        ],
-        "title": "AsrRun"
-      },
-      "Evaluation": {
-        "properties": {
-          "idempotency_key": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Idempotency Key"
-          },
-          "revision": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Revision"
-          },
-          "candidates_digest": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 64,
-            "title": "Candidates Digest"
-          },
-          "preferred_engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preferred Engine"
-          },
-          "reference_text": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 30000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Text"
-          },
-          "note": {
-            "type": "string",
-            "maxLength": 2000,
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "idempotency_key",
-          "revision",
-          "candidates_digest"
-        ],
-        "title": "Evaluation"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1183,12 +858,6 @@
               }
             ],
             "title": "Error"
-          },
-          "moderation": {
-            "type": "string",
-            "const": "pending",
-            "title": "Moderation",
-            "default": "pending"
           },
           "repeat_signals": {
             "additionalProperties": {

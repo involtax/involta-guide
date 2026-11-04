@@ -131,42 +131,25 @@ def test_acceptance_idempotency_ownership_and_service_auth(voice_database):
     assert len(list((settings.data_dir / "audio").glob("*.wav"))) == 1
 
 
-def test_transcript_is_committed_before_analysis_failure_and_survives_new_run(voice_database):
+def test_primary_commits_without_analysis_or_manual_approval(voice_database):
     settings, engine = voice_database
     service = VoiceService(engine, settings)
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
-
-    class BrokenAnalysis(FakeProvider):
-        calls = []
-
-        def call(self, kind, request, audio, mime):
-            self.calls.append(kind)
-            if kind == "analysis":
-                raise ProviderFailure("OpenAI HTTP 403")
-            return super().call(kind, request, audio, mime)
-
-    provider = BrokenAnalysis()
-    assert Worker(engine, settings, provider).once()
-    with engine.connect() as conn:
-        event = conn.execute(text("SELECT payload FROM outbox")).scalar_one()
-        assert event["kind"] == "transcript_ready" and event["transcript"]
-    assert Worker(engine, settings, provider).once()
+    worker = Worker(engine, settings, FakeProvider())
+    assert worker.once() and not worker.once()
     status = service.status(reference)
     assert status["transcript"] == "Был здесь сегодня, было вкусно."
-    assert status["state"] == "analysis_failed"
-    assert (settings.data_dir / "audio").iterdir()
-    service.new_run(reference)
-    assert Worker(engine, settings, FakeProvider()).once()
-    assert service.status(reference)["state"] == "result_ready"
+    assert status["state"] == "result_ready"
+    assert "moderation" not in status
     with engine.connect() as conn:
         assert (
-            conn.execute(
-                text("SELECT count(*) FROM stages WHERE kind='transcription'")
-            ).scalar_one()
-            == 1
+            conn.execute(text("SELECT count(*) FROM stages WHERE kind='analysis'")).scalar_one()
+            == 0
         )
-        assert conn.execute(text("SELECT count(*) FROM runs")).scalar_one() == 2
-    assert provider.calls == ["transcription", "analysis"]
+        assert conn.execute(text("SELECT kind FROM outbox ORDER BY sequence")).scalars().all() == [
+            "recording_received",
+            "gigaam_ready",
+        ]
 
 
 def test_expired_paid_attempt_is_unknown_not_automatically_submitted_twice(voice_database):
@@ -212,42 +195,15 @@ def test_saved_transcription_response_recovers_without_new_provider_call(voice_d
         worker.process(stage)
 
 
-def test_bad_audio_and_no_action_do_not_create_fake_ratings(voice_database):
+def test_bad_audio_does_not_create_a_review_and_primary_creates_no_ratings(voice_database):
     settings, engine = voice_database
     service = VoiceService(engine, settings)
     with pytest.raises(ValueError):
         service.submit(metadata(), b"not audio" * 30, "audio/webm")
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())
-    assert worker.once() and worker.once()
+    assert worker.once() and not worker.once()
     with engine.connect() as conn:
-        result = conn.execute(text("SELECT result FROM runs")).scalar_one()
-        assert result["outcome"] == "no_action" and result["entries"] == []
+        assert conn.execute(text("SELECT result FROM runs")).scalar_one() is None
         assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 2
     assert service.status(reference)["transcript"]
-
-
-def test_manual_revalidation_recovers_saved_transcription_without_paid_retry(voice_database):
-    settings, engine = voice_database
-    service = VoiceService(engine, settings)
-    ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
-    worker = Worker(engine, settings, FakeProvider())
-    assert worker.claim()
-    with engine.begin() as conn:
-        conn.execute(
-            text("UPDATE stages SET state='unknown', raw_response=CAST(:raw AS jsonb)"),
-            {
-                "raw": json.dumps(
-                    {"status_code": 200, "body": json.dumps({"text": "Исходный отзыв"})}
-                )
-            },
-        )
-    worker.revalidate(ref, 1)
-    assert service.status(ref)["transcript"] == "Исходный отзыв"
-    with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM provider_calls")).scalar_one() == 0
-        assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 1
-        assert (
-            conn.execute(text("SELECT state FROM stages WHERE kind='analysis'")).scalar_one()
-            == "queued"
-        )

@@ -6,15 +6,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from involta_guide.domain.entities import Conflict
-from involta_guide.infrastructure.security import Security
 from involta_guide.infrastructure.voice.client import VoiceClient
 from involta_guide.infrastructure.voice.consumer import Consumer
-from involta_guide.infrastructure.voice.editorial import Decision, VoiceEditorial
 from involta_guide.main import create_app as guide_app
 from involta_voice.contracts import LocationContext
 from involta_voice.main import create_app as voice_app
-from involta_voice.provider import FakeProvider, ProviderFailure
+from involta_voice.provider import FakeProvider
 from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
 
@@ -37,8 +34,8 @@ def client_for(guide_settings, voice_settings):
     return VoiceClient(guide_settings, httpx.MockTransport(handle))
 
 
-def test_text_import_survives_analysis_failure_replay_and_rejection(database, voice_database):
-    settings, engine, uow, queries, city, _, _ = setup(database)
+def test_received_then_primary_import_is_automatic_and_replay_safe(database, voice_database):
+    settings, engine, _, queries, city, _, _ = setup(database)
     voice_settings, voice_engine = voice_database
     settings = settings.model_copy(update={"voice_service_secret": voice_settings.service_secret})
     data = metadata().model_copy(
@@ -49,52 +46,23 @@ def test_text_import_survives_analysis_failure_replay_and_rejection(database, vo
         }
     )
     service = VoiceService(voice_engine, voice_settings)
-    reference = service.submit(data, recording(), "audio/wav")["reference"]
-
-    class Failure(FakeProvider):
-        def call(self, kind, *args):
-            if kind == "analysis":
-                raise ProviderFailure("OpenAI HTTP 403")
-            return super().call(kind, *args)
-
-    assert Worker(voice_engine, voice_settings, Failure()).once()
+    ref = service.submit(data, recording(), "audio/wav")["reference"]
     consumer = Consumer(engine, client_for(settings, voice_settings))
     assert consumer.once() == 1
-    assert Worker(voice_engine, voice_settings, Failure()).once()
-    stored = queries.get("review_texts", reference)
-    assert stored["original_text"] == stored["editorial_text"] == "Был здесь сегодня, было вкусно."
-    assert queries.get("reviews", reference)["moderation"] == "pending"
-    assert queries.get("reviews", reference)["result"]["entries"] == []
+    assert queries.get("reviews", ref)["transcript"] is None
+    from involta_guide.infrastructure.voice.read_model import VoiceReadModel
+
+    read = VoiceReadModel(engine)
+    assert read.listing()["total"] == 1
+    assert read.public_texts(city["id"])[0]["state"] == "accepted"
+    assert Worker(voice_engine, voice_settings, FakeProvider()).once()
     assert consumer.once() == 1
     assert consumer.once() == 0
-    with voice_engine.connect() as conn:
-        event = (
-            conn.execute(text("SELECT sequence,payload FROM outbox WHERE kind='transcript_ready'"))
-            .mappings()
-            .one()
-        )
-    assert consumer.import_event({"sequence": event["sequence"], **event["payload"]}) == 0
-    session = Security(settings, uow).login("test-password-123456", "test-ip")
-    principal = Security(settings, uow).principal(session)
-    command = Decision(
-        idempotency_key=uuid4(), review_revision=1, processing_run=1, action="reject"
-    )
-    editorial = VoiceEditorial(engine)
-    result = editorial.decide(reference, command, principal["id"])
-    assert editorial.decide(reference, command, principal["id"]) == result
-    assert queries.get("reviews", reference)["moderation"] == "rejected"
-    assert queries.get("review_texts", reference)["original_text"] == stored["original_text"]
-    assert service.storage.path(
-        next((voice_settings.data_dir / "audio").glob("*.wav")).name
-    ).exists()
-    with pytest.raises(Conflict):
-        editorial.decide(
-            reference,
-            command.model_copy(update={"idempotency_key": uuid4(), "action": "approve"}),
-            principal["id"],
-        )
+    assert read.public_texts(city["id"])[0]["transcript"] == "Был здесь сегодня, было вкусно."
+    assert queries.rows("review_texts") == []
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 1
+        assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 0
+    assert service.status(ref)["state"] == "delivered_to_guide"
 
 
 def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, voice_database):
@@ -129,18 +97,9 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         reference = result.json()["reference"]
         owner_cookie = client.cookies.get("guide_visitor")
         assert upload().json()["reference"] == reference
-        initial_status = client.get("/guide/voice/api/v1/submissions/" + reference)
-        assert initial_status.status_code == 200
-        intake_created_at = initial_status.json()["created_at"]
+        intake_created_at = result.json()["created_at"]
         client.cookies.clear()
-        assert client.get("/guide/voice/api/v1/submissions/" + reference).status_code == 404
-        assert (
-            client.post(
-                "/guide/voice/api/v1/identity?location=ivanovo", headers=headers
-            ).status_code
-            == 200
-        )
-        assert client.get("/guide/voice/api/v1/submissions/" + reference).status_code == 404
+        assert client.get("/guide/voice/api/v1/reviews?location=ivanovo").status_code == 200
         assert (
             client.post(
                 "/guide/voice/api/v1/submissions", headers={"origin": "https://other.example"}
@@ -154,18 +113,12 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         assert "attacker" not in json.dumps(meta)
     assert queries.rows("jobs") == []
     worker = Worker(voice_engine, voice_settings, FakeProvider())
-    assert worker.once() and worker.once()
+    assert worker.once() and not worker.once()
     Consumer(engine, client_for(settings, voice_settings)).once()
     with TestClient(app) as client:
         client.cookies.set("guide_visitor", owner_cookie)
-        assert (
-            client.get("/guide/voice/api/v1/submissions/" + reference).json()["created_at"]
-            == intake_created_at
-        )
-        online = client.get(
-            "/guide/voice/api/v1/submissions/mine", params={"location": city["slug"]}
-        )
-        assert online.json()["rows"][0]["created_at"] == intake_created_at
+        online = client.get("/guide/voice/api/v1/reviews", params={"location": city["slug"]})
+        assert online.json()["rows"][0]["created_at"] == intake_created_at.replace(" ", "T")
     # Imported history remains usable with its location filter when Voice is down.
     from involta_guide.infrastructure.voice.client import VoiceUnavailable
 
@@ -179,19 +132,15 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
     app.state.voice_client = Unavailable()
     with TestClient(app) as client:
         client.cookies.set("guide_visitor", owner_cookie)
-        history = client.get(
-            "/guide/voice/api/v1/submissions/mine", params={"location": city["slug"]}
-        )
+        history = client.get("/guide/voice/api/v1/reviews", params={"location": city["slug"]})
         assert history.status_code == 200
         assert history.json()["content_epoch"] == 1
         assert history.json()["rows"][0]["reference"] == reference
         assert history.json()["rows"][0]["transcript"]
-        offline_status = client.get("/guide/voice/api/v1/submissions/" + reference).json()
-        assert offline_status["transcript"]
-        assert history.json()["rows"][0]["created_at"] == str(
-            queries.get("reviews", reference)["created_at"]
+        assert (
+            history.json()["rows"][0]["created_at"]
+            == queries.get("reviews", reference)["created_at"].isoformat()
         )
-        assert offline_status["created_at"] == history.json()["rows"][0]["created_at"]
         app.state.context.settings.voice_enabled = False
         assert (
             client.post(
@@ -199,16 +148,18 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
             ).status_code
             == 503
         )
-        assert client.get("/guide/voice/api/v1/submissions/" + reference).json()["transcript"]
+        assert client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"][0][
+            "transcript"
+        ]
 
 
-def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_moderation(
+def test_primary_before_receipt_and_legacy_fallback_never_replace_public_text(
     database, voice_database
 ):
-    settings, engine, uow, queries, city, _, _ = setup(database)
+    settings, engine, _, queries, city, _, _ = setup(database)
     voice_settings, voice_engine = voice_database
     settings = settings.model_copy(update={"voice_service_secret": voice_settings.service_secret})
-    meta = metadata().model_copy(
+    data = metadata().model_copy(
         update={
             "location": LocationContext(
                 id=city["id"], slug=city["slug"], name=city["name"], content_epoch=1
@@ -216,32 +167,24 @@ def test_out_of_order_analysis_creates_text_once_and_new_runs_do_not_undo_modera
         }
     )
     service = VoiceService(voice_engine, voice_settings)
-    ref = service.submit(meta, recording(), "audio/wav")["reference"]
-    worker = Worker(voice_engine, voice_settings, FakeProvider())
-    assert worker.once() and worker.once()
-    with voice_engine.connect() as conn:
-        events = [
-            {"sequence": r["sequence"], **r["payload"]}
-            for r in conn.execute(text("SELECT * FROM outbox ORDER BY sequence")).mappings()
-        ]
-    consumer = Consumer(engine, client_for(settings, voice_settings))
+    ref = service.submit(data, recording(), "audio/wav")["reference"]
+    assert Worker(voice_engine, voice_settings, FakeProvider()).once()
+    remote = client_for(settings, voice_settings)
+    events = remote.json("GET", "/events", params={"after": 0})["events"]
+    consumer = Consumer(engine, remote)
     assert consumer.import_event(events[1]) == 1
     assert consumer.import_event(events[0]) == 1
+    legacy = {
+        **events[1],
+        "event_id": str(uuid4()),
+        "sequence": events[1]["sequence"] + 1,
+        "kind": "transcript_ready",
+        "transcript": "Старый fallback Parakeet",
+    }
+    assert consumer.import_event(legacy) == 1
+    assert queries.get("reviews", ref)["transcript"] == "Был здесь сегодня, было вкусно."
+    assert queries.get("reviews", ref)["status"] == "transcribed"
     assert len(queries.rows("reviews")) == 1
-    principal = Security(settings, uow).principal(
-        Security(settings, uow).login("test-password-123456", "test")
-    )
-    VoiceEditorial(engine).decide(
-        ref,
-        Decision(idempotency_key=uuid4(), review_revision=2, processing_run=1, action="approve"),
-        principal["id"],
-    )
-    service.new_run(ref)
-    assert worker.once()
-    assert consumer.once() == 1
-    assert queries.get("reviews", ref)["moderation"] == "approved"
-    assert queries.get("voice_links", ref)["active_run"] == 1
-    assert queries.get("review_texts", ref)["revision"] == 3
 
 
 def test_ack_loss_after_commit_and_concurrent_replay_create_one_review(database, voice_database):
@@ -278,4 +221,36 @@ def test_ack_loss_after_commit_and_concurrent_replay_create_one_review(database,
     assert results == [0, 0]
     assert len(queries.rows("reviews")) == 1
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM voice_inbox")).scalar_one() == 1
+        assert conn.execute(text("SELECT count(*) FROM voice_inbox")).scalar_one() == 2
+
+
+def test_ready_primary_is_not_hidden_by_a_received_record_while_consumer_catches_up(
+    database, voice_database
+):
+    settings, engine, _, _, city, _, _ = setup(database)
+    voice_settings, voice_engine = voice_database
+    settings = settings.model_copy(update={"voice_service_secret": voice_settings.service_secret})
+    visitor = str(uuid4())
+    data = metadata().model_copy(
+        update={
+            "visitor": visitor,
+            "location": LocationContext(
+                id=city["id"], slug=city["slug"], name=city["name"], content_epoch=1
+            ),
+        }
+    )
+    VoiceService(voice_engine, voice_settings).submit(data, recording(), "audio/wav")["reference"]
+    remote = client_for(settings, voice_settings)
+    assert Consumer(engine, remote).once() == 1
+    assert Worker(voice_engine, voice_settings, FakeProvider()).once()
+    app = guide_app(settings)
+    app.state.voice_client = remote
+    with TestClient(app) as client:
+        client.cookies.set("guide_visitor", visitor)
+        pending = client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"][0]
+        assert pending["state"] == "accepted"
+        assert Consumer(engine, remote).once() == 1
+        assert client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"][0][
+            "transcript"
+        ]
+    assert Consumer(engine, remote).once() == 0

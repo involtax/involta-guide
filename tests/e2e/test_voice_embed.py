@@ -25,7 +25,7 @@ def test_native_recording_sends_once_and_transcription_stays_in_reviews():
             route.fulfill(content_type="application/javascript", body=widget)
         elif path.endswith("/identity"):
             route.fulfill(json={"ready": True, "content_epoch": 1})
-        elif path.endswith("/mine"):
+        elif path.endswith("/reviews"):
             if rows:
                 reads += 1
                 if reads >= 2:

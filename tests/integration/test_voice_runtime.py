@@ -134,7 +134,7 @@ def test_combined_voice_delivers_once_and_stops_without_waiting_for_backoff(shar
     service = VoiceService(storage, settings)
     reference = service.submit(meta, recording(), "audio/wav")["reference"]
     worker = Worker(storage, settings, FakeProvider())
-    assert worker.once() and worker.once()
+    assert worker.once() and not worker.once()
     for _ in range(2):
         with server(shared_voice, tmp_path, "involta_guide.infrastructure.voice.runtime") as (
             process,

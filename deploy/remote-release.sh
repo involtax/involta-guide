@@ -132,8 +132,14 @@ stop_guide_writers() {
 }
 restore_cutover_database() {
   local backup="$DEPLOY_ROOT/releases/$target_sha/pre-cutover.$deployment_id.dump"
-  [[ -f "$backup" ]] || return 0
+  local voice_backup="$DEPLOY_ROOT/releases/$target_sha/pre-voice-stream.$deployment_id.dump"
+  [[ -f "$backup" || -f "$voice_backup" ]] || return 0
   stop_guide_writers "$target_sha" "$target_image" || return 1
+  if [[ -f "$voice_backup" ]]; then
+    compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+      python -m involta_guide.infrastructure.voice.release_backup restore < "$voice_backup" || return 1
+  fi
+  [[ -f "$backup" ]] || return 0
   compose "$target_sha" "$target_image" run --rm --no-deps -T web \
     python -m involta_guide.infrastructure.persistence.release_backup restore < "$backup" || return 1
 }
@@ -151,13 +157,6 @@ restore_previous() {
   restore_cutover_database || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
-  compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
-  wait_health "$previous_sha" "$previous_image" web || return 1
-  check_local "$previous_sha" || return 1
-  # An older worker must not turn a pending background GET into another paid POST.
-  compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
-  compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
-  wait_health "$previous_sha" "$previous_image" worker || return 1
   # Use the previous service definitions too: old images do not contain the
   # combined runtime. The shared Voice DB URL remains backward compatible.
   if [[ -f "$DEPLOY_ROOT/releases/$previous_sha/compose.voice.yaml" ]]; then
@@ -168,10 +167,14 @@ restore_previous() {
       compose "$previous_sha" "$previous_image" up -d --no-build --no-deps "$service" || return 1
       wait_health "$previous_sha" "$previous_image" "$service" || return 1
     done < <(voice_services "$previous_sha" "$previous_image")
-    compose "$previous_sha" "$previous_image" up -d --no-build --no-deps web worker || return 1
-    wait_health "$previous_sha" "$previous_image" web || return 1
-    wait_health "$previous_sha" "$previous_image" worker || return 1
   fi
+  compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
+  wait_health "$previous_sha" "$previous_image" web || return 1
+  check_local "$previous_sha" || return 1
+  # An older worker must not turn a pending background GET into another paid POST.
+  compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
+  compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
+  wait_health "$previous_sha" "$previous_image" worker || return 1
   write_state "$state_file" "$previous_sha" "$previous_image" "$previous_id"
 }
 # Never let Compose adopt a foreign container even if its name collides with ours.
@@ -282,6 +285,17 @@ if [[ "$VOICE_STACK" == 1 ]]; then
     if grep -qx voice-consumer <<< "$old_services"; then
       compose "$previous_sha" "$previous_image" rm --force voice-api voice-consumer
     fi
+  fi
+  voice_needs_backup=$(compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+    python -m involta_guide.infrastructure.voice.release_backup needed)
+  if [[ "$voice_needs_backup" == yes ]]; then
+    voice_backup="$release_dir/pre-voice-stream.$deployment_id.dump"
+    compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+      python -m involta_guide.infrastructure.voice.release_backup backup > "$voice_backup.tmp"
+    [[ -s "$voice_backup.tmp" ]] || { echo 'Empty Voice backup; migration refused' >&2; false; }
+    mv -f -- "$voice_backup.tmp" "$voice_backup"
+  elif [[ "$voice_needs_backup" != no ]]; then
+    echo 'Cannot determine Voice schema compatibility' >&2; false
   fi
   compose "$target_sha" "$target_image" run --rm voice-migrate
   compose "$target_sha" "$target_image" run --rm voice-prepare-model

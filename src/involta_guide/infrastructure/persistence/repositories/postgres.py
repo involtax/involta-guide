@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from involta_guide.application.ports.repositories import Record
 from involta_guide.domain.entities import RuleViolation
-from involta_guide.domain.rules import KINDS, similarity
+from involta_guide.domain.rules import KINDS
 
 from ..models import Base
 
@@ -259,7 +259,7 @@ class PostgresRepository:
             FROM voice_fragments f LEFT JOIN review_fragment_bindings b USING(review_id,run,number)
             WHERE f.review_id=v.id AND f.run=vl.active_run AND CASE WHEN b.review_id IS NOT NULL
             THEN b.restaurant_id ELSE f.restaurant_id END=r.id)))
-           FROM reviews v JOIN voice_links vl ON vl.review_id=v.id WHERE v.location_id=l.id AND EXISTS(
+           FROM reviews v JOIN voice_links vl ON vl.review_id=v.id WHERE v.location_id=l.id AND v.status<>'deleted' AND EXISTS(
             SELECT 1 FROM voice_fragments f LEFT JOIN review_fragment_bindings b USING(review_id,run,number)
             WHERE f.review_id=v.id AND f.run=vl.active_run AND CASE WHEN b.review_id IS NOT NULL
             THEN b.restaurant_id ELSE f.restaurant_id END=r.id)) reviews,
@@ -273,39 +273,18 @@ class PostgresRepository:
         result = self.query(
             "SELECT count(*) total,count(*) FILTER (WHERE initialized_at IS NULL) empty,count(*) FILTER (WHERE initialized_at IS NOT NULL) published FROM locations"
         )[0]
-        result["pending_reviews"] = self.query(
-            "SELECT count(*) n FROM reviews WHERE moderation='pending'"
-        )[0]["n"]
+        result["reviews"] = self.query("SELECT count(*) n FROM reviews WHERE status<>'deleted'")[0][
+            "n"
+        ]
         result["jobs"] = self.query("SELECT status,count(*) n FROM jobs GROUP BY status")
         result["usage"] = self.query(
             "SELECT count(*) calls,coalesce(sum(input_tokens),0) input_tokens,coalesce(sum(output_tokens),0) output_tokens FROM ai_usage WHERE created_at>=CURRENT_DATE"
         )[0]
         return result
 
-    def signals(self, review: Record) -> list[Record]:
-        matches = []
-        for other in self.rows("reviews", limit=500):
-            if other["id"] == review["id"]:
-                continue
-            ratio = similarity(review["transcript"], other["transcript"])
-            same = other["hash"] == review["hash"]
-            visitor = other["visitor"] == review["visitor"]
-            ip = other["ip"] == review["ip"]
-            if ratio >= 0.45 or same or visitor or ip:
-                matches.append(
-                    {
-                        **other,
-                        "similarity": ratio,
-                        "sameAudio": same,
-                        "sameVisitor": visitor,
-                        "sameIp": ip,
-                    }
-                )
-        return sorted(matches, key=lambda row: (-row["sameAudio"], -row["similarity"]))[:20]
-
     def phone_proposals(self) -> list[Record]:
         return self.query(
-            """SELECT p.restaurant_id restaurant_id,p.payload->>'phone' phone,max(r.name) restaurant_name,max(r.phone) current_phone,count(*) messages,count(DISTINCT v.visitor) visitors,count(DISTINCT v.ip) networks,count(*) FILTER (WHERE v.fraud=1) fraud,count(*) FILTER (WHERE v.moderation='approved' AND v.fraud=0) approved,jsonb_agg(jsonb_build_object('reviewId',v.id,'date',v.created_at,'reason',p.payload->>'reason','status',p.status)) evidence FROM proposals p JOIN reviews v ON v.id=p.review_id LEFT JOIN restaurants r ON r.id=p.restaurant_id WHERE coalesce(p.payload->>'phone','')<>'' GROUP BY p.restaurant_id,p.payload->>'phone' ORDER BY max(v.created_at) DESC LIMIT 200"""
+            """SELECT p.restaurant_id restaurant_id,p.payload->>'phone' phone,max(r.name) restaurant_name,max(r.phone) current_phone,count(*) messages,count(DISTINCT v.visitor) visitors,count(DISTINCT v.ip) networks,count(*) FILTER (WHERE v.fraud=1) fraud,count(*) FILTER (WHERE v.moderation='approved' AND v.fraud=0) approved,jsonb_agg(jsonb_build_object('reviewId',v.id,'date',v.created_at,'reason',p.payload->>'reason','status',p.status)) evidence FROM proposals p JOIN reviews v ON v.id=p.review_id LEFT JOIN restaurants r ON r.id=p.restaurant_id WHERE v.status<>'deleted' AND coalesce(p.payload->>'phone','')<>'' GROUP BY p.restaurant_id,p.payload->>'phone' ORDER BY max(v.created_at) DESC LIMIT 200"""
         )
 
     def queue(self, values: Record) -> bool:

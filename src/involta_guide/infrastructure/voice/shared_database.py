@@ -49,7 +49,6 @@ def consolidate(settings: Settings, source_url: str | None) -> str:
                 if origin[:3] == tuple(destination):
                     if origin[3] != settings.database_schema:
                         raise RuntimeError("Shared database configured with the wrong Voice schema")
-                    migrate_connection(target)
                     return "shared"
                 existed = (
                     target.execute(
@@ -61,8 +60,8 @@ def consolidate(settings: Settings, source_url: str | None) -> str:
                 version = source.execute(
                     "SELECT max(version) FROM voice_schema_versions"
                 ).fetchone()
-                if not version or version[0] != 5:
-                    raise RuntimeError("Expected Voice schema version 5 before consolidation")
+                if not version or version[0] not in (5, 6):
+                    raise RuntimeError("Expected Voice schema version 5 or 6 before consolidation")
                 source_schema = origin[3]
                 source_tables = {
                     r[0]
@@ -71,7 +70,7 @@ def consolidate(settings: Settings, source_url: str | None) -> str:
                     )
                 }
                 if not existed:
-                    migrate_connection(target)
+                    migrate_connection(target, version=version[0])
                 inspector = inspect(target)
                 tables = inspector.get_table_names(schema=settings.database_schema)
                 if set(tables) != source_tables:

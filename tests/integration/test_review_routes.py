@@ -41,8 +41,8 @@ def test_review_numbers_survive_sorting_slug_changes_and_concurrent_creation(dat
         login(client)
         page = client.get("/guide" + path)
         assert page.status_code == 200, page.text
-        assert page.text.count('aria-label="Сравнение распознавания"') == 1
-        assert "<h4>GigaAM</h4>" in page.text and "<h4>Parakeet</h4>" in page.text
+        assert page.text.count('class="review-transcripts"') == 8
+        assert "<dt>GigaAM</dt>" in page.text and "<dt>Parakeet</dt>" in page.text
         assert "admin.css" in page.text and "?tab=" not in page.text
         assert client.get("/guide" + path, headers={"HX-Request": "true"}).status_code == 200
         for route in ("/admin/reviews", "/admin/reviews?page=2", path):
@@ -91,33 +91,14 @@ def test_saved_model_comparison_survives_settings_failure_and_shows_outages(data
             calls.append((method, path))
             if path == "/admin/settings" or self.failed:
                 raise VoiceUnavailable("Сервис временно недоступен")
-            assert path.endswith("/asr")
+            assert path == "/admin/recognitions"
             return {
-                "runs": [
-                    {
-                        "run": 1,
-                        "source_engine": "gigaam",
-                        "digest": "test",
-                        "evaluation": None,
-                        "candidates": [
-                            {
-                                "name": name,
-                                "engine": engine,
-                                "state": "done",
-                                "revision": "test",
-                                "text": phrase,
-                                "error": "",
-                                "seconds": 1,
-                                "rtf": 1,
-                                "wer": None,
-                                "cer": None,
-                            }
-                            for name, engine, phrase in [
-                                ("GigaAM", "gigaam", "Первый сохранённый текст"),
-                                ("Parakeet", "parakeet", "Второй сохранённый текст"),
-                            ]
-                        ],
-                    }
+                str(review["id"]): [
+                    {"name": name, "text": phrase, "state": "completed"}
+                    for name, phrase in [
+                        ("GigaAM", "Первый сохранённый текст"),
+                        ("Parakeet", "Второй сохранённый текст"),
+                    ]
                 ]
             }
 
@@ -133,7 +114,7 @@ def test_saved_model_comparison_survives_settings_failure_and_shows_outages(data
         remote.failed = True
         unavailable = client.get(path)
         assert unavailable.status_code == 200
-        assert "<h4>GigaAM</h4>" in unavailable.text and "<h4>Parakeet</h4>" in unavailable.text
-        assert "Сервис сравнения временно недоступен" in unavailable.text
-    assert all(method == "GET" for method, _ in calls)
+        assert "<dt>GigaAM</dt>" in unavailable.text and "<dt>Parakeet</dt>" in unavailable.text
+        assert "Voice временно недоступен" in unavailable.text
+    assert all(method == "POST" and path == "/admin/recognitions" for method, path in calls)
     assert queries.rows("jobs") == []

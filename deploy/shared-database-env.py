@@ -19,10 +19,19 @@ def update(root: Path, release: Path) -> None:
         if line and not line.startswith("#") and "=" in line
     )
     parsed = urlsplit(values["DATABASE_URL"])
-    query = dict(parse_qsl(parsed.query))
-    query["options"] = query.get("options", "") + " -c search_path=voice"
-    url = urlunsplit(parsed._replace(query=urlencode(query, quote_via=quote)))
     path = root / ".env.voice"
+    voice_values = dict(
+        line.split("=", 1)
+        for line in path.read_text().splitlines()
+        if line and not line.startswith("#") and "=" in line
+    )
+    query = dict(parse_qsl(parsed.query))
+    query["options"] = (
+        query.get("options", "")
+        + " -c search_path="
+        + voice_values.get("VOICE_DATABASE_SCHEMA", "voice")
+    )
+    url = urlunsplit(parsed._replace(query=urlencode(query, quote_via=quote)))
     backup = release / "voice-env-before-shared-db"
     if not backup.exists():
         shutil.copyfile(path, backup)

@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
 from involta_guide.infrastructure.voice.shared_database import consolidate, digest
-from involta_voice.db import database, migrate
+from involta_voice.db import database, migrate_connection
 from involta_voice.provider import FakeProvider
 from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
@@ -22,7 +22,8 @@ def legacy_source(voice_database):
     settings, _ = voice_database
     settings = settings.model_copy(update={"database_schema": "public"})
     engine = database(settings)
-    migrate(engine)
+    with engine.begin() as conn:
+        migrate_connection(conn, version=5)
     try:
         yield settings, engine
     finally:
@@ -64,7 +65,7 @@ def test_transfer_preserves_audio_events_sequences_and_old_client_access(
     service = VoiceService(engine, settings)
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())
-    assert worker.once() and worker.once()
+    assert worker.once() and not worker.once()
     assert consolidate(shared_target, source_url(settings)) == "imported"
     assert consolidate(shared_target, source_url(settings)) == "verified"
     target = database(shared_target)
