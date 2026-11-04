@@ -1,3 +1,4 @@
+from textwrap import shorten
 from urllib.parse import urlencode
 from uuid import UUID
 from xml.sax.saxutils import escape
@@ -376,6 +377,10 @@ def routes(prefix: str) -> APIRouter:
         public_reviews = VoiceReadModel(ctx.engine).public_texts(c["id"])
         request.state.audience_page = True
         title = "Где поесть " + (c["in_phrase"] or "в " + c["name"])
+        description = (
+            title + ": короткая подборка ресторанов, кухня и причины зайти. " + c["region"]
+        )
+        preview = shorten(data["content"].get("intro") or "", width=200, placeholder="…")
         breadcrumbs = [{"name": "Все локации", "slug": ""}, *data["parents"], c]
         structured = [
             {
@@ -426,9 +431,8 @@ def routes(prefix: str) -> APIRouter:
                 **data,
                 "settings": ctx.settings,
                 "title": title + " — Инвольта гид",
-                "description": title
-                + ": короткая подборка ресторанов, кухня и причины зайти. "
-                + c["region"],
+                "description": description,
+                "og_description": preview or description,
                 "canonical": ctx.settings.url("/" + c["slug"]),
                 "kinds": KINDS,
                 "days": DAYS,
