@@ -127,7 +127,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     release_backup.main()
     assert capsys.readouterr().out.strip() == "yes"
     command.upgrade(config, "head")
-    new_prompt = (settings.root_dir / "data/prompts/restaurant-research-v3.txt").read_text()
+    new_prompt = (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
     assert queries.setting("prompt") == new_prompt
     assert queries.get("jobs", untouched["id"])["prompt"] == new_prompt
     assert queries.get("jobs", submitted["id"])["prompt"] == old_prompt

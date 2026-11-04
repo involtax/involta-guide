@@ -173,7 +173,7 @@ def test_untrusted_link_is_never_promoted_to_sources():
 
 
 def test_research_prompt_has_one_contract_and_city_voice():
-    prompt = (FIXTURE.parents[2] / "data/prompts/restaurant-research-v3.txt").read_text()
+    prompt = (FIXTURE.parents[2] / "data/prompts/restaurant-research-v4.txt").read_text()
     assert "candidates" in prompt and "sourceRefs" in prompt
     assert "личный рейтинг Алекса" in prompt
     assert "одно-два живых" in prompt
@@ -183,7 +183,7 @@ def test_research_prompt_has_one_contract_and_city_voice():
     assert "{лимит}" not in prompt and "Размер подборки определяется" not in prompt
 
 
-def test_manifest_cannot_hide_extra_discovered_names_in_warnings():
+def test_a_passing_mention_in_warnings_does_not_expand_the_selected_shortlist():
     raw = json.loads(FIXTURE.read_text())
     raw["candidateReview"] = [
         {"name": row["name"], "status": "verified", "reason": "Есть оценки"}
@@ -191,7 +191,7 @@ def test_manifest_cannot_hide_extra_discovered_names_in_warnings():
     ]
     result = process(raw)
     assert result["qualityReport"]["status"] == "partial"
-    assert any(row["name"] == "Бояре" for row in result["candidateReview"])
+    assert not any(row["name"] == "Бояре" for row in result["candidateReview"])
 
 
 def test_html_is_plain_text_and_embedded_code_is_not_published():

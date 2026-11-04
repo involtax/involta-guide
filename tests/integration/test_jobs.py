@@ -67,6 +67,8 @@ def provider_payload(content=None):
                 ]
             )
         )
+        # Provider fixtures model evidenced ratings, without performing any real web search.
+        sources = sources or ["https://example.com/fixture-evidence"]
         candidates.append(
             {
                 **{
@@ -93,7 +95,8 @@ def provider_payload(content=None):
                         "factor": e["factor"],
                         "reason": e["reason"],
                         "confidence": e["confidence"],
-                        "sourceRefs": [sources.index(url) + 1 for url in e.get("sources", [])],
+                        "sourceRefs": [sources.index(url) + 1 for url in e.get("sources", [])]
+                        or [1],
                     }
                     for e in ranking["evidence"]
                 ],
