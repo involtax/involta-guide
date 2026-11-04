@@ -1,0 +1,56 @@
+.prototype-label { color:var(--muted);font-size:11px; }
+.search-hero { padding-top:56px;padding-bottom:38px; }
+.search-hero h1 { margin-bottom:36px; }
+.destination-search { position:relative; }
+.destination-search label { display:block;font-size:20px;font-weight:400;margin-bottom:14px;letter-spacing:-.02em; }
+.search-control { position:relative;display:flex;align-items:center;border:1px solid var(--black);background:var(--paper);min-width:0; }
+.search-control:focus-within { outline:1px solid var(--black);outline-offset:0; }
+.search-symbol { flex:0 0 24px;width:24px;height:24px;margin-left:24px; }
+.search-control input { min-width:0;flex:1;width:auto;height:76px;border:0;padding:18px 20px;font-size:24px;font-weight:400;line-height:1.4;background:transparent; }
+.search-control input:focus { outline:none; }
+.search-control input::-webkit-search-cancel-button { -webkit-appearance:none; }
+.search-control input::placeholder { color:#858580;opacity:1; }
+.search-control button { flex-shrink:0; }
+.search-control .search-submit { align-self:stretch;display:flex;align-items:center;justify-content:center;gap:24px;min-width:156px;padding:16px 25px;font-size:16px;border:0;border-left:1px solid var(--black); }
+.search-clear { display:block;font-family:Arial,sans-serif;font-size:28px;line-height:1;padding:0;width:46px;height:46px;border:0;background:white;color:var(--muted); }
+.search-clear[hidden],.search-menu-footer[hidden] { display:none; }
+.search-clear:hover { color:var(--black); }
+.search-status { min-height:18px;margin:8px 0 0;font-size:12px;color:var(--muted); }
+.search-status:empty { visibility:hidden; }
+.search-intro { color:var(--muted);font-size:14px;line-height:1.7;margin:12px 0 0; }
+.search-hero + .cities { border-top:1px solid var(--line);padding-top:28px; }
+.search-hero + .cities .section-heading { margin-bottom:12px; }
+.destination-results { position:absolute;z-index:5;top:100%;left:-1px;right:-1px;margin:1px 0 0;padding:0;list-style:none;border:1px solid var(--black);border-top:0;background:var(--paper);max-height:min(440px,45dvh);overflow-y:auto;overscroll-behavior:contain; }
+.destination-results[hidden] { display:none; }
+.destination-result { display:flex;align-items:center;justify-content:space-between;min-height:72px;padding:13px 24px;border-bottom:1px solid var(--line);cursor:pointer; }
+.destination-result:last-child { border-bottom:0; }
+.destination-result[aria-selected="true"] { background:var(--soft); }
+.destination-result .result-name { display:block;font-size:18px;font-weight:400;line-height:1.4; }
+.destination-result .result-context { display:block;margin-top:3px;font-size:12px;color:var(--muted);line-height:1.5; }
+.destination-result .result-arrow { margin-left:18px;font-size:22px;line-height:1;color:var(--muted); }
+.destination-result mark { padding:0;background:transparent;color:inherit;font-weight:700; }
+.destination-results .search-empty { padding:25px 24px;color:var(--muted);font-size:14px;cursor:default; }
+.search-menu-footer { position:absolute;z-index:6;left:-1px;right:-1px;top:calc(100% + var(--menu-height,0px));border:1px solid var(--black);border-top:1px solid var(--line);background:var(--paper); }
+.search-menu-footer button { width:100%;display:flex;justify-content:space-between;align-items:center;color:var(--black);background:var(--paper);border:0;padding:14px 24px;font-size:13px;text-align:left; }
+.search-menu-footer button:hover { background:var(--soft);opacity:1; }
+.search-hero + .cities .city-link { padding-top:18px;padding-bottom:18px; }
+@media (max-width:650px) {
+  .prototype-label { max-width:76px;font-size:9px;line-height:1.5;text-align:right; }
+  .search-hero { padding-top:38px;padding-bottom:30px; }
+  .search-hero h1 { font-size:clamp(46px,12.5vw,72px);margin-bottom:28px; }
+  .search-hero .eyebrow { font-size:9px;letter-spacing:1.6px; }
+  .destination-search label { font-size:18px;margin-bottom:12px; }
+  .search-control input { height:64px;padding:15px 12px;font-size:18px; }
+  .search-symbol { margin-left:16px;width:20px;height:20px;flex-basis:20px; }
+  .search-control .search-submit { min-width:58px;width:58px;padding:12px;font-size:24px; }
+  .search-submit > span:first-child { display:none; }
+  .search-clear { width:36px;height:44px;font-size:24px; }
+  .search-intro { font-size:12px;line-height:1.7;margin-top:8px; }
+  .desktop-break { display:none; }
+  .destination-result { min-height:68px;padding:12px 16px; }
+  .destination-result .result-name { font-size:17px; }
+  .destination-result .result-context { font-size:11px; }
+  .search-menu-footer button { padding:14px 16px; }
+  .destination-results .search-empty { padding:22px 16px;font-size:13px; }
+  .search-hero + .cities { padding-top:24px; }
+}

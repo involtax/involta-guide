@@ -1,0 +1,78 @@
+// Interactive visual prototype only: test data, no Guide endpoint or production navigation.
+(() => {
+  const records = [
+    {name:'Великий Новгород',context:'Город · Новгородская область',alias:'Новгород',slug:'velikiy-novgorod'},
+    {name:'Нижний Новгород',context:'Город · Нижегородская область',alias:'Нижний',slug:'nizhniy-novgorod'},
+    {name:'Новосибирск',context:'Город · Новосибирская область',slug:'novosibirsk'},
+    {name:'Новороссийск',context:'Город · Краснодарский край',slug:'novorossiysk'},
+    {name:'Новомосковск',context:'Город · Тульская область',slug:'novomoskovsk'},
+    {name:'Новый Уренгой',context:'Город · Ямало-Ненецкий автономный округ',slug:'novyy-urengoy'},
+    {name:'Плёс',context:'Город · Ивановская область',slug:'plyos'},
+    {name:'Переславль-Залесский',context:'Город · Ярославская область',slug:'pereslavl-zalesskiy'},
+    {name:'Красная Поляна',context:'Направление · Краснодарский край',slug:'krasnaya-polyana'},
+    {name:'Красная Поляна',context:'Курорт · Эсто-Садок, Краснодарский край',slug:'kurort-krasnaya-polyana'},
+    {name:'Сочи',context:'Город · Краснодарский край',slug:'sochi'},
+    {name:'Иваново',context:'Город · Ивановская область',slug:'ivanovo'},
+  ];
+  const form=document.querySelector('.destination-search');
+  const input=document.querySelector('#destination');
+  const status=document.querySelector('#search-status');
+  const clear=document.querySelector('.search-clear');
+  const footer=document.querySelector('.search-menu-footer');
+  const unavailable=new URLSearchParams(location.search).get('state')==='error';
+  const normalize=text=>text.toLowerCase().replaceAll('ё','е').trim();
+  const safeHighlight=(element,text,query)=>{
+    const at=normalize(text).indexOf(normalize(query));
+    if(at<0){element.textContent=text;return;}
+    element.append(document.createTextNode(text.slice(0,at)));
+    const mark=document.createElement('mark');mark.textContent=text.slice(at,at+query.length);
+    element.append(mark,document.createTextNode(text.slice(at+query.length)));
+  };
+  let widget;
+  widget=new autoComplete({
+    selector:'#destination',wrapper:false,threshold:2,debounce:180,submit:true,
+    data:{src:async query=>unavailable?[]:records.filter(row=>normalize(row.name+' '+row.context+' '+(row.alias||'')).includes(normalize(query))),keys:['name'],cache:false},
+    searchEngine:()=> ' ',
+    resultsList:{class:'destination-results',maxResults:6,noResults:true,element:(list,data)=>{
+      if(!data.results.length){
+        const empty=document.createElement('li');empty.className='search-empty';empty.role='presentation';
+        empty.textContent=unavailable?'Подсказки временно недоступны.':'Не нашли такую локацию. Попробуйте другое название.';list.append(empty);
+      }
+      requestAnimationFrame(()=>{
+        form.style.setProperty('--menu-height',list.getBoundingClientRect().height+'px');
+      });
+      status.textContent=data.results.length?`Подсказок: ${data.results.length}`:'Ничего не найдено';
+    }},
+    resultItem:{class:'destination-result',element:(li,data)=>{
+      li.replaceChildren();
+      const text=document.createElement('span');
+      const title=document.createElement('span');title.className='result-name';
+      safeHighlight(title,data.value.name,input.value);
+      const context=document.createElement('span');context.className='result-context';context.textContent=data.value.context;
+      text.append(title,context);
+      const arrow=document.createElement('span');arrow.className='result-arrow';arrow.textContent='→';arrow.ariaHidden='true';
+      li.append(text,arrow);
+    }},
+    events:{input:{
+      selection:event=>{
+        const selected=event.detail.selection.value;
+        input.value=selected.name;input.dataset.selected=selected.slug;widget.close();
+        status.textContent='Демонстрация выбора: '+selected.name;clear.hidden=false;
+      },
+      keydown:event=>{
+        if(event.isComposing)return;
+        if(event.key==='Escape'){event.preventDefault();widget.close();return;}
+        if(!widget.isOpen)return;
+        if(event.key==='ArrowDown'){event.preventDefault();widget.next();}
+        else if(event.key==='ArrowUp'){event.preventDefault();widget.previous();}
+        else if(event.key==='Enter'&&widget.cursor>=0){event.preventDefault();widget.select(widget.cursor);}
+      },
+      open:()=>{footer.hidden=false;},
+      close:()=>{footer.hidden=true;}
+    }}
+  });
+  input.setAttribute('aria-autocomplete','list');
+  input.addEventListener('input',()=>{clear.hidden=!input.value;delete input.dataset.selected;if(input.value.length<2){widget.close();status.textContent='';}});
+  clear.addEventListener('click',()=>{input.value='';widget.close();clear.hidden=true;status.textContent='';input.focus();});
+  form.addEventListener('submit',event=>{event.preventDefault();widget.close();status.textContent='Демонстрация поиска: '+input.value;input.dataset.submitted=input.value;});
+})();
