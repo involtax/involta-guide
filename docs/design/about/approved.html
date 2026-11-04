@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Три голоса — эксперимент с типографикой</title><style>
+:root{color-scheme:light;--ink:#151515;--muted:#747474;--line:#dededb}
+*{box-sizing:border-box}body{margin:0;background:white;color:var(--ink);font:15px/1.6 Arial,Helvetica,sans-serif}
+a{color:inherit;text-decoration:none}a:focus-visible{outline:2px solid #151515;outline-offset:5px}
+.header{padding:22px 25px;border-bottom:1px solid var(--line);max-width:1360px;margin:auto}
+.brand{display:inline-flex;align-items:baseline;gap:7px;font-size:28px;letter-spacing:-1.5px;font-weight:700;line-height:1.4}
+.brand i{font-family:Georgia,serif;font-weight:400}.brand small{font-size:9px;font-weight:400;letter-spacing:1.1px;text-transform:uppercase;margin-left:14px;align-self:flex-start;padding-top:9px}
+main{padding:38px 25px 44px;max-width:720px;margin:auto}
+.eyebrow{font-size:10px;font-weight:500;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);margin:0 0 23px}
+h1{font-weight:400;font-size:clamp(43px,12vw,56px);line-height:1.04;letter-spacing:-.065em;margin:0}
+h1 em{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.065em}
+.lead{font-size:17px;line-height:1.55;margin:24px 0 30px;max-width:490px}
+.steps{list-style:none;margin:0;padding:0}.step{position:relative}
+.step h2{font-size:20px;font-weight:400;line-height:1.25;letter-spacing:-.035em;margin:0 0 7px}
+.step p{font-size:14px;line-height:1.55;margin:0;color:#676767}
+.number{font-family:Georgia,serif;font-size:25px;color:#9a9a9a;line-height:1.15}
+.closing{font-size:15px;line-height:1.55;margin:27px 0 0}
+.signature{font-size:12px;color:var(--muted);margin:12px 0 0}
+.cta{display:flex;align-items:center;justify-content:space-between;min-height:48px;margin-top:29px;padding:12px 0;border-top:1px solid var(--ink);font-size:15px}
+.cta span{font-size:22px;line-height:1}footer{max-width:1232px;margin:auto;border-top:1px solid var(--line);padding:22px 25px;font-size:11px;color:var(--muted)}
+.warm .step{display:grid;grid-template-columns:30px 1fr;gap:15px;padding:19px 0;border-top:1px solid var(--line)}
+.warm .step:last-child{padding-bottom:0}.warm .lead{margin-bottom:31px}
+.together h1{font-size:clamp(46px,13.2vw,62px)}
+.together .lead{margin-top:23px;margin-bottom:32px}
+.together .step{padding:0 0 25px 36px}
+.together .step:last-child{padding-bottom:0}
+.together .step:before{content:'';position:absolute;left:8px;top:11px;bottom:-8px;width:1px;background:var(--line)}
+.together .step:last-child:before{display:none}
+.together .number{position:absolute;left:0;top:0;background:white;font-size:17px;color:#555;width:18px;text-align:center;line-height:25px}
+.together .closing{padding-top:22px;border-top:1px solid var(--line);font-family:Georgia,serif;font-style:italic;font-size:23px;line-height:1.3;letter-spacing:-.035em}
+.direct h1{font-size:clamp(46px,13.3vw,64px)}
+.direct .lead{margin-bottom:34px}
+.direct .step{padding:18px 0 20px;border-top:1px solid var(--line)}
+.direct .step:last-child{padding-bottom:0}
+.direct .step-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:7px}
+.direct .step h2{font-size:28px;letter-spacing:-.045em;margin:0}.direct .number{font-family:Arial,sans-serif;font-size:10px;letter-spacing:1px}
+.direct .closing{font-size:14px;color:#676767}.direct .signature{margin-top:18px}
+@media(min-width:760px){.header{padding:32px 64px}main{padding:64px 40px 64px}h1{font-size:72px}.together h1,.direct h1{font-size:76px}.lead{font-size:19px}.step h2{font-size:23px}.step p{font-size:16px}.warm .step{padding:24px 0;grid-template-columns:36px 1fr;gap:20px}.together .step{padding-bottom:30px}.direct .step{padding:24px 0}.direct .step h2{font-size:32px}footer{padding:28px 64px}}
+
+.warm .steps{margin-top:32px}
+
+/* Эксперимент: три самостоятельных типографических блока. */
+main{padding-top:32px;padding-bottom:40px}
+.warm .steps{margin-top:0}
+.warm .step{display:block;padding:25px 0 28px;border-top:1px solid var(--line)}
+.warm .step:first-child{padding-top:0;border-top:0}
+.warm .step:last-child{padding-bottom:0}
+.warm .step h2{font-size:clamp(36px,10.7vw,48px);font-weight:400;line-height:1.04;letter-spacing:-.055em;margin:0 0 17px}
+.step h2 em{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.055em}
+.warm .step p{color:var(--ink);font-size:17px;line-height:1.5;margin:0;max-width:540px}
+@media(min-width:760px){main{padding-top:48px;padding-bottom:56px}.warm .step{padding:30px 0 34px}.warm .step h2{font-size:60px;margin-bottom:20px}.warm .step p{font-size:19px}}
+</style></head>
+<body class="warm"><header class="header"><a class="brand" href="https://involta.ru/guide/">инвольта <i>гид</i><small>О проекте</small></a></header>
+<main aria-label="О проекте">
+<ol class="steps"><li class="step"><div><h2>Скажи<br><em>голосом.</em></h2><p>Оставить отзыв стало в тысячу раз проще. А значит, о хорошем будут говорить чаще. Не забудь сказать название ресторана и своё имя.</p></div></li><li class="step"><div><h2>Тебя услышат<br><em>моментально.</em></h2><p>Твой отзыв сразу увидят другие. Кто-то узнает в нём свой опыт, кто-то захочет познакомиться. Иногда отзывы превращаются в живой чат ресторана.</p></div></li><li class="step"><div><h2>Повлияй<br><em>на рейтинг.</em></h2><p>Мы не просто считаем ваши голоса, мы их слышим. 🙂 Принципиально новый рейтинг и действительно честный.</p></div></li></ol></main>
+</body></html>

@@ -26,11 +26,16 @@ def test_about_cookie_and_statistics_table_at_desktop_and_mobile_widths(database
         expect(footer.get_by_role("link", name="Я тут в первый раз")).to_be_visible()
         assert footer.get_by_role("link").count() == 1
         footer.get_by_role("link").click()
-        expect(page.get_by_role("heading", name="О проекте")).to_be_visible()
-        expect(footer.get_by_role("link", name="О проекте")).to_be_visible()
-        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-        page.screenshot(path=str(tmp_path / "about-mobile.png"), full_page=True)
-        page.get_by_role("link", name="Выбрать город").click()
+        expect(page.locator(".brand sup")).to_have_text("О проекте")
+        expect(page.get_by_role("main", name="О проекте")).to_be_visible()
+        expect(page.locator(".about-steps > li")).to_have_count(3)
+        expect(footer).to_have_count(0)
+        for width in (390, 320, 1440):
+            page.set_viewport_size({"width": width, "height": 950})
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.screenshot(path=str(tmp_path / f"about-{width}.png"), full_page=True)
+        page.locator(".brand").click()
+        expect(page.locator(".brand sup")).to_have_text("Россия")
         expect(footer.get_by_role("link", name="О проекте")).to_be_visible()
         assert daily_stats(engine)[0].hits == 3
         assert daily_stats(engine)[0].uniques == 1

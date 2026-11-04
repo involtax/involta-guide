@@ -79,7 +79,7 @@ def test_public_hits_footer_cookie_and_real_admin_exclusion(database, monkeypatc
         )
         assert "Max-Age=31536000" in home.headers["set-cookie"]
         about = client.get("/guide/about")
-        assert about.status_code == 200 and "<h1>О проекте</h1>" in about.text
+        assert about.status_code == 200 and '<main class="about-page"' in about.text
         assert client.cookies.get("guide_about_seen") == "1"
         assert "Я тут в первый раз" not in about.text
         assert "О проекте" in client.get("/guide/ivanovo").text.split("<footer>")[1]

@@ -23,7 +23,7 @@
 <body>
 <header class="header">
 <a href="{{ settings.path('/') }}" class="brand">инвольта<span>гид</span>
-<sup>Россия</sup>
+<sup>{% block brand_context %}Россия{% endblock %}</sup>
 </a>
 {% if admin_ui|default(false) %}
 {% if admin_authenticated|default(false) %}<form method="post" action="{{ settings.path('/admin/logout') }}" class="admin-logout" hx-boost="false"><input type="hidden" name="_csrf" value="{{csrf_token}}"><button>Выйти</button></form>{% endif %}
@@ -31,9 +31,11 @@
 </header>
 {% block body %}
 {% endblock %}
+{% block footer %}
 <footer>
 <a href="{{ settings.path('/about') }}">{{'О проекте' if request.cookies.get('guide_about_seen')=='1' or request.url.path==settings.path('/about') else 'Я тут в первый раз'}}</a>
 </footer>
+{% endblock %}
 {% block scripts %}
 {% endblock %}
 </body>
