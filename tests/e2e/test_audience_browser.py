@@ -15,7 +15,7 @@ def test_about_cookie_and_statistics_table_at_desktop_and_mobile_widths(database
     token = Security(settings, lambda: PostgresUow(engine)).login("test-password-123456", "test-ip")
     with serving(app) as origin, sync_playwright() as p:
         browser = p.chromium.launch(
-            executable_path=os.getenv("CHROMIUM_PATH"), args=["--no-sandbox"]
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         context = browser.new_context(viewport={"width": 390, "height": 950})
         page = context.new_page()

@@ -246,7 +246,7 @@ def routes(prefix: str) -> APIRouter:
                     name=location["name"],
                     revision=location["revision"],
                     content_epoch=epoch,
-                    recognition_dictionary=dictionary_names(names),
+                    recognition_dictionary=dictionary_names([location["name"], *names]),
                     restaurants=[
                         RestaurantContext(
                             id=r["id"],

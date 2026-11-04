@@ -149,7 +149,9 @@ class VoiceService:
 
             names = frozen["location"].get("recognition_dictionary", [])
             frozen["sherpa_models"] = {
-                kind: sherpa_options(self.settings, engine, variant, names)
+                kind: sherpa_options(
+                    self.settings, engine, variant, names, location_name=frozen["location"]["name"]
+                )
                 for kind, (engine, variant) in SHERPA_STAGES.items()
             }
         execute(
@@ -164,11 +166,6 @@ class VoiceService:
             id=reference,
         )
         if frozen["asr_beta"]:
-            execute(
-                conn,
-                "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'comparison')",
-                id=reference,
-            )
             for kind in frozen["sherpa_models"]:
                 execute(
                     conn,

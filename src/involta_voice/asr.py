@@ -1,4 +1,4 @@
-"""Pinned, offline GigaAM/Parakeet inference with the same decoding/VAD protocol."""
+"""Pinned, offline GigaAM inference with the same decoding/VAD protocol."""
 
 import gc
 import hashlib
@@ -27,20 +27,6 @@ MODELS: dict[str, dict[str, Any]] = {
             "v3_e2e_rnnt_vocab.txt",
             "README.md",
             "LICENSE.txt",
-        ],
-    },
-    "parakeet": {
-        "name": "Parakeet TDT 0.6B v3",
-        "loader": "nemo-parakeet-tdt-0.6b-v3",
-        "repository": "istupakov/parakeet-tdt-0.6b-v3-onnx",
-        "revision": "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
-        "license": "CC-BY-4.0",
-        "files": [
-            "config.json",
-            "encoder-model.int8.onnx",
-            "decoder_joint-model.int8.onnx",
-            "vocab.txt",
-            "README.md",
         ],
     },
 }
@@ -133,7 +119,7 @@ class LocalAsr:
             or request.get("model") not in MODELS
             or request.get("revision") != MODELS.get(str(request.get("model")), {}).get("revision")
         ):
-            raise ProviderFailure("Нужна новая обработка с GigaAM/Parakeet")
+            raise ProviderFailure("Нужна новая обработка с GigaAM")
         root = model_path(self.settings, request)
         vad = self.settings.asr_models_dir / "vad" / request["vad_revision"]
         if not (root / "READY.json").is_file() or not (vad / "READY.json").is_file():

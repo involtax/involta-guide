@@ -23,7 +23,7 @@ from .test_voice_service import voice_database as voice_database
 from .test_web import login
 
 
-class SixResults(FakeProvider):
+class GigaResults(FakeProvider):
     def __init__(self, failed=None):
         self.failed = failed
         self.calls = []
@@ -46,7 +46,7 @@ class SixResults(FakeProvider):
         }
 
 
-def test_six_results_share_audio_and_freeze_dictionary_with_idempotent_intake(voice_database):
+def test_seven_profiles_share_audio_and_freeze_dictionary_with_idempotent_intake(voice_database):
     settings, engine = voice_database
     settings = settings.model_copy(update={"asr_beta_enabled": True})
     meta = metadata()
@@ -56,32 +56,41 @@ def test_six_results_share_audio_and_freeze_dictionary_with_idempotent_intake(vo
     reference = service.submit(meta, audio, "audio/wav")["reference"]
     assert service.submit(meta, audio, "audio/wav")["reference"] == reference
     queued = reports(engine, [reference])[reference]
-    assert len(queued) == 6 and all(r["state"] == "queued" for r in queued)
+    assert len(queued) == 7 and all(r["state"] == "queued" for r in queued)
     assert [r["dictionary"] for r in queued if r["variant"] == "sherpa_hotwords"] == [
         meta.location.recognition_dictionary
-    ] * 2
+    ]
     meta.location.recognition_dictionary.append("Добавлено позже")
-    provider = SixResults()
+    provider = GigaResults()
     worker = Worker(engine, settings, provider)
-    assert all(worker.once() for _ in range(6)) and not worker.once()
-    assert len(provider.calls) == 6
+    assert all(worker.once() for _ in range(7)) and not worker.once()
+    assert len(provider.calls) == 7
     assert {call[3] for call in provider.calls} == {hashlib.sha256(audio).hexdigest()}
     rows = reports(engine, [reference])[reference]
     assert [(r["engine"], r["variant"]) for r in rows] == list(RESULTS)
     assert all(r["state"] == "completed" for r in rows)
-    assert rows[3]["dictionary"] == rows[5]["dictionary"] == ["Алхимист", "Огонёк", "Сыроварня"]
-    assert all(not r["dictionary"] for r in rows if r["variant"] != "sherpa_hotwords")
+    assert rows[-1]["dictionary"] == [meta.location.name]
+    assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows[1:]] == [
+        (1.5, 4),
+        (0.75, 4),
+        (1.5, 4),
+        (3.0, 4),
+        (1.5, 8),
+        (1.5, 4),
+    ]
+    assert rows[3]["dictionary"] == ["Алхимист", "Огонёк", "Сыроварня"]
+    assert all(not r["dictionary"] for r in rows if r["variant"] in ("onnx", "sherpa_plain"))
     assert service.status(reference)["transcript"] == "gigaam / onnx"
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM submissions")).scalar_one() == 1
-        assert conn.execute(text("SELECT count(*) FROM asr_candidates")).scalar_one() == 6
+        assert conn.execute(text("SELECT count(*) FROM asr_candidates")).scalar_one() == 7
         assert (
             conn.execute(text("SELECT count(*) FROM outbox WHERE kind='gigaam_ready'")).scalar_one()
             == 1
         )
 
 
-@pytest.mark.parametrize("failed", list(RESULTS)[2:] + [("gigaam", "onnx")])
+@pytest.mark.parametrize("failed", list(RESULTS)[1:] + [("gigaam", "onnx")])
 def test_comparison_failure_is_independent_and_sherpa_never_becomes_public(
     database, voice_database, failed
 ):
@@ -104,8 +113,8 @@ def test_comparison_failure_is_independent_and_sherpa_never_becomes_public(
     reference = service.submit(meta, recording(), "audio/wav")["reference"]
     consumer = Consumer(engine, client_for(settings, vs))
     assert consumer.once() == 1
-    worker = Worker(ve, vs, SixResults(failed))
-    assert all(worker.once() for _ in range(6)) and not worker.once()
+    worker = Worker(ve, vs, GigaResults(failed))
+    assert all(worker.once() for _ in range(7)) and not worker.once()
     assert consumer.once() == 1 and consumer.once() == 0
     rows = reports(ve, [reference])[reference]
     assert sum(r["state"] == "failed" for r in rows) == 1
@@ -128,6 +137,7 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
     )
     names = [f"Ресторан {i:03}" for i in range(205)] + ["Алхимист"]
     with engine.begin() as conn:
+        conn.execute(text("UPDATE locations SET name='Плёс' WHERE id=:id"), {"id": city["id"]})
         conn.execute(
             text(
                 "INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,active) VALUES(:id,:city,:name,'','','',0)"
@@ -155,19 +165,20 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
         reference = response.json()["reference"]
         with ve.connect() as conn:
             saved = conn.execute(text("SELECT metadata FROM submissions")).scalar_one()
-            assert saved["location"]["recognition_dictionary"] == sorted(names)
+            assert saved["location"]["recognition_dictionary"] == sorted(["Плёс", *names])
         with engine.begin() as conn:
             conn.execute(text("UPDATE restaurants SET name='Переименован' WHERE name='Алхимист'"))
-        worker = Worker(ve, vs, SixResults())
-        assert all(worker.once() for _ in range(6))
+        worker = Worker(ve, vs, GigaResults())
+        assert all(worker.once() for _ in range(7))
         Consumer(engine, client_for(settings, vs)).once()
         login(client)
         page = client.get("/guide/admin/reviews/ivanovo")
         assert page.status_code == 200
-        assert page.text.count('class="recognition-dictionary"') == 6
-        assert page.text.count("Алхимист") == 2
+        assert page.text.count('class="recognition-dictionary"') == 7
+        assert page.text.count("Алхимист") == 4
+        assert page.text.count("Плёс · Ресторан 000") == 4
         assert "Переименован" not in page.text
-        assert page.text.count("Sherpa · со словарём") == 2
+        assert page.text.count("Sherpa · текущие подсказки") == 1
         assert "Ресторан 204" in page.text
         public = client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()
         assert public["rows"][0]["transcript"] == "gigaam / onnx"
@@ -186,12 +197,12 @@ def test_migration_preserves_original_results_and_does_not_schedule_historical_a
     settings, engine = voice_database
     service = VoiceService(engine, settings)
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
-    assert Worker(engine, settings, SixResults()).once()
+    assert Worker(engine, settings, GigaResults()).once()
     with engine.begin() as conn:
         old = dict(conn.execute(text("SELECT * FROM asr_candidates")).mappings().one())
         old.pop("variant")
         audio = conn.execute(text("SELECT audio FROM submissions")).scalar_one()
-        conn.execute(text("DELETE FROM voice_schema_versions WHERE version=8"))
+        conn.execute(text("DELETE FROM voice_schema_versions WHERE version>=8"))
         conn.execute(text("ALTER TABLE asr_candidates DROP CONSTRAINT asr_candidates_pkey"))
         conn.execute(text("ALTER TABLE asr_candidates DROP COLUMN variant"))
         conn.execute(text("ALTER TABLE asr_candidates ADD PRIMARY KEY(submission,run,engine)"))
@@ -217,7 +228,7 @@ def test_sherpa_interruption_retries_locally_and_saved_response_is_reused(voice_
     settings = settings.model_copy(update={"asr_beta_enabled": True})
     service = VoiceService(engine, settings)
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
-    worker = Worker(engine, settings, SixResults())
+    worker = Worker(engine, settings, GigaResults())
     assert worker.once() and worker.once()
     interrupted = worker.claim()
     assert interrupted["kind"].startswith("sherpa_")

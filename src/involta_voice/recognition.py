@@ -56,7 +56,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         candidates = (
             conn.execute(
                 text(
-                    "SELECT submission,run,engine,variant,settings,transcript FROM asr_candidates WHERE submission=ANY(CAST(:ids AS uuid[])) ORDER BY run DESC"
+                    "SELECT submission,run,engine,variant,settings,transcript FROM asr_candidates WHERE submission=ANY(CAST(:ids AS uuid[])) AND engine='gigaam' ORDER BY run DESC"
                 ),
                 {"ids": references},
             )
@@ -66,7 +66,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         stages = (
             conn.execute(
                 text(
-                    "SELECT s.submission,s.run,s.kind,s.state,s.error,coalesce(s.request,r.snapshot->'sherpa_models'->s.kind) AS request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND s.kind<>'analysis' ORDER BY s.run DESC"
+                    "SELECT s.submission,s.run,s.kind,s.state,s.error,coalesce(s.request,r.snapshot->'sherpa_models'->s.kind) AS request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND (s.kind IN ('transcription','comparison','evaluate_gigaam') OR s.kind LIKE 'sherpa_gigaam_%') ORDER BY s.run DESC"
                 ),
                 {"ids": references},
             )
@@ -105,7 +105,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                 ),
                 None,
             )
-            # Existing reviews retain their two original rows; no comparison is scheduled by reads.
+            # Existing reviews retain their saved profiles; no comparison is scheduled by reads.
             if variant != "onnx" and candidate is None and stage is None:
                 continue
             request = (
@@ -115,9 +115,11 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                 {
                     "engine": name,
                     "variant": variant,
-                    "name": "GigaAM" if name == "gigaam" else "Parakeet",
+                    "name": "GigaAM",
                     "variant_label": VARIANT_LABELS[variant],
                     "dictionary": request.get("dictionary", []) if stage or candidate else None,
+                    "max_active_paths": request.get("max_active_paths"),
+                    "hotwords_score": request.get("hotwords_score"),
                     "text": candidate["transcript"] if candidate else None,
                     "state": "completed"
                     if candidate
@@ -160,7 +162,7 @@ def summary(engine: Engine) -> dict[str, Any]:
                     text("""SELECT engine,variant,count(*) recordings,
             sum(elapsed_seconds) seconds,sum(duration) audio_seconds FROM (
             SELECT DISTINCT ON(submission,engine,variant) * FROM asr_candidates
-            WHERE coalesce(details->>'is_fake','false')<>'true'
+            WHERE engine='gigaam' AND coalesce(details->>'is_fake','false')<>'true'
             ORDER BY submission,engine,variant,run DESC) latest GROUP BY engine,variant ORDER BY engine,variant""")
                 ).mappings()
             ]

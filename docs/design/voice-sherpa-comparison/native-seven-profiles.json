@@ -1,0 +1,521 @@
+[
+  {
+    "variant": "onnx",
+    "request": {
+      "engine": "onnx-asr",
+      "model": "gigaam",
+      "revision": "322c3b29492673eb7d0b434bfa9dfb8653e34d02",
+      "quantization": "int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "model": "GigaAM v3 E2E RNN-T",
+      "revision": "322c3b29492673eb7d0b434bfa9dfb8653e34d02",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 2.9216635939956177,
+      "inference_seconds": 0.983746550991782,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "runtime": "onnx-asr",
+      "settings": {
+        "engine": "onnx-asr",
+        "model": "gigaam",
+        "revision": "322c3b29492673eb7d0b434bfa9dfb8653e34d02",
+        "quantization": "int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_plain",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_plain",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 4,
+      "hotwords_score": 1.5,
+      "length_reward": 0.0,
+      "dictionary": [],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 2.5248914280091412,
+      "inference_seconds": 1.2630629549967125,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_plain",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 4,
+        "hotwords_score": 1.5,
+        "length_reward": 0.0,
+        "dictionary": [],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_hotwords_weak",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_hotwords_weak",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 4,
+      "hotwords_score": 0.75,
+      "length_reward": 0.0,
+      "dictionary": [
+        "Алхимист",
+        "Огонёк",
+        "Плёс"
+      ],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 3.5504698019940406,
+      "inference_seconds": 2.6888470300036715,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_hotwords_weak",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 4,
+        "hotwords_score": 0.75,
+        "length_reward": 0.0,
+        "dictionary": [
+          "Алхимист",
+          "Огонёк",
+          "Плёс"
+        ],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_hotwords",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_hotwords",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 4,
+      "hotwords_score": 1.5,
+      "length_reward": 0.0,
+      "dictionary": [
+        "Алхимист",
+        "Огонёк",
+        "Плёс"
+      ],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 3.697571239012177,
+      "inference_seconds": 2.6686630609910935,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_hotwords",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 4,
+        "hotwords_score": 1.5,
+        "length_reward": 0.0,
+        "dictionary": [
+          "Алхимист",
+          "Огонёк",
+          "Плёс"
+        ],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_hotwords_strong",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_hotwords_strong",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 4,
+      "hotwords_score": 3.0,
+      "length_reward": 0.0,
+      "dictionary": [
+        "Алхимист",
+        "Огонёк",
+        "Плёс"
+      ],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 3.575055887995404,
+      "inference_seconds": 2.713678842992522,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_hotwords_strong",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 4,
+        "hotwords_score": 3.0,
+        "length_reward": 0.0,
+        "dictionary": [
+          "Алхимист",
+          "Огонёк",
+          "Плёс"
+        ],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_hotwords_wide",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_hotwords_wide",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 8,
+      "hotwords_score": 1.5,
+      "length_reward": 0.0,
+      "dictionary": [
+        "Алхимист",
+        "Огонёк",
+        "Плёс"
+      ],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 5.726259200004279,
+      "inference_seconds": 4.827565630999743,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_hotwords_wide",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 8,
+        "hotwords_score": 1.5,
+        "length_reward": 0.0,
+        "dictionary": [
+          "Алхимист",
+          "Огонёк",
+          "Плёс"
+        ],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  },
+  {
+    "variant": "sherpa_hotwords_city",
+    "request": {
+      "engine": "sherpa-onnx",
+      "model": "gigaam",
+      "variant": "sherpa_hotwords_city",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "quantization": "encoder-int8",
+      "cpu_threads": 2,
+      "sample_rate": 16000,
+      "feature_dim": 64,
+      "model_type": "nemo_transducer",
+      "decoding_method": "modified_beam_search",
+      "max_active_paths": 4,
+      "hotwords_score": 1.5,
+      "length_reward": 0.0,
+      "dictionary": [
+        "Плёс"
+      ],
+      "dictionary_encoding": "tokens-longest-match-v1",
+      "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+      "max_speech_duration_s": 20,
+      "min_silence_duration_ms": 500,
+      "preprocessing": "av-mono-16k-v1"
+    },
+    "result": {
+      "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои. У лукоморья дуб зелёный.",
+      "engine": "gigaam",
+      "runtime": "sherpa-onnx",
+      "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+      "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+      "runtime_reported_revision": "96255a1b",
+      "audio_sha256": "d8aaaa18a5098d7c6de0595ae7ac1e64cacd0d4022af3595213bdaf23be77e69",
+      "pcm_sha256": "33e81a75b4850307d2ca18b3884036e82f67766cdb8fc9f8290234bec5e220de",
+      "duration": 11.29,
+      "elapsed_seconds": 3.593530151003506,
+      "inference_seconds": 2.6772515270131407,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.638,
+          "text": "Ничьих не требуя похвал, счастлив уж я надеждой сладкой, что дева с трепетом любви посмотрит, может быть, украдкой на песни грешные мои."
+        },
+        {
+          "start": 9.282,
+          "end": 11.29,
+          "text": "У лукоморья дуб зелёный."
+        }
+      ],
+      "settings": {
+        "engine": "sherpa-onnx",
+        "model": "gigaam",
+        "variant": "sherpa_hotwords_city",
+        "revision": "a6039be7cee829a9044a69ac0ebaf1c191217c97",
+        "runtime_revision": "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+        "quantization": "encoder-int8",
+        "cpu_threads": 2,
+        "sample_rate": 16000,
+        "feature_dim": 64,
+        "model_type": "nemo_transducer",
+        "decoding_method": "modified_beam_search",
+        "max_active_paths": 4,
+        "hotwords_score": 1.5,
+        "length_reward": 0.0,
+        "dictionary": [
+          "Плёс"
+        ],
+        "dictionary_encoding": "tokens-longest-match-v1",
+        "vad_revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
+        "max_speech_duration_s": 20,
+        "min_silence_duration_ms": 500,
+        "preprocessing": "av-mono-16k-v1"
+      }
+    }
+  }
+]

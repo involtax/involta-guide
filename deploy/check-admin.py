@@ -53,6 +53,7 @@ def main():
             "/admin/locations/ivanovo",
             "/admin/restaurants?location=ivanovo",
             "/admin/reviews",
+            "/admin/stats",
             "/admin/settings/filling",
             "/admin/sessions",
             "/logs",

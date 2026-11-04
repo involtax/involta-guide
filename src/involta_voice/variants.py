@@ -1,21 +1,28 @@
-"""The six explicit beta recognitions; only the original GigaAM publishes text."""
+"""The seven GigaAM beta profiles; only the original GigaAM publishes text."""
 
-SHERPA_STAGES = {
-    "sherpa_gigaam_plain": ("gigaam", "sherpa_plain"),
-    "sherpa_gigaam_hotwords": ("gigaam", "sherpa_hotwords"),
-    "sherpa_parakeet_plain": ("parakeet", "sherpa_plain"),
-    "sherpa_parakeet_hotwords": ("parakeet", "sherpa_hotwords"),
+# score, search width, dictionary source. Frozen in each run at intake.
+SHERPA_PROFILES = {
+    "sherpa_plain": (1.5, 4, "none"),
+    "sherpa_hotwords_weak": (0.75, 4, "catalogue"),
+    "sherpa_hotwords": (1.5, 4, "catalogue"),
+    "sherpa_hotwords_strong": (3.0, 4, "catalogue"),
+    "sherpa_hotwords_wide": (1.5, 8, "catalogue"),
+    "sherpa_hotwords_city": (1.5, 4, "city"),
 }
-STAGES = ("transcription", "comparison", *SHERPA_STAGES)
-RESULTS = (
-    ("gigaam", "onnx"),
-    ("parakeet", "onnx"),
-    *SHERPA_STAGES.values(),
-)
+SHERPA_STAGES = {
+    "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)
+    for variant in SHERPA_PROFILES
+}
+STAGES = ("transcription", *SHERPA_STAGES)
+RESULTS = (("gigaam", "onnx"), *SHERPA_STAGES.values())
 VARIANT_LABELS = {
-    "onnx": "onnx-asr",
+    "onnx": "Базовый · onnx-asr",
     "sherpa_plain": "Sherpa · без словаря",
-    "sherpa_hotwords": "Sherpa · со словарём",
+    "sherpa_hotwords_weak": "Sherpa · слабые подсказки",
+    "sherpa_hotwords": "Sherpa · текущие подсказки",
+    "sherpa_hotwords_strong": "Sherpa · сильные подсказки",
+    "sherpa_hotwords_wide": "Sherpa · широкий поиск",
+    "sherpa_hotwords_city": "Sherpa · только город",
 }
 
 
