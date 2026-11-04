@@ -10,7 +10,7 @@ from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
 
-from .test_jobs import FakeAI, setup
+from .test_jobs import provider_payload, setup
 
 
 def test_model_snapshot_changes_generation_only_and_records_actual_model(database):
@@ -27,11 +27,7 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
                 "id": "resp_model_snapshot",
                 "status": "completed",
                 "output": [
-                    {
-                        "content": [
-                            {"type": "output_text", "text": json.dumps(FakeAI().generate("", ""))}
-                        ]
-                    }
+                    {"content": [{"type": "output_text", "text": json.dumps(provider_payload())}]}
                 ],
             },
         )
@@ -126,11 +122,7 @@ def test_reset_deletion_cannot_erase_daily_provider_limits(database):
                 "id": "resp_limit",
                 "status": "completed",
                 "output": [
-                    {
-                        "content": [
-                            {"type": "output_text", "text": json.dumps(FakeAI().generate("", ""))}
-                        ]
-                    }
+                    {"content": [{"type": "output_text", "text": json.dumps(provider_payload())}]}
                 ],
             },
         )

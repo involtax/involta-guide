@@ -291,7 +291,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 dict(c)
                 for c in conn.execute(
                     text(
-                        "SELECT * FROM provider_calls WHERE submission=:id AND run=:n ORDER BY created_at,id"
+                        "SELECT id,submission,run,kind,request,response,error,input_tokens,output_tokens,created_at FROM provider_calls WHERE submission=:id AND run=:n ORDER BY created_at,id"
                     ),
                     {"id": str(reference), "n": number},
                 ).mappings()
@@ -370,11 +370,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/internal/v1/admin/settings", dependencies=dependencies)
     def get_settings() -> Any:
         with engine.connect() as conn:
-            return {**snapshot(conn, settings), "models": MODELS, "prices_checked": "2026-11-03"}
+            return {**snapshot(conn, settings), "models": MODELS}
 
     @app.put("/internal/v1/admin/settings", dependencies=dependencies)
     def put_settings(request: Request, body: dict[str, Any]) -> Any:
-        if set(body) - {"transcription_model", "analysis_model", "prompt", "prices"}:
+        if set(body) - {"transcription_model", "analysis_model", "prompt"}:
             raise VoiceError("Неизвестная настройка")
         for key, kind in (("transcription_model", "transcription"), ("analysis_model", "analysis")):
             if key in body and body[key] not in MODELS[kind]:
@@ -383,15 +383,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             not isinstance(body["prompt"], str) or not 50 <= len(body["prompt"]) <= 30000
         ):
             raise VoiceError("Промпт должен содержать 50–30000 символов")
-        if "prices" in body:
-            prices = body["prices"]
-            if not isinstance(prices, dict) or any(
-                not isinstance(rates, dict)
-                or set(rates) - {"input", "output"}
-                or any(type(v) not in (int, float) or not 0 <= v <= 10000 for v in rates.values())
-                for rates in prices.values()
-            ):
-                raise VoiceError("Некорректный каталог стоимости")
         before = get_settings()
         with engine.begin() as conn:
             for key, value in body.items():

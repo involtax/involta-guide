@@ -15,9 +15,7 @@ def test_transcription_survives_missing_analysis_key_without_audio_network(
     voice_database, monkeypatch
 ):
     settings, engine = voice_database
-    settings = settings.model_copy(
-        update={"fake_provider": False, "openai_api_key": SecretStr(""), "daily_budget_usd": 0.01}
-    )
+    settings = settings.model_copy(update={"fake_provider": False, "openai_api_key": SecretStr("")})
     from involta_voice.asr import LocalAsr
 
     monkeypatch.setattr(
@@ -37,8 +35,8 @@ def test_transcription_survives_missing_analysis_key_without_audio_network(
         assert service.status(ref)["transcript"] == "Локальная расшифровка."
         with engine.connect() as conn:
             call = conn.execute(text("SELECT * FROM provider_calls")).mappings().one()
-            assert call["reserved_usd"] == 0 and call["cost_usd"] == 0
-        assert worker.once()  # optional analysis is budget-blocked; text is still committed.
+            assert call["reserved_usd"] is None and call["cost_usd"] is None
+        assert worker.once()  # optional analysis has no API key; text is still committed.
         assert service.status(ref)["transcript"] == "Локальная расшифровка."
         assert service.status(ref)["state"] == "analysis_failed"
     finally:

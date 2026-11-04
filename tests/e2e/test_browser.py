@@ -145,8 +145,8 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                 model_form.get_by_label("Модель новых запросов наполнения").select_option(
                     "gpt-6.1-sol"
                 )
-                expect(page.get_by_role("region", name="Сравнение моделей и цен")).to_contain_text(
-                    "$0.12"
+                expect(page.get_by_role("region", name="Модели наполнения")).to_contain_text(
+                    "GPT-6.1 Sol"
                 )
                 model_form.get_by_role("button", name="Сохранить настройки наполнения").click()
                 expect(page.get_by_role("status")).to_contain_text("Настройки сохранены")

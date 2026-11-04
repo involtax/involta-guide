@@ -207,13 +207,6 @@ class BackgroundGeneration:
         usage = result.get("usage") or {}
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
-        prices = json.loads(self.settings.ai_prices_json).get(body["model"])
-        cost = (
-            (input_tokens * prices.get("input", 0) + output_tokens * prices.get("output", 0))
-            / 1_000_000
-            if prices and usage
-            else None
-        )
         failure = (
             None
             if state in ("queued", "in_progress", "completed")
@@ -243,7 +236,7 @@ class BackgroundGeneration:
             )
             conn.execute(
                 text("""UPDATE ai_usage SET status=:status,input_tokens=:input,
-                output_tokens=:output,estimated_cost_usd=:cost,detail=:detail WHERE id=:id"""),
+                output_tokens=:output,detail=:detail WHERE id=:id"""),
                 {
                     "id": task["usage_id"],
                     "status": "done"
@@ -253,7 +246,6 @@ class BackgroundGeneration:
                     else "failed",
                     "input": input_tokens,
                     "output": output_tokens,
-                    "cost": cost,
                     "detail": failure or "",
                 },
             )

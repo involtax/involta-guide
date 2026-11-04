@@ -29,8 +29,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("var")
     max_audio_bytes: int = 10 * 1024 * 1024
     daily_ai_calls: int = 1000
-    ai_daily_budget_usd: float = 20
-    ai_prices_json: str = "{}"
+    generation_max_output_tokens: int = Field(default=32000, ge=1000, le=128000)
     trusted_proxy_ips: str = "127.0.0.1"
     worker_heartbeat_file: Path = Path("/tmp/involta-worker-heartbeat")
     lease_seconds: int = 240

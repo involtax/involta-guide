@@ -278,7 +278,7 @@ class PostgresRepository:
         )[0]["n"]
         result["jobs"] = self.query("SELECT status,count(*) n FROM jobs GROUP BY status")
         result["usage"] = self.query(
-            "SELECT count(*) calls,coalesce(sum(input_tokens),0) input_tokens,coalesce(sum(output_tokens),0) output_tokens,sum(estimated_cost_usd) cost,count(*) FILTER (WHERE estimated_cost_usd IS NULL) unpriced FROM ai_usage WHERE created_at>=CURRENT_DATE"
+            "SELECT count(*) calls,coalesce(sum(input_tokens),0) input_tokens,coalesce(sum(output_tokens),0) output_tokens FROM ai_usage WHERE created_at>=CURRENT_DATE"
         )[0]
         return result
 

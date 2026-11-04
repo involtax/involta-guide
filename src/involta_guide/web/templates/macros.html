@@ -5,10 +5,10 @@
 <label>{{label}}
 <select name="model" aria-label="{{label}}" required>
 {%if selected not in generation_model_ids%}
-<option value="{{selected}}" selected>Сохранённая модель: {{selected}} — тариф не указан</option>
+<option value="{{selected}}" selected>Сохранённая модель: {{selected}}</option>
 {%endif%}
 {%for m in generation_models%}
-<option value="{{m.id}}" {%if m.id==selected%}selected{%endif%}>{{m.name}}{%if m.recommended%} · рекомендую{%endif%} · ≈ ${{m.example_price}} за пример*</option>
+<option value="{{m.id}}" {%if m.id==selected%}selected{%endif%}>{{m.name}}{%if m.recommended%} · рекомендую{%endif%}</option>
 {%endfor%}
 </select></label>
 {%endmacro%}

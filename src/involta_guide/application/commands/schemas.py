@@ -169,9 +169,82 @@ class ContentInput(BaseModel):
     qualityReport: dict[str, Any] | None = None
 
 
-class Generation(ContentInput):
+class GeneratedContent(ContentInput):
     rankingReport: list[RankingCandidate] = Field(max_length=10)
     warnings: list[str] = Field(default_factory=list, max_length=20)
+
+
+class GenerationEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    factor: str
+    reason: str = Field(min_length=1, max_length=300)
+    confidence: Literal["high", "medium", "low"]
+    sourceRefs: list[int] = Field(default_factory=list, max_length=10)
+
+
+class GenerationCandidate(CandidateReview):
+    """Research facts only; persistence IDs and administrative flags never enter this schema."""
+
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=1, max_length=500)
+    cuisine: str = Field(default="", max_length=300)
+    description: str = Field(default="", max_length=800)
+    phone: str = ""
+    openingHours: Hours | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    scores: dict[str, StrictInt | None] = Field(default_factory=dict)
+    evidence: list[GenerationEvidence] = Field(default_factory=list, max_length=8)
+
+    @field_validator("phone")
+    @classmethod
+    def valid_phone(cls, value: str) -> str:
+        return RestaurantInput.phone_valid(value)
+
+    @model_validator(mode="after")
+    def assessment(self) -> "GenerationCandidate":
+        if self.scores:
+            if set(self.scores) != set(FACTORS) or any(
+                value is not None and not 0 <= value <= 10 for value in self.scores.values()
+            ):
+                raise ValueError("Нужны восемь оценок от 0 до 10 или null")
+            if len(self.evidence) != 8 or {e.factor for e in self.evidence} != set(FACTORS):
+                raise ValueError("Нужны краткие обоснования восьми факторов")
+        elif self.evidence:
+            raise ValueError("Обоснования требуют оценки факторов")
+        for item in self.evidence:
+            if len(set(item.sourceRefs)) != len(item.sourceRefs) or any(
+                index < 1 or index > len(self.sources) for index in item.sourceRefs
+            ):
+                raise ValueError("sourceRefs должны ссылаться на номера sources начиная с 1")
+        if self.status == "verified" and (
+            not self.mapsUrl
+            or not self.phone
+            or not self.cuisine.strip()
+            or not self.description.strip()
+            or set(self.scores) != set(FACTORS)
+            or any(value is None for value in self.scores.values())
+        ):
+            raise ValueError("verified требует карточку, телефон и восемь полных оценок")
+        if self.status == "excluded" and (self.scores or self.evidence):
+            raise ValueError("Исключённому кандидату не нужны оценки")
+        return self
+
+
+class GenerationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    intro: str = Field(max_length=800)
+    candidates: list[GenerationCandidate] = Field(max_length=100)
+    warnings: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def candidates_valid(self) -> "GenerationResult":
+        names = [" ".join(c.name.casefold().split()) for c in self.candidates]
+        if len(names) != len(set(names)):
+            raise ValueError("Кандидат повторяется")
+        if sum(bool(c.scores) for c in self.candidates) > 10:
+            raise ValueError("Оценивай не более десяти кандидатов")
+        return self
 
 
 class LocationInput(BaseModel):

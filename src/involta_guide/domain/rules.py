@@ -83,7 +83,14 @@ def rank(content: dict[str, Any], limit: int | None = None) -> dict[str, Any]:
         )
     )
     cards = {key(row["name"]): row for row in content["restaurants"]}
-    eligible = [row for row in report if row["totalScore"] is not None and row.get("mapsUrl")]
+    statuses = {key(c["name"]): c["status"] for c in content.get("candidateReview") or []}
+    eligible = [
+        row
+        for row in report
+        if row["totalScore"] is not None
+        and row.get("mapsUrl")
+        and (not statuses or statuses.get(key(row["name"]), "verified") == "verified")
+    ]
     result = []
     for row in eligible:
         card = cards.get(key(row["name"]))

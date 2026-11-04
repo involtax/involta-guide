@@ -62,7 +62,7 @@ def seed(uow: PostgresUow, root: Path) -> int:
             )
         if not uow.repo.setting("prompt"):
             uow.repo.set_setting(
-                "prompt", (root / "data/prompts/restaurant-ranking-v1.txt").read_text()
+                "prompt", (root / "data/prompts/restaurant-research-v3.txt").read_text()
             )
         uow.repo.set_setting("python_catalog_v1", catalog_hash)
         return added

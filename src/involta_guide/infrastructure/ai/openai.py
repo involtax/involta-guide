@@ -4,11 +4,11 @@ from contextlib import nullcontext
 from uuid import uuid4
 
 import httpx
-from pydantic import BaseModel
 from sqlalchemy import Connection, Engine, text
 
-from involta_guide.application.commands.schemas import Generation
+from involta_guide.application.commands.schemas import GenerationResult
 from involta_guide.application.ports.repositories import Record
+from involta_guide.application.services.generation_quality import generation_content
 from involta_guide.config import Settings
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.infrastructure.ai.audit import AIAudit
@@ -88,16 +88,13 @@ class OpenAIProvider:
             stats = (
                 conn.execute(
                     text(
-                        "SELECT coalesce(sum(calls),0) calls,coalesce(sum(cost),0) cost FROM ai_daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date"
+                        "SELECT coalesce(sum(calls),0) calls FROM ai_daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date"
                     )
                 )
                 .mappings()
                 .one()
             )
-            if (
-                stats["calls"] >= self.settings.daily_ai_calls
-                or stats["cost"] >= self.settings.ai_daily_budget_usd
-            ):
+            if stats["calls"] >= self.settings.daily_ai_calls:
                 raise RuleViolation("Дневной лимит OpenAI исчерпан")
             conn.execute(
                 text(
@@ -107,16 +104,11 @@ class OpenAIProvider:
             )
         return key
 
-    def _structured(
-        self,
-        prompt: str,
-        schema: type[BaseModel],
-        job_id: str,
-        *,
-        search: bool = False,
-        model: str | None = None,
-    ) -> Record:
-        selected_model = model or self.model
+    def generate(self, prompt: str, job_id: str) -> Record:
+        with self.engine.connect() as conn:
+            selected_model = conn.execute(
+                text("SELECT model FROM jobs WHERE id=:id"), {"id": job_id}
+            ).scalar_one()
         body = {
             "model": selected_model,
             "input": [
@@ -126,25 +118,20 @@ class OpenAIProvider:
                 },
                 {"role": "user", "content": prompt},
             ],
-            "max_output_tokens": 15000 if search else 10000,
+            "max_output_tokens": self.settings.generation_max_output_tokens,
             "text": {
                 "format": {
                     "type": "json_schema",
-                    "name": "result",
-                    "schema": schema.model_json_schema(),
+                    "name": "generation_v3",
+                    "schema": GenerationResult.model_json_schema(),
                     "strict": False,
                 }
             },
         }
-        if search:
-            body["tools"] = [{"type": "web_search_preview"}]
-        if search:
-            from involta_guide.infrastructure.ai.background import BackgroundGeneration
+        from involta_guide.infrastructure.ai.background import BackgroundGeneration
 
-            body.update(background=True, store=True)
-            result = BackgroundGeneration(self).advance(job_id, body)
-        else:
-            raise RuleViolation("Guide выполняет только первоначальное наполнение")
+        body.update(tools=[{"type": "web_search_preview"}], background=True, store=True)
+        result = BackgroundGeneration(self).advance(job_id, body)
         output = "".join(
             part.get("text", "")
             for item in result.get("output", [])
@@ -152,7 +139,7 @@ class OpenAIProvider:
             if part.get("type") == "output_text"
         )
         try:
-            return dict(json.loads(output))
+            raw = dict(json.loads(output))
         except (ValueError, TypeError):
             from involta_guide.infrastructure.ai.errors import GenerationStopped
 
@@ -160,9 +147,14 @@ class OpenAIProvider:
                 "ИИ не вернул структурированный JSON; ответ сохранён в логе"
             ) from None
 
-    def generate(self, prompt: str, job_id: str) -> Record:
         with self.engine.connect() as conn:
-            model = conn.execute(
-                text("SELECT model FROM jobs WHERE id=:id"), {"id": job_id}
+            request_schema = conn.execute(
+                text(
+                    "SELECT request_json->'text'->'format'->'schema' FROM generation_requests WHERE job_id=:id"
+                ),
+                {"id": job_id},
             ).scalar_one()
-        return self._structured(prompt, Generation, job_id, search=True, model=model)
+        # Already submitted responses retain their recorded contract and remain reprocessable.
+        if "candidates" not in request_schema.get("properties", {}):
+            return raw
+        return generation_content(raw)

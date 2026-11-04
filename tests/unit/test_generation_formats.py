@@ -4,14 +4,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from involta_guide.application.commands.schemas import Generation, Hours
+from involta_guide.application.commands.schemas import GeneratedContent, Hours
 
 
 def test_real_production_response_accepts_object_hours_and_still_rejects_tripadvisor():
     path = Path(__file__).parents[1] / "fixtures/ivanovo-provider-format.json"
     content = json.loads(path.read_text())
     with pytest.raises(ValidationError) as failure:
-        Generation.model_validate(content)
+        GeneratedContent.model_validate(content)
     assert [e["loc"] for e in failure.value.errors()] == [
         ("restaurants", 2, "mapsUrl"),
         ("rankingReport", 2, "mapsUrl"),
@@ -19,7 +19,7 @@ def test_real_production_response_accepts_object_hours_and_still_rejects_tripadv
     # A bad reserve candidate must not cause hours errors for valid cards.
     content["restaurants"] = content["restaurants"][:2]
     content["rankingReport"] = content["rankingReport"][:2]
-    accepted = Generation.model_validate(content).model_dump(mode="json")
+    accepted = GeneratedContent.model_validate(content).model_dump(mode="json")
     assert accepted["restaurants"][0]["openingHours"]["week"][0] == [["12:00", "00:00"]]
 
 

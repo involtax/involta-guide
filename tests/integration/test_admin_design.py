@@ -87,8 +87,6 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                     "models": {"transcription": ["gigaam"], "analysis": ["gpt-5"]},
                     "transcription_model": "gigaam",
                     "analysis_model": "gpt-5",
-                    "prices": {},
-                    "prices_checked": "fixture",
                     "prompt": "Промпт анализа",
                 }
             if path == "/admin/submissions":
