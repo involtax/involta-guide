@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Инвольта гид — капсула в движении</title>
+  <style>
+    :root { color-scheme: light; --ink: #181818; --muted: #797979; --blue: #2861eb; --duration: 420ms; --ease: cubic-bezier(.22,1,.36,1); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fff; color: var(--ink); font: 15px/1.5 Arial, Helvetica, sans-serif; }
+    main { width: min(100% - 88px, 1040px); margin: 64px auto; }
+    .eyebrow { margin: 0 0 24px; color: var(--muted); font-size: 10px; letter-spacing: 1.7px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(36px, 5vw, 58px); line-height: 1.06; font-weight: 400; letter-spacing: -.055em; }
+    h1 em { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
+    .intro { max-width: 560px; margin: 22px 0 0; color: #707070; font-size: 15px; }
+    .demo { max-width: 704px; margin: 64px auto 0; }
+    .search { --radius: 40px; width: 100%; height: 80px; overflow: hidden; border: 1px solid #e7e7e7; border-radius: var(--radius); background: #fcfcfc; box-shadow: 0 2px 7px rgb(0 0 0 / .035); transition: height var(--duration) var(--ease), border-radius var(--duration) var(--ease), box-shadow var(--duration) var(--ease); }
+    .search.is-open { --radius: 24px; box-shadow: 0 4px 14px rgb(0 0 0 / .045); }
+    .search:focus-within { border-color: #ddd; }
+    .row { height: 78px; display: flex; align-items: center; gap: 18px; padding: 0 12px 0 28px; }
+    .magnify { width: 20px; height: 20px; flex: 0 0 20px; color: #858585; }
+    input { min-width: 0; width: 100%; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 22px; border-radius: 0; }
+    input::placeholder { color: #858585; opacity: 1; }
+    input::-webkit-search-cancel-button { display: none; }
+    button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
+    input:focus-visible { outline: none; }
+    .clear { flex: 0 0 28px; width: 28px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #777; opacity: 0; visibility: hidden; transition: opacity 140ms, visibility 140ms; margin-left: -8px; }
+    .clear svg { width: 18px; height: 18px; }
+    .is-open .clear { opacity: 1; visibility: visible; }
+    .find { flex: 0 0 132px; height: 54px; border: 0; border-radius: 27px; background: var(--blue); color: white; font-size: 14px; transition: flex-basis var(--duration) var(--ease), height var(--duration) var(--ease), border-radius var(--duration) var(--ease), background 150ms; }
+    .find:hover { background: #1d53d5; }
+    .find:active { background: #1847bc; }
+    .is-open .find { flex-basis: 122px; height: 50px; border-radius: 25px; }
+    .panel { opacity: 0; transform: translateY(-6px); transition: opacity 180ms ease, transform var(--duration) var(--ease); }
+    .is-open .panel { opacity: 1; transform: translateY(0); }
+    .panel-inner { padding: 0 8px 4px; }
+    .separator { height: 1px; margin: 0 10px 8px; background: #e9e9e9; }
+    .results { margin: 0; padding: 0; list-style: none; }
+    .result { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 12px 18px; border-radius: 24px; cursor: pointer; transition: border-radius var(--duration) var(--ease), background 120ms; }
+    .is-open .result { border-radius: 16px; }
+    .result[aria-selected="true"], .result:hover { background: #f0f1f5; }
+    .name { font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
+    .meta { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .arrow { color: #858585; font-size: 18px; }
+    mark { padding: 0; background: transparent; color: inherit; font-weight: 700; }
+    .bottom { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin: 8px 10px 0; padding: 0 8px; border-top: 1px solid #e9e9e9; font-size: 12px; color: var(--muted); }
+    .empty { padding: 25px 18px 28px; }
+    .empty p { margin: 0; }
+    .empty .meta { margin-top: 8px; }
+    .caption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; margin: 24px 20px 0; color: var(--muted); font-size: 12px; }
+    .tip { margin: 52px 20px 0; color: var(--muted); font-size: 13px; }
+    .tip button { border: 0; padding: 2px 0; border-bottom: 1px solid #ccc; color: #444; background: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 600px) {
+      main { width: calc(100% - 32px); margin: 40px auto; }
+      .eyebrow { font-size: 9px; letter-spacing: 1.2px; }
+      .demo { margin-top: 42px; }
+      .row { gap: 10px; padding-left: 20px; }
+      input { font-size: 16px; }
+      .magnify { width: 18px; height: 18px; flex-basis: 18px; }
+      .find, .is-open .find { flex-basis: 82px; font-size: 13px; }
+      .clear { flex-basis: 22px; width: 22px; margin-left: -4px; }
+      .name { font-size: 16px; }
+      .result { padding-left: 12px; padding-right: 12px; }
+      .caption, .tip { margin-left: 8px; margin-right: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 1ms !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Инвольта гид · интерактивный макет</p>
+    <h1>Капсула. <em>В движении.</em></h1>
+    <p class="intro">Начни писать — поиск раскроется вниз, а скругления станут мягче и компактнее. Удали текст — вернётся капсула.</p>
+    <section class="demo" aria-label="Демонстрация поиска">
+      <form class="search" id="search" autocomplete="off">
+        <div class="row">
+          <svg class="magnify" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.2"/><path d="m16 16 5 5"/></svg>
+          <input id="query" type="text" placeholder="Город, район, курорт" aria-label="Город, район, курорт" role="combobox" aria-autocomplete="list" aria-controls="results" aria-expanded="false" spellcheck="false">
+          <button class="clear" id="clear" type="button" aria-label="Очистить поиск" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+          <button class="find" type="submit">Найти</button>
+        </div>
+        <div class="panel" id="panel" inert aria-hidden="true">
+          <div class="panel-inner" id="panel-content">
+            <div class="separator"></div>
+            <ul class="results" id="results" role="listbox" aria-label="Локации"></ul>
+            <div class="empty" id="empty" hidden><p>Пока нет совпадений</p><p class="meta">В макете только несколько локаций. Анимация работает с любым словом.</p></div>
+            <div class="bottom"><span id="count">Подсказки на тестовых данных</span><span aria-hidden="true">→</span></div>
+          </div>
+        </div>
+      </form>
+      <div class="caption"><span>Капсула Б → раскрытая форма А</span><span>40 → 24 px · 420 мс</span></div>
+      <p class="tip">Попробуй <button type="button" id="example">«нов»</button>, любое другое слово или сотри всё крестиком.</p>
+      <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script>
+    // Автономный макет: никаких запросов, библиотек или сохранения введённых данных.
+    const locations = [
+      ['Великий Новгород', 'Город · Новгородская область'],
+      ['Нижний Новгород', 'Город · Нижегородская область'],
+      ['Новосибирск', 'Город · Новосибирская область'],
+      ['Иваново', 'Город · Ивановская область'],
+      ['Москва', 'Город'], ['Санкт-Петербург', 'Город'],
+      ['Сочи', 'Город · Краснодарский край'], ['Адлер', 'Район · Сочи'],
+      ['Сириус', 'Федеральная территория'], ['Красная Поляна', 'Курорт · Краснодарский край'],
+      ['Казань', 'Город · Республика Татарстан'], ['Шуя', 'Город · Ивановская область']
+    ];
+    const search = document.querySelector('#search');
+    const query = document.querySelector('#query');
+    const clear = document.querySelector('#clear');
+    const panel = document.querySelector('#panel');
+    const content = document.querySelector('#panel-content');
+    const results = document.querySelector('#results');
+    const empty = document.querySelector('#empty');
+    const count = document.querySelector('#count');
+    const announcement = document.querySelector('#announcement');
+    let matches = [], active = 0, open = false;
+    const normalize = value => value.toLocaleLowerCase('ru').replaceAll('ё', 'е');
+
+    function resize() {
+      // Числовая высота позволяет плавно разворачивать переход даже посреди анимации.
+      search.style.height = `${80 + (open ? content.offsetHeight : 0)}px`;
+    }
+
+    function select(index) {
+      active = index;
+      [...results.children].forEach((node, i) => node.setAttribute('aria-selected', String(i === active)));
+      if (matches.length) query.setAttribute('aria-activedescendant', `location-${active}`);
+      else query.removeAttribute('aria-activedescendant');
+    }
+
+    function update() {
+      const term = normalize(query.value.trim());
+      open = query.value.length > 0;
+      const all = term ? locations.filter(([name]) => normalize(name).includes(term)) : [];
+      matches = all.slice(0, 3);
+      results.replaceChildren();
+      matches.forEach(([name, meta], index) => {
+        const item = document.createElement('li');
+        item.className = 'result'; item.id = `location-${index}`; item.setAttribute('role', 'option');
+        const copy = document.createElement('div');
+        const title = document.createElement('div'); title.className = 'name';
+        const start = normalize(name).indexOf(term);
+        const mark = document.createElement('mark'); mark.textContent = name.slice(start, start + term.length);
+        title.append(name.slice(0, start), mark, name.slice(start + term.length));
+        const subtitle = document.createElement('div'); subtitle.className = 'meta'; subtitle.textContent = meta;
+        const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→'; arrow.setAttribute('aria-hidden', 'true');
+        copy.append(title, subtitle); item.append(copy, arrow);
+        item.addEventListener('pointerdown', event => event.preventDefault());
+        item.addEventListener('click', () => choose(index));
+        results.append(item);
+      });
+      empty.hidden = matches.length > 0;
+      count.textContent = all.length ? `Все результаты · ${all.length}` : 'Демонстрация формы поиска';
+      search.classList.toggle('is-open', open);
+      query.setAttribute('aria-expanded', String(open));
+      panel.inert = !open; panel.setAttribute('aria-hidden', String(!open));
+      clear.tabIndex = open ? 0 : -1;
+      select(0);
+      resize();
+    }
+
+    function choose(index) {
+      if (!matches[index]) return;
+      query.value = matches[index][0]; update(); query.focus();
+      announcement.textContent = `Выбрано: ${query.value}. Это макет, переход на страницу не выполняется.`;
+    }
+
+    query.addEventListener('input', update);
+    clear.addEventListener('click', () => { query.value = ''; update(); query.focus(); });
+    document.querySelector('#example').addEventListener('click', () => { query.value = 'нов'; update(); query.focus(); });
+    query.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { query.value = ''; update(); }
+      if (open && matches.length && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault(); select((active + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length);
+      }
+    });
+    search.addEventListener('submit', event => {
+      event.preventDefault();
+      if (matches.length) choose(active);
+      else { query.focus(); announcement.textContent = 'Это демонстрация анимации на тестовых данных.'; }
+    });
+    new ResizeObserver(resize).observe(content);
+  </script>
+</body>
+</html>

@@ -4,10 +4,16 @@
   const input = form.querySelector('input[name="q"]');
   const clear = form.querySelector('.search-clear');
   const panel = form.querySelector('.search-suggestions');
+  const content = form.querySelector('.search-panel-content');
+  const control = form.querySelector('.search-control');
+  const surface = form.querySelector('.search-surface');
+  const inputRow = form.querySelector('.search-input-row');
   const footer = form.querySelector('.search-menu-footer');
   const status = form.querySelector('[role="status"]');
-  let rows = [], message = '', generation = 0, renderGeneration = -1, timer, loadingTimer, request;
+  let rows = [], message = '', generation = 0, renderGeneration = -1, timer, request;
   let composing = false;
+  let expanded = false, closeTimer;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   const folded = value => value.toLowerCase().replaceAll('ё', 'е');
   function title(element, value) {
@@ -61,8 +67,8 @@
       }
     },
     events: {input: {
-      input: () => { clear.hidden = !input.value; invalidate(); if (!composing) schedule(); },
-      focus: () => { if (!composing) schedule(); },
+      input: () => begin(),
+      focus: () => { if (!composing) begin(); },
       blur: () => invalidate(),
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
@@ -86,26 +92,60 @@
       open: () => {
         if (renderGeneration !== generation || document.activeElement !== input || composing) { widget.close(); return; }
         panel.hidden = false;
+        panel.inert = false;
+        panel.setAttribute('aria-hidden', 'false');
+        clearTimeout(closeTimer);
+        // Establish the closed panel style before starting its opacity/transform transition.
+        panel.getBoundingClientRect();
+        expanded = true;
+        control.classList.add('is-open');
+        requestAnimationFrame(fitResults);
       },
-      close: () => { panel.hidden = true; }
+      close: () => {
+        expanded = false;
+        panel.inert = true;
+        panel.setAttribute('aria-hidden', 'true');
+        control.classList.remove('is-open');
+        // The library hides its list immediately; keep it painted while it fades out.
+        widget.list.hidden = false;
+        panel.style.minHeight = '';
+        resizeSurface();
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(() => {
+          if (!expanded) { panel.hidden = true; widget.list.hidden = true; }
+        }, reducedMotion.matches ? 0 : 420);
+      }
     }}
   });
   input.setAttribute('aria-autocomplete', 'list');
   clear.hidden = !input.value;
 
-  function invalidate() {
+  function invalidate(close = true) {
     generation++;
-    clearTimeout(timer); clearTimeout(loadingTimer);
+    clearTimeout(timer);
     request?.abort(); request = undefined;
-    widget.close(); input.removeAttribute('aria-busy'); status.textContent = '';
+    if (close) widget.close();
+    input.removeAttribute('aria-busy'); status.textContent = '';
   }
   function current(version) {
     return version === generation && document.activeElement === input && !composing;
   }
-  function show(items, text = '') {
+  function show(items, text = '', pending = false) {
+    if (!pending) panel.style.minHeight = '';
     rows = items; message = text; renderGeneration = generation;
     footer.hidden = !items.length && !!text;
     widget.start(input.value);
+  }
+  function begin() {
+    clear.hidden = !input.value;
+    invalidate(false);
+    if (composing) { widget.close(); return; }
+    const length = input.value.trim().length;
+    if (!length) { widget.close(); return; }
+    // Preserve the current height while fetching, without leaving stale options selectable.
+    if (expanded && length >= 2) panel.style.minHeight = panel.offsetHeight + 'px';
+    show([], length < 2 ? 'Продолжайте ввод…' : 'Ищем…', length >= 2);
+    if (length >= 2) schedule();
   }
   function schedule() {
     if (input.value.trim().length < 2) return;
@@ -117,7 +157,6 @@
     const controller = new AbortController(); request = controller;
     const timeout = setTimeout(() => controller.abort(), 4000);
     input.setAttribute('aria-busy', 'true');
-    loadingTimer = setTimeout(() => { if (current(version)) show([], 'Ищем…'); }, 250);
     try {
       const url = new URL(form.dataset.suggestUrl, location.href);
       url.searchParams.set('q', input.value.trim());
@@ -134,26 +173,32 @@
     } finally {
       clearTimeout(timeout);
       if (current(version)) {
-        clearTimeout(loadingTimer); input.removeAttribute('aria-busy'); request = undefined;
+        input.removeAttribute('aria-busy'); request = undefined;
       }
     }
   }
   function fitResults() {
-    if (panel.hidden) return;
+    if (!expanded) return;
     const viewport = window.visualViewport;
     const bottom = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight);
     if (innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
-      form.querySelector('.search-control').scrollIntoView({block: 'start', behavior: 'instant'});
+      control.scrollIntoView({block: 'start', behavior: 'instant'});
     }
     const list = form.querySelector('.destination-results');
     const room = bottom - list.getBoundingClientRect().top - footer.getBoundingClientRect().height - 24;
     form.style.setProperty('--search-results-height', Math.max(72, Math.min(456, room)) + 'px');
+    resizeSurface();
+  }
+  function resizeSurface() {
+    surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
   }
   input.addEventListener('compositionstart', () => { composing = true; invalidate(); });
-  input.addEventListener('compositionend', () => { composing = false; invalidate(); schedule(); });
+  input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { invalidate(); input.value = ''; clear.hidden = true; input.focus(); });
   footer.addEventListener('mousedown', event => event.preventDefault());
   form.addEventListener('submit', () => invalidate());
   window.addEventListener('resize', fitResults);
   window.visualViewport?.addEventListener('resize', fitResults);
+  new ResizeObserver(resizeSurface).observe(content);
+  resizeSurface();
 })();

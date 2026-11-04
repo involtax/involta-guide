@@ -34,15 +34,23 @@ def test_real_search_keyboard_touch_footer_and_javascript_free_form(database, tm
             page.goto(origin + "/guide/")
             field = page.get_by_role("combobox", name="Куда отправимся?")
             button = page.get_by_role("button", name="Найти", exact=True)
-            assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
-            assert (
-                button.evaluate("el=>getComputedStyle(el).backgroundColor") == "rgb(20, 119, 207)"
+            assert button.evaluate("el=>getComputedStyle(el).fontSize") == (
+                "13px" if width == 390 else "14px"
             )
+            assert button.evaluate("el=>getComputedStyle(el).backgroundColor") == "rgb(40, 97, 235)"
             field.fill("нов")
             expect(page.get_by_role("option")).to_have_count(6)
             field.press("ArrowDown")
             expect(page.get_by_role("option").first).to_have_attribute("aria-selected", "true")
             assert "Великий Новгород" in page.get_by_role("option").first.inner_text()
+            page.wait_for_function("""() => {
+                const shell = document.querySelector('.search-surface');
+                return !shell.getAnimations().length && shell.offsetHeight > 80;
+            }""")
+            assert (
+                page.locator(".search-surface").evaluate("el=>getComputedStyle(el).borderRadius")
+                == "24px"
+            )
             page.screenshot(path=str(tmp_path / f"search-{label}.png"), full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
             field.fill("пле")
@@ -160,4 +168,56 @@ def test_late_responses_escape_ime_error_and_untrusted_titles(database):
         field.press("Enter")
         page.wait_for_url(re.compile(r"\?q="))
         assert parse_qs(urlsplit(page.url).query)["q"] == ["ошиб"]
+        browser.close()
+
+
+def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motion(database):
+    settings, _ = database
+    with serving(create_app(settings)) as origin, sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        page = browser.new_page(viewport={"width": 1440, "height": 1100})
+        requests = []
+
+        def suggest(route):
+            requests.append(route.request.url)
+            route.fulfill(
+                json={"items": [{"name": "Новгород", "context": "Город", "url": "/guide/novgorod"}]}
+            )
+
+        page.route("**/api/locations/suggest?*", suggest)
+        page.goto(origin + "/guide/")
+        field = page.get_by_role("combobox", name="Куда отправимся?")
+        shell = page.locator(".search-surface")
+        panel = page.locator(".search-suggestions")
+        city_top = page.locator(".cities").bounding_box()["y"]
+        assert shell.evaluate("el=>el.offsetHeight") == 80
+        assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
+        field.fill("н")
+        expect(page.locator(".search-message")).to_have_text("Продолжайте ввод…")
+        page.wait_for_timeout(250)
+        assert not requests
+        field.fill("нов")
+        expect(page.get_by_role("option")).to_have_count(1)
+        page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
+        expanded_height = shell.evaluate("el=>el.getBoundingClientRect().height")
+        assert expanded_height > 80
+        assert page.locator(".cities").bounding_box()["y"] == city_top
+        field.press("Escape")
+        expect(panel).to_have_attribute("inert", "")
+        expect(field).to_have_value("нов")
+        page.wait_for_timeout(80)
+        assert 80 < shell.evaluate("el=>el.getBoundingClientRect().height") < expanded_height
+        field.fill("новг")
+        expect(panel).to_have_attribute("aria-hidden", "false")
+        expect(page.get_by_role("option")).to_have_count(1)
+        page.wait_for_timeout(480)
+        expect(panel).to_be_visible()
+        assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "24px"
+        page.emulate_media(reduced_motion="reduce")
+        field.press("Escape")
+        expect(panel).to_be_hidden()
+        page.wait_for_function("document.querySelector('.search-surface').offsetHeight === 80")
+        assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         browser.close()

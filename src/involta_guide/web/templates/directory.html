@@ -21,11 +21,14 @@
 <div class="search-input-row">
 <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
 <input id="destination" type="search" name="q" value="{{q}}" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-describedby="search-status">
-<button type="button" class="search-clear" aria-label="Очистить поиск" hidden>×</button>
+<button type="button" class="search-clear" aria-label="Очистить поиск" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
 <button type="submit" class="search-submit">Найти</button>
 </div>
-<div class="search-suggestions" hidden>
+<div class="search-suggestions" hidden inert aria-hidden="true">
+<div class="search-panel-content">
+<div class="search-separator" aria-hidden="true"></div>
 <div class="search-menu-footer"><button type="submit">Все результаты <span aria-hidden="true">→</span></button></div>
+</div>
 </div>
 </div>
 </div>
