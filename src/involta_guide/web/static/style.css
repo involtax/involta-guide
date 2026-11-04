@@ -157,20 +157,57 @@ main {
   margin: 0 auto;
 }
 .about-page {
-  max-width: 780px;
-  padding-top: 64px;
-  padding-bottom: 80px;
+  max-width: 720px;
+  padding: 32px 25px 40px;
 }
-.about-page h1 {
-  font-size: clamp(44px, 7vw, 72px);
-  margin-bottom: 32px;
+.about-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.about-page p {
-  margin-bottom: 24px;
+.about-steps > li {
+  padding: 25px 0 28px;
+  border-top: 1px solid var(--line);
 }
-.about-back {
-  display: inline-block;
-  margin-top: 20px;
+.about-steps > li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.about-steps > li:last-child {
+  padding-bottom: 0;
+}
+.about-steps h2 {
+  margin: 0 0 17px;
+  font-size: clamp(36px, 10.7vw, 48px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+.about-steps h2 em {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+}
+.about-steps p {
+  max-width: 540px;
+  margin: 0;
+  color: var(--black);
+  font-size: 17px;
+  line-height: 1.5;
+}
+@media (min-width: 760px) {
+  .about-page {
+    padding: 48px 40px 56px;
+  }
+  .about-steps > li {
+    padding: 30px 0 34px;
+  }
+  .about-steps h2 {
+    margin-bottom: 20px;
+    font-size: 60px;
+  }
+  .about-steps p {
+    font-size: 19px;
+  }
 }
 .hero {
   padding: 75px 0 60px;
