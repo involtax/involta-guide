@@ -23,7 +23,9 @@ class AudienceStats(BaseHTTPMiddleware):
             return response
         # The footer and visitor identity belong to this browser, never a shared cache.
         response.headers["Cache-Control"] = "private, no-store"
-        response.headers.append("Vary", "Cookie")
+        vary = {value.strip().lower() for value in response.headers.get("Vary", "").split(",")}
+        if "cookie" not in vary:
+            response.headers.append("Vary", "Cookie")
         if (
             request.method != "GET"
             or response.status_code != 200
