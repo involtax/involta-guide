@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from involta_guide.application.ports.repositories import Record
 from involta_guide.domain.entities import RuleViolation
-from involta_guide.domain.rules import KINDS, similarity
+from involta_guide.domain.rules import KINDS
 
 from ..models import Base
 
@@ -273,35 +273,12 @@ class PostgresRepository:
         result = self.query(
             "SELECT count(*) total,count(*) FILTER (WHERE initialized_at IS NULL) empty,count(*) FILTER (WHERE initialized_at IS NOT NULL) published FROM locations"
         )[0]
-        result["pending_reviews"] = self.query(
-            "SELECT count(*) n FROM reviews WHERE moderation='pending'"
-        )[0]["n"]
+        result["reviews"] = self.query("SELECT count(*) n FROM reviews")[0]["n"]
         result["jobs"] = self.query("SELECT status,count(*) n FROM jobs GROUP BY status")
         result["usage"] = self.query(
             "SELECT count(*) calls,coalesce(sum(input_tokens),0) input_tokens,coalesce(sum(output_tokens),0) output_tokens FROM ai_usage WHERE created_at>=CURRENT_DATE"
         )[0]
         return result
-
-    def signals(self, review: Record) -> list[Record]:
-        matches = []
-        for other in self.rows("reviews", limit=500):
-            if other["id"] == review["id"]:
-                continue
-            ratio = similarity(review["transcript"], other["transcript"])
-            same = other["hash"] == review["hash"]
-            visitor = other["visitor"] == review["visitor"]
-            ip = other["ip"] == review["ip"]
-            if ratio >= 0.45 or same or visitor or ip:
-                matches.append(
-                    {
-                        **other,
-                        "similarity": ratio,
-                        "sameAudio": same,
-                        "sameVisitor": visitor,
-                        "sameIp": ip,
-                    }
-                )
-        return sorted(matches, key=lambda row: (-row["sameAudio"], -row["similarity"]))[:20]
 
     def phone_proposals(self) -> list[Record]:
         return self.query(
