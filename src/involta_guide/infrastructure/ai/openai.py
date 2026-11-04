@@ -122,7 +122,7 @@ class OpenAIProvider:
             "text": {
                 "format": {
                     "type": "json_schema",
-                    "name": "generation_v3",
+                    "name": "generation_v4",
                     "schema": GenerationResult.model_json_schema(),
                     "strict": False,
                 }
@@ -150,11 +150,11 @@ class OpenAIProvider:
         with self.engine.connect() as conn:
             request_schema = conn.execute(
                 text(
-                    "SELECT request_json->'text'->'format'->'schema' FROM generation_requests WHERE job_id=:id"
+                    "SELECT request_json->'text'->'format' FROM generation_requests WHERE job_id=:id"
                 ),
                 {"id": job_id},
             ).scalar_one()
         # Already submitted responses retain their recorded contract and remain reprocessable.
-        if "candidates" not in request_schema.get("properties", {}):
+        if "candidates" not in request_schema.get("schema", {}).get("properties", {}):
             return raw
-        return generation_content(raw)
+        return generation_content(raw, recorded=request_schema.get("name") != "generation_v4")

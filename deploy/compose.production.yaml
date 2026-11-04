@@ -5,6 +5,7 @@ services:
     image: ${IMAGE_REF:?A digest-pinned IMAGE_REF is required}
     labels:
       com.involta.guide.owner: production
+    init: true
     restart: unless-stopped
     env_file: ${DEPLOY_ROOT:?}/.env.production
     environment:
@@ -27,6 +28,7 @@ services:
     image: ${IMAGE_REF:?}
     labels:
       com.involta.guide.owner: production
+    init: true
     restart: unless-stopped
     env_file: ${DEPLOY_ROOT:?}/.env.production
     environment:

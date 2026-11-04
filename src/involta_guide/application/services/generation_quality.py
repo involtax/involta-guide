@@ -9,20 +9,33 @@ from involta_guide.domain.plain_text import clean_editorial_text
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score
 
 CANDIDATE_LIMIT = 10
+PUBLISHED_LIMIT = 3
 
 
-def generation_content(raw: dict[str, Any]) -> dict[str, Any]:
+def generation_content(raw: dict[str, Any], *, recorded: bool = False) -> dict[str, Any]:
     """Build the existing server views from one validated research record per candidate."""
-    from involta_guide.application.commands.schemas import GenerationResult
+    from involta_guide.application.commands.schemas import (
+        GenerationResult,
+        RecordedGenerationResult,
+    )
 
-    research = GenerationResult.model_validate(raw)
+    schema = RecordedGenerationResult if recorded else GenerationResult
+    research = schema.model_validate(raw)
     cards, ranking, manifest = [], [], []
     for candidate in research.candidates:
         item = candidate.model_dump(mode="json")
         manifest.append(
             {
                 key: item[key]
-                for key in ("name", "mapsUrl", "status", "reason", "sources", "exclusionCode")
+                for key in (
+                    "name",
+                    "mapsUrl",
+                    "status",
+                    "reason",
+                    "sources",
+                    "exclusionCode",
+                    "verificationIssues",
+                )
             }
         )
         if candidate.status == "verified":
@@ -157,7 +170,9 @@ def assess_coverage(content: dict[str, Any], normalization: dict[str, Any]) -> d
         issues.append(
             "В сохранённом ответе нет структурированного отчёта обхода; полнота не подтверждена."
         )
-    for name, lead in _legacy_leads(content.get("warnings", [])).items():
+    # A structured report owns its shortlist. A passing mention in a warning is not a task.
+    legacy = {} if structured else _legacy_leads(content.get("warnings", []))
+    for name, lead in legacy.items():
         if name not in by_name:
             by_name[name] = lead
             if structured:

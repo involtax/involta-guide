@@ -1,44 +1,5 @@
 {
   "$defs": {
-    "AnalysisResult": {
-      "additionalProperties": false,
-      "properties": {
-        "outcome": {
-          "enum": [
-            "review",
-            "no_action"
-          ],
-          "title": "Outcome",
-          "type": "string"
-        },
-        "reason": {
-          "default": "",
-          "title": "Reason",
-          "type": "string"
-        },
-        "entries": {
-          "items": {
-            "$ref": "#/$defs/ReviewFragment"
-          },
-          "maxItems": 20,
-          "title": "Entries",
-          "type": "array"
-        },
-        "suggestions": {
-          "items": {
-            "$ref": "#/$defs/Suggestion"
-          },
-          "maxItems": 20,
-          "title": "Suggestions",
-          "type": "array"
-        }
-      },
-      "required": [
-        "outcome"
-      ],
-      "title": "AnalysisResult",
-      "type": "object"
-    },
     "LocationContext": {
       "additionalProperties": false,
       "properties": {
@@ -148,6 +109,8 @@
         },
         "kind": {
           "enum": [
+            "recording_received",
+            "gigaam_ready",
             "transcript_ready",
             "analysis_ready",
             "processing_failed"
@@ -169,10 +132,18 @@
           "$ref": "#/$defs/SubmissionMetadata"
         },
         "transcript": {
-          "maxLength": 30000,
-          "minLength": 1,
-          "title": "Transcript",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 30000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transcript"
         },
         "analysis": {
           "anyOf": [
@@ -228,7 +199,6 @@
         "reference",
         "run",
         "metadata",
-        "transcript",
         "sha256",
         "mime",
         "duration",
@@ -278,170 +248,6 @@
         "name"
       ],
       "title": "RestaurantContext",
-      "type": "object"
-    },
-    "ReviewFragment": {
-      "additionalProperties": false,
-      "properties": {
-        "restaurantId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Restaurantid"
-        },
-        "restaurantName": {
-          "default": "",
-          "title": "Restaurantname",
-          "type": "string"
-        },
-        "candidates": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "maxItems": 10,
-          "title": "Candidates",
-          "type": "array"
-        },
-        "quote": {
-          "maxLength": 20000,
-          "minLength": 1,
-          "title": "Quote",
-          "type": "string"
-        },
-        "start": {
-          "minimum": 0,
-          "title": "Start",
-          "type": "integer"
-        },
-        "end": {
-          "exclusiveMinimum": 0,
-          "title": "End",
-          "type": "integer"
-        },
-        "type": {
-          "default": "review",
-          "enum": [
-            "review",
-            "rating"
-          ],
-          "title": "Type",
-          "type": "string"
-        },
-        "text": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Text"
-        },
-        "sentiment": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                }
-              ],
-              "ge": -10,
-              "le": 10
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Sentiment"
-        },
-        "recommendation": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                }
-              ],
-              "ge": -10,
-              "le": 10
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Recommendation"
-        },
-        "rating": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                }
-              ],
-              "ge": 0,
-              "le": 10
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Rating"
-        },
-        "confidence": {
-          "default": 0,
-          "maximum": 1,
-          "minimum": 0,
-          "title": "Confidence",
-          "type": "number"
-        },
-        "topics": {
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 20,
-          "title": "Topics",
-          "type": "array"
-        },
-        "experience": {
-          "default": "unknown",
-          "enum": [
-            "personal",
-            "hearsay",
-            "unknown"
-          ],
-          "title": "Experience",
-          "type": "string"
-        }
-      },
-      "required": [
-        "quote",
-        "start",
-        "end"
-      ],
-      "title": "ReviewFragment",
       "type": "object"
     },
     "SubmissionMetadata": {
@@ -571,12 +377,6 @@
           "default": null,
           "title": "Error"
         },
-        "moderation": {
-          "const": "pending",
-          "default": "pending",
-          "title": "Moderation",
-          "type": "string"
-        },
         "repeat_signals": {
           "additionalProperties": {
             "type": "integer"
@@ -595,58 +395,6 @@
       ],
       "title": "SubmissionStatus",
       "type": "object"
-    },
-    "Suggestion": {
-      "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "enum": [
-            "edit",
-            "restaurant"
-          ],
-          "title": "Kind",
-          "type": "string"
-        },
-        "restaurantId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Restaurantid"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "quote": {
-          "minLength": 1,
-          "title": "Quote",
-          "type": "string"
-        },
-        "reason": {
-          "title": "Reason",
-          "type": "string"
-        },
-        "changes": {
-          "additionalProperties": true,
-          "title": "Changes",
-          "type": "object"
-        }
-      },
-      "required": [
-        "kind",
-        "quote",
-        "reason"
-      ],
-      "title": "Suggestion",
-      "type": "object"
     }
   },
   "anyOf": [
@@ -658,9 +406,6 @@
     },
     {
       "$ref": "#/$defs/OutboxEvent"
-    },
-    {
-      "$ref": "#/$defs/AnalysisResult"
     },
     {
       "$ref": "#/$defs/LocationReset"

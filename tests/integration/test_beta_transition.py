@@ -125,8 +125,9 @@ def test_populated_released_transition_preserves_owners_and_clears_incompatible_
                 conn.execute(text("SELECT value FROM settings WHERE key='beta-marker'")).scalar()
                 == "keep"
             )
-            assert conn.execute(text("SELECT action FROM audit")).scalars().all() == [
-                "prompt_contract"
+            assert conn.execute(text("SELECT action,target FROM audit ORDER BY target")).all() == [
+                ("prompt_contract", "filling_top3"),
+                ("prompt_contract", "filling_v3"),
             ]
             for table in ["reviews", "jobs", "request_logs"]:
                 assert conn.execute(text("SELECT count(*) FROM " + table)).scalar() == 0
@@ -150,8 +151,8 @@ def test_populated_voice_v3_transition_deletes_files_explicitly_and_keeps_sequen
     settings, engine = voice_database
     # This DB/role is disposable and belongs solely to this test.
     with engine.begin() as conn:
-        conn.exec_driver_sql("DROP SCHEMA public CASCADE")
-        conn.exec_driver_sql("CREATE SCHEMA public")
+        conn.exec_driver_sql(f"DROP SCHEMA {settings.database_schema} CASCADE")
+        conn.exec_driver_sql(f"CREATE SCHEMA {settings.database_schema}")
         from pathlib import Path
 
         import involta_voice

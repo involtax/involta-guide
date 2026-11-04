@@ -127,8 +127,13 @@
 </div>
 </section>
 {%endif%}
-{%if public_reviews%}<section aria-label="Отзывы посетителей"><h2>Отзывы посетителей</h2>{%for review in public_reviews%}<article>{%if review.restaurant_name%}<h3>{{review.restaurant_name}}</h3>{%endif%}<p>{{review.editorial_text}}</p><small>{{review.created_at.strftime('%d.%m.%Y')}}</small></article>{%endfor%}</section>{%endif%}
-{%if not location.is_hub%}<div id="guide-voice"></div>{%endif%}
+{%if not location.is_hub%}
+<div id="guide-voice"></div>
+<section data-public-reviews class="public-reviews" aria-label="Отзывы" {%if not public_reviews%}hidden{%endif%}>
+<h2>Отзывы</h2><div class="reviews">
+{%for review in public_reviews%}<p data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}"><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}}</time><br><span class="transcript">{{review.transcript or 'Расшифровка…'}}</span><a class="review-log" href="{{settings.path('/logs/reviews/'+location.slug+'/'+review.number|string)}}">Лог ↗</a></p>{%endfor%}
+</div></section>
+{%endif%}
 <script type="application/ld+json">{{structured|tojson}}</script>
 </main>
 {%endblock%}

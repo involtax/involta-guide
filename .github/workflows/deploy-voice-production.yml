@@ -10,7 +10,7 @@ on:
         description: "Release full stack, or inspect beta progress"
         type: choice
         default: release
-        options: [release, report, backfill]
+        options: [release, report]
 permissions:
   contents: read
 concurrency:
@@ -95,9 +95,6 @@ jobs:
       - name: Verify public HTTPS release
         if: inputs.operation == 'release'
         run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA" external
-      - name: Compare all retained recordings without applying reviews or commands
-        if: inputs.operation != 'report'
-        run: bash deploy/ssh-release.sh voice-backfill
       - name: Report health and beta progress
         run: bash deploy/ssh-release.sh voice-report
       - name: Verify authenticated pages and revoke the test session

@@ -1,159 +1,73 @@
+> Интеграция #28–31: единственная общая лента для всех, GET /voice/api/v1/reviews?location={slug}.
+> Никакого личного списка; SSR HTML и виджет обновляют одни DOM-записи.
+
 # Голосовой виджет: реализация и проверка
 
-Актуальное поведение по решению владельца от 04.11.2026: касание микрофона →
-запись → ручной стоп/автостоп → автоматический upload. Плеера, отдельной отправки,
-перезаписи и состояния preview нет. Смысл записи виджет не фильтрует.
+Текущее поведение определено в [UX-ТЗ](VOICE_WIDGET_UX_SPEC.md): одна автоматическая
+отправка после стопа, без браузерного хранения аудио, восстановления и повтора.
+На базе main 983e52b сохранены оформление №2, движение микрофона, VAD, минимум 5 с,
+автостоп и единый серверный журнал. ASR, анализ и модерация не меняются.
 
-База — main `67c1db6` с упрощённой архитектурой беты и content_epoch. Один существующий
-SDK в Shadow DOM, один элемент управления на странице. В Guide gateway исправлено
-наличие created_at в fallback при недоступном Voice; онлайн сохраняется исходное
-время Voice. ASR/анализ, модерация и схемы БД не меняются.
+## Что удалено
 
-## Выбранный вариант №2
+IndexedDB-очередь blob/key/epoch, restore/save/block, состояние retry, иконка повтора,
+локальное скачивание аудио и отдельный current-result. Старая база
+involta-voice-drafts удаляется при запуске SDK. Серверные отзывы/аудио/логи и cookie
+владельца не удаляются. После ошибки следующий клик записывает новый отзыв.
+Серверные idempotency key и content_epoch защищают единственную отправку.
 
-[ТЗ и эталон](VOICE_WIDGET_DESIGN_SPEC.md) взяты из ветки design/voice-section-options.
-Тонкая линия #151515, слева uppercase-рубрика и заголовок Arial 34 px (31 px на
-узкой ширине), Georgia italic только на «ресторане.». Микрофон 72 px / SVG 25 px
-центрируется по всей доступной ширине, заголовок ограничен 620 px. Адаптивность
-учитывает ширину контейнера через container query, включая узкий standalone на
-широком экране. В idle нет подписи, строки «От 5 секунд» и пустых CSS-рядов.
+## Единый список
 
-В истории и под новой расшифровкой — time с настоящим created_at, отформатированным
-в часовом поясе браузера, без «Ожидает редактора». Неверное/отсутствующее время
-не заменяется временем открытия страницы. Подсказка «Прослушай и отправь отзыв» удалена.
+После 202 запись сразу добавляется в «Отзывы» с «Расшифровка…» и серверным created_at,
+если он уже известен. GET /reviews обновляет тот же элемент до появления
+текста или терминальной ошибки. В списке нет второго экземпляра нового отзыва,
+редакторского статуса и отдельной подписи «Текст отзыва сохранён».
 
-## Проверить на стенде
+Обновление списка не меняет текущий микрофон. Счётчик чтений отсекает старый ответ
+до принятия нового отзыва; подтверждённая запись остаётся до появления в списке
+сервера. Новый content_epoch очищает прежний цикл. При недоступном Voice сохраняется
+существующий Guide fallback с service_available=false.
 
-```sh
-python tools/voice-widget-demo.py --port 33091
-```
+Диагностика v3 передаёт recording (байты, MIME, длительность, epoch), без локального
+аудио. Общий журнал читает этот формат и прежние сохранённые draft-метрики.
+API приёма, owner-права, размер и серверный минимум прежние; список дополнен текущим
+content_epoch локации. JSON/HTML-представление журнала сохраняет правила приватности.
 
-Открыть http://localhost:33091/guide/ivanovo с микрофоном. Нужен localhost либо
-собственный HTTPS. SDK, MediaRecorder, AudioContext и локальный Silero настоящие;
-upload перехватывается в браузере, Guide/Voice worker/ASR/OpenAI не вызываются.
-Демонстрационная расшифровка подписана. Переключатель под виджетом позволяет
-проверить успех, HTML 502, потерянный ответ после принятия, отказ по длине и сбой VAD.
-
-После штатного стопа запись сама отправляется в mock. На ошибке тот же кружок
-показывает «Повторить отправку». Reload восстанавливает аудио и прежний ключ для
-повтора, без автоматической отправки при открытии страницы. При 422 по длине
-повтор запрещён, остаются скачивание в диагностике и микрофон для нового отзыва.
-Плеера нет ни в нормальном сценарии, ни при восстановлении/ошибке.
-
-## Управление и гарантии
-
-- Круглый микрофон 72 px / SVG 25 px, центр основной доступной ширины; рубрика и
-  инструкция постоянно над ним слева. Во время записи на том же button появляется стоп.
-- Запуск по pointerdown без искусственных задержек. Изначальный pointerup/click
-  не нажимает стоп; Enter/Space и screen reader также выполняют одно действие.
-- Голубая браузерная подсветка отключена внутри Shadow DOM. Только на кружке
-  touch-action: none и запрет выделения/callout; страница вокруг скроллится.
-- Pointer capture сохраняет исходный жест за пределами круга. Движение вверх
-  возможно сразу или после нескольких секунд удержания; одна запись продолжается.
-- Круг следует transform с сопротивлением (вверх в доступном зазоре под заголовком,
-  в стороны до 36 px, вниз до 16), лёгкой тенью/увеличением, возвращается за 240 мс.
-  Компактный idle не требует пустого резерва 64 px, инструкция не перекрывается;
-  текст/таймер не прыгают. Reduced motion отключает пружину/масштабирование.
-- Ручной стоп, тишина, no-speech и 120 с финализируют/сохраняют/отправляют запись.
-  Отмена не отправляет; системное прерывание/unmount сохраняет допустимую запись
-  для восстановления, без фонового upload. Повреждённый/усечённый файл не отправляется.
-- Минимум 5000 мс от события recorder.start до запроса stop. Разрешение и кодирование
-  не добавляют время; 4,999 не округляется. Существующий backend тоже требует 5 с.
-- Одна финализация, один recorder/автоматический POST. Пока upload выполняется,
-  кнопка отключена. Поздний статус прежнего отзыва не перезаписывает новую запись.
-- Перед upload — попытка сохранить blob/key/epoch в прежнем IndexedDB. При сетевой
-  ошибке/HTML/неизвестном результате они сохраняются; повтор использует тот же ключ.
-  Успех — подтверждение устойчивого сохранения сервером, после него очередь очищается.
-- Известный отказ по длине помечается атомарно по id и сохраняется при reload,
-  предотвращая повтор заведомо невалидного файла. Скачивание остаётся в диагностике.
-- Content_epoch не переименовывается: reset удаляет старое намерение. Cleanup не
-  стирает чужую/более новую локальную запись. Старые отзывы/аудио/логи не удаляются.
-- Поздние streams/events игнорируются токеном попытки. Tracks, AudioContext,
-  VAD/worklet, timers, capture и object URLs освобождаются. Закрытие процесса браузера
-  во время незавершённого кодирования не гарантирует восстановление.
-
-## VAD и диагностика
-
-Silero v5, @ricky0123/vad-web 0.0.30, onnxruntime-web 1.22.0. Все assets и ISC/MIT
-лицензии лежат в src/involta_voice/static/vad, manifest.json содержит integrity,
-SHA256/размеры/источники. Проверяются без npm и без runtime CDN:
+## Локальный стенд
 
 ```sh
-python tools/vendor-voice-vad.py
-python tools/vendor-voice-vad.py --restore # восстановить точные версии из npm
+python tools/voice-widget-demo.py --port 33092
 ```
 
-Десять файлов/лицензий, 13,68 MB без сжатия; модель 2,33 MB, WASM 11,21 MB.
-Раздача с нашего origin через /BASE_PATH/voice/vad в Guide и /vad в Voice.
-COOP/CSP не менялись, WASM однопоточный, SharedArrayBuffer не требуется.
-
-Recorder стартует до анализа, тот же stream. 400 мс положительных кадров для
-подтверждения речи; positive 0.3 / negative 0.25. Предупреждение на 4,5 с тишины,
-стоп на 5 с; no-speech на 8 с обработанного потока после готовности. Unknown/новая
-речь сбрасывают паузу. Lag, отсутствие кадров, suspended context, ошибка/таймаут
-загрузки 12 с отключают только автостоп. RMS — только визуальный уровень.
-Все исходные чанки сохраняются. VAD не задерживает начало записи и не решает,
-должен ли голосовой стать отзывом.
-
-Существующая сворачиваемая бета-диагностика сохраняет HTTP статус/тело/тайминги,
-локальное скачивание и серверный журнал. Добавлены capture/VAD timeline,
-gesture_start/gesture_end, причина и длительность удержания. Каждый кадр движения
-в журнал не пишется. Аудио/секреты в консоль не выводятся; cookies/CSRF маскируются.
+http://localhost:33092/guide/ivanovo — настоящий микрофон, MediaRecorder, Silero;
+только upload/status перехватываются mock. ASR/OpenAI/production не вызываются.
+Сценарии: успешная отправка, HTML 502, потерянный ответ, короткое аудио, сбой VAD.
+В каждой новой попытке новый ключ. После приёма появляется ожидающая расшифровки
+строка, через несколько секунд — явно демонстрационный текст в ней же.
 
 ## Проверки
 
-Локально: **42 целевые проверки** UX/native MediaRecorder/реального Guide и API;
-Ruff/format/mypy,
-node --check и проверка pinned assets. Полный CI актуального HEAD указан в PR.
+```sh
+CHROMIUM_PATH=/usr/bin/chromium uv run pytest -q \
+  tests/e2e/test_voice_widget_ux.py tests/e2e/test_voice_embed.py
+TEST_DATABASE_URL=postgresql://... uv run pytest -q \
+  tests/integration/test_voice_upload_transport.py tests/integration/test_upload_logs.py
+uv run ruff check src tests migrations deploy
+uv run ruff format --check src tests migrations deploy
+uv run mypy
+```
 
-Проверено: границы 4,999/5,000/5,001; отдельный минимум backend сохранён; удержание
-0/3/7 с и движение вверх; скролл вне кнопки; одна автоотправка после стопа/VAD/лимита;
-отсутствие audio/старых кнопок во всех состояниях; native финальные чанки; HTML 502,
-reload, lost accepted response и прежний ключ; старое короткое аудио и persisted 422;
-позднее разрешение, capture loss, unmount до POST; отмена при удержании; reduced motion;
-reset/content_epoch и поздний статус предыдущего отзыва.
-Также проверены 360/390/768/1440 px, узкий standalone при широком viewport,
-увеличенный текст, Tab/Enter/Space, компактный idle, центр круга и отсутствие
-горизонтальной прокрутки. Время проверено с UTC-offset/часовым поясом браузера,
-через Voice и в локальном fallback Guide.
+Проверяются жесты/скролл, 4.999/5.000/5.001 с, одна отправка, ошибки 422/504/сети,
+отсутствие отправки на reload и новое аудио с новым ключом, удаление старой очереди,
+отмена/unmount, late permission, reset, полный ответ и ссылка на лог. Отдельно
+проверяются переход «Расшифровка…» → текст в том же элементе списка, независимость
+от новой записи, серверное время и мобильная/широкая компоновка.
 
-Стенд: Chromium 154/Linux с синтетическим русским input (не личная запись).
-Настоящий MediaRecorder/Silero, удержание → движение вверх → отпускание → стоп →
-один mock upload. Скриншоты/анимация пересняты для текущего UI; для видимости
-upload при съёмке его mock-ответ задержан, это не замер реальной сети.
+Целевой прогон: 52 проверки. Настоящий MediaRecorder проверен отдельно внутри
+браузерного набора; снимки сделаны с синтетическим русским input на локальном
+mock-стенде, без production/ASR/OpenAI:
 
-Физические Android Chrome/Opera и iPhone Safari, desktop Firefox/Safari,
-настоящие кафе/музыка/тихий голос, системные звонки и слуховая оценка первых/последних
-фонем в этом окружении не проверены. Мобильный viewport не является телефоном.
-
-## Скриншоты настоящего компонента стенда
-
-Реальный Guide (изолированная БД с тестовой подборкой, настоящий MediaRecorder,
-запись отменена без upload):
-
-| Состояние | Широкая страница | Телефонная ширина |
-| --- | --- | --- |
-| Idle | ![Guide desktop](screenshots/voice-widget/guide-idle-desktop.png) | ![Guide mobile](screenshots/voice-widget/guide-idle-mobile.png) |
-| Запись | ![Guide recording desktop](screenshots/voice-widget/guide-recording-desktop.png) | ![Guide recording mobile](screenshots/voice-widget/guide-recording-mobile.png) |
-
-Standalone SDK в предоставленном контейнере (idle/запись — настоящий recorder;
-для ожидания/ошибки разрешения использована управляемая тестовая media fixture):
-
-| Состояние | Широкий контейнер | Узкий контейнер |
-| --- | --- | --- |
-| Idle | ![Embed desktop](screenshots/voice-widget/embed-idle-desktop.png) | ![Embed mobile](screenshots/voice-widget/embed-idle-mobile.png) |
-| Запись | ![Embed recording desktop](screenshots/voice-widget/embed-recording-desktop.png) | ![Embed recording mobile](screenshots/voice-widget/embed-recording-mobile.png) |
-| Разрешение | ![Embed waiting desktop](screenshots/voice-widget/embed-waiting-desktop.png) | ![Embed waiting mobile](screenshots/voice-widget/embed-waiting-mobile.png) |
-| Ошибка | ![Embed error desktop](screenshots/voice-widget/embed-error-desktop.png) | ![Embed error mobile](screenshots/voice-widget/embed-error-mobile.png) |
-
-Ниже полный сценарий демостенда с mock upload и синтетическим русским input:
-
-![Мобильный сценарий](screenshots/voice-widget/touch-drag-mobile.gif)
-
-| Состояние | 1440×1000 | 390×844 |
-| --- | --- | --- |
-| Ожидание | ![Idle desktop](screenshots/voice-widget/idle-desktop.png) | ![Idle mobile](screenshots/voice-widget/idle-mobile.png) |
-| Запись | ![Recording desktop](screenshots/voice-widget/recording-desktop.png) | ![Recording mobile](screenshots/voice-widget/recording-mobile.png) |
-| Движение вверх | ![Dragging desktop](screenshots/voice-widget/dragging-desktop.png) | ![Dragging mobile](screenshots/voice-widget/dragging-mobile.png) |
-| Отправка | ![Uploading desktop](screenshots/voice-widget/uploading-desktop.png) | ![Uploading mobile](screenshots/voice-widget/uploading-mobile.png) |
-| Подтверждение | ![Accepted desktop](screenshots/voice-widget/accepted-desktop.png) | ![Accepted mobile](screenshots/voice-widget/accepted-mobile.png) |
+- [Телефон: расшифровка ожидается](screenshots/voice-single-send/mobile-pending.png).
+- [Телефон: текст в той же строке](screenshots/voice-single-send/mobile-transcript.png).
+- [Широкий экран: ожидание](screenshots/voice-single-send/desktop-pending.png).
+- [Широкий экран: текст](screenshots/voice-single-send/desktop-transcript.png).

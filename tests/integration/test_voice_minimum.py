@@ -89,7 +89,7 @@ def test_old_accepted_short_recording_replays_and_delivers_unchanged(voice_datab
     assert Worker(engine, settings, FakeProvider()).once()
     with engine.connect() as conn:
         event = conn.execute(
-            text("SELECT payload FROM outbox WHERE kind='transcript_ready'")
+            text("SELECT payload FROM outbox WHERE kind='gigaam_ready'")
         ).scalar_one()
         assert OutboxEvent.model_validate({"sequence": 1, **event}).duration == 2
         assert conn.execute(text("SELECT count(*) FROM submissions")).scalar_one() == 1

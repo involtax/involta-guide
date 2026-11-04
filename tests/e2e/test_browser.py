@@ -137,7 +137,7 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                 page.goto(base + "/admin")
                 page.get_by_label("Пароль редакции").fill("test-password-123456")
                 page.get_by_role("button", name="Войти ↗").click()
-                expect(page.get_by_role("heading", name="Рабочий стол.")).to_be_visible()
+                expect(page.get_by_role("navigation", name="Администрирование")).to_be_visible()
                 queries = Queries(lambda: PostgresUow(engine))
                 location = queries.directory(query="Иваново")["rows"][0]
                 page.goto(base + "/admin/settings/filling")

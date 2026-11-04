@@ -1,12 +1,11 @@
 import json
 from types import SimpleNamespace
 
-import httpx
 import pytest
 
 from involta_voice.asr import MODELS, VAD, LocalAsr, model_path, options
 from involta_voice.config import Settings
-from involta_voice.provider import OpenAIProvider, ProviderFailure
+from involta_voice.provider import ProviderFailure, VoiceProvider
 
 
 def settings(tmp_path):
@@ -18,19 +17,11 @@ def settings(tmp_path):
     )
 
 
-def test_cloud_provider_refuses_audio_before_http(tmp_path):
-    provider = OpenAIProvider(settings(tmp_path))
-    provider.client.close()
-
-    def deny(request):
-        raise AssertionError("Audio must never leave the server")
-
-    provider.client = httpx.Client(transport=httpx.MockTransport(deny))
-    try:
-        with pytest.raises(ProviderFailure, match="локальным ASR"):
-            provider.call("transcription", {}, b"private-audio", "audio/wav")
-    finally:
-        provider.close()
+def test_voice_provider_rejects_analysis_without_a_cloud_client(tmp_path):
+    provider = VoiceProvider(settings(tmp_path))
+    with pytest.raises(ProviderFailure, match="отключён"):
+        provider.call("analysis", {}, b"private-audio", "audio/wav")
+    assert not hasattr(provider, "analysis")
 
 
 @pytest.mark.parametrize("engine", ["gigaam", "parakeet"])

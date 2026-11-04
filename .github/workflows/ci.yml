@@ -79,6 +79,10 @@ jobs:
         run: docker build -t involta-guide:ci .
       - name: Verify current-state cutover and real database rollback
         run: uv run python tests/deployment/current_state_smoke.py
+      - name: Verify combined Voice and shared database
+        run: uv run python tests/deployment/voice_stack_smoke.py
+        env:
+          VOICE_TEST_IMAGE: involta-guide:ci
       - name: Validate generated routes with real nginx
         run: uv run python tests/deployment/nginx_smoke.py
       - name: Check deployment shell scripts
@@ -95,8 +99,6 @@ jobs:
           IMAGE_REF: ghcr.io/involtax/involta-guide@sha256:1111111111111111111111111111111111111111111111111111111111111111
           POSTGRES_IMAGE: postgres@sha256:2222222222222222222222222222222222222222222222222222222222222222
           RELEASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-          VOICE_POSTGRES_IMAGE: postgres@sha256:3333333333333333333333333333333333333333333333333333333333333333
-          VOICE_POSTGRES_PASSWORD: ci-only
           VOICE_SERVICE_SECRET: ci-only-voice-secret-with-at-least-32-characters
           OPENAI_API_KEY: ci-fake-key-never-used
           DEPLOY_ROOT: /tmp/guide-compose-check

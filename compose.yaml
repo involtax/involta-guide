@@ -4,6 +4,7 @@ services:
     container_name: involta-guide
     build: .
     image: involta-guide:python
+    init: true
     restart: unless-stopped
     env_file: .env.production
     ports: ["127.0.0.1:3000:3000"]
@@ -11,6 +12,7 @@ services:
     stop_grace_period: 30s
   worker:
     image: involta-guide:python
+    init: true
     restart: unless-stopped
     env_file: .env.production
     command: ["guide-worker"]

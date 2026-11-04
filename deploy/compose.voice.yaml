@@ -1,32 +1,5 @@
 {
   "services": {
-    "voice-db": {
-      "image": "${VOICE_POSTGRES_IMAGE:?}",
-      "labels": {
-        "com.involta.guide.owner": "production"
-      },
-      "networks": [
-        "voice-private"
-      ],
-      "environment": {
-        "POSTGRES_USER": "voice",
-        "POSTGRES_DB": "voice",
-        "POSTGRES_PASSWORD": "${VOICE_POSTGRES_PASSWORD:?}"
-      },
-      "volumes": [
-        "voice-postgres:/var/lib/postgresql/data"
-      ],
-      "healthcheck": {
-        "test": [
-          "CMD-SHELL",
-          "pg_isready -h 127.0.0.1 -p 5432 -U voice -d voice"
-        ],
-        "interval": "5s",
-        "timeout": "3s",
-        "retries": 30
-      },
-      "restart": "unless-stopped"
-    },
     "voice-migrate": {
       "image": "${IMAGE_REF:?}",
       "labels": {
@@ -44,9 +17,13 @@
         "no-new-privileges:true"
       ],
       "networks": [
-        "voice-private"
+        "voice-private",
+        "frontend"
       ],
-      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "env_file": [
+        "${DEPLOY_ROOT:?}/.env.production",
+        "${DEPLOY_ROOT:?}/.env.voice"
+      ],
       "environment": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
@@ -59,68 +36,7 @@
         "voice",
         "migrate"
       ],
-      "depends_on": {
-        "voice-db": {
-          "condition": "service_healthy"
-        }
-      }
-    },
-    "voice-api": {
-      "image": "${IMAGE_REF:?}",
-      "labels": {
-        "com.involta.guide.owner": "production"
-      },
-      "restart": "unless-stopped",
-      "read_only": true,
-      "tmpfs": [
-        "/tmp:mode=1777"
-      ],
-      "cap_drop": [
-        "ALL"
-      ],
-      "security_opt": [
-        "no-new-privileges:true"
-      ],
-      "networks": [
-        "frontend",
-        "voice-private"
-      ],
-      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
-      "environment": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
-        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
-        "VOICE_DATA_DIR": "/app/var/voice"
-      },
-      "volumes": [
-        "voice-audio:/app/var/voice"
-      ],
-      "command": [
-        "uvicorn",
-        "involta_voice.main:create_app",
-        "--factory",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "3100",
-        "--no-access-log",
-        "--no-proxy-headers"
-      ],
-      "depends_on": {
-        "voice-migrate": {
-          "condition": "service_completed_successfully"
-        }
-      },
-      "healthcheck": {
-        "test": [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3100/health/ready',timeout=3)"
-        ],
-        "interval": "5s",
-        "timeout": "5s",
-        "retries": 12
-      }
+      "depends_on": {}
     },
     "voice-worker": {
       "image": "${IMAGE_REF:?}",
@@ -139,9 +55,13 @@
         "no-new-privileges:true"
       ],
       "networks": [
-        "voice-private"
+        "voice-private",
+        "frontend"
       ],
-      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "env_file": [
+        "${DEPLOY_ROOT:?}/.env.production",
+        "${DEPLOY_ROOT:?}/.env.voice"
+      ],
       "environment": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
@@ -177,54 +97,12 @@
         "retries": 4
       },
       "mem_limit": "3g",
-      "cpus": 1.5
-    },
-    "voice-consumer": {
-      "image": "${IMAGE_REF:?}",
-      "labels": {
-        "com.involta.guide.owner": "production"
-      },
-      "restart": "unless-stopped",
-      "read_only": true,
-      "tmpfs": [
-        "/tmp:mode=1777"
-      ],
-      "cap_drop": [
-        "ALL"
-      ],
-      "security_opt": [
-        "no-new-privileges:true"
-      ],
-      "networks": [
-        "frontend",
-        "voice-private"
-      ],
-      "env_file": "${DEPLOY_ROOT:?}/.env.production",
-      "environment": {
-        "VOICE_URL": "http://voice-api:3100"
-      },
-      "command": [
-        "guide-voice-consumer"
-      ],
-      "healthcheck": {
-        "test": [
-          "CMD",
-          "guide",
-          "voice-consumer-health"
-        ],
-        "interval": "15s",
-        "timeout": "5s",
-        "retries": 4
-      },
-      "depends_on": {
-        "voice-api": {
-          "condition": "service_healthy"
-        }
-      }
+      "cpus": 1.5,
+      "init": true
     },
     "web": {
       "environment": {
-        "VOICE_URL": "http://voice-api:3100"
+        "VOICE_URL": "http://voice:3100"
       },
       "networks": [
         "frontend",
@@ -248,9 +126,13 @@
         "no-new-privileges:true"
       ],
       "networks": [
-        "voice-private"
+        "voice-private",
+        "frontend"
       ],
-      "env_file": "${DEPLOY_ROOT:?}/.env.voice",
+      "env_file": [
+        "${DEPLOY_ROOT:?}/.env.production",
+        "${DEPLOY_ROOT:?}/.env.voice"
+      ],
       "environment": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
@@ -267,10 +149,73 @@
         "prepare-model"
       ],
       "depends_on": {}
+    },
+    "voice": {
+      "image": "${IMAGE_REF:?}",
+      "labels": {
+        "com.involta.guide.owner": "production"
+      },
+      "restart": "unless-stopped",
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:mode=1777"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "networks": [
+        "frontend",
+        "voice-private"
+      ],
+      "env_file": [
+        "${DEPLOY_ROOT:?}/.env.production",
+        "${DEPLOY_ROOT:?}/.env.voice"
+      ],
+      "environment": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
+        "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
+        "VOICE_DATA_DIR": "/app/var/voice",
+        "VOICE_URL": "http://127.0.0.1:3100"
+      },
+      "volumes": [
+        "voice-audio:/app/var/voice"
+      ],
+      "command": [
+        "uvicorn",
+        "involta_guide.infrastructure.voice.runtime:create_app",
+        "--factory",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "3100",
+        "--no-access-log",
+        "--no-proxy-headers",
+        "--timeout-graceful-shutdown",
+        "15"
+      ],
+      "depends_on": {
+        "voice-migrate": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3100/health/ready',timeout=3)\" && guide voice-consumer-health"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 12,
+        "start_period": "15s"
+      },
+      "init": true,
+      "stop_grace_period": "90s"
     }
   },
   "volumes": {
-    "voice-postgres": {},
     "voice-audio": {},
     "asr-models": {}
   },

@@ -104,36 +104,70 @@ write_state() {
   printf '%s %s %s\n' "$sha" "$image" "$id" > "$file.tmp"
   mv -f -- "$file.tmp" "$file"
 }
-stop_guide_writers() {
+voice_services() {
   local sha=$1 image=$2
-  compose "$sha" "$image" stop --timeout 240 worker web
   if [[ -f "$DEPLOY_ROOT/releases/$sha/compose.voice.yaml" ]]; then
-    compose "$sha" "$image" stop --timeout 240 voice-consumer
+    if compose "$sha" "$image" config --services | grep -qx voice; then
+      printf '%s\n' voice voice-worker
+    else
+      # Only for switching/rolling back the existing production release.
+      printf '%s\n' voice-api voice-worker voice-consumer
+    fi
   fi
+}
+stop_guide_writers() {
+  local sha=$1 image=$2 service pid status=0
+  local services=(worker web) pids=()
+  while IFS= read -r service; do
+    [[ -z "$service" ]] || services+=("$service")
+  done < <(voice_services "$sha" "$image")
+  # Signal independent processes together. Respect each service's own grace
+  # period, rather than imposing 240 seconds on every HTTP server/consumer.
+  for service in "${services[@]}"; do
+    compose "$sha" "$image" stop "$service" &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || status=1; done
+  return "$status"
 }
 restore_cutover_database() {
   local backup="$DEPLOY_ROOT/releases/$target_sha/pre-cutover.$deployment_id.dump"
-  [[ -f "$backup" ]] || return 0
+  local voice_backup="$DEPLOY_ROOT/releases/$target_sha/pre-voice-stream.$deployment_id.dump"
+  [[ -f "$backup" || -f "$voice_backup" ]] || return 0
   stop_guide_writers "$target_sha" "$target_image" || return 1
+  if [[ -f "$voice_backup" ]]; then
+    compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+      python -m involta_guide.infrastructure.voice.release_backup restore < "$voice_backup" || return 1
+  fi
+  [[ -f "$backup" ]] || return 0
   compose "$target_sha" "$target_image" run --rm --no-deps -T web \
     python -m involta_guide.infrastructure.persistence.release_backup restore < "$backup" || return 1
 }
 restore_previous() {
   export VOICE_INTAKE=false
   [[ -n "$previous_sha" ]] || return 1
-  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/voice-initial-rollout.json" ]]; then
-    compose "$target_sha" "$target_image" stop --timeout 240 voice-api voice-worker voice-consumer || return 1
-  fi
+  stop_guide_writers "$target_sha" "$target_image" || return 1
   local compatibility
   compatibility=$(compose "$target_sha" "$target_image" run --rm --no-deps -T web python -m involta_guide.infrastructure.persistence.release_backup compatibility) || return 1
   if [[ "$compatibility" == beta ]] && ! docker run --rm --entrypoint python "$previous_image" -c 'import involta_guide.infrastructure.beta_reset' >/dev/null 2>&1; then
-    compose "$target_sha" "$target_image" stop --timeout 240 web worker voice-api voice-worker voice-consumer || true
+    stop_guide_writers "$target_sha" "$target_image" || true
     echo 'Image-only rollback across beta_core is incompatible. Restore matching Guide + Voice databases/files under the deployment lock, or deploy a forward fix. See docs/BETA_CORE_RUNBOOK.md.' >&2
     return 1
   fi
   restore_cutover_database || return 1
   echo "Restoring previous release $previous_sha"
   docker image inspect "$previous_image" >/dev/null 2>&1 || timeout 300 docker pull "$previous_image" >/dev/null || return 1
+  # Use the previous service definitions too: old images do not contain the
+  # combined runtime. The shared Voice DB URL remains backward compatible.
+  if [[ -f "$DEPLOY_ROOT/releases/$previous_sha/compose.voice.yaml" ]]; then
+    if compose "$target_sha" "$target_image" config --services | grep -qx voice; then
+      compose "$target_sha" "$target_image" rm --force voice >/dev/null || return 1
+    fi
+    while IFS= read -r service; do
+      compose "$previous_sha" "$previous_image" up -d --no-build --no-deps "$service" || return 1
+      wait_health "$previous_sha" "$previous_image" "$service" || return 1
+    done < <(voice_services "$previous_sha" "$previous_image")
+  fi
   compose "$previous_sha" "$previous_image" up -d --no-build web || return 1
   wait_health "$previous_sha" "$previous_image" web || return 1
   check_local "$previous_sha" || return 1
@@ -141,19 +175,10 @@ restore_previous() {
   compose "$previous_sha" "$previous_image" run --rm --no-deps -T web python - < "$script_dir/pause-background.py" || return 1
   compose "$previous_sha" "$previous_image" up -d --no-build worker || return 1
   wait_health "$previous_sha" "$previous_image" worker || return 1
-  # Roll back Voice executors as well, retaining their current volumes/schema.
-  # The gateway-compatible baseline may predate the overlay, so reuse the current
-  # service definition with its reviewed previous image and no dependency recreation.
-  if [[ -f "$DEPLOY_ROOT/releases/$target_sha/compose.voice.yaml" ]] && docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' >/dev/null 2>&1; then
-    compose "$target_sha" "$previous_image" up -d --no-build --no-deps voice-api voice-worker voice-consumer || return 1
-    wait_health "$target_sha" "$previous_image" voice-api || return 1
-    wait_health "$target_sha" "$previous_image" voice-worker || return 1
-    wait_health "$target_sha" "$previous_image" voice-consumer || return 1
-  fi
   write_state "$state_file" "$previous_sha" "$previous_image" "$previous_id"
 }
 # Never let Compose adopt a foreign container even if its name collides with ours.
-for container in involta-guide involta-guide-production-worker-1; do
+for container in involta-guide involta-guide-production-worker-1 involta-guide-production-voice-1 involta-guide-production-voice-api-1 involta-guide-production-voice-consumer-1 involta-guide-production-voice-worker-1 involta-guide-production-voice-db-1; do
   if docker inspect "$container" >/dev/null 2>&1; then
     owner=$(docker inspect --format '{{index .Config.Labels "com.involta.guide.owner"}}' "$container")
     [[ "$owner" == production ]] || { echo "Foreign container name collision: $container; no containers changed" >&2; exit 1; }
@@ -185,15 +210,10 @@ template=compose.production.yaml
 if [[ ! -f "$release_dir/compose.yaml" ]]; then install -m 600 "$script_dir/$template" "$release_dir/compose.yaml"; fi
 if [[ "$VOICE_STACK" == 1 ]]; then
   [[ "$mode" != rollback ]] || export VOICE_INTAKE=false
-  voice_postgres_image=''
-  while IFS='=' read -r key value; do
-    if [[ "$key" == VOICE_POSTGRES_IMAGE ]]; then voice_postgres_image=$value; fi
-  done < "$DEPLOY_ROOT/.env.voice"
-  [[ "$voice_postgres_image" =~ ^postgres@sha256:[0-9a-f]{64}$ ]] || { echo 'Voice PostgreSQL image must be digest-pinned' >&2; exit 2; }
   [[ -f "$DEPLOY_ROOT/.env.voice" ]] || { echo 'Provision .env.voice first' >&2; exit 2; }
   voice_template=compose.voice.yaml
   [[ "$NETWORK_MODE" != host ]] || voice_template=compose.voice.host.yaml
-  install -m 600 "$script_dir/$voice_template" "$release_dir/compose.voice.yaml"
+  if [[ ! -f "$release_dir/compose.voice.yaml" ]]; then install -m 600 "$script_dir/$voice_template" "$release_dir/compose.voice.yaml"; fi
   # A first Voice release is allowed with an explicit private pre-change backup.
   if [[ -n "$previous_sha" ]] && ! docker run --rm --entrypoint python "$previous_image" -c 'import involta_voice; import involta_guide.web.routes.voice' >/dev/null 2>&1; then
     python3 - "$release_dir/voice-initial-rollout.json" "$previous_sha" "$target_sha" <<'VOICE_BACKUP'
@@ -253,13 +273,35 @@ elif [[ "$needs_backup" != no ]]; then
 fi
 compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
 if [[ "$VOICE_STACK" == 1 ]]; then
-  compose "$target_sha" "$target_image" up -d --no-build voice-db
+  compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+    python -m involta_guide.infrastructure.voice.shared_database
+  python3 "$script_dir/shared-database-env.py" "$DEPLOY_ROOT" "$release_dir"
+  if [[ -n "$previous_sha" && -f "$DEPLOY_ROOT/releases/$previous_sha/compose.voice.yaml" ]]; then
+    old_services=$(compose "$previous_sha" "$previous_image" config --services)
+    if grep -qx voice-db <<< "$old_services"; then
+      compose "$previous_sha" "$previous_image" stop voice-db
+      compose "$previous_sha" "$previous_image" rm --force voice-db
+    fi
+    if grep -qx voice-consumer <<< "$old_services"; then
+      compose "$previous_sha" "$previous_image" rm --force voice-api voice-consumer
+    fi
+  fi
+  voice_needs_backup=$(compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+    python -m involta_guide.infrastructure.voice.release_backup needed)
+  if [[ "$voice_needs_backup" == yes ]]; then
+    voice_backup="$release_dir/pre-voice-stream.$deployment_id.dump"
+    compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
+      python -m involta_guide.infrastructure.voice.release_backup backup > "$voice_backup.tmp"
+    [[ -s "$voice_backup.tmp" ]] || { echo 'Empty Voice backup; migration refused' >&2; false; }
+    mv -f -- "$voice_backup.tmp" "$voice_backup"
+  elif [[ "$voice_needs_backup" != no ]]; then
+    echo 'Cannot determine Voice schema compatibility' >&2; false
+  fi
   compose "$target_sha" "$target_image" run --rm voice-migrate
   compose "$target_sha" "$target_image" run --rm voice-prepare-model
-  compose "$target_sha" "$target_image" up -d --no-build voice-api voice-worker voice-consumer
-  wait_health "$target_sha" "$target_image" voice-api
+  compose "$target_sha" "$target_image" up -d --no-build voice voice-worker
+  wait_health "$target_sha" "$target_image" voice
   wait_health "$target_sha" "$target_image" voice-worker
-  wait_health "$target_sha" "$target_image" voice-consumer
 fi
 compose "$target_sha" "$target_image" up -d --no-build web
 wait_health "$target_sha" "$target_image" web

@@ -73,8 +73,6 @@ def purge(service: Any, location_id: str, epoch: int) -> dict[str, Any]:
         condition = "submission IN (SELECT reference FROM submissions WHERE location_id=:id AND content_epoch<:epoch)"
         for table in [
             "asr_run_requests",
-            "asr_evaluation_events",
-            "asr_evaluations",
             "asr_candidates",
             "outbox",
             "provider_calls",

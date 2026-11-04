@@ -15,7 +15,7 @@ if [[ "$mode" != inspect && "$mode" != admin-password ]]; then
 fi
 DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT:-22}; DEPLOY_ROOT=${DEPLOY_ROOT:-/opt/involta-guide}
 PUBLIC_URL=${PUBLIC_URL:-https://involta.ru/guide/}
-[[ "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-backfill || "$mode" == voice-report ]] || exit 2
+[[ "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-report ]] || exit 2
 [[ "$DEPLOY_SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ && "$DEPLOY_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 2
 (( DEPLOY_SSH_PORT > 0 && DEPLOY_SSH_PORT < 65536 )) || exit 2
 [[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || exit 2
@@ -46,7 +46,7 @@ if [[ "$mode" == inspect ]]; then
 fi
 ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "umask 077; mkdir '$remote_dir'"
 remote_created=1
-scp "${opts[@]}" -P "$DEPLOY_SSH_PORT" deploy/remote-release.sh deploy/check-release.sh deploy/compose.production.yaml deploy/compose.database.yaml deploy/compose.host.yaml deploy/compose.voice.yaml deploy/compose.voice.host.yaml deploy/compose.database-host.yaml deploy/bootstrap-production.py deploy/nginx_config.py deploy/sync-admin-password.py deploy/pause-background.py deploy/voice-rollout.py deploy/beta-transition.py "$remote:$remote_dir/"
+scp "${opts[@]}" -P "$DEPLOY_SSH_PORT" deploy/remote-release.sh deploy/check-release.sh deploy/compose.production.yaml deploy/compose.database.yaml deploy/compose.host.yaml deploy/compose.voice.yaml deploy/compose.voice.host.yaml deploy/compose.database-host.yaml deploy/bootstrap-production.py deploy/nginx_config.py deploy/sync-admin-password.py deploy/pause-background.py deploy/shared-database-env.py deploy/voice-rollout.py deploy/beta-transition.py "$remote:$remote_dir/"
 # Check privilege before executing any production tooling. No password prompts.
 privilege=$(ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" 'if [ "$(id -u)" = 0 ]; then echo root; elif command -v sudo >/dev/null && sudo -n true; then echo sudo; else echo "Root or passwordless sudo is required" >&2; exit 1; fi')
 prefix=''

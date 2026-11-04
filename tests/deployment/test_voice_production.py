@@ -36,20 +36,21 @@ def test_voice_production_composition(tmp_path, mode):
     )
     services = json.loads(result.stdout)["services"]
     assert {
-        "voice-db",
-        "voice-api",
+        "voice",
         "voice-worker",
-        "voice-consumer",
         "voice-migrate",
         "web",
         "worker",
     } <= services.keys()
-    for name in ["voice-api", "voice-worker", "voice-consumer"]:
+    for name in ["voice", "voice-worker"]:
         assert services[name]["healthcheck"]
         assert "build" not in services[name]
         assert "@sha256:" in services[name]["image"]
-    assert services["voice-api"]["environment"]["OPENAI_API_KEY"] == "test-key-no-api-calls"
-    assert "VOICE_OPENAI_API_KEY" not in services["voice-api"]["environment"]
-    assert not services["voice-api"].get("ports")
-    assert services["voice-consumer"]["command"] == ["guide-voice-consumer"]
-    assert not services["voice-api"]["environment"].get("DATABASE_URL")
+    assert services["voice"]["environment"]["OPENAI_API_KEY"] == "test-key-no-api-calls"
+    assert "VOICE_OPENAI_API_KEY" not in services["voice"]["environment"]
+    assert not services["voice"].get("ports")
+    assert "voice-consumer" not in services and "voice-db" not in services
+    assert (
+        services["voice"]["command"][1] == "involta_guide.infrastructure.voice.runtime:create_app"
+    )
+    assert not services["voice"]["environment"].get("DATABASE_URL")

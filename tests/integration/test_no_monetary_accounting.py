@@ -41,7 +41,7 @@ def test_voice_migration_keeps_history_but_new_calls_have_no_monetary_values(voi
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())
     try:
-        assert worker.once() and worker.once()
+        assert worker.once() and not worker.once()
         assert service.status(ref)["state"] == "result_ready"
         with engine.connect() as conn:
             records = (
@@ -52,10 +52,10 @@ def test_voice_migration_keeps_history_but_new_calls_have_no_monetary_values(voi
                 .mappings()
                 .all()
             )
-            assert len(records) == 2 and all(
+            assert len(records) == 1 and all(
                 r["cost_usd"] is None and r["reserved_usd"] is None for r in records
             )
             usage = conn.execute(text("SELECT calls,cost FROM daily_usage")).mappings().one()
-            assert usage["calls"] == 2 and usage["cost"] == 0.75
+            assert usage["calls"] == 1 and usage["cost"] == 0.75
     finally:
         worker.provider.close()

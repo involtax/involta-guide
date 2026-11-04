@@ -1,6 +1,6 @@
-"""Manual isolated host-Compose smoke. Requires disposable TEST_DATABASE_URL and a built VOICE_TEST_IMAGE.
+"""Isolated host-Compose smoke. Requires disposable TEST_DATABASE_URL and a built VOICE_TEST_IMAGE.
 Never use a production database. Uses generated fake credentials; performs no provider calls.
-Ports 33080/13100/55439 must be free. Keeps only generated env files for diagnosis.
+Ports 33080/13100 must be free. Keeps only generated env files for diagnosis.
 """
 
 import io
@@ -27,8 +27,6 @@ env = {
     "RELEASE_SHA": "a" * 40,
     "AUDIO_VOLUME": "voice-review-" + uuid.uuid4().hex,
     "GUIDE_HTTP_PORT": "33080",
-    "VOICE_POSTGRES_IMAGE": "postgres:17-alpine",
-    "VOICE_POSTGRES_PASSWORD": secret,
     "OPENAI_API_KEY": "fake-never-called",
     "VOICE_SERVICE_SECRET": secret,
 }
@@ -52,7 +50,7 @@ env = {
     + "\n"
 )
 (root / ".env.voice").write_text(
-    f"VOICE_DATABASE_URL=postgresql://voice:{secret}@127.0.0.1:55439/voice\nVOICE_FAKE_PROVIDER=true\nVOICE_MIN_FREE_BYTES=0\nNO_PROXY=127.0.0.1,localhost\n"
+    f"VOICE_DATABASE_SCHEMA={schema}_voice\nVOICE_FAKE_PROVIDER=true\nVOICE_MIN_FREE_BYTES=0\nNO_PROXY=127.0.0.1,localhost\n"
 )
 (root / "override.json").write_text(
     json.dumps(
@@ -100,8 +98,13 @@ run(cmd + ["volume", "create", env["AUDIO_VOLUME"]])
 try:
     run(compose + ["run", "--rm", "--no-deps", "web", "alembic", "upgrade", "head"])
     run(compose + ["run", "--rm", "--no-deps", "web", "guide", "seed"])
-    run(compose + ["up", "-d", "--no-build"])
-    with httpx.Client(base_url="http://127.0.0.1:33080", trust_env=False, timeout=10) as c:
+    run(compose + ["up", "-d", "--no-build", "--wait", "--wait-timeout", "90"])
+    # Nested Docker may use vfs: release the completed one-off root filesystems
+    # before testing audio storage. No running services or persistent volumes change.
+    run(compose + ["rm", "--force", "voice-migrate", "voice-prepare-model"])
+    with httpx.Client(
+        base_url="http://127.0.0.1:33080", trust_env=False, timeout=10, follow_redirects=True
+    ) as c:
         for _ in range(40):
             try:
                 if c.get("/guide/health/ready").status_code == 200:
@@ -109,7 +112,13 @@ try:
             except httpx.HTTPError:
                 pass
             time.sleep(1)
-        c.post("/guide/voice/api/v1/identity", headers={"origin": "http://127.0.0.1:33080"})
+        identity = c.post(
+            "/guide/voice/api/v1/identity",
+            params={"location": "ivanovo"},
+            headers={"origin": "http://127.0.0.1:33080"},
+        )
+        assert identity.status_code == 200, identity.text
+        epoch = identity.json()["content_epoch"]
         buf = io.BytesIO()
         with wave.open(buf, "wb") as audio:
             audio.setnchannels(1)
@@ -118,54 +127,65 @@ try:
             audio.writeframes(b"\0\0" * 48000)
         r = c.post(
             "/guide/voice/api/v1/submissions",
-            headers={"origin": "http://127.0.0.1:33080"},
-            data={"location": "ivanovo", "idempotency_key": str(uuid.uuid4())},
-            files={"audio": ("x.wav", buf.getvalue(), "audio/wav")},
+            headers={"origin": "http://127.0.0.1:33080", "Content-Type": "audio/wav"},
+            params={
+                "location": "ivanovo",
+                "content_epoch": epoch,
+                "idempotency_key": str(uuid.uuid4()),
+            },
+            content=buf.getvalue(),
         )
         assert r.status_code == 202, r.text
         ref = r.json()["reference"]
         for _ in range(40):
-            status = c.get("/guide/voice/api/v1/submissions/" + ref).json()
-            if status.get("transcript") and status.get("editorial_state") == "pending":
+            rows = c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"]
+            status = next((r for r in rows if r["reference"] == ref), {})
+            if status.get("transcript"):
                 break
             time.sleep(1)
         assert status.get("transcript"), status
+        assert status["transcript"] in c.get("/guide/ivanovo").text
+        assert c.get(status["log_url"]).status_code == 200
+        stopping = time.monotonic()
+        run(compose + ["stop", "voice"])
+        elapsed = time.monotonic() - stopping
+        print(f"Combined voice stopped in {elapsed:.2f}s")
+        assert elapsed < 15
+        assert c.get("/guide/ivanovo").status_code == 200
+        assert c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"][0]["transcript"]
         login = c.get("/guide/admin").text
         csrf = re.search(r'name="_csrf" value="([^"]+)"', login).group(1)
-        r = c.post(
-            "/guide/admin/login",
-            headers={"origin": "http://127.0.0.1:33080"},
-            data={"_csrf": csrf, "password": "review-smoke-password"},
+        assert (
+            c.post(
+                "/guide/admin/login",
+                headers={"origin": "http://127.0.0.1:33080"},
+                data={"_csrf": csrf, "password": "review-smoke-password"},
+            ).status_code
+            == 200
         )
-        assert r.status_code in [200, 303], r.text
-        listing = c.get("/guide/admin/reviews").text
-        review_path = re.search(r'href="(/guide/admin/reviews/ivanovo/\d+)"', listing).group(1)
-        page = c.get(review_path).text
-        csrf = re.search(r'name="_csrf" value="([^"]+)"', page).group(1)
-        revision = re.search(r'name="review_revision" value="([^"]+)"', page).group(1)
-        r = c.post(
-            review_path + "/actions",
-            headers={"origin": "http://127.0.0.1:33080"},
-            data={
-                "_csrf": csrf,
-                "idempotency_key": str(uuid.uuid4()),
-                "review_revision": revision,
-                "processing_run": "1",
-                "action": "approve",
-            },
+        listing = c.get("/guide/admin/reviews/ivanovo").text
+        csrf = re.search(r'name="_csrf" value="([^"]+)"', listing).group(1)
+        deletion = re.search(r'action="(/guide/admin/reviews/ivanovo/\d+/delete)"', listing).group(
+            1
         )
-        assert r.status_code in [200, 303], r.text
-        assert status.get("transcript"), status in c.get("/guide/ivanovo").text
-        run(compose + ["stop", "voice-api"])
-        assert c.get("/guide/ivanovo").status_code == 200
-        assert c.get("/guide/voice/api/v1/submissions/" + ref).json()["transcript"]
+        assert (
+            c.post(
+                deletion, headers={"origin": "http://127.0.0.1:33080"}, data={"_csrf": csrf}
+            ).status_code
+            == 200
+        )
+        assert c.get("/guide/voice/api/v1/reviews?location=ivanovo").json()["rows"] == []
         print(
-            "PASS: production host Compose, migrations, worker, consumer, review approval and offline history/HTML. Fake provider only."
+            "PASS: production host Compose, migrations, worker, consumer, public reviews, public logs, admin deletion and offline HTML. Fake provider only."
         )
+except Exception:
+    subprocess.run(compose + ["logs", "--no-color", "--tail", "35"], env=environ)
+    raise
 finally:
     subprocess.run(compose + ["down", "--volumes"], env=environ, stdout=subprocess.DEVNULL)
     subprocess.run(
         cmd + ["volume", "rm", env["AUDIO_VOLUME"]], env=environ, stdout=subprocess.DEVNULL
     )
     with psycopg.connect(os.environ["TEST_DATABASE_URL"], autocommit=True) as c:
+        c.execute("DROP SCHEMA IF EXISTS " + schema + "_voice CASCADE")
         c.execute("DROP SCHEMA " + schema + " CASCADE")

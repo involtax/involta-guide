@@ -126,6 +126,7 @@ def routes(prefix: str) -> APIRouter:
             "logs.html",
             {
                 "admin_ui": admin,
+                "admin_authenticated": admin,
                 "fragment": False,
                 "logs_admin": admin,
                 "audit_public": not admin,
@@ -177,6 +178,7 @@ def routes(prefix: str) -> APIRouter:
             "logs.html",
             {
                 "admin_ui": admin,
+                "admin_authenticated": admin,
                 "fragment": False,
                 "logs_admin": admin,
                 "audit_public": not admin,

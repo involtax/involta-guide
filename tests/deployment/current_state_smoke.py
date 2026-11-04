@@ -136,7 +136,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "filling_v3"
+                    == "review_stream"
                 )
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)
@@ -170,6 +170,60 @@ def main() -> None:
         finally:
             with psycopg.connect(url, autocommit=True) as conn:
                 conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+
+    voice_schema = "test_voice_restore_" + uuid4().hex
+    env.update(VOICE_DATABASE_SCHEMA=voice_schema, VOICE_SERVICE_SECRET="local-test-" + "x" * 40)
+    base = [
+        *docker,
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        os.getenv("GUIDE_TEST_NETWORK", "host"),
+        "--env",
+        "DATABASE_URL",
+        "--env",
+        "SESSION_SECRET",
+        "--env",
+        "VOICE_DATABASE_SCHEMA",
+        "--env",
+        "VOICE_SERVICE_SECRET",
+        os.getenv("GUIDE_TEST_IMAGE", "involta-guide:ci"),
+    ]
+    backup_command = ["python", "-m", "involta_guide.infrastructure.voice.release_backup"]
+    try:
+        call(
+            [
+                "python",
+                "-c",
+                "from involta_voice.config import Settings; from involta_voice.db import database,migrate_connection; e=database(Settings()); c=e.connect(); t=c.begin(); migrate_connection(c,version=5); t.commit(); c.close()",
+            ]
+        )
+        with psycopg.connect(url, options=f"-c search_path={voice_schema}") as conn:
+            conn.execute(
+                "INSERT INTO voice_settings(key,value) VALUES('test-marker','\"keep\"'::jsonb)"
+            )
+        assert call([*backup_command, "needed"]).strip() == b"yes"
+        dump = call([*backup_command, "backup"])
+        assert dump.startswith(b"PGDMP")
+        call(["voice", "migrate"])
+        assert call([*backup_command, "needed"]).strip() == b"no"
+        call([*backup_command, "restore"], dump)
+        with psycopg.connect(url, options=f"-c search_path={voice_schema}") as conn:
+            assert conn.execute("SELECT max(version) FROM voice_schema_versions").fetchone()[0] == 5
+            assert conn.execute("SELECT to_regclass('asr_evaluations')").fetchone()[0]
+            assert (
+                conn.execute("SELECT value FROM voice_settings WHERE key='test-marker'").fetchone()[
+                    0
+                ]
+                == "keep"
+            )
+        print("Voice: real shared-schema v5 → v6 → pg_restore v5 passed", flush=True)
+    finally:
+        with psycopg.connect(url, autocommit=True) as conn:
+            conn.execute(
+                sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(voice_schema))
+            )
 
 
 if __name__ == "__main__":

@@ -1,16 +1,17 @@
 # Voice API, контракт 2
 
-Voice — отдельный backend с собственной БД/файлами. Guide — каталог и модерация.
+Отдельный Voice использует общую PostgreSQL БД со схемой `voice`. API и доставка работают в контейнере `voice`; ASR — в `voice-worker`. Публичные отзывы — тексты GigaAM, без GPT-анализа.
 [OpenAPI](voice-openapi.json) · [DTO JSON Schema](voice-dtos.schema.json).
-Внутренние пути `/internal/v1` требуют Bearer service secret; настройки и ASR-оценки
-также передают административную сессию. Публичного доступа к Voice DB/API нет.
+Внутренние пути `/internal/v1` требуют Bearer service secret; административные результаты доступны только через защищённый gateway. Публичного доступа к Voice DB/API нет.
 
 Gateway Guide под BASE_PATH `/voice/api/v1`:
 
 - POST `/identity?location={slug}` назначает/сохраняет `guide_visitor`, возвращает content_epoch.
 - POST `/submissions?location={slug}&content_epoch={epoch}` принимает тот же blob/key
-  при retry. Заголовки/поля actor, visitor, IP клиента не назначают права/владельца.
-- GET `/submissions/{reference}`, GET `/submissions/mine?location={slug}` — собственные записи.
+  одной отправкой; серверная идемпотентность сохраняется. Actor, visitor и IP клиента не назначают права/владельца.
+- GET `/reviews?location={slug}` — одна общая лента (последние 10 записей), без cookies/входа.
+  Поля: reference, number, transcript, created_at, state, log_url; ответ содержит content_epoch.
+  Персональные metadata не выдаются. Старые gateway GET /submissions/{reference} и /mine удалены.
 - GET/POST `/debug/{request_id}` — приватные диагностические события, флаг VOICE_DEBUG_ENABLED.
 
 Общий журнал `/guide/logs?kind=uploads` показывает техническое представление
@@ -37,20 +38,32 @@ upload/callback возвращает `stale_epoch` 409. Повтор purge то�
 новые записи этого цикла. Во время неполной очистки новые intake закрыты.
 
 Outbox event v2: sequence/event_id/reference/run/kind, metadata v2, transcript,
-analysis, audio SHA/MIME/duration, created_at и repeat_signals. Виды: transcript_ready,
-analysis_ready, processing_failed. GET `/events?after=N`; POST `/events/ack` после
-сохранения входа в Guide inbox. Ошибка одного применения не блокирует независимые
-reference; зависимые события одного reference ждут. Повтор ACK/event безопасен.
+analysis (историческое поле), audio SHA/MIME/duration, created_at и repeat_signals.
+Новые виды: `recording_received` (transcript=null) и `gigaam_ready` (текст GigaAM).
+GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Receipt и
+primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
+analysis_ready, processing_failed принимаются только как история доставки.
 
-Сохранены normal new-run/revalidate, локальные GigaAM/Parakeet, ASR-кандидаты и
-ручные оценки из PR18. Архивных API, guide-transcription, Alex-команд и второго
-Guide-исполнителя нет. ЧПУ карточки Guide `/admin/reviews/{slug}/{number}`, действия
-`/actions`, аудио `/audio`; сравнение двух моделей показывается в этой же карточке.
+POST `/admin/recognitions` — приватный batch до 30 UUID: по две строки результатов,
+без оценок и эталона. GET `/admin/submissions/{reference}` и `/asr` содержат
+подробности для лога. Ручные new-run/revalidate, ASR-run/evaluation и изменение
+настроек анализа удалены. GigaAM фиксирован как primary. Публичный SubmissionStatus
+и общая лента не содержат Parakeet, модерации и редакторского состояния.
 
-Виджет сохраняет blob/key/**исходный epoch** в IndexedDB. После reset старый blob/key
-не получает свежую метку: очередь очищается при следующем контакте, пользователь
-видит сообщение и может сознательно записать новый отзыв. Сервер не удаляет файлы
-из закрытого чужого браузера, но не принимает их повторно в новый цикл.
+Админка: `/admin/reviews/{slug}` — лента города. ЧПУ `/admin/reviews/{slug}/{number}`
+открывает страницу с якорем. `/audio` доступно только администратору.
+Публичный технический лог `/logs/reviews/{slug}/{number}`, без metadata/cookies/секретов.
+POST `/admin/reviews/{slug}/{number}/delete` требует admin session + CSRF: status=deleted,
+аудит review_deleted; повтор безопасен, поздняя доставка не публикует запись снова.
+Подробности и переход общей БД:
+[ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
+
+Виджет держит blob/key/исходный epoch только в памяти одной отправки. После
+ошибки, отмены или reload старое аудио не отправляется. IndexedDB-очередь удалена.
+Серверная защита owner/key/epoch и сохранённые отзывы/аудио/логи остаются прежними.
+Общий список GET /reviews?location={slug} дополнен content_epoch локации для
+очистки устаревшего отображения после reset. В UI один список «Отзывы»: после
+приёма — «Расшифровка…», затем серверный текст в той же записи.
 
 ## Minimum duration for new reviews
 
@@ -67,8 +80,7 @@ The widget retains each recording's original content_epoch across all retries.
 
 ## Время в пользовательском списке и результате
 
-`GET /voice/api/v1/submissions/mine` и `GET /voice/api/v1/submissions/{reference}`
-сохраняют исходный `created_at` Voice. Если Voice недоступен, локальный ответ Guide
+`GET /voice/api/v1/reviews?location={slug}` сохраняет исходный `created_at` Voice. Если Voice недоступен, локальный ответ Guide
 содержит сохранённый `reviews.created_at`; время загрузки страницы не подставляется.
 Виджет показывает дату/время в часовом поясе браузера через `<time datetime="…">`
 вместо редакторского статуса. Поля состояния API сохраняются для обработки/опроса.

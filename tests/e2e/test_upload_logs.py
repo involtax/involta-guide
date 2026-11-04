@@ -29,7 +29,7 @@ def test_upload_logs_use_shared_admin_shell_and_mobile_layout(database, tmp_path
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(origin + "/guide/logs?kind=uploads")
-            expect(page.get_by_role("heading", name="Рабочий стол.")).to_be_visible()
+            expect(page.get_by_role("navigation", name="Администрирование")).to_be_visible()
             expect(page.get_by_role("heading", name="Браузер получил HTTP 504")).to_be_visible()
             page.get_by_role("navigation", name="Список отправок").get_by_role("link").click()
             expect(page).to_have_url(

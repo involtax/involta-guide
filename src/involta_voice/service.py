@@ -124,7 +124,8 @@ class VoiceService:
                         sha=sha,
                         signals=encoded(signals or {}),
                     )
-                    self._new_run(conn, reference, None)
+                    self._new_run(conn, reference)
+                    self.emit(conn, reference, 1, "recording_received")
         except VoiceError:
             if name:
                 self.storage.path(name).unlink(missing_ok=True)
@@ -137,89 +138,28 @@ class VoiceService:
         if old["payload_hash"] != payload_hash:
             raise VoiceError("Ключ уже использован для другой записи", "conflict", 409)
 
-    def _new_run(
-        self,
-        conn: Connection,
-        reference: str,
-        transcript: str | None,
-        request_key: str | None = None,
-        context: dict[str, Any] | None = None,
-    ) -> int:
-        previous = row(
-            conn, "SELECT coalesce(max(number),0)+1 n FROM runs WHERE submission=:id", id=reference
-        )
-        number = int(previous["n"]) if previous else 1
+    def _new_run(self, conn: Connection, reference: str) -> None:
         frozen = snapshot(conn, self.settings)
         submission = row(conn, "SELECT metadata FROM submissions WHERE reference=:id", id=reference)
         assert submission is not None
-        frozen["location"] = context or submission["metadata"]["location"]
+        frozen["location"] = submission["metadata"]["location"]
         execute(
             conn,
-            "INSERT INTO runs(submission,number,snapshot,transcript,request_key) VALUES(:id,:n,CAST(:snapshot AS jsonb),:transcript,:key)",
+            "INSERT INTO runs(submission,number,snapshot) VALUES(:id,1,CAST(:snapshot AS jsonb))",
             id=reference,
-            n=number,
             snapshot=encoded(frozen),
-            key=request_key,
-            transcript=transcript,
-        )
-        execute(
-            conn, "UPDATE submissions SET active_run=:n WHERE reference=:id", n=number, id=reference
         )
         execute(
             conn,
-            "INSERT INTO stages(submission,run,kind) VALUES(:id,:n,:kind)",
+            "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'transcription')",
             id=reference,
-            n=number,
-            kind="analysis" if transcript is not None else "transcription",
         )
-        if transcript is None and frozen.get("asr_beta"):
+        if frozen["asr_beta"]:
             execute(
                 conn,
-                "INSERT INTO stages(submission,run,kind) VALUES(:id,:n,'comparison')",
+                "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'comparison')",
                 id=reference,
-                n=number,
             )
-        return number
-
-    def new_run(
-        self, reference: str, request_key: str | None = None, context: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        with self.engine.begin() as conn:
-            submission = row(conn, "SELECT * FROM submissions WHERE reference=:id", id=reference)
-            if not submission:
-                raise VoiceError("Запись не найдена", "not_found", 404)
-            from .reset import lock_epoch
-
-            lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
-            submission = row(
-                conn, "SELECT * FROM submissions WHERE reference=:id FOR UPDATE", id=reference
-            )
-            if not submission:
-                raise VoiceError("Запись не найдена", "not_found", 404)
-            previous = (
-                row(
-                    conn,
-                    "SELECT number FROM runs WHERE submission=:id AND request_key=:key",
-                    id=reference,
-                    key=request_key,
-                )
-                if request_key
-                else None
-            )
-            if previous:
-                return {"reference": reference, "run": previous["number"], "state": "accepted"}
-            active = row(
-                conn,
-                "SELECT 1 FROM stages WHERE submission=:id AND (kind IN ('transcription','analysis') OR (:need_text AND kind='comparison')) AND state IN ('queued','running')",
-                id=reference,
-                need_text=submission["transcript"] is None,
-            )
-            if active:
-                raise VoiceError("Обработка уже выполняется", "conflict", 409)
-            if context and str(context["id"]) != str(submission["location_id"]):
-                raise VoiceError("Нельзя изменить идентичность локации", "conflict", 409)
-            number = self._new_run(conn, reference, submission["transcript"], request_key, context)
-        return {"reference": reference, "run": number, "state": "accepted"}
 
     def status(
         self, reference: str, visitor: str | None = None, *, admin: bool = False
@@ -241,6 +181,13 @@ class VoiceService:
                 id=reference,
                 n=submission["active_run"],
             )
+            primary_text = row(
+                conn,
+                "SELECT transcript FROM asr_candidates WHERE submission=:id AND engine='gigaam' ORDER BY run DESC LIMIT 1",
+                id=reference,
+            )
+            # Historical fallback text is retained in storage, never exposed to visitors.
+            submission["transcript"] = primary_text["transcript"] if primary_text else None
             delivery = row(
                 conn,
                 "SELECT coalesce(max(sequence),0) n FROM outbox WHERE submission=:id AND run=:n",
@@ -248,39 +195,31 @@ class VoiceService:
                 n=submission["active_run"],
             )
             ack = row(conn, "SELECT sequence FROM delivery_ack WHERE consumer='guide'")
-        current = [
-            s
-            for s in stages
-            if s["run"] == submission["active_run"] and s["kind"] in ("transcription", "analysis")
-        ]
-        failed = next(
+        frozen_primary = run["snapshot"]["transcription_model"] if run else "gigaam"
+        engines = {
+            "transcription": frozen_primary,
+            "comparison": "parakeet" if frozen_primary == "gigaam" else "gigaam",
+        }
+        primary = next(
             (
                 s
-                for s in current
-                if s["state"] in ("failed", "unknown")
-                and (s["kind"] == "analysis" or submission["transcript"] is None)
+                for s in stages
+                if s["run"] == submission["active_run"]
+                and s["kind"] in engines
+                and ((s["request"] or {}).get("model") or engines[s["kind"]]) == "gigaam"
             ),
             None,
         )
-        fallback_pending = any(
-            s["run"] == submission["active_run"]
-            and s["kind"] == "comparison"
-            and s["state"] in ("queued", "running")
-            for s in stages
-        )
-        if failed and failed["kind"] == "transcription" and fallback_pending:
-            failed = None
-        if failed:
-            state = failed["kind"] + "_" + failed["state"]
-        elif run and run["result"] is not None:
+        failed = primary if primary and primary["state"] in ("failed", "unknown") else None
+        if submission["transcript"] is not None:
             state = (
                 "delivered_to_guide"
                 if delivery and delivery["n"] and ack and ack["sequence"] >= delivery["n"]
                 else "result_ready"
             )
-        elif submission["transcript"] is not None:
-            state = "analysis"
-        elif any(s["state"] == "running" for s in current):
+        elif failed:
+            state = "transcription_" + failed["state"]
+        elif primary and primary["state"] == "running":
             state = "transcription"
         else:
             state = "accepted"
@@ -292,7 +231,6 @@ class VoiceService:
             "transcript": submission["transcript"],
             "created_at": str(submission["created_at"]),
             "error": failed["error"] if failed else None,
-            "moderation": "pending",
             "repeat_signals": submission["repeat_signals"],
         }
         if admin:
@@ -347,7 +285,7 @@ class VoiceService:
             "reference": reference,
             "run": number,
             "metadata": event_metadata,
-            "transcript": submission["transcript"],
+            "transcript": submission["transcript"] if kind == "gigaam_ready" else None,
             "analysis": result,
             "sha256": submission["sha256"],
             "mime": submission["mime"],

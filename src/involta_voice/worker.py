@@ -8,7 +8,6 @@ from uuid import uuid4
 from sqlalchemy import Engine
 
 from .config import Settings
-from .contracts import AnalysisResult, LocationContext, validate_analysis
 from .db import database, encoded, execute, row
 from .errors import VoiceError
 from .provider import FakeProvider, ProviderFailure, VoiceProvider
@@ -32,7 +31,7 @@ class Worker:
                 conn,
                 """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') AND attempts<3 THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'failed' ELSE 'unknown' END,
                 error=CASE WHEN raw_response IS NOT NULL THEN NULL WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'Локальный исполнитель прерван; ограниченный повтор' ELSE 'Исполнитель прерван; исход OpenAI неизвестен' END,
-                lease_token=NULL,lease_until=NULL WHERE state='running' AND lease_until<now()""",
+                lease_token=NULL,lease_until=NULL WHERE kind IN ('transcription','comparison') AND state='running' AND lease_until<now()""",
             )
             running = row(conn, "SELECT count(*) n FROM stages WHERE state='running'")
             if running and running["n"] >= self.settings.concurrency:
@@ -42,8 +41,8 @@ class Worker:
             )
             stage = row(
                 conn,
-                """SELECT s.* FROM stages s WHERE state='queued' AND available_at<=now() AND (:local_busy=false OR kind='analysis')
-                ORDER BY CASE kind WHEN 'transcription' THEN 0 WHEN 'analysis' THEN 1 ELSE 2 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                """SELECT s.* FROM stages s WHERE kind IN ('transcription','comparison') AND state='queued' AND available_at<=now() AND :local_busy=false
+                ORDER BY CASE kind WHEN 'transcription' THEN 0 ELSE 1 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
                 local_busy=bool(local_running),
             )
             if not stage:
@@ -80,7 +79,7 @@ class Worker:
             )
             self.fail(stage, str(exc), state)
         except (ValueError, KeyError, TypeError) as exc:
-            # Details are private and sanitized; the transcript is already independent of analysis.
+            # Both engines keep their own result or diagnostic failure.
             self.fail(stage, "Ответ не прошёл проверку: " + self.clean(str(exc))[:2000])
         return True
 
@@ -141,57 +140,21 @@ class Worker:
             )
         if not submission or not run:
             return
-        context = LocationContext.model_validate(run["snapshot"]["location"])
         snapshot = run["snapshot"]
-        if kind != "analysis":
-            request = dict(
-                snapshot.get("transcription") or {"model": snapshot["transcription_model"]}
-            )
-            if kind in ("comparison", "evaluate_gigaam", "evaluate_parakeet"):
-                engine = (
-                    ("parakeet" if snapshot["transcription_model"] == "gigaam" else "gigaam")
-                    if kind == "comparison"
-                    else kind.removeprefix("evaluate_")
-                )
-                request = snapshot["asr_models"][engine]
-
-        else:
-            request = {
-                "model": snapshot["analysis_model"],
-                "max_output_tokens": snapshot["max_output_tokens"],
-                "input": [
-                    {"role": "system", "content": snapshot["prompt"]},
-                    {
-                        "role": "user",
-                        "content": encoded(
-                            {
-                                "transcript": run["transcript"],
-                                "context": context.model_dump(mode="json"),
-                            }
-                        ),
-                    },
-                ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "voice_analysis_v1",
-                        "schema": AnalysisResult.model_json_schema(),
-                        "strict": False,
-                    }
-                },
-            }
+        primary = snapshot["transcription_model"]
+        engine = (
+            primary
+            if kind == "transcription"
+            else ("parakeet" if primary == "gigaam" else "gigaam")
+        )
+        # A saved response belongs to its frozen request, including pre-transition jobs.
+        request = stage.get("request") or snapshot["asr_models"][engine]
+        engine = request["model"]
         raw = stage.get("raw_response")
         if raw is None:
             call_id = str(uuid4())
             with self.engine.begin() as conn:
                 self.fenced(conn, stage)
-                execute(conn, "SELECT pg_advisory_xact_lock(47032005)")
-                count = row(
-                    conn,
-                    "SELECT coalesce(sum(calls),0) n FROM daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date",
-                )
-                if kind == "analysis" and count and count["n"] >= self.settings.daily_calls:
-                    raise ProviderFailure("Дневной лимит обращений Voice к OpenAI исчерпан")
                 execute(
                     conn,
                     "INSERT INTO provider_calls(id,submission,run,kind,request) VALUES(:call,:id,:n,:kind,CAST(:request AS jsonb))",
@@ -210,52 +173,38 @@ class Worker:
                     request=encoded(self.clean(request)),
                 )
             try:
-                audio = (
-                    self.service.storage.path(submission["audio"]).read_bytes()
-                    if kind != "analysis"
-                    else b""
-                )
-                if kind != "analysis":
-                    stop_heartbeat = Event()
+                audio = self.service.storage.path(submission["audio"]).read_bytes()
+                stop_heartbeat = Event()
 
-                    def renew() -> None:
-                        while not stop_heartbeat.wait(min(10, self.settings.lease_seconds / 3)):
-                            try:
-                                with self.engine.begin() as conn:
-                                    execute(
-                                        conn,
-                                        "UPDATE stages SET lease_until=now()+make_interval(secs=>:lease) WHERE submission=:id AND run=:run AND kind=:kind AND state='running' AND lease_token=:token",
-                                        kind=kind,
-                                        lease=self.settings.lease_seconds,
-                                        id=reference,
-                                        run=number,
-                                        token=stage["lease_token"],
-                                    )
-                                self.settings.heartbeat_file.write_text(
-                                    datetime.now(UTC).isoformat()
+                def renew() -> None:
+                    while not stop_heartbeat.wait(min(10, self.settings.lease_seconds / 3)):
+                        try:
+                            with self.engine.begin() as conn:
+                                execute(
+                                    conn,
+                                    "UPDATE stages SET lease_until=now()+make_interval(secs=>:lease) WHERE submission=:id AND run=:run AND kind=:kind AND state='running' AND lease_token=:token",
+                                    kind=kind,
+                                    lease=self.settings.lease_seconds,
+                                    id=reference,
+                                    run=number,
+                                    token=stage["lease_token"],
                                 )
-                            except Exception:
-                                return
+                            self.settings.heartbeat_file.write_text(datetime.now(UTC).isoformat())
+                        except Exception:
+                            return
 
-                    heartbeat = Thread(target=renew, daemon=True)
-                    heartbeat.start()
-                    try:
-                        raw = self.provider.call(
-                            "transcription" if kind != "analysis" else "analysis",
-                            request,
-                            audio,
-                            submission["mime"],
-                        )
-                    finally:
-                        stop_heartbeat.set()
-                        heartbeat.join(timeout=2)
-                else:
+                heartbeat = Thread(target=renew, daemon=True)
+                heartbeat.start()
+                try:
                     raw = self.provider.call(
-                        "transcription" if kind != "analysis" else "analysis",
+                        "transcription",
                         request,
                         audio,
                         submission["mime"],
                     )
+                finally:
+                    stop_heartbeat.set()
+                    heartbeat.join(timeout=2)
             except (ProviderFailure, OSError) as exc:
                 with self.engine.begin() as conn:
                     execute(
@@ -298,98 +247,51 @@ class Worker:
         status = raw["status_code"]
         if status >= 400:
             raise ProviderFailure(
-                f"OpenAI HTTP {status}; request_id={raw.get('request_id') or 'unknown'}",
+                f"ASR HTTP {status}; request_id={raw.get('request_id') or 'unknown'}",
                 unknown=status >= 500 or status == 408,
                 retry=status == 429,
             )
         body = json.loads(raw["body"])
         if not isinstance(body, dict):
-            raise ValueError("OpenAI должен вернуть JSON-объект")
-        if kind != "analysis":
-            transcript = body.get("text")
-            if not isinstance(transcript, str) or not transcript.strip() or len(transcript) > 30000:
-                raise ValueError("Пустая или слишком длинная расшифровка")
-            from .evaluation import save_candidate
+            raise ValueError("ASR должен вернуть JSON-объект")
+        transcript = body.get("text")
+        if not isinstance(transcript, str) or not transcript.strip() or len(transcript) > 30000:
+            raise ValueError("Пустая или слишком длинная расшифровка")
+        from .recognition import save_candidate
 
-            with self.engine.begin() as conn:
-                self.fenced(conn, stage)
-                save_candidate(
-                    conn,
-                    reference,
-                    number,
-                    request,
-                    {
-                        **body,
-                        "is_fake": bool(
-                            self.settings.fake_provider
-                            or str(raw.get("request_id") or "").startswith("fake")
-                        ),
-                    },
-                    submission,
-                )
-                self.complete(conn, stage)
-                evaluation_only = bool(snapshot.get("asr_evaluation_only"))
-                primary_failed = row(
-                    conn,
-                    "SELECT 1 FROM stages WHERE submission=:id AND run=:n AND kind='transcription' AND state IN ('failed','unknown')",
-                    id=reference,
-                    n=number,
-                )
-                if evaluation_only or (kind != "transcription" and not primary_failed):
-                    return
-                promoted = row(
-                    conn,
-                    "UPDATE submissions SET transcript=:text WHERE reference=:id AND transcript IS NULL RETURNING reference",
-                    id=reference,
-                    text=transcript,
-                )
-                if not promoted:
-                    return
-                execute(
-                    conn,
-                    "UPDATE runs SET transcript=:text,transcription_engine=:engine WHERE submission=:id AND number=:n AND transcript IS NULL",
-                    id=reference,
-                    n=number,
-                    text=transcript,
-                    engine=request["model"],
-                )
-                self.service.emit(conn, reference, number, "transcript_ready")
-                execute(
-                    conn,
-                    "INSERT INTO stages(submission,run,kind) VALUES(:id,:n,'analysis') ON CONFLICT DO NOTHING",
-                    id=reference,
-                    n=number,
-                )
-
-        else:
-            result = self.parse_analysis(body, run["transcript"], context)
-            with self.engine.begin() as conn:
-                self.fenced(conn, stage)
-                execute(
-                    conn,
-                    "UPDATE runs SET result=CAST(:result AS jsonb) WHERE submission=:id AND number=:n",
-                    result=result.model_dump_json(),
-                    id=reference,
-                    n=number,
-                )
-                self.complete(conn, stage)
-                self.service.emit(
-                    conn, reference, number, "analysis_ready", result.model_dump(mode="json")
-                )
-
-    @staticmethod
-    def parse_analysis(body: Any, transcript: str, context: LocationContext) -> AnalysisResult:
-        if not isinstance(body, dict):
-            raise ValueError("Expected provider object")
-        if body.get("status") != "completed":
-            raise ValueError("Незавершённый ответ анализа; исходный ответ сохранён")
-        output = "".join(
-            c.get("text", "")
-            for item in body.get("output", [])
-            for c in item.get("content", [])
-            if c.get("type") == "output_text"
-        )
-        return validate_analysis(json.loads(output), transcript, context)
+        with self.engine.begin() as conn:
+            self.fenced(conn, stage)
+            save_candidate(
+                conn,
+                reference,
+                number,
+                request,
+                {
+                    **body,
+                    "is_fake": bool(
+                        self.settings.fake_provider
+                        or str(raw.get("request_id") or "").startswith("fake")
+                    ),
+                },
+                submission,
+            )
+            self.complete(conn, stage)
+            if engine != "gigaam":
+                return
+            execute(
+                conn,
+                "UPDATE submissions SET transcript=:text WHERE reference=:id",
+                id=reference,
+                text=transcript,
+            )
+            execute(
+                conn,
+                "UPDATE runs SET transcript=:text,transcription_engine='gigaam' WHERE submission=:id AND number=:n",
+                id=reference,
+                n=number,
+                text=transcript,
+            )
+            self.service.emit(conn, reference, number, "gigaam_ready")
 
     @staticmethod
     def complete(conn: Any, stage: dict[str, Any]) -> None:
@@ -404,7 +306,7 @@ class Worker:
 
     def fail(self, stage: dict[str, Any], error: str, state: str = "failed") -> None:
         with self.engine.begin() as conn:
-            updated = row(
+            row(
                 conn,
                 """UPDATE stages SET state=:state,error=:error,finished_at=now(),lease_token=NULL,
                 lease_until=NULL,available_at=now()+interval '30 seconds',
@@ -416,118 +318,6 @@ class Worker:
                 n=stage["run"],
                 kind=stage["kind"],
                 token=stage["lease_token"],
-            )
-            if updated and stage["kind"] == "analysis" and state in ("failed", "unknown"):
-                submission = row(
-                    conn,
-                    "SELECT transcript FROM submissions WHERE reference=:id",
-                    id=stage["submission"],
-                )
-                if submission and submission["transcript"] is not None:
-                    self.service.emit(
-                        conn,
-                        str(stage["submission"]),
-                        stage["run"],
-                        "processing_failed",
-                        {"stage": stage["kind"], "state": state, "error": error},
-                    )
-
-    def revalidate(self, reference: str, number: int) -> None:
-        from .reset import lock_submission
-
-        with self.engine.begin() as conn:
-            lock_submission(conn, reference)
-            run = row(
-                conn,
-                "SELECT * FROM runs WHERE submission=:id AND number=:n FOR UPDATE",
-                id=reference,
-                n=number,
-            )
-            stage = row(
-                conn,
-                "SELECT * FROM stages WHERE submission=:id AND run=:n AND kind='analysis' FOR UPDATE",
-                id=reference,
-                n=number,
-            )
-            if stage is None:
-                stage = row(
-                    conn,
-                    "SELECT * FROM stages WHERE submission=:id AND run=:n AND kind='transcription' FOR UPDATE",
-                    id=reference,
-                    n=number,
-                )
-            submission = row(conn, "SELECT * FROM submissions WHERE reference=:id", id=reference)
-            if not run or not stage or not submission or stage["raw_response"] is None:
-                raise VoiceError("Нет сохранённого ответа для проверки", "conflict", 409)
-            if stage["state"] in ("running", "queued"):
-                raise VoiceError("Обработка выполняется", "conflict", 409)
-            if run["result"] is not None:
-                return
-            if stage["kind"] == "transcription":
-                raw = stage["raw_response"]
-                transcript = (
-                    json.loads(raw["body"]).get("text") if raw.get("status_code") == 200 else None
-                )
-                if (
-                    not isinstance(transcript, str)
-                    or not transcript.strip()
-                    or len(transcript) > 30000
-                ):
-                    raise VoiceError("Сохранённая расшифровка не прошла проверку")
-                if submission["transcript"] is not None and submission["transcript"] != transcript:
-                    raise VoiceError(
-                        "Исходный текст уже сохранён другой обработкой", "conflict", 409
-                    )
-                execute(
-                    conn,
-                    "UPDATE submissions SET transcript=coalesce(transcript,:text) WHERE reference=:id",
-                    id=reference,
-                    text=transcript,
-                )
-                execute(
-                    conn,
-                    "UPDATE runs SET transcript=:text,transcription_engine=:engine WHERE submission=:id AND number=:n",
-                    engine=run["snapshot"].get("transcription_model"),
-                    id=reference,
-                    n=number,
-                    text=transcript,
-                )
-                from .evaluation import save_candidate
-
-                saved_request = stage["request"] or run["snapshot"].get("transcription", {})
-                if saved_request.get("model") in ("gigaam", "parakeet"):
-                    save_candidate(
-                        conn,
-                        reference,
-                        number,
-                        saved_request,
-                        {**json.loads(raw["body"]), "is_fake": self.settings.fake_provider},
-                        submission,
-                    )
-                self.complete(conn, stage)
-                self.service.emit(conn, reference, number, "transcript_ready")
-                execute(
-                    conn,
-                    "INSERT INTO stages(submission,run,kind) VALUES(:id,:n,'analysis') ON CONFLICT DO NOTHING",
-                    id=reference,
-                    n=number,
-                )
-                return
-            result = self.parse_analysis(
-                json.loads(stage["raw_response"]["body"]),
-                run["transcript"],
-                LocationContext.model_validate(run["snapshot"]["location"]),
-            )
-            execute(
-                conn,
-                "UPDATE runs SET result=CAST(:result AS jsonb) WHERE submission=:id AND number=:n",
-                result=result.model_dump_json(),
-                id=reference,
-                n=number,
-            )
-            self.complete(conn, stage)
-            self.service.emit(
-                conn, reference, number, "analysis_ready", result.model_dump(mode="json")
             )
 
 

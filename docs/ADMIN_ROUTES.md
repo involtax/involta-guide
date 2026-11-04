@@ -2,7 +2,7 @@
 
 Все пути ниже под BASE_PATH (`/guide`). Защищённые действия требуют действующую
 admin-сессию, same-origin и CSRF. Вход `/admin`, выход `/admin/logout` сохранены.
-Единый shell/дизайн PR17 и карточки PR18 сохраняются.
+Единый shell сохраняется; компактная лента отзывов описана в [ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
 
 | Раздел | URL | Действия |
 | --- | --- | --- |
@@ -10,9 +10,9 @@ admin-сессию, same-origin и CSRF. Вход `/admin`, выход `/admin/l
 | Локации | `/admin/locations`, `/admin/locations/{slug}` | Sidebar, настройки географии/навигации, отдельный POST `/intro` с revision |
 | Полный бета-сброс | POST `/admin/locations/{slug}/reset-and-fill` | Название-подтверждение, request_key, content_epoch; только обычный город, флаг BETA_RESET_ENABLED |
 | Рестораны | `/admin/restaurants`, `/admin/restaurants/{slug}`, `/admin/restaurants/{number}` | Город в пути, ссылка на публичную страницу в новой вкладке, рейтинг и данные карточки |
-| Отзывы | `/admin/reviews`, `/admin/reviews/{slug}/{number}` | Единая карточка, исходный/редакционный текст, пакет, ASR обеих моделей и ручные решения |
+| Отзывы | `/admin/reviews`, `/admin/reviews/{slug}` | Города слева, лента справа; permalink `/{slug}/{number}` открывает страницу и якорь |
 | Повтор доставки | POST `/admin/reviews/inbox/{event_id}/retry` | Повтор сохранённого ошибочного Voice event |
-| Действия отзыва | POST `/admin/reviews/{slug}/{number}/actions` | Модерация, привязки, правки пакета, новый анализ/проверка, ASR-оценка |
+| Лог отзыва | `/logs/reviews/{slug}/{number}` | Приватные исходные ответы ASR, метаданные и доставка; только администратор |
 | Аудио | `/admin/reviews/{slug}/{number}/audio` | Только администратор, no-store |
 | Логи | `/logs`, `/logs/{slug}/{number}` | Неудачный первый запуск: новый запрос/тот же ответ; успешный: просмотр и переход к сбросу |
 | Настройки наполнения | `/admin/settings/filling` | Промпт и модель одной операцией, без постановки заданий |
@@ -20,7 +20,7 @@ admin-сессию, same-origin и CSRF. Вход `/admin`, выход `/admin/l
 | Сессии | `/admin/sessions` | Управление административным доступом |
 
 Редакторского раздела Алекс, attach и старой очереди Guide review нет. Запись под
-admin-сессией проходит обычную модерацию. Канонические ЧПУ отзывов и сравнение
+admin-сессией становится обычным автоматическим GigaAM-отзывом. Канонические ЧПУ отзывов и сравнение
 GigaAM/Parakeet из PR18 не заменяются UUID-ссылками. Удалённый отзыв/лог возвращает
 404, а не новый объект с тем же номером.
 

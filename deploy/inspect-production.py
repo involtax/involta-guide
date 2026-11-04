@@ -271,7 +271,7 @@ engine.dispose()
         report["voice_upload_runtime"] = {}
         for container, kind in [
             ("involta-guide", "guide"),
-            ("involta-guide-production-voice-api-1", "voice"),
+            ("involta-guide-production-voice-1", "voice"),
         ]:
             code, output, _ = run(
                 ["docker", "exec", container, "python", "-c", runtime_program, kind], timeout=10
@@ -287,7 +287,7 @@ engine.dispose()
                 "--format",
                 "{{json .}}",
                 "involta-guide",
-                "involta-guide-production-voice-api-1",
+                "involta-guide-production-voice-1",
                 "involta-guide-production-voice-worker-1",
             ]
         )

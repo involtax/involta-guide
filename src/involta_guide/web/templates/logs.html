@@ -1,7 +1,7 @@
 {%extends 'admin_shell.html'%}
-{%set workspace_title='Рабочий стол.' if logs_admin else 'Логи'%}
+{%if not logs_admin%}{%set workspace_title='Логи'%}{%endif%}
 {%set workspace_id='logs-main'%}{%set workspace_boost=false%}
-{%set show_admin_nav=logs_admin%}{%set show_admin_logout=logs_admin%}
+{%set show_admin_nav=logs_admin%}
 {%from 'macros.html' import csrf,generation_model_picker with context%}
 {%block admin_content%}
 <header class="admin-section-heading">{%if logs_admin%}<h2>Логи</h2>{%endif%}{%if not logs_admin%}<a href="{{settings.path('/admin')}}">Войти в админку ↗</a>{%endif%}</header>

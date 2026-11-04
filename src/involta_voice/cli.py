@@ -18,7 +18,6 @@ def main() -> None:
             "orphan-audio",
             "beta-cleanup-files",
             "prepare-model",
-            "asr-backfill",
             "asr-report",
         ],
     )
@@ -40,6 +39,10 @@ def main() -> None:
     try:
         if args.command == "migrate":
             migrate(engine)
+        elif args.command == "asr-report":
+            from .recognition import summary
+
+            print(json.dumps(summary(engine), ensure_ascii=False, default=str))
         elif args.command == "beta-cleanup-files":
             from .reset import cleanup_files
             from .service import VoiceService
@@ -50,17 +53,6 @@ def main() -> None:
             print(json.dumps({"pending_files": count, "execute": args.execute}))
             if args.execute:
                 cleanup_files(VoiceService(engine, settings))
-        elif args.command in ("asr-backfill", "asr-report"):
-            from .beta import backfill, summary
-
-            result = (
-                backfill(engine, settings, args.execute)
-                if args.command == "asr-backfill"
-                else summary(engine, settings)
-            )
-            print(json.dumps(result, ensure_ascii=False, default=str))
-            if result.get("errors"):
-                raise SystemExit(1)
         else:
             # Synchronize owner-prefixed files with intake/reset and prove no committed reference.
             from .db import execute

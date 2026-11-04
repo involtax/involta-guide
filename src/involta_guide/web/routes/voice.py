@@ -9,7 +9,6 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request as StarletteRequest
 
-from involta_guide.domain.entities import NotFound
 from involta_guide.infrastructure.voice.client import VoiceClient, VoiceUnavailable
 from involta_guide.web.http import admin_token, check_origin, client_ip, context
 from involta_voice.contracts import LocationContext, RestaurantContext, SubmissionMetadata
@@ -29,37 +28,6 @@ def owner(request: Request) -> str:
     except ValueError:
         raise HTTPException(404, "Запись не найдена") from None
     return visitor
-
-
-def editorial_status(request: Request, reference: str, visitor: str) -> dict[str, Any] | None:
-    ctx = context(request)
-    try:
-        review = ctx.queries.get("reviews", reference)
-    except NotFound:
-        return None
-    if review["visitor"] != visitor:
-        raise HTTPException(404, "Запись не найдена")
-    try:
-        text = ctx.queries.get("review_texts", reference)
-    except NotFound:
-        text = None
-    location = ctx.queries.get("locations", review["location_id"])
-    state = "fraud" if review["fraud"] else review["moderation"]
-    if review["changes"] and review["moderation"] == "approved" and not review["fraud"]:
-        state = "published"
-    if text and text["public"] and review["moderation"] == "approved" and not review["fraud"]:
-        state = "published"
-    return {
-        "reference": reference,
-        "location": {"id": str(location["id"]), "slug": location["slug"], "name": location["name"]},
-        "transcript": text["original_text"] if text else review["transcript"],
-        "moderation": review["moderation"],
-        "editorial_state": state,
-        "created_at": str(review["created_at"]),
-        "state": "result_ready"
-        if review["transcript"]
-        else ("processing_failed" if review["status"] == "failed" else "accepted"),
-    }
 
 
 def routes(prefix: str) -> APIRouter:
@@ -172,6 +140,7 @@ def routes(prefix: str) -> APIRouter:
                         "role",
                         "location",
                         "draft",
+                        "recording",
                         "events",
                         "timeline",
                         "vad",
@@ -368,7 +337,7 @@ def routes(prefix: str) -> APIRouter:
                 {
                     "error": {
                         "code": "unavailable",
-                        "message": "Сервис временно недоступен. Повторите отправку этой записи.",
+                        "message": "Сервис временно недоступен. Запишите новый отзыв позже.",
                     }
                 },
                 status_code=503,
@@ -376,69 +345,38 @@ def routes(prefix: str) -> APIRouter:
         finally:
             await form.close()
 
-    @router.get(base + "/submissions/mine")
-    def mine(request: Request, page: int = 1, location: str = "") -> Response:
-        if not request.cookies.get("guide_visitor"):
-            return JSONResponse(
-                {"rows": [], "page": page}, headers={"Cache-Control": "private,no-store"}
-            )
-        visitor = owner(request)
-        try:
-            data = voice_client(request).json(
-                "GET", "/submissions", params={"visitor": visitor, "page": max(1, page)}
-            )
-            for item in data["rows"]:
-                imported = editorial_status(request, item["reference"], visitor)
-                if imported:
-                    item.update(
-                        {k: v for k, v in imported.items() if k not in {"state", "created_at"}}
-                    )
-                    item.setdefault("created_at", imported["created_at"])
-        except VoiceUnavailable:
-            rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
-            data = {
-                "rows": [editorial_status(request, r["id"], visitor) for r in rows],
-                "page": page,
-                "service_available": False,
-            }
-        known = {r["reference"] for r in data["rows"]}
-        rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
-        for item in rows:
-            if item["id"] not in known:
-                own = editorial_status(request, item["id"], visitor)
-                if own:
-                    data["rows"].append(own)
-        if location:
-            public = context(request).queries.public(location)
-            data["rows"] = [
-                r
-                for r in data["rows"]
-                if public and str(r.get("location", {}).get("id")) == public["location"]["id"]
-            ]
-        return JSONResponse(data, headers={"Cache-Control": "private,no-store"})
+    @router.get(base + "/reviews")
+    def public_reviews(request: Request, location: str) -> Response:
+        from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 
-    @router.get(base + "/submissions/{reference}")
-    def status(request: Request, reference: UUID) -> Response:
-        visitor = owner(request)
-        imported = editorial_status(request, str(reference), visitor)
-        try:
-            remote = voice_client(request).request(
-                "GET", "/submissions/" + str(reference), params={"visitor": visitor}
+        ctx = context(request)
+        public = ctx.queries.public(location)
+        if not public:
+            raise HTTPException(404, "Локация не найдена")
+        city = public["location"]
+        rows = VoiceReadModel(ctx.engine).public_texts(city["id"])
+        pending = [r["reference"] for r in rows if r["state"] == "accepted"]
+        if pending:
+            try:
+                reports = voice_client(request).json("POST", "/admin/recognitions", json=pending)
+                for item in rows:
+                    primary = next(
+                        (r for r in reports.get(item["reference"], []) if r["name"] == "GigaAM"),
+                        None,
+                    )
+                    if primary and primary["state"] in ("failed", "unknown"):
+                        item["state"] = "processing_failed"
+            except VoiceUnavailable:
+                pass  # Durable Guide receipts and texts remain readable offline.
+        for item in rows:
+            item["log_url"] = ctx.settings.path(
+                "/logs/reviews/" + city["slug"] + "/" + str(item["number"])
             )
-            if remote.status_code == 404:
-                if imported is None:
-                    raise HTTPException(404, "Запись не найдена")
-                raise VoiceUnavailable("Локальная запись")
-            if not remote.is_success:
-                raise VoiceUnavailable("Статус временно недоступен")
-            data = remote.json()
-        except VoiceUnavailable:
-            if imported is None:
-                raise HTTPException(503, "Статус временно недоступен") from None
-            data = imported
-        if imported:
-            data.update({k: v for k, v in imported.items() if k not in {"state", "created_at"}})
-            data.setdefault("created_at", imported["created_at"])
-        return JSONResponse(data, headers={"Cache-Control": "private,no-store"})
+        from fastapi.encoders import jsonable_encoder
+
+        return JSONResponse(
+            jsonable_encoder({"rows": rows, "content_epoch": city["content_epoch"]}),
+            headers={"Cache-Control": "no-store"},
+        )
 
     return router

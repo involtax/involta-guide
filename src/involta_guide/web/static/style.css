@@ -1025,3 +1025,9 @@ pre.audit-json {
 .candidate-review > span { display: inline-block; margin-left: 10px; color: var(--muted); font-size: 11px; }
 .candidate-review p { margin: 6px 0; }
 .candidate-review a { display: block; font-size: 11px; }
+
+.public-reviews { margin: 2rem 0; }
+.public-reviews .reviews > p { padding: 1.25rem 0; border-bottom: 1px solid #ddd; }
+.public-reviews time, .public-reviews .review-log { color: #777; font-size: .8rem; }
+.public-reviews .review-log { display: block; margin-top: .5rem; }
+.public-reviews .transcript { white-space: pre-wrap; }

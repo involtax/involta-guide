@@ -54,7 +54,7 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
             "ai-audit",
         ):
             response = client.get("/guide/admin?tab=" + tab, follow_redirects=False)
-            assert response.status_code == 200 and "Рабочий стол." in response.text
+            assert response.status_code == 200 and 'class="admin-tabs"' in response.text
             assert 'href="/guide/admin" class="selected"' in response.text
             assert "location" not in response.headers and "HX-Redirect" not in response.headers
         for query in (
@@ -63,7 +63,7 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
             "anything=123&page=bad",
         ):
             response = client.get("/guide/admin?" + query, headers={"HX-Request": "true"})
-            assert response.status_code == 200 and "Рабочий стол." in response.text
+            assert response.status_code == 200 and 'class="admin-tabs"' in response.text
             assert "HX-Redirect" not in response.headers
         for old in (
             "/admin/voice",

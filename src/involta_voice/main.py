@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -19,22 +19,14 @@ from starlette.requests import Request as StarletteRequest
 
 from .config import Settings
 from .contracts import (
-    LocationContext,
     LocationPurged,
     LocationReset,
     SubmissionMetadata,
     SubmissionStatus,
 )
-from .db import database, encoded, execute, row, snapshot
+from .db import database, execute, row
 from .errors import VoiceError
-from .evaluation import AsrRun, Evaluation
 from .service import VoiceService
-from .worker import Worker
-
-MODELS = {
-    "transcription": ["gigaam", "parakeet"],
-    "analysis": ["gpt-4.1-mini", "gpt-4.1", "gpt-6.1-sol"],
-}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -102,7 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health/ready")
     def ready() -> dict[str, str]:
         with engine.connect() as conn:
-            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=4") or row(
+            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=6") or row(
                 conn, "SELECT 1 FROM purge_files WHERE content_epoch=1 LIMIT 1"
             ):
                 raise HTTPException(
@@ -121,36 +113,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     dependencies = [Depends(authorized)]
-
-    def audit_admin(request: Request, action: str, before: Any, after: Any) -> None:
-        session = request.headers.get("x-guide-session")
-        session_id = str(UUID(session)) if session else None
-        with engine.begin() as conn:
-            reference = request.path_params.get("reference")
-            location = None
-            if reference:
-                submission = row(
-                    conn,
-                    "SELECT location_id,content_epoch FROM submissions WHERE reference=:id",
-                    id=str(reference),
-                )
-                if not submission:
-                    return
-                from .reset import lock_epoch
-
-                lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
-                location = submission
-            execute(
-                conn,
-                "INSERT INTO admin_events(id,action,session_id,before_data,after_data,location_id,content_epoch) VALUES(:id,:action,:session,CAST(:before AS jsonb),CAST(:after AS jsonb),:location,:epoch)",
-                id=str(uuid4()),
-                action=action,
-                session=session_id,
-                before=encoded(before),
-                after=encoded(after),
-                location=location["location_id"] if location else None,
-                epoch=location["content_epoch"] if location else None,
-            )
 
     @app.post(
         "/internal/v1/locations/{location_id}/reset",
@@ -298,103 +260,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ]
         return {**run, "calls": calls}
 
-    @app.post(
-        "/internal/v1/admin/submissions/{reference}/runs",
-        dependencies=dependencies,
-        status_code=202,
-    )
-    def new_run(request: Request, reference: UUID, body: dict[str, Any]) -> Any:
-        key = str(UUID(str(body.get("idempotency_key") or "")))
-        frozen_context = (
-            LocationContext.model_validate(body["context"]).model_dump(mode="json")
-            if body.get("context")
-            else None
-        )
-        before = service.status(str(reference))
-        after = service.new_run(str(reference), key, frozen_context)
-        audit_admin(request, "new-run", before, after)
-        return after
-
-    @app.post(
-        "/internal/v1/admin/submissions/{reference}/runs/{number}/revalidate",
-        dependencies=dependencies,
-    )
-    def revalidate(request: Request, reference: UUID, number: int) -> Any:
-        worker = Worker(engine, settings)
-        try:
-            worker.revalidate(str(reference), number)
-        except ValueError as exc:
-            raise VoiceError("Сохранённый ответ не прошёл проверку", "invalid", 400) from exc
-        finally:
-            worker.provider.close()
-        after = service.status(str(reference), admin=True)
-        audit_admin(request, "revalidate", {"reference": str(reference), "run": number}, after)
-        return after
-
     @app.get("/internal/v1/admin/submissions/{reference}/asr", dependencies=dependencies)
     def asr_report(reference: UUID) -> Any:
-        from .evaluation import report
+        from .recognition import report
 
         return report(engine, str(reference))
 
-    @app.post(
-        "/internal/v1/admin/submissions/{reference}/asr-runs",
-        dependencies=dependencies,
-        status_code=202,
-    )
-    def asr_run(request: Request, reference: UUID, body: AsrRun) -> Any:
-        from .evaluation import queue_evaluation
+    @app.post("/internal/v1/admin/recognitions", dependencies=dependencies)
+    def recognitions(body: list[UUID]) -> Any:
+        from .recognition import reports
 
-        result = queue_evaluation(
-            engine,
-            settings,
-            str(reference),
-            str(body.idempotency_key),
-            body.force,
-        )
-        audit_admin(request, "asr-evaluation-run", {"reference": str(reference)}, result)
-        return result
-
-    @app.post(
-        "/internal/v1/admin/submissions/{reference}/asr-runs/{number}/evaluation",
-        dependencies=dependencies,
-    )
-    def asr_vote(request: Request, reference: UUID, number: int, body: Evaluation) -> Any:
-        from .evaluation import evaluate
-
-        session = request.headers.get("x-guide-session")
-        if not session:
-            raise HTTPException(403, "Требуется сессия редактора")
-        return evaluate(engine, str(reference), number, body, str(UUID(session)))
-
-    @app.get("/internal/v1/admin/settings", dependencies=dependencies)
-    def get_settings() -> Any:
-        with engine.connect() as conn:
-            return {**snapshot(conn, settings), "models": MODELS}
-
-    @app.put("/internal/v1/admin/settings", dependencies=dependencies)
-    def put_settings(request: Request, body: dict[str, Any]) -> Any:
-        if set(body) - {"transcription_model", "analysis_model", "prompt"}:
-            raise VoiceError("Неизвестная настройка")
-        for key, kind in (("transcription_model", "transcription"), ("analysis_model", "analysis")):
-            if key in body and body[key] not in MODELS[kind]:
-                raise VoiceError("Выберите модель из каталога")
-        if "prompt" in body and (
-            not isinstance(body["prompt"], str) or not 50 <= len(body["prompt"]) <= 30000
-        ):
-            raise VoiceError("Промпт должен содержать 50–30000 символов")
-        before = get_settings()
-        with engine.begin() as conn:
-            for key, value in body.items():
-                execute(
-                    conn,
-                    "INSERT INTO voice_settings(key,value) VALUES(:key,CAST(:value AS jsonb)) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    key=key,
-                    value=encoded(value),
-                )
-        after = get_settings()
-        audit_admin(request, "settings", before, after)
-        return after
+        if len(body) > 30:
+            raise VoiceError("Не более 30 записей за один запрос")
+        return reports(engine, [str(reference) for reference in body])
 
     return app
 

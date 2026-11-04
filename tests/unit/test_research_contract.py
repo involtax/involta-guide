@@ -86,6 +86,7 @@ def test_pending_candidate_with_full_scores_and_missing_phone_is_retained_not_pu
         status="needs_verification",
         phone="",
         reason="Номер не подтверждён",
+        verificationIssues=["phone"],
     )
     raw["candidates"].append(pending)
     content, info = normalize_generation(generation_content(raw))
@@ -94,3 +95,57 @@ def test_pending_candidate_with_full_scores_and_missing_phone_is_retained_not_pu
     assert len(result["rankingReport"]) == 2
     assert result["qualityReport"]["needsVerification"] == 1
     assert result["qualityReport"]["status"] == "partial"
+
+
+def test_new_request_cannot_turn_the_shortlist_into_a_city_directory():
+    raw = research()
+    raw["candidates"] = [dict(deepcopy(raw["candidates"][0]), name=f"Место {i}") for i in range(11)]
+    with pytest.raises(ValidationError, match="at most 10"):
+        generation_content(raw)
+    assert GenerationResult.model_json_schema()["properties"]["candidates"]["maxItems"] == 10
+
+
+def test_unknown_optional_facts_do_not_block_an_evidenced_restaurant():
+    raw = research()
+    raw["candidates"][0].update(openingHours=None, latitude=None, longitude=None)
+    content = generation_content(raw)
+    assert content["restaurants"][0]["openingHours"] is None
+    assert content["candidateReview"][0]["verificationIssues"] == []
+
+
+def test_pending_status_requires_a_real_publication_blocker_and_preserves_address_doubt():
+    raw = research()
+    candidate = raw["candidates"][0]
+    candidate.update(status="needs_verification", reason="Часы неизвестны")
+    with pytest.raises(ValidationError, match="verificationIssues"):
+        generation_content(raw)
+    candidate["verificationIssues"] = ["hours"]
+    with pytest.raises(ValidationError):
+        generation_content(raw)
+    candidate.update(verificationIssues=["location"], reason="Источники указывают разные филиалы")
+    content = generation_content(raw)
+    assert content["restaurants"] == []
+    assert len(content["rankingReport"]) == 1
+    assert content["candidateReview"][0]["verificationIssues"] == ["location"]
+
+
+def test_a_numeric_rating_without_evidence_cannot_be_published():
+    raw = research()
+    raw["candidates"][0]["evidence"][0]["sourceRefs"] = []
+    with pytest.raises(ValidationError, match="источника"):
+        generation_content(raw)
+    raw = research()
+    raw["candidates"][0]["verificationIssues"] = ["phone"]
+    with pytest.raises(ValidationError, match="несовместим"):
+        generation_content(raw)
+
+
+def test_paid_v3_response_retains_its_recorded_contract_without_starting_a_new_request():
+    raw = research()
+    raw["candidates"] += [
+        {"name": f"Упоминание {i}", "status": "needs_verification", "reason": "Не проверено"}
+        for i in range(10)
+    ]
+    with pytest.raises(ValidationError):
+        generation_content(raw)
+    assert len(generation_content(raw, recorded=True)["candidateReview"]) == 11
