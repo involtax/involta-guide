@@ -165,10 +165,9 @@ class Worker:
         primary = snapshot["transcription_model"]
         engine, variant = result_identity(kind, primary)
         # A saved response belongs to its frozen request, including pre-transition jobs.
-        frozen_request = (
+        request = stage.get("request") or (
             snapshot["asr_models"][engine] if variant == "onnx" else snapshot["sherpa_models"][kind]
         )
-        request = stage.get("request") or frozen_request
         engine = request["model"]
         raw = stage.get("raw_response")
         if raw is None:
