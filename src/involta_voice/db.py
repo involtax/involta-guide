@@ -91,4 +91,6 @@ def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
         "fake_provider": settings.fake_provider,
         "schema_version": 2,
         "transcription_model": selected,
+        "primary_variant": "sherpa_hotwords" if settings.asr_beta_enabled else "onnx",
+        "restore_dictionary_case": True,
     }

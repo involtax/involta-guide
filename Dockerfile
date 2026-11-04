@@ -35,7 +35,7 @@ RUN apt-get update \
     && useradd --uid 10001 --gid 10001 --create-home --no-log-init \
        --shell /usr/sbin/nologin guide
 COPY --from=builder /app/.venv /app/.venv
-RUN /app/.venv/bin/python -c "import sherpa_onnx, importlib.metadata, json; provenance=json.loads(importlib.metadata.distribution('sherpa-onnx').read_text('direct_url.json')); assert provenance['vcs_info']['commit_id']=='3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb', provenance"
+RUN /app/.venv/bin/python -c "import sherpa_onnx, importlib.metadata, json; provenance=json.loads(importlib.metadata.distribution('sherpa-onnx').read_text('direct_url.json')); assert provenance['vcs_info']['commit_id']=='3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb', provenance; from involta_voice.sherpa_tokenizer import tokenizer; assert tokenizer().vocab_size()==1024"
 COPY data ./data
 COPY migrations ./migrations
 COPY alembic.ini ./

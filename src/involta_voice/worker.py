@@ -12,7 +12,8 @@ from .db import database, encoded, execute, row
 from .errors import VoiceError
 from .provider import FakeProvider, ProviderFailure, VoiceProvider
 from .service import VoiceService
-from .variants import STAGES, result_identity
+from .text import restore_names
+from .variants import STAGES, primary_kind, primary_variant, result_identity
 
 
 class Worker:
@@ -54,9 +55,20 @@ class Worker:
                 .all()
             )
             for interrupted in expired:
-                if interrupted["kind"] == "transcription" and interrupted["state"] in (
-                    "failed",
-                    "unknown",
+                frozen = row(
+                    conn,
+                    "SELECT snapshot FROM runs WHERE submission=:id AND number=:n",
+                    id=interrupted["submission"],
+                    n=interrupted["run"],
+                )
+                if (
+                    frozen
+                    and interrupted["kind"] == primary_kind(frozen["snapshot"])
+                    and interrupted["state"]
+                    in (
+                        "failed",
+                        "unknown",
+                    )
                 ):
                     self.service.emit(
                         conn,
@@ -73,8 +85,12 @@ class Worker:
             )
             stage = row(
                 conn,
-                """SELECT s.* FROM stages s WHERE kind=ANY(:kinds) AND state='queued' AND available_at<=now() AND :local_busy=false
-                ORDER BY CASE kind WHEN 'transcription' THEN 0 ELSE 1 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                """SELECT s.* FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run
+                WHERE s.kind=ANY(:kinds) AND s.state='queued' AND s.available_at<=now() AND :local_busy=false
+                ORDER BY CASE WHEN s.kind=CASE WHEN coalesce(r.snapshot->>'primary_variant','onnx')='onnx'
+                  THEN 'transcription' ELSE 'sherpa_gigaam_'||substr(r.snapshot->>'primary_variant',8) END
+                  THEN 0 WHEN s.kind='transcription' THEN 1 ELSE 2 END,
+                s.available_at,s.submission,s.run,s.kind FOR UPDATE OF s SKIP LOCKED LIMIT 1""",
                 kinds=list(STAGES),
                 local_busy=bool(local_running),
             )
@@ -307,8 +323,13 @@ class Worker:
                 submission,
             )
             self.complete(conn, stage)
-            if engine != "gigaam" or request.get("variant", "onnx") != "onnx":
+            if engine != "gigaam" or request.get("variant", "onnx") != primary_variant(snapshot):
                 return
+            if snapshot.get("restore_dictionary_case"):
+                location = snapshot["location"]
+                transcript = restore_names(
+                    transcript, [location["name"], *location.get("recognition_dictionary", [])]
+                )
             execute(
                 conn,
                 "UPDATE submissions SET transcript=:text WHERE reference=:id",
@@ -350,7 +371,18 @@ class Worker:
                 kind=stage["kind"],
                 token=stage["lease_token"],
             )
-            if changed and stage["kind"] == "transcription" and state in ("failed", "unknown"):
+            frozen = row(
+                conn,
+                "SELECT snapshot FROM runs WHERE submission=:id AND number=:n",
+                id=stage["submission"],
+                n=stage["run"],
+            )
+            if (
+                changed
+                and frozen
+                and stage["kind"] == primary_kind(frozen["snapshot"])
+                and state in ("failed", "unknown")
+            ):
                 self.service.emit(
                     conn,
                     str(stage["submission"]),
@@ -364,7 +396,7 @@ def main() -> None:
     settings = Settings()
     engine = database(settings)
     worker = Worker(engine, settings)
-    if isinstance(worker.provider, VoiceProvider):
+    if isinstance(worker.provider, VoiceProvider) and not settings.asr_beta_enabled:
         worker.provider.asr.warmup()
     stopped = Event()
 

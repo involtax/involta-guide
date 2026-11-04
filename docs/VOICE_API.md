@@ -46,10 +46,10 @@ GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Recei
 primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
 analysis_ready, processing_failed принимаются только как история доставки.
 
-POST `/admin/recognitions` — приватный batch до 30 UUID: до семи строк результатов,
+POST `/admin/recognitions` — приватный batch до 30 UUID: до пяти строк результатов,
 без оценок и эталона. GET `/admin/submissions/{reference}` и `/asr` содержат
 подробности для лога. Ручные new-run/revalidate, ASR-run/evaluation и изменение
-настроек анализа удалены. GigaAM фиксирован как primary. Публичный SubmissionStatus
+настроек анализа удалены. Основной профиль фиксируется в snapshot каждого отзыва. Публичный SubmissionStatus
 и общая лента не содержат Parakeet, модерации и редакторского состояния.
 
 Админка: `/admin/reviews/{slug}` — лента города. ЧПУ `/admin/reviews/{slug}/{number}`
@@ -113,52 +113,35 @@ UUID через запятую: ответ publication_statuses сообщает
 review_publication добавляет ограничение IN(0,1,2). Voice migration 7 создаёт новые
 события для уже сохранённых терминальных ошибок GigaAM, не вызывая ASR снова.
 
-## Семь профилей GigaAM (бета)
+## Пять профилей Sherpa с родным токенизатором
 
-Для **новых** отзывов профиль беты автоматически создаёт семь независимых stages:
+Новые записи создают пять заданий: sherpa_gigaam_plain (без подсказок, поиск8),
+sherpa_gigaam_hotwords (основной5/8), sherpa_gigaam_hotwords_weak (4.5/8),
+sherpa_gigaam_hotwords_strong (5.5/8), sherpa_gigaam_hotwords_wide (5/16).
+Задания onnx-asr/Parakeet/только-город не создаются. Исторические этапы/результаты
+сохраняются, данные схемы9 и ключ (submission,run,engine,variant) не меняются.
 
-| kind | Модель | variant |
-| --- | --- | --- |
-| transcription | GigaAM | onnx |
-| sherpa_gigaam_plain | GigaAM | sherpa_plain |
-| sherpa_gigaam_hotwords_weak | GigaAM | sherpa_hotwords_weak |
-| sherpa_gigaam_hotwords | GigaAM | sherpa_hotwords |
-| sherpa_gigaam_hotwords_strong | GigaAM | sherpa_hotwords_strong |
-| sherpa_gigaam_hotwords_wide | GigaAM | sherpa_hotwords_wide |
-| sherpa_gigaam_hotwords_city | GigaAM | sherpa_hotwords_city |
+Guide передаёт LocationContext.recognition_dictionary: название города и все
+названия его ресторанов без ограничения публичной подборкой или 200 строками.
+Voice добавляет исходный/строчный регистр и фиксирует фактический словарь каждого
+профиля. На инференсе нет загрузок моделей/токенизатора и редактирования словаря.
 
-Контракт v2 дополнен `LocationContext.recognition_dictionary: string[]` (default []).
-Guide формирует его из **всех** строк `restaurants` выбранного города, включая
-не входящие в публичную подборку; без лимита 200 и без названий соседних городов.
-В список также входит название самого населённого пункта.
-Пробельные последовательности нормализуются, точные дубликаты удаляются. Это
-подсказки, а не ограничение допустимой речи. Список фиксируется вместе с исходным
-контекстом в `runs.snapshot`; каждый Sherpa request сохраняет фактический dictionary.
-Позднее редактирование каталога на уже принятый отзыв не влияет.
-Полный список подсказок выдаётся только в приватных метаданных/результатах;
-публичный status не раскрывает его.
+Новые runs.snapshot содержат primary_variant=sherpa_hotwords и
+restore_dictionary_case=true. Отсутствующий primary_variant исторического задания
+означает прежний onnx. Только зафиксированный primary даёт gigaam_ready/failed;
+успешные сравнения не заменяют ошибочный primary. События schema_version=2 и
+publication_status 0/1 сохраняются. Новые события публикуют текст5/8 после
+восстановления точного каталогового написания слов. Созвучия, е/ё и грамматические
+формы не подменяются. Исходный текст остаётся в candidate.transcript/provider_calls.
 
-Voice schema 8 добавляет `asr_candidates.variant`; ключ результата теперь
-`(submission, run, engine, variant)`. Имеющиеся записи получают variant=onnx,
-их поля, аудио, outbox/ACK и результаты сохраняются. Миграция не запускает ASR
-исторических отзывов и не создаёт для них дополнительные stages.
+Приватный batch /admin/recognitions: максимум30 references, три SQL-запроса.
+Каждая строка содержит variant/variant_label/text/raw_text/primary/state/error,
+dictionary, hotwords_score, max_active_paths. У основной строки text — сохранённый
+публикуемый текст, raw_text — ответ модели до форматирования. Остальные строки
+содержат сырые результаты сравнения. Чтение не запускает ASR. Публичная лента
+не раскрывает технические параметры или словарь.
 
-Приватный batch `/admin/recognitions` по-прежнему ограничен 30 references и тремя
-SQL-запросами; каждый элемент содержит engine/name/variant/variant_label,
-text/state/error, dictionary (null — данные не получены, [] — словаря нет),
-max_active_paths и hotwords_score из фактического сохранённого request.
-Новые отзывы имеют семь строк GigaAM; исторические — только имеющиеся варианты GigaAM.
-Parakeet исключён из карточек и новых заданий; сохранённые результаты остаются в логе.
-Чтение ничего не распознаёт. Ошибка одного сравнения не мешает остальным.
-
-События публикации неизменны: **только исходный GigaAM / onnx** может дать
-`gigaam_ready` или `gigaam_failed`. Ни один результат Sherpa не служит fallback,
-не меняет публичный текст или publication_status. Работает прежняя защита
-от поздней доставки после удаления и reset.
-
-Sherpa-профили используют modified_beam_search, одинаковую предобработку и Silero VAD.
-У каталожных словарей сила подсказок 0.75/1.5/3.0 при max_active_paths=4;
-широкий поиск — сила 1.5/max_active_paths=8; только город — сила 1.5/поиск4.
-Без словаря — поиск4. Length_reward=0. Все параметры входят в frozen request.
-Voice schema 9 расширяет CHECK вариантов/этапов без изменения ключа результата
-и без обработки исторических аудио. [Точная таблица профилей](VOICE_SHERPA_COMPARISON.md).
+Request хранит dictionary_encoding=gigaam-sentencepiece-native-v2, SHA256 родного
+токенизатора и экспортированного bpe.vocab. Файл с весами частей слов версионирован;
+старые задания v1 используют собственный неизменный файл. Точная конфигурация и
+подготовка: [VOICE_SHERPA_COMPARISON.md](VOICE_SHERPA_COMPARISON.md).
