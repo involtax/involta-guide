@@ -1,12 +1,16 @@
 // Interactive visual prototype only: test data, no Guide endpoint or production navigation.
 (() => {
   const params=new URLSearchParams(location.search);
-  const variant=window.SEARCH_VARIANTS.find(item=>item.id===params.get('variant'))||window.SEARCH_VARIANTS[0];
+  const buttonVariant=window.SEARCH_BUTTON_VARIANTS.find(item=>item.id===params.get('button'));
+  const porcelain=window.SEARCH_VARIANTS.find(item=>item.id==='04');
+  const variant=buttonVariant?porcelain:(window.SEARCH_VARIANTS.find(item=>item.id===params.get('variant'))||porcelain);
   const gallery=params.get('gallery')==='1';
   document.documentElement.dataset.searchVariant=variant.id;
+  if(buttonVariant)document.documentElement.dataset.buttonVariant=buttonVariant.id;
   if(gallery)document.documentElement.dataset.preview='component';
-  document.title=variant.id+' · '+variant.name+' — Макет поиска';
-  document.querySelector('.prototype-label').textContent='Макет '+variant.id+' · '+variant.name;
+  document.title=buttonVariant?'Кнопка '+buttonVariant.id+' · '+buttonVariant.name+' — Макет':variant.id+' · '+variant.name+' — Макет поиска';
+  document.querySelector('.prototype-label').textContent=buttonVariant?'Макет · Фарфор · '+buttonVariant.id:'Макет '+variant.id+' · '+variant.name;
+  if(buttonVariant&&!buttonVariant.arrow)document.querySelector('.search-submit > span:last-child').hidden=true;
   const records = [
     {name:'Великий Новгород',context:'Город · Новгородская область',alias:'Новгород',slug:'velikiy-novgorod'},
     {name:'Нижний Новгород',context:'Город · Нижегородская область',alias:'Нижний',slug:'nizhniy-novgorod'},
