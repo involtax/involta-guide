@@ -6,7 +6,7 @@ umask 077
 mode=${1:?deploy or rollback}; DEPLOY_ROOT=${2:?}; target_sha=${3:?}; target_image=${4:?}
 deployment_id=${5:?}; public_url=${6:?}; registry_user=${7:?}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-[[ "$mode" == deploy || "$mode" == rollback ]] || exit 2
+[[ "$mode" == deploy || "$mode" == rollback || "$mode" == recover ]] || exit 2
 [[ "$mode" != rollback ]] || export VOICE_INTAKE=false
 [[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || { echo 'Unsafe deployment directory' >&2; exit 2; }
 [[ "$target_sha" =~ ^[0-9a-f]{40}$ && "$deployment_id" =~ ^[0-9]+-[0-9]+$ ]] || exit 2
@@ -202,6 +202,24 @@ else
     echo 'Existing container has no rollback state. Adopt/provision the first release explicitly.' >&2; exit 1
   fi
 fi
+if [[ "$mode" == recover ]]; then
+  # Recover a failed, uncommitted cutover using its original dump and env backup.
+  [[ "$target_sha" != "$previous_sha" && -n "$previous_sha" ]] || exit 2
+  [[ -s "$DEPLOY_ROOT/releases/$target_sha/pre-cutover.$deployment_id.dump" ]] || exit 2
+  [[ -s "$DEPLOY_ROOT/releases/$target_sha/voice-env-before-shared-db" ]] || exit 2
+  # Before repairing env, require all application writers to still be stopped.
+  for container in involta-guide involta-guide-production-worker-1 involta-guide-production-voice-1 involta-guide-production-voice-api-1 involta-guide-production-voice-consumer-1 involta-guide-production-voice-worker-1; do
+    running=$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)
+    [[ "$running" != true ]] || { echo "Recovery refused: writer $container is running" >&2; exit 2; }
+  done
+  python3 "$script_dir/shared-database-env.py" "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases/$target_sha" --recover
+  compose "$target_sha" "$target_image" config --quiet
+  compose "$previous_sha" "$previous_image" config --quiet
+  restore_previous
+  check_public "$previous_sha"
+  echo "Recovery to $previous_sha succeeded"
+  exit 0
+fi
 release_dir="$DEPLOY_ROOT/releases/$target_sha"
 mkdir -p "$release_dir"
 # Keep each release's Compose snapshot for an exact image rollback.
@@ -232,6 +250,10 @@ if [[ "$mode" == rollback && -n "$previous_sha" && -f "$DEPLOY_ROOT/releases/$pr
   docker run --rm --entrypoint python "$target_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Cannot roll back Voice references to an incompatible image' >&2; exit 2; }
 fi
 docker volume inspect "$AUDIO_VOLUME" >/dev/null
+# Validate the proposed environment while the previous release still serves traffic.
+if [[ "$VOICE_STACK" == 1 ]]; then
+  python3 "$script_dir/shared-database-env.py" "$DEPLOY_ROOT" "$release_dir" --check
+fi
 # The current-state cutover has a private pre-change dump; image rollback restores it first.
 changed=0
 failed() {

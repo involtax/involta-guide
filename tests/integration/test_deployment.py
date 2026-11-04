@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -57,6 +58,10 @@ if args[0]=='inspect':
 if args[0]=='run' and '--entrypoint' in args:
  sys.exit(1 if os.getenv('FAKE_PRE_VOICE_IMAGE') in args else 0)
 if args[0]=='compose':
+ if 'involta-guide-env-validation' in args:
+  # Parse the candidate with real Compose, but never start a container.
+  assert 'config' in args and '--format' in args and 'json' in args
+  os.execv(os.environ['REAL_DOCKER'],[os.environ['REAL_DOCKER'],*args])
  command=next(x for x in args if x in ('up','ps','stop','rm','logs','run','config'))
  if command=='config':
   names=['web','worker']
@@ -115,6 +120,7 @@ def harness(tmp_path):
         **os.environ,
         "PATH": str(bin_dir) + ":" + os.environ["PATH"],
         "FAKE_STATE": str(state),
+        "REAL_DOCKER": shutil.which("docker"),
         "GUIDE_GLOBAL_LOCK": str(tmp_path / "global.lock"),
     }
     return root, state, env
@@ -498,3 +504,20 @@ def test_combined_voice_rollout_and_rollback_use_matching_topology(tmp_path, fai
         assert services["voice-consumer"]["sha"] == A
         assert not {"voice", "voice-db"} & services.keys()
         assert "search_path%3Dvoice" in (root / ".env.voice").read_text()
+
+
+def test_invalid_voice_env_is_rejected_before_stopping_writers(tmp_path):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    with (root / "deploy.env").open("a") as stream:
+        stream.write("VOICE_STACK=1\n")
+    (root / ".env.voice").write_text("VOICE_DATABASE_URL=postgresql://old:test@localhost/voice\n")
+    (root / ".env.production").write_text("DATABASE_URL='invalid-test-url'\n")
+    log = Path(str(state) + ".log")
+    before = len(log.read_text().splitlines())
+    result = deploy(root, env, B, "2-1")
+    assert result.returncode != 0 and "Invalid PostgreSQL URL" in result.stderr
+    calls = [json.loads(line)[1] for line in log.read_text().splitlines()[before:]]
+    assert not any("stop" in args or "alembic" in args or "up" in args for args in calls)
+    assert (root / "current-release").read_text().split()[0] == A
+    assert "invalid-test-url" not in result.stderr

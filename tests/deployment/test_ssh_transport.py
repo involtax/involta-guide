@@ -29,6 +29,7 @@ if Path(sys.argv[0]).name=='ssh':
     "mode",
     [
         "deploy",
+        "recover",
         "beta-transition",
         "rollback",
         "bootstrap",
@@ -62,6 +63,7 @@ def test_host_pin_policy_applies_to_every_connection(tmp_path, mode, pin):
         "GITHUB_ACTOR": "test-actor",
         "GITHUB_RUN_ID": "123",
         "GITHUB_RUN_ATTEMPT": "1",
+        "RECOVERY_DEPLOYMENT_ID": "122-1",
         "SYNC_ADMIN_PASSWORD": "test-only-new-admin-password",
     }
     env.pop("DEPLOY_SSH_KNOWN_HOSTS", None)

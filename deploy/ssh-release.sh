@@ -15,7 +15,7 @@ if [[ "$mode" != inspect && "$mode" != admin-password ]]; then
 fi
 DEPLOY_SSH_PORT=${DEPLOY_SSH_PORT:-22}; DEPLOY_ROOT=${DEPLOY_ROOT:-/opt/involta-guide}
 PUBLIC_URL=${PUBLIC_URL:-https://involta.ru/guide/}
-[[ "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-report ]] || exit 2
+[[ "$mode" == recover || "$mode" == deploy || "$mode" == beta-transition || "$mode" == rollback || "$mode" == bootstrap || "$mode" == bootstrap-rollback || "$mode" == inspect || "$mode" == admin-password || "$mode" == voice-prepare || "$mode" == voice-activate || "$mode" == voice-report ]] || exit 2
 [[ "$DEPLOY_SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ && "$DEPLOY_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 2
 (( DEPLOY_SSH_PORT > 0 && DEPLOY_SSH_PORT < 65536 )) || exit 2
 [[ "$DEPLOY_ROOT" =~ ^/([a-zA-Z0-9_-]+/)+[a-zA-Z0-9_-]+$ ]] || exit 2
@@ -96,6 +96,11 @@ print(json.dumps({
 PAYLOAD
   exit 0
 fi
-printf -v arguments '%q ' "$mode" "$DEPLOY_ROOT" "$TARGET_SHA" "$IMAGE_REF" "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}" "$PUBLIC_URL" "$GITHUB_ACTOR"
+release_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
+if [[ "$mode" == recover ]]; then
+  release_id=${RECOVERY_DEPLOYMENT_ID:?}
+  [[ "$release_id" =~ ^[0-9]+-[0-9]+$ ]] || exit 2
+fi
+printf -v arguments '%q ' "$mode" "$DEPLOY_ROOT" "$TARGET_SHA" "$IMAGE_REF" "$release_id" "$PUBLIC_URL" "$GITHUB_ACTOR"
 # Never place registry credentials in argv, env files, SSH command text or logs.
 printf '%s\n' "$GHCR_TOKEN" | ssh "${opts[@]}" -p "$DEPLOY_SSH_PORT" "$remote" "${prefix}bash '$remote_dir/remote-release.sh' $arguments"
