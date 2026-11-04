@@ -217,7 +217,10 @@ def main() -> None:
                     conn.execute("SELECT max(version) FROM voice_schema_versions").fetchone()[0]
                     == previous
                 )
-                assert conn.execute("SELECT to_regclass('asr_evaluations')").fetchone()[0]
+                restored_evaluations = conn.execute(
+                    "SELECT to_regclass('asr_evaluations')"
+                ).fetchone()[0]
+                assert bool(restored_evaluations) == (previous == 5)
                 assert (
                     conn.execute(
                         "SELECT value FROM voice_settings WHERE key='test-marker'"
