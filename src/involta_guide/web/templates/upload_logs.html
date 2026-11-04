@@ -1,0 +1,54 @@
+<div class="logs-layout">
+<aside class="logs-sidebar admin-sidebar" id="log-requests" aria-label="Отправки голоса">
+<h2>Отправки · {{upload_requests.total}}</h2>
+<form method="get" action="{{settings.path('/logs')}}" class="stack">
+<input type="hidden" name="kind" value="uploads">
+<label>Город или request_id<input name="q" value="{{q}}" placeholder="Иваново или request_id"></label>
+<label>Статус<select name="status">
+{%for value,label in [('', 'Все'),('running','В работе'),('done','Принято'),('failed','Ошибка'),('stalled','Нет завершения')]%}
+<option value="{{value}}" {%if status==value%}selected{%endif%}>{{label}}</option>{%endfor%}
+</select></label><button>Найти</button>
+</form>
+<nav aria-label="Список отправок">
+{%for item in upload_requests.rows%}
+<a class="log-request upload-request {{'selected' if upload_detail and upload_detail.request.request_id==item.request_id else ''}}" href="{{settings.path(item.log_path)}}?{{audit_page(upload_requests.page)}}" {%if upload_detail and upload_detail.request.request_id==item.request_id%}aria-current="page"{%endif%}>
+<strong>{{item.location_name}}</strong> · <time data-local-time data-time-format="short" datetime="{{item.created_at}}">{{item.created_at}}</time>
+<small>{{item.stage_label}}</small>
+</a>
+{%else%}<p>Отправок пока нет.</p>{%endfor%}
+</nav>
+<nav aria-label="Страницы отправок">
+{%if upload_requests.page>1%}<a href="{{settings.path('/logs')}}?{{audit_page(upload_requests.page-1)}}">← Назад</a>{%endif%}
+ {{upload_requests.page}} / {{upload_requests.pages}}
+{%if upload_requests.page<upload_requests.pages%}<a href="{{settings.path('/logs')}}?{{audit_page(upload_requests.page+1)}}">Дальше →</a>{%endif%}
+</nav>
+</aside>
+<section class="logs-content admin-detail" aria-label="Выбранная отправка">
+{%if upload_detail%}
+{%set d=upload_detail%}{%set r=d.request%}{%set f=d.facts%}
+<h2>{{r.location_name}} · загрузка голоса</h2>
+<p>{%if r.location_slug%}<a href="{{settings.path('/'+r.location_slug)}}">Открыть страницу города ↗</a> · {%endif%}
+<a href="{{settings.path(r.log_path)}}?{{audit_page(upload_requests.page)}}">Обновить ↻</a> ·
+<a href="{{settings.path(r.log_path)}}.json{%if logs_admin%}?download=1{%endif%}">JSON ↗</a> ·
+<a href="#log-requests">К списку отправок ↓</a></p>
+<section class="panel">
+<h3>{{r.stage_label}}</h3><p>{{d.explanation}}</p>
+<dl class="admin-facts">
+<div><dt>Запись по отчёту браузера</dt><dd>{%if f.duration_ms is not none and f.duration_ms is defined%}{{'%.2f'|format(f.duration_ms/1000)}} с{%else%}Длительность неизвестна{%endif%}{%if f.bytes is defined and f.bytes is not none%} · {{f.bytes|int}} байт{%endif%}{%if f.mime%}<br>{{f.mime}}{%endif%}</dd></div>
+<div><dt>Ожидание браузера</dt><dd>{%if f.elapsed_ms is defined and f.elapsed_ms is not none%}{{f.elapsed_ms|int}} мс{%else%}Нет данных{%endif%}</dd></div>
+<div><dt>Начало отправки</dt><dd><time data-local-time datetime="{{r.created_at}}">{{r.created_at}}</time></dd></div>
+<div><dt>request_id</dt><dd><code>{{r.request_id}}</code></dd></div>
+<div><dt>Принятые байты по журналу Guide</dt><dd>{%if f.received_bytes is defined and f.received_bytes is not none%}{{f.received_bytes|int}} байт<br>{{'Приём завершён' if f.body_complete else 'Завершение приёма не зарегистрировано'}}{%else%}Нет данных о завершении приёма{%endif%}</dd></div>
+<div><dt>Локальная копия</dt><dd>{%if f.local_copy_saved%}Браузер сообщил о сохранении{%else%}Нет подтверждения от браузера{%endif%}</dd></div>
+</dl>
+</section>
+<h3>Ход отправки</h3>
+<p class="admin-muted">События браузера — его собственный отчёт. События Guide зафиксированы сервером.</p>
+<ol class="upload-events">
+{%for e in d.timeline%}<li><small>{%if e.time%}<time data-local-time datetime="{{e.time}}">{{e.time}}</time> · {%endif%}{{e.source}}</small>{{e.label}}{%if e.status%} · HTTP {{e.status}}{%endif%}{%if e.bytes is defined and e.bytes is not none%} · {{e.bytes}} байт{%endif%}{%if e.error%}<br>{{e.error}}{%endif%}</li>{%endfor%}
+</ol>
+{%for b in d.bodies%}<details {%if r.status=='failed'%}open{%endif%}><summary>{{b.source}} · полный ответ{%if not logs_admin%} без личных данных{%endif%}</summary><pre>{{b.body}}</pre></details>{%endfor%}
+<details><summary>Все события и технические данные</summary><pre>{{d.events|tojson(indent=2)}}</pre></details>
+{%else%}<h2>Выберите отправку</h2><p>Здесь появятся этапы приёма аудио, ответ сервера и диагностика браузера.</p>{%endif%}
+</section>
+</div>

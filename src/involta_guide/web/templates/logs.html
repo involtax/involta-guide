@@ -5,6 +5,11 @@
 {%from 'macros.html' import csrf,generation_model_picker with context%}
 {%block admin_content%}
 <header class="admin-section-heading">{%if logs_admin%}<h2>Логи</h2>{%endif%}{%if not logs_admin%}<a href="{{settings.path('/admin')}}">Войти в админку ↗</a>{%endif%}</header>
+<nav class="log-kinds" aria-label="Тип журналов">
+<a href="{{settings.path('/logs')}}" class="{{'selected' if log_kind=='fill' else ''}}" {%if log_kind=='fill'%}aria-current="page"{%endif%}>Наполнение страниц</a>
+<a href="{{settings.path('/logs')}}?kind=uploads" class="{{'selected' if log_kind=='uploads' else ''}}" {%if log_kind=='uploads'%}aria-current="page"{%endif%}>Загрузки голоса</a>
+</nav>
+{%if log_kind=='uploads'%}{%include 'upload_logs.html'%}{%else%}
 <div class="logs-layout">
 <aside class="logs-sidebar admin-sidebar" id="log-requests" aria-label="Запросы">
 <h2>Запросы · {{audit_jobs.total}}</h2>
@@ -31,5 +36,6 @@
 {%if audit_detail%}{%include 'log_detail.html'%}{%else%}<h2>Выберите запрос</h2><p>Здесь появятся промт, полный ответ, ошибки и применённые изменения.</p>{%endif%}
 </section>
 </div>
+{%endif%}
 {%endblock%}
 {%block scripts%}<script defer src="{{settings.path('/assets/log-status.js')}}"></script>{%endblock%}

@@ -146,6 +146,10 @@
         this.download = document.createElement("a");
         this.download.textContent = "Скачать аудио";
         this.download.hidden = true;
+        this.logLink = document.createElement("a");
+        this.logLink.textContent = "Открыть журнал отправки ↗";
+        this.logLink.style.marginInline = "12px";
+        this.logLink.hidden = true;
         const copy = document.createElement("button");
         copy.type = "button";
         copy.textContent = "Скопировать отчёт";
@@ -164,6 +168,7 @@
         this.panel.append(
           title,
           this.download,
+          this.logLink,
           copy,
           this.info,
           heading,
@@ -309,6 +314,14 @@
       }
       begin() {
         this.id = crypto.randomUUID();
+        const logs = new URL(this.api);
+        logs.pathname =
+          logs.pathname.replace(/\/voice\/api\/v1\/?$/, "/logs/") +
+          `${encodeURIComponent(this.location || "unassigned")}/uploads/${this.id}`;
+        logs.search = "";
+        logs.hash = "";
+        this.logLink.href = logs.href;
+        this.logLink.hidden = false;
         this.report.request_id = this.id;
         this.report.events = [];
         this.render();

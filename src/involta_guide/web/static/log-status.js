@@ -1,4 +1,12 @@
 (() => {
+  document.querySelectorAll('time[data-local-time]').forEach(element => {
+    const date = new Date(element.dateTime);
+    if (!Number.isNaN(date.getTime())) {
+      const format = element.dataset.timeFormat === 'short'
+        ? {dateStyle: 'short', timeStyle: 'short'} : {timeZoneName: 'short'};
+      element.textContent = date.toLocaleString('ru-RU', format);
+    }
+  });
   const panel = document.getElementById('log-live');
   if (!panel || panel.dataset.active !== 'true') return;
   async function poll() {

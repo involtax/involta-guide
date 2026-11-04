@@ -1,6 +1,7 @@
 """Persistent upload diagnostics. Audio, credentials and cookies never enter the audit log."""
 
 import json
+import math
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,8 @@ class UploadDebug:
         self.settings = settings
 
     def clean(self, value: Any, private: tuple[str, ...] = ()) -> Any:
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
         if isinstance(value, dict):
             return {
                 k: self.clean(v, private)

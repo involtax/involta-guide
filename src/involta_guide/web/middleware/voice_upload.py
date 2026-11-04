@@ -50,6 +50,9 @@ class VoiceUploadTrace:
         )
         start = time.monotonic()
         received = 0
+        body_finished = False
+        checkpoints = iter((1, 65_536, 262_144, 1_048_576, 4_194_304, 8_388_608))
+        next_checkpoint: float = next(checkpoints)
         digest = hashlib.sha256()
         status = 0
         response_body: list[bytes] = []
@@ -67,6 +70,8 @@ class VoiceUploadTrace:
                         request_id,
                         {
                             "owner": owner,
+                            "path": scope["path"],
+                            "elapsed_ms": round((time.monotonic() - start) * 1000),
                             "_context": {
                                 "slug": request.query_params.get("location", ""),
                                 "content_epoch": request.query_params.get("content_epoch", "0"),
@@ -80,6 +85,8 @@ class VoiceUploadTrace:
                     "Cannot persist upload diagnostic %s", request_id
                 )
 
+        scope["state"]["voice_upload_record"] = record
+
         await record(
             {
                 "stage": "received",
@@ -91,12 +98,19 @@ class VoiceUploadTrace:
         )
 
         async def counted_receive() -> Message:
-            nonlocal received
+            nonlocal received, body_finished, next_checkpoint
             message = await receive()
             if message["type"] == "http.request":
                 body = message.get("body", b"")
                 received += len(body)
                 digest.update(body)
+                if not body_finished and not message.get("more_body", False):
+                    body_finished = True
+                    await record({"stage": "body_received", "received_bytes": received})
+                elif not body_finished and received >= next_checkpoint:
+                    while received >= next_checkpoint:
+                        next_checkpoint = next(checkpoints, float("inf"))
+                    await record({"stage": "body_progress", "received_bytes": received})
             return message
 
         async def traced_send(message: Message) -> None:
