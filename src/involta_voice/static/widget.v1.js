@@ -148,6 +148,8 @@
         this.download.hidden = true;
         this.logLink = document.createElement("a");
         this.logLink.textContent = "Открыть журнал отправки ↗";
+        this.logLink.target = "_blank";
+        this.logLink.rel = "noopener";
         this.logLink.style.marginInline = "12px";
         this.logLink.hidden = true;
         const copy = document.createElement("button");

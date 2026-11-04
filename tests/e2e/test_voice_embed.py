@@ -111,6 +111,19 @@ def test_widget_permission_html_error_reload_and_lost_202():
         expect(first.get_by_role("alert")).to_contain_text("HTTP 502")
         expect(first.locator("pre").last).to_contain_text("full error response end")
         expect(first.get_by_role("link", name="Скачать аудио")).to_be_visible()
+        context.route(
+            "**/logs/ivanovo/uploads/*",
+            lambda route: route.fulfill(
+                content_type="text/html; charset=utf-8", body="<h1>Журнал отправки</h1>"
+            ),
+        )
+        report = json.loads(first.locator("pre").first.inner_text())
+        with context.expect_page() as journal:
+            first.get_by_role("link", name="Открыть журнал отправки ↗").click()
+        expect(journal.value).to_have_url(origin + "/logs/ivanovo/uploads/" + report["request_id"])
+        expect(journal.value.get_by_role("heading", name="Журнал отправки")).to_be_visible()
+        journal.value.close()
+        assert page.url == origin + "/" and len(keys) == 1
         page.reload()
         expect(first.get_by_role("status")).to_contain_text("Восстановлена неотправленная запись")
         expect(first.locator("audio")).to_have_count(0)
