@@ -66,7 +66,9 @@ jobs:
         with:
           version: "0.12.23"
           enable-cache: true
-      - run: uv sync --frozen --extra voice-local
+      # Sherpa's CMake cache retains an isolated build interpreter's temporary path.
+      # A restored uv source/build cache can point to a Python that no longer exists.
+      - run: uv sync --frozen --extra voice-local --no-cache
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: uv run ruff check src tests migrations deploy
       - run: uv run ruff format --check src tests migrations deploy
