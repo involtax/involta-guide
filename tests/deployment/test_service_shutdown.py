@@ -72,3 +72,25 @@ def test_previous_image_url_uses_shared_schema_without_exposing_credentials(tmp_
     assert (tmp_path / ".env.voice").stat().st_mode & 0o777 == 0o600
     module.update(tmp_path, release)
     assert (release / "voice-env-before-shared-db").read_text() == old
+
+
+@pytest.mark.parametrize("quote", ["'", '"', ""])
+def test_bootstrap_quoted_database_url_and_recovery(tmp_path, quote):
+    from urllib.parse import parse_qs, urlsplit
+
+    spec = importlib.util.spec_from_file_location("shared_env", ROOT / "deploy/shared-database-env.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    release = tmp_path / "release"
+    release.mkdir()
+    url = "postgresql://guide:fake-test@localhost/guide"
+    (tmp_path / ".env.production").write_text(f"DATABASE_URL={quote}{url}{quote}\n")
+    original = "VOICE_DATABASE_URL='postgresql://old:test@localhost/voice'\nVOICE_DATABASE_SCHEMA='voice'\n"
+    (release / "voice-env-before-shared-db").write_text(original)
+    (tmp_path / ".env.voice").write_text("broken\n?options=bad\n")
+    module.update(tmp_path, release, recover=True)
+    result = module.read_values((tmp_path / ".env.voice").read_text())["VOICE_DATABASE_URL"]
+    parsed = urlsplit(result)
+    assert parsed.scheme == "postgresql" and parsed.path == "/guide"
+    assert parse_qs(parsed.query)["options"] == [" -c search_path=voice"]
+    assert (release / "voice-env-before-shared-db").read_text() == original
