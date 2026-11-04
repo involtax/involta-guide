@@ -1,0 +1,27 @@
+/* Static proposals only. Values and font families follow the public Guide. */
+:root{--ink:#151515;--muted:#747474;--line:#dededb;--paper:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
+main{padding:0 40px;max-width:1136px;margin:auto}
+.context{height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.context span:first-child{font-size:19px;font-weight:700;letter-spacing:-.8px}.context i{font-family:Georgia,'Times New Roman',serif;font-weight:400}
+.context span:last-child{font-size:11px;color:var(--muted)}
+.voice{padding:46px 0 40px;text-align:center;min-height:365px}
+h2{margin:0;font-weight:500;font-size:48px;line-height:1.08;letter-spacing:-.055em;text-wrap:balance}
+em{font:italic 1.06em/1 Georgia,'Times New Roman',serif;letter-spacing:-.055em}
+p{margin:0}.invitation{font-size:16px;line-height:1.6;margin:20px auto 0;max-width:440px}
+.action{margin:28px auto 0;display:flex;align-items:center;flex-direction:column;width:max-content;max-width:100%}
+button{font:inherit;display:grid;place-items:center;width:72px;height:72px;border-radius:50%;border:1px solid var(--ink);padding:0;background:var(--ink);color:white;cursor:pointer}
+button svg{width:25px;height:25px}button:focus-visible{outline:2px solid var(--ink);outline-offset:4px}
+.action-label{font-size:12px;line-height:1.5;margin-top:12px}.minimum{font-size:11px;color:var(--muted);margin-top:3px}
+.ending{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:18px 0;font-size:10px;color:var(--muted)}
+.variant-1 .voice{padding-top:48px}.variant-1 h2{font-size:52px}
+.variant-2 .voice{text-align:left;padding-top:27px;border-top:1px solid var(--ink);margin-top:-1px}.variant-2 .kicker{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:19px}.variant-2 h2{font-size:34px;line-height:1.14;letter-spacing:-.04em}.variant-2 .action{margin-top:28px;text-align:center}
+.variant-3 .voice{padding-top:66px}.variant-3 h2{font:italic 34px/1.2 Georgia,'Times New Roman',serif;letter-spacing:-.04em}.variant-3 .invitation{font-size:15px;margin-top:15px}.variant-3 button{background:#fff;color:var(--ink);width:64px;height:64px}.variant-3 .action{margin-top:25px}
+.variant-4 .voice{padding:30px 0}.variant-4 .frame{border:1px solid var(--line);padding:26px 20px 23px}.variant-4 h2{font-size:35px;line-height:1.15}.variant-4 .invitation{font-size:15px;margin-top:14px}.variant-4 .action{margin-top:22px}.variant-4 button{width:64px;height:64px}.variant-4 .ending{border-top:0;padding-top:0}
+@media(max-width:500px){
+ main{padding:0 24px}.context{height:64px}.context span:last-child{font-size:10px}.voice{min-height:385px;padding-top:42px;padding-bottom:36px}
+ .variant-1 h2{font-size:43px;max-width:300px;margin:auto}.variant-1 h2 em{display:block}.variant-1 .voice{padding-top:37px}.invitation{font-size:15px;margin-top:18px}.action{margin-top:25px}
+ .variant-2 .voice{padding-top:28px}.variant-2 h2{font-size:31px;line-height:1.12;max-width:300px}.variant-2 h2 br{display:none}.variant-2 .action{margin-top:30px}.variant-2 .kicker{margin-bottom:19px}
+ .variant-3 .voice{padding-top:58px}.variant-3 h2{font-size:30px;letter-spacing:-.05em}.variant-3 .invitation{font-size:14px;margin-top:18px}.variant-3 .action{margin-top:27px}
+ .variant-4 .voice{padding-top:26px;min-height:385px}.variant-4 .frame{padding:26px 16px}.variant-4 h2{font-size:33px;max-width:230px;margin:auto}.variant-4 h2 em{display:block}.variant-4 .invitation{font-size:14px;margin-top:17px}
+}
