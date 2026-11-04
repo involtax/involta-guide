@@ -102,7 +102,9 @@ try:
     # Nested Docker may use vfs: release the completed one-off root filesystems
     # before testing audio storage. No running services or persistent volumes change.
     run(compose + ["rm", "--force", "voice-migrate", "voice-prepare-model"])
-    with httpx.Client(base_url="http://127.0.0.1:33080", trust_env=False, timeout=10) as c:
+    with httpx.Client(
+        base_url="http://127.0.0.1:33080", trust_env=False, timeout=10, follow_redirects=True
+    ) as c:
         for _ in range(40):
             try:
                 if c.get("/guide/health/ready").status_code == 200:
