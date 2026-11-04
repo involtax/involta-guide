@@ -1,4 +1,4 @@
-"""Private, transactionally restorable schema backup for the one-time architecture cutover.
+"""Private, transactionally restorable Guide backup for incompatible schema transitions.
 
 Used by the deployment controller with all Guide writers stopped. Secrets stay in
 libpq's environment; stdout contains only the dump (backup) or a public status.
@@ -70,7 +70,23 @@ def main() -> None:
                 if mode == "compatibility":
                     print("beta" if beta else "previous" if "locations" in tables else "empty")
                 else:
-                    print("manual-beta-transition" if "locations" in tables and not beta else "no")
+                    columns = (
+                        {
+                            c["name"]
+                            for c in inspect(conn).get_columns(
+                                "restaurants", schema=settings.database_schema
+                            )
+                        }
+                        if "restaurants" in tables
+                        else set()
+                    )
+                    print(
+                        "manual-beta-transition"
+                        if "locations" in tables and not beta
+                        else "yes"
+                        if "position" in columns
+                        else "no"
+                    )
         finally:
             engine.dispose()
         return

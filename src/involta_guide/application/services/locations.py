@@ -121,7 +121,7 @@ class Queries:
             report = runs[0]["report"] if runs else {}
             return {
                 "location": location,
-                "content": {**current_content(repo, location), **report},
+                "content": {**report, **current_content(repo, location)},
                 "available": repo.available(key),
                 "related_ids": [row["id"] for row in repo.related(key)],
                 "parents": repo.tree(key, ancestors=True),
@@ -151,7 +151,12 @@ class Queries:
         return result
 
     def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
-        from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score
+        from involta_guide.domain.rules import (
+            FACTOR_LABELS,
+            FACTORS,
+            restaurant_rank_key,
+            restaurant_score,
+        )
 
         with self.uow() as uow:
             repo = uow.repo
@@ -180,11 +185,7 @@ class Queries:
             result["generation_quality"] = report.get("qualityReport")
             result["candidate_review"] = report.get("candidateReview")
 
-            def normalize(name: str) -> str:
-                return " ".join(name.casefold().split())
-
             for card in cards:
-                candidate = card["ranking"]
                 approved = [
                     entry
                     for review in card["reviews"] or []
@@ -197,19 +198,10 @@ class Queries:
                     for values in [[e[key] for e in approved if e.get(key) is not None]]
                 }
                 card["review_count"] = len(approved)
-                card["ranking"] = candidate
-                card["score"] = score(candidate["scores"]) if candidate else None
-            cards.sort(
-                key=lambda c: (
-                    c["score"] is None,
-                    -(c["score"] if c["score"] is not None else 0),
-                    c["review_scores"]["rating"] is None,
-                    -(c["review_scores"]["rating"] or 0),
-                    -int(c["alex_star"]),
-                    normalize(c["name"]),
-                    c["id"],
-                )
-            )
+                card["score"] = restaurant_score(card)
+            cards.sort(key=restaurant_rank_key)
+            for index, card in enumerate(cards, start=1):
+                card["display_rank"] = index if card["active"] else None
             result["restaurant_cards"] = cards
             return result
 

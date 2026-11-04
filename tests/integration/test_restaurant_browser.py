@@ -161,11 +161,19 @@ def test_restaurant_browser_in_chromium(database):
                         "exceptions": {"2026-12-31": [["12:00", "02:00"]]},
                     },
                     "sources": ["https://example.com/menu"],
-                }
+                },
+                {**CARD, "name": "Оценённый ресторан"},
+                {**CARD, "name": "Ресторан с нулевой оценкой"},
+            ],
+            "rankingReport": [
+                {"name": name, "scores": dict.fromkeys(FACTORS, value), "evidence": []}
+                for name, value in [("Оценённый ресторан", 8), ("Ресторан с нулевой оценкой", 0)]
             ],
         },
         None,
     )
+    screenshots = Path("var/screenshots/ranking")
+    screenshots.mkdir(parents=True, exist_ok=True)
     second_city = queries.directory(query="Казань")["rows"][0]
     editor.save(
         second_city["id"],
@@ -195,15 +203,20 @@ def test_restaurant_browser_in_chromium(database):
             "http://testserver/guide/admin/restaurants/" + city["slug"],
             wait_until="networkidle",
         )
-        assert page.locator(".restaurant-record").count() == 1
+        assert page.locator(".restaurant-record").count() == 3
         assert (
             page.locator(".restaurant-sidebar").bounding_box()["x"]
             < page.locator(".restaurant-results").bounding_box()["x"]
         )
         assert "10:00–23:00" in page.locator(".restaurant-hours").inner_text()
-        screenshots = Path("var/screenshots")
-        screenshots.mkdir(parents=True, exist_ok=True)
-        page.screenshot(path=screenshots / "admin-route-restaurants-desktop.png")
+        assert (
+            page.locator(".restaurant-record h3")
+            .all_text_contents()[0]
+            .startswith("Оценённый ресторан")
+        )
+        assert page.locator(".restaurant-score strong").all_text_contents() == ["8.00", "0.00", "—"]
+        page.screenshot(path=screenshots / "admin-desktop.png", full_page=True)
+        page.screenshot(path=screenshots.parent / "admin-route-restaurants-desktop.png")
         public_link = page.get_by_role("link", name="Открыть страницу локации ↗")
         assert public_link.get_attribute("target") == "_blank"
         with page.expect_popup() as popup:
@@ -213,17 +226,26 @@ def test_restaurant_browser_in_chromium(database):
         expect(page).to_have_url("http://testserver/guide/admin/restaurants/ivanovo")
         page.set_viewport_size({"width": 390, "height": 844})
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-        page.screenshot(path=screenshots / "admin-route-restaurants-mobile.png")
+        page.screenshot(path=screenshots / "admin-mobile.png", full_page=True)
+        page.screenshot(path=screenshots.parent / "admin-route-restaurants-mobile.png")
         page.locator(".restaurant-city", has_text="Казань").click()
         page.wait_for_selector(".restaurant-record h3:has-text('Казанский ресторан')")
         page.locator(".restaurant-city", has_text="Иваново").click()
         page.wait_for_selector(".restaurant-hours")
         page.locator("#restaurant-city-search").fill("ничего")
         expect(page.locator(".restaurant-sidebar")).to_contain_text("наполненных городов нет")
-        assert page.locator(".restaurant-record").count() == 1
+        assert page.locator(".restaurant-record").count() == 3
         expect(page).to_have_url(
             "http://testserver/guide/admin/restaurants/ivanovo?q=%D0%BD%D0%B8%D1%87%D0%B5%D0%B3%D0%BE"
         )
         assert "наполненных городов нет" in page.locator(".restaurant-sidebar").inner_text()
+        page.goto("http://testserver/guide/" + city["slug"], wait_until="networkidle")
+        public_names = page.locator(".restaurant h2").all_text_contents()
+        assert public_names[0].startswith("Оценённый ресторан")
+        assert public_names[-1].startswith(CARD["name"])
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=screenshots / "public-mobile.png", full_page=True)
+        page.set_viewport_size({"width": 1440, "height": 1100})
+        page.screenshot(path=screenshots / "public-desktop.png", full_page=True)
         assert not errors
         browser.close()

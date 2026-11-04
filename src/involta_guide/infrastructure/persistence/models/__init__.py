@@ -50,7 +50,6 @@ class LocationRow(Base):
 
 class RestaurantRow(Base):
     __tablename__ = "restaurants"
-    position: Mapped[int] = mapped_column(Integer)
     ranking: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)

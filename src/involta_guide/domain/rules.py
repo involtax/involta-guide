@@ -37,6 +37,8 @@ KINDS = {
 
 
 def score(values: dict[str, int | None]) -> float | None:
+    if set(values) != set(FACTORS):
+        return None
     items = [values.get(key) for key in FACTORS]
     if any(type(value) is not int or not 0 <= value <= 10 for value in items):
         return None
@@ -44,6 +46,23 @@ def score(values: dict[str, int | None]) -> float | None:
         (Decimal(sum(value for value in items if value is not None)) / 8).quantize(
             Decimal(".01"), rounding=ROUND_HALF_UP
         )
+    )
+
+
+def restaurant_score(restaurant: dict[str, Any]) -> float | None:
+    ranking = restaurant.get("ranking")
+    values = ranking.get("scores") if isinstance(ranking, dict) else None
+    return score(values) if isinstance(values, dict) else None
+
+
+def restaurant_rank_key(restaurant: dict[str, Any]) -> tuple[bool, bool, float, int]:
+    """One catalogue order: active, complete scores descending, stable restaurant number."""
+    total = restaurant_score(restaurant)
+    return (
+        not restaurant["active"],
+        total is None,
+        -total if total is not None else 0,
+        restaurant["number"],
     )
 
 

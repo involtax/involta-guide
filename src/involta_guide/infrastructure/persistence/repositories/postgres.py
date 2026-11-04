@@ -265,7 +265,7 @@ class PostgresRepository:
             THEN b.restaurant_id ELSE f.restaurant_id END=r.id)) reviews,
           jsonb_build_array(jsonb_build_object('id',l.id,'name',l.name,'slug',l.slug)) collections
           FROM restaurants r JOIN locations l ON l.id=r.location_id WHERE r.location_id=:id
-          ORDER BY r.position,r.number""",
+          ORDER BY r.number""",
             {"id": location_id},
         )
 
