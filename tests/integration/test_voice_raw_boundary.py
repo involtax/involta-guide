@@ -1,4 +1,4 @@
-"""Real raw-browser uploads around the observed 256 KiB boundary, without ASR calls."""
+"""Real raw uploads matching the failed 20-second recording, without ASR calls."""
 
 from uuid import uuid4
 
@@ -16,7 +16,10 @@ from .test_voice_upload_transport import serving
 
 
 @pytest.mark.parametrize("chunked", [False, True])
-def test_twenty_second_raw_upload_gets_durable_acceptance(database, voice_database, chunked):
+@pytest.mark.parametrize("administrator", [False, True])
+def test_twenty_second_raw_upload_gets_durable_acceptance(
+    database, voice_database, chunked, administrator
+):
     settings, _, _, _, city, _, _ = setup(database)
     vs, ve = voice_database
     audio = recording(20.28)
@@ -29,8 +32,9 @@ def test_twenty_second_raw_upload_gets_durable_acceptance(database, voice_databa
                 "voice_enabled": True,
             }
         )
+        app = guide_app(settings)
         with (
-            serving(guide_app(settings)) as guide_url,
+            serving(app) as guide_url,
             httpx.Client(
                 base_url=guide_url,
                 trust_env=False,
@@ -38,6 +42,9 @@ def test_twenty_second_raw_upload_gets_durable_acceptance(database, voice_databa
                 headers={"origin": "http://testserver"},
             ) as client,
         ):
+            if administrator:
+                token = app.state.context.security.login("test-password-123456", "test-ip")
+                client.cookies.set("guide_admin", token, path="/guide")
             identity = client.post("/guide/voice/api/v1/identity?location=ivanovo")
             assert identity.status_code == 200
             key = str(uuid4())

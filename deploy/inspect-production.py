@@ -196,9 +196,11 @@ e.dispose()
     # Technical-only runtime evidence: no SQL text, audio, transcripts or credentials.
     code, sockets, _ = run(["ss", "-Hntip"])
     connections = []
+    connection = None
     for line in sockets.splitlines():
         fields = line.split()
         if fields and fields[0] in {"ESTAB", "CLOSE-WAIT", "FIN-WAIT-1", "FIN-WAIT-2"}:
+            connection = None
             try:
                 local_port = int(fields[3].rsplit(":", 1)[-1])
                 peer_port = int(fields[4].rsplit(":", 1)[-1])
@@ -206,17 +208,16 @@ e.dispose()
                 continue
             if not {local_port, peer_port} & {3001, 13100, 15432, 55439}:
                 continue
-            connections.append(
-                {
-                    "local_port": local_port,
-                    "peer_port": peer_port,
-                    "recv_q": fields[1],
-                    "send_q": fields[2],
-                    "state": fields[0],
-                }
-            )
-        elif connections and "bytes_received:" in line:
-            connections[-1].update(
+            connection = {
+                "local_port": local_port,
+                "peer_port": peer_port,
+                "recv_q": fields[1],
+                "send_q": fields[2],
+                "state": fields[0],
+            }
+            connections.append(connection)
+        elif connection is not None and "bytes_received:" in line:
+            connection.update(
                 {
                     k: int(v)
                     for k, v in re.findall(
@@ -259,8 +260,8 @@ with engine.connect() as c:
  AND state<>'idle' ORDER BY query_start LIMIT 40''')).mappings().all()
  result={'database_activity':[dict(r) for r in rows]}
  if voice:
-  result['matching_intake']=[dict(r) for r in c.execute(text('''SELECT reference,size,duration,created_at
-  FROM submissions WHERE idempotency_key='8e92f9d3-baf6-447e-8c1e-2fafb30ae13e' ''')).mappings()]
+  result['recent_intake']=[dict(r) for r in c.execute(text('''SELECT reference,size,duration,created_at
+  FROM submissions ORDER BY created_at DESC LIMIT 10''')).mappings()]
   root=Settings().data_dir/'audio'
   result['recent_audio_files']=[{'name':p.name,'size':p.stat().st_size,'modified':p.stat().st_mtime}
    for p in sorted(root.glob('*'),key=lambda p:p.stat().st_mtime,reverse=True)[:12] if p.is_file()]
