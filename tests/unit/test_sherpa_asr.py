@@ -150,3 +150,16 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
         local.call(request, b"fixture")
     local.close()
     assert local._model is None
+
+
+@pytest.mark.parametrize("contents", [None, b"corrupt"])
+def test_native_vocabulary_missing_or_corrupt_fails_before_runtime_import(tmp_path, contents):
+    config = settings(tmp_path)
+    root = model_path(config, "gigaam")
+    for path in (root, config.asr_models_dir / "vad" / VAD["revision"]):
+        path.mkdir(parents=True)
+        (path / "READY.json").write_text("{}")
+    if contents is not None:
+        (root / VOCAB_FILE).write_bytes(contents)
+    with pytest.raises(ProviderFailure, match="Родной словарь GigaAM не подготовлен"):
+        LocalSherpa(config).warmup(options(config, "gigaam", "sherpa_hotwords", ["Плёс"]))

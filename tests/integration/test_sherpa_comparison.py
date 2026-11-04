@@ -372,3 +372,38 @@ def test_previously_received_onnx_primary_keeps_its_original_publication_source(
             conn.execute(text("SELECT count(*) FROM outbox WHERE kind='gigaam_ready'")).scalar_one()
             == 1
         )
+
+
+def test_already_received_city_only_job_finishes_without_creating_new_city_jobs(voice_database):
+    settings, engine = voice_database
+    settings = settings.model_copy(update={"asr_beta_enabled": True})
+    service = VoiceService(engine, settings)
+    ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
+    with engine.begin() as conn:
+        frozen = conn.execute(
+            text("SELECT snapshot FROM runs WHERE submission=:id"), {"id": ref}
+        ).scalar_one()
+        request = dict(frozen["sherpa_models"]["sherpa_gigaam_hotwords"])
+        request.update(
+            variant="sherpa_hotwords_city",
+            dictionary=["Плёс"],
+            dictionary_encoding="tokens-longest-match-v1",
+        )
+        conn.execute(
+            text(
+                "INSERT INTO stages(submission,run,kind,request) VALUES(:id,1,'sherpa_gigaam_hotwords_city',CAST(:request AS jsonb))"
+            ),
+            {"id": ref, "request": json.dumps(request)},
+        )
+    worker = Worker(engine, settings, GigaResults())
+    for _ in range(6):
+        assert worker.once()
+    assert not worker.once()
+    with engine.connect() as conn:
+        assert (
+            conn.execute(
+                text("SELECT transcript FROM asr_candidates WHERE variant='sherpa_hotwords_city'")
+            ).scalar_one()
+            == "gigaam / sherpa_hotwords_city"
+        )
+    assert service.status(ref)["transcript"] == "gigaam / sherpa_hotwords"

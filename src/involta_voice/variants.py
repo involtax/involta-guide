@@ -12,7 +12,7 @@ SHERPA_STAGES = {
     "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)
     for variant in SHERPA_PROFILES
 }
-STAGES = ("transcription", *SHERPA_STAGES)
+STAGES = ("transcription", *SHERPA_STAGES, "sherpa_gigaam_hotwords_city")
 RESULTS = tuple(SHERPA_STAGES.values())
 VARIANT_LABELS = {
     "onnx": "Базовый · onnx-asr",
@@ -28,6 +28,8 @@ VARIANT_LABELS = {
 def result_identity(kind: str, primary: str = "gigaam") -> tuple[str, str]:
     if kind in SHERPA_STAGES:
         return SHERPA_STAGES[kind]
+    if kind == "sherpa_gigaam_hotwords_city":
+        return "gigaam", "sherpa_hotwords_city"
     if kind == "transcription":
         return primary, "onnx"
     if kind == "comparison":

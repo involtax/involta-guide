@@ -36,13 +36,7 @@ def options(
     if variant not in SHERPA_PROFILES:
         raise ValueError("Неизвестный вариант Sherpa")
     score, paths, source = SHERPA_PROFILES[variant]
-    dictionary = (
-        [location_name]
-        if source == "city"
-        else [location_name, *names]
-        if source == "catalogue"
-        else []
-    )
+    dictionary = [location_name, *names] if source == "catalogue" else []
     return {
         "engine": "sherpa-onnx",
         "model": engine,
