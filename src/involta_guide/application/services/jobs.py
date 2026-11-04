@@ -20,6 +20,7 @@ from involta_guide.domain.rules import assert_publishable, rank
 from .editorial import require, save
 from .generation_quality import (
     CANDIDATE_LIMIT,
+    PUBLISHED_LIMIT,
     assess_coverage,
     normalize_generation,
 )
@@ -221,6 +222,7 @@ class JobService:
                     "scope": scope,
                     "parent": [p["name"] for p in parents],
                     "candidateLimit": CANDIDATE_LIMIT,
+                    "publishedLimit": PUBLISHED_LIMIT,
                 },
                 default=str,
                 ensure_ascii=False,
@@ -238,6 +240,9 @@ class JobService:
                     "Ответ сохранён, но страница изменена после постановки запроса. Автоматическое применение отменено."
                 )
             result = assess_coverage(rank(generated), normalization)
+            # Keep the comparison in the job report; only the winners become catalogue records.
+            result["restaurants"] = result["restaurants"][:PUBLISHED_LIMIT]
+            result["qualityReport"]["publishedCards"] = len(result["restaurants"])
             ContentInput.model_validate(result)
             assert_publishable(result)
             with self.uow() as uow:

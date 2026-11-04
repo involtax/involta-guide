@@ -137,6 +137,9 @@ class CandidateReview(BaseModel):
     reason: str = Field(min_length=1, max_length=2000)
     exclusionCode: Literal["outside_area", "closed", "not_restaurant", "duplicate"] | None = None
     sources: list[str] = Field(default_factory=list, max_length=50)
+    verificationIssues: list[
+        Literal["location", "operating_status", "map", "phone", "scores", "evidence"]
+    ] = Field(default_factory=list, max_length=6)
 
     @model_validator(mode="after")
     def decision(self) -> "CandidateReview":
@@ -231,19 +234,37 @@ class GenerationCandidate(CandidateReview):
         return self
 
 
-class GenerationResult(BaseModel):
+class RecordedGenerationResult(BaseModel):
+    """The already submitted v3 contract; never used for a new request."""
+
     model_config = ConfigDict(extra="forbid")
     intro: str = Field(max_length=800)
     candidates: list[GenerationCandidate] = Field(max_length=100)
     warnings: list[str] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
-    def candidates_valid(self) -> "GenerationResult":
+    def candidates_valid(self) -> "RecordedGenerationResult":
         names = [" ".join(c.name.casefold().split()) for c in self.candidates]
         if len(names) != len(set(names)):
             raise ValueError("Кандидат повторяется")
         if sum(bool(c.scores) for c in self.candidates) > 10:
             raise ValueError("Оценивай не более десяти кандидатов")
+        return self
+
+
+class GenerationResult(RecordedGenerationResult):
+    candidates: list[GenerationCandidate] = Field(max_length=10)
+
+    @model_validator(mode="after")
+    def publication_requirements(self) -> "GenerationResult":
+        for candidate in self.candidates:
+            if candidate.status == "needs_verification" and not candidate.verificationIssues:
+                raise ValueError("needs_verification требует конкретного verificationIssues")
+            if candidate.status == "verified":
+                if candidate.verificationIssues:
+                    raise ValueError("verified несовместим с нерешёнными verificationIssues")
+                if any(not evidence.sourceRefs for evidence in candidate.evidence):
+                    raise ValueError("Для verified каждый фактор требует источника")
         return self
 
 
