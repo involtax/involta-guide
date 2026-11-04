@@ -90,6 +90,10 @@ def prepare(settings: Settings) -> Path:
         (target / "READY.json").write_text(
             json.dumps({"repository": definition["repository"], "revision": definition["revision"]})
         )
+    if settings.asr_beta_enabled:
+        from .sherpa import prepare as prepare_sherpa
+
+        prepare_sherpa(settings)
     return settings.asr_models_dir
 
 
@@ -115,6 +119,12 @@ class LocalAsr:
         self._vad: Any = None
         self._signature: Any = None
         self._lock = threading.RLock()
+
+    def close(self) -> None:
+        with self._lock:
+            self._model = None
+            self._signature = None
+            gc.collect()
 
     def warmup(self, request: dict[str, Any] | None = None) -> None:
         request = request or options(self.settings)

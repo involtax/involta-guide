@@ -10,7 +10,10 @@ dependencies = [
  "argon2-cffi>=23.1", "python-dotenv>=1.0", "rapidfuzz>=3.14,<4",
 ]
 [project.optional-dependencies]
-voice-local = ["onnx-asr[cpu,hub]>=0.9,<1", "av>=14,<16"]
+voice-local = [
+ "onnx-asr[cpu,hub]>=0.9,<1", "av>=14,<16",
+ "sherpa-onnx @ git+https://github.com/k2-fsa/sherpa-onnx.git@3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
+]
 
 [project.scripts]
 guide = "involta_guide.cli:main"
@@ -31,8 +34,14 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+[tool.uv.extra-build-dependencies]
+sherpa-onnx = ["cmake>=3.30,<4", "wheel"]
+[tool.uv.extra-build-variables]
+sherpa-onnx = { SHERPA_ONNX_CMAKE_ARGS = "-DCMAKE_BUILD_TYPE=Release -DSHERPA_ONNX_ENABLE_GPU=OFF -DSHERPA_ONNX_ENABLE_BINARY=OFF -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF -DSHERPA_ONNX_ENABLE_C_API=OFF", SHERPA_ONNX_MAKE_ARGS = "-j2" }
 [tool.hatch.build.targets.wheel]
 packages = ["src/involta_guide", "src/involta_voice"]
+[tool.hatch.metadata]
+allow-direct-references = true
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
 markers = ["integration: PostgreSQL integration", "e2e: browser tests"]

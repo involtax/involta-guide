@@ -12,6 +12,7 @@ from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.web.http import admin_token, check_csrf, context, form_data, require_admin
 from involta_guide.web.routes.admin import render
 from involta_guide.web.routes.voice import voice_client
+from involta_voice.variants import RESULTS, VARIANT_LABELS
 
 
 def routes(prefix: str) -> APIRouter:
@@ -38,15 +39,18 @@ def routes(prefix: str) -> APIRouter:
                 review["reference"],
                 [
                     {
-                        "name": "GigaAM",
-                        "text": review["transcript"] if review["status"] == "transcribed" else None,
+                        "name": "GigaAM" if engine == "gigaam" else "Parakeet",
+                        "variant_label": VARIANT_LABELS[variant],
+                        "dictionary": None,
+                        "text": review["transcript"]
+                        if engine == "gigaam"
+                        and variant == "onnx"
+                        and review["status"] == "transcribed"
+                        else None,
                         "state": "unavailable" if unavailable else "not_scheduled",
-                    },
-                    {
-                        "name": "Parakeet",
-                        "text": None,
-                        "state": "unavailable" if unavailable else "not_scheduled",
-                    },
+                    }
+                    for engine, variant in RESULTS
+                    if review["reference"] or variant == "onnx"
                 ],
             )
         return render(

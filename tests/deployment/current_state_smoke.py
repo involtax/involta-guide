@@ -171,7 +171,7 @@ def main() -> None:
             with psycopg.connect(url, autocommit=True) as conn:
                 conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
 
-    for previous in (5, 6):
+    for previous in (5, 6, 7):
         voice_schema = "test_voice_restore_" + uuid4().hex
         env.update(
             VOICE_DATABASE_SCHEMA=voice_schema, VOICE_SERVICE_SECRET="local-test-" + "x" * 40
@@ -228,7 +228,7 @@ def main() -> None:
                     == "keep"
                 )
             print(
-                f"Voice: real shared-schema v{previous} → v7 → pg_restore v{previous} passed",
+                f"Voice: real shared-schema v{previous} → v8 → pg_restore v{previous} passed",
                 flush=True,
             )
         finally:

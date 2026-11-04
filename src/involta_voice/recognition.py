@@ -7,6 +7,7 @@ from sqlalchemy import Engine, text
 from .asr import MODELS
 from .db import encoded, execute, row
 from .errors import VoiceError
+from .variants import RESULTS, VARIANT_LABELS, result_identity
 
 
 def save_candidate(
@@ -23,12 +24,13 @@ def save_candidate(
     details = {**body, "audio_sha256": submission["sha256"]}
     execute(
         conn,
-        """INSERT INTO asr_candidates(submission,run,engine,revision,settings,transcript,elapsed_seconds,duration,details)
-    VALUES(:id,:run,:engine,:revision,CAST(:settings AS jsonb),:text,:elapsed,:duration,CAST(:details AS jsonb))
-    ON CONFLICT(submission,run,engine) DO NOTHING""",
+        """INSERT INTO asr_candidates(submission,run,engine,variant,revision,settings,transcript,elapsed_seconds,duration,details)
+    VALUES(:id,:run,:engine,:variant,:revision,CAST(:settings AS jsonb),:text,:elapsed,:duration,CAST(:details AS jsonb))
+    ON CONFLICT(submission,run,engine,variant) DO NOTHING""",
         id=reference,
         run=run,
         engine=engine,
+        variant=request.get("variant", "onnx"),
         revision=request["revision"],
         settings=encoded(request),
         text=body["text"],
@@ -54,7 +56,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         candidates = (
             conn.execute(
                 text(
-                    "SELECT submission,run,engine,transcript FROM asr_candidates WHERE submission=ANY(CAST(:ids AS uuid[])) ORDER BY run DESC"
+                    "SELECT submission,run,engine,variant,settings,transcript FROM asr_candidates WHERE submission=ANY(CAST(:ids AS uuid[])) ORDER BY run DESC"
                 ),
                 {"ids": references},
             )
@@ -64,7 +66,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         stages = (
             conn.execute(
                 text(
-                    "SELECT s.submission,s.run,s.kind,s.state,s.error,s.request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND s.kind<>'analysis' ORDER BY s.run DESC"
+                    "SELECT s.submission,s.run,s.kind,s.state,s.error,coalesce(s.request,r.snapshot->'sherpa_models'->s.kind) AS request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND s.kind<>'analysis' ORDER BY s.run DESC"
                 ),
                 {"ids": references},
             )
@@ -75,9 +77,16 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
     for submission in submissions:
         ref = str(submission["reference"])
         pair = []
-        for name in MODELS:
+        for name, variant in RESULTS:
             candidate = next(
-                (c for c in candidates if str(c["submission"]) == ref and c["engine"] == name), None
+                (
+                    c
+                    for c in candidates
+                    if str(c["submission"]) == ref
+                    and c["engine"] == name
+                    and c["variant"] == variant
+                ),
+                None,
             )
             stage = next(
                 (
@@ -85,18 +94,30 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     for s in stages
                     if str(s["submission"]) == ref
                     and (
-                        (s["request"] or {}).get("model") == name
-                        or s["kind"] == "evaluate_" + name
-                        or (s["kind"] == "transcription" and s["primary_engine"] == name)
-                        or (s["kind"] == "comparison" and s["primary_engine"] != name)
+                        (
+                            (s["request"] or {}).get("model"),
+                            (s["request"] or {}).get("variant", "onnx"),
+                        )
+                        if s["request"]
+                        else result_identity(s["kind"], s["primary_engine"])
                     )
+                    == (name, variant)
                 ),
                 None,
+            )
+            # Existing reviews retain their two original rows; no comparison is scheduled by reads.
+            if variant != "onnx" and candidate is None and stage is None:
+                continue
+            request = (
+                candidate["settings"] if candidate else (stage["request"] or {}) if stage else {}
             )
             pair.append(
                 {
                     "engine": name,
+                    "variant": variant,
                     "name": "GigaAM" if name == "gigaam" else "Parakeet",
+                    "variant_label": VARIANT_LABELS[variant],
+                    "dictionary": request.get("dictionary", []) if stage or candidate else None,
                     "text": candidate["transcript"] if candidate else None,
                     "state": "completed"
                     if candidate
@@ -117,7 +138,9 @@ def report(engine: Engine, reference: str) -> dict[str, Any]:
         candidates = [
             dict(c)
             for c in conn.execute(
-                text("SELECT * FROM asr_candidates WHERE submission=:id ORDER BY run DESC,engine"),
+                text(
+                    "SELECT * FROM asr_candidates WHERE submission=:id ORDER BY run DESC,engine,variant"
+                ),
                 {"id": reference},
             ).mappings()
         ]
@@ -134,11 +157,11 @@ def summary(engine: Engine) -> dict[str, Any]:
             "engines": [
                 dict(r)
                 for r in conn.execute(
-                    text("""SELECT engine,count(*) recordings,
+                    text("""SELECT engine,variant,count(*) recordings,
             sum(elapsed_seconds) seconds,sum(duration) audio_seconds FROM (
-            SELECT DISTINCT ON(submission,engine) * FROM asr_candidates
+            SELECT DISTINCT ON(submission,engine,variant) * FROM asr_candidates
             WHERE coalesce(details->>'is_fake','false')<>'true'
-            ORDER BY submission,engine,run DESC) latest GROUP BY engine ORDER BY engine""")
+            ORDER BY submission,engine,variant,run DESC) latest GROUP BY engine,variant ORDER BY engine,variant""")
                 ).mappings()
             ]
         }

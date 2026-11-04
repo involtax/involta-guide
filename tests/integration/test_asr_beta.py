@@ -42,16 +42,19 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     provider = Pair(failed)
     worker = Worker(engine, settings, provider)
-    assert worker.once() and worker.once() and not worker.once()
+    assert all(worker.once() for _ in range(6))
+    assert not worker.once()
     status = service.status(ref)
     assert status["transcript"] == (None if failed == "gigaam" else "Текст GigaAM")
     assert status["state"] == ("transcription_failed" if failed == "gigaam" else "result_ready")
     assert "parakeet" not in json.dumps(status).lower()
     pair = reports(engine, [ref])[ref]
     assert {r["engine"] for r in pair} == {"gigaam", "parakeet"}
-    assert sum(r["state"] == "failed" for r in pair) == bool(failed)
-    assert len(report(engine, ref)["candidates"]) == (1 if failed else 2)
-    assert provider.calls == ["gigaam", "parakeet"]
+    assert len(pair) == 6
+    assert sum(r["state"] == "failed" for r in pair) == (3 if failed else 0)
+    assert len(report(engine, ref)["candidates"]) == (3 if failed else 6)
+    assert provider.calls[:2] == ["gigaam", "parakeet"]
+    assert provider.calls.count("gigaam") == provider.calls.count("parakeet") == 3
     with engine.connect() as conn:
         assert conn.execute(
             text("SELECT count(*) FROM outbox WHERE kind='gigaam_ready'")
@@ -123,6 +126,11 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
         pass
     with engine.begin() as conn:
         # A database at released version 5 with a Parakeet fallback and human judgments.
+        conn.execute(text("DELETE FROM asr_candidates WHERE variant<>'onnx'"))
+        conn.execute(text("DELETE FROM stages WHERE kind LIKE 'sherpa_%'"))
+        conn.execute(text("ALTER TABLE asr_candidates DROP CONSTRAINT asr_candidates_pkey"))
+        conn.execute(text("ALTER TABLE asr_candidates DROP COLUMN variant"))
+        conn.execute(text("ALTER TABLE asr_candidates ADD PRIMARY KEY(submission,run,engine)"))
         conn.execute(text("DELETE FROM voice_schema_versions WHERE version>=6"))
         conn.execute(
             text("CREATE TABLE asr_evaluations(reference_text text,preferred_engine text)")
@@ -153,10 +161,9 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
             conn.execute(text("SELECT transcript FROM submissions")).scalar_one()
             == "Historical fallback"
         )
-        assert (
-            conn.execute(text("SELECT * FROM asr_candidates ORDER BY engine")).mappings().all()
-            == candidates
-        )
+        assert conn.execute(
+            text("SELECT * FROM asr_candidates ORDER BY engine")
+        ).mappings().all() == [{**dict(candidate), "variant": "onnx"} for candidate in candidates]
         assert conn.execute(text("SELECT to_regclass('asr_evaluations')")).scalar_one() is None
         assert (
             conn.execute(text("SELECT to_regclass('asr_evaluation_events')")).scalar_one() is None

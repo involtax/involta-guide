@@ -12,6 +12,7 @@ from .db import database, encoded, execute, row
 from .errors import VoiceError
 from .provider import FakeProvider, ProviderFailure, VoiceProvider
 from .service import VoiceService
+from .variants import STAGES, result_identity
 
 
 class Worker:
@@ -30,11 +31,12 @@ class Worker:
             expired = (
                 conn.execute(
                     text(
-                        """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') AND attempts<3 THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'failed' ELSE 'unknown' END,
-                error=CASE WHEN raw_response IS NOT NULL THEN NULL WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'Локальный исполнитель прерван; ограниченный повтор' ELSE 'Исполнитель прерван; исход OpenAI неизвестен' END,
-                lease_token=NULL,lease_until=NULL WHERE kind IN ('transcription','comparison') AND state='running' AND lease_until<now()
+                        """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN (request->>'engine' IN ('faster-whisper','onnx-asr','sherpa-onnx') OR kind LIKE 'sherpa_%') AND attempts<3 THEN 'queued' WHEN (request->>'engine' IN ('faster-whisper','onnx-asr','sherpa-onnx') OR kind LIKE 'sherpa_%') THEN 'failed' ELSE 'unknown' END,
+                error=CASE WHEN raw_response IS NOT NULL THEN NULL WHEN (request->>'engine' IN ('faster-whisper','onnx-asr','sherpa-onnx') OR kind LIKE 'sherpa_%') THEN CASE WHEN attempts<3 THEN 'Локальный исполнитель прерван; ограниченный повтор' ELSE 'Локальный исполнитель прерван; исчерпаны попытки' END ELSE 'Исполнитель прерван; исход OpenAI неизвестен' END,
+                lease_token=NULL,lease_until=NULL WHERE kind=ANY(:kinds) AND state='running' AND lease_until<now()
                 RETURNING submission,run,kind,state,error"""
-                    )
+                    ),
+                    {"kinds": list(STAGES)},
                 )
                 .mappings()
                 .all()
@@ -59,8 +61,9 @@ class Worker:
             )
             stage = row(
                 conn,
-                """SELECT s.* FROM stages s WHERE kind IN ('transcription','comparison') AND state='queued' AND available_at<=now() AND :local_busy=false
-                ORDER BY CASE kind WHEN 'transcription' THEN 0 ELSE 1 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                """SELECT s.* FROM stages s WHERE kind=ANY(:kinds) AND state='queued' AND available_at<=now() AND :local_busy=false
+                ORDER BY CASE kind WHEN 'transcription' THEN 0 WHEN 'comparison' THEN 1 ELSE 2 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                kinds=list(STAGES),
                 local_busy=bool(local_running),
             )
             if not stage:
@@ -160,13 +163,12 @@ class Worker:
             return
         snapshot = run["snapshot"]
         primary = snapshot["transcription_model"]
-        engine = (
-            primary
-            if kind == "transcription"
-            else ("parakeet" if primary == "gigaam" else "gigaam")
-        )
+        engine, variant = result_identity(kind, primary)
         # A saved response belongs to its frozen request, including pre-transition jobs.
-        request = stage.get("request") or snapshot["asr_models"][engine]
+        frozen_request = (
+            snapshot["asr_models"][engine] if variant == "onnx" else snapshot["sherpa_models"][kind]
+        )
+        request = stage.get("request") or frozen_request
         engine = request["model"]
         raw = stage.get("raw_response")
         if raw is None:
@@ -294,7 +296,7 @@ class Worker:
                 submission,
             )
             self.complete(conn, stage)
-            if engine != "gigaam":
+            if engine != "gigaam" or request.get("variant", "onnx") != "onnx":
                 return
             execute(
                 conn,

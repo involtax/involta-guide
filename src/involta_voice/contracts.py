@@ -63,6 +63,7 @@ class LocationContext(DTO):
     revision: str | None = None
     content_epoch: int = Field(ge=1)
     restaurants: list[RestaurantContext] = Field(default_factory=list, max_length=200)
+    recognition_dictionary: list[str] = Field(default_factory=list)
 
 
 class SubmissionMetadata(DTO):

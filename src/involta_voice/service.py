@@ -143,6 +143,15 @@ class VoiceService:
         submission = row(conn, "SELECT metadata FROM submissions WHERE reference=:id", id=reference)
         assert submission is not None
         frozen["location"] = submission["metadata"]["location"]
+        if frozen["asr_beta"]:
+            from .sherpa import options as sherpa_options
+            from .variants import SHERPA_STAGES
+
+            names = frozen["location"].get("recognition_dictionary", [])
+            frozen["sherpa_models"] = {
+                kind: sherpa_options(self.settings, engine, variant, names)
+                for kind, (engine, variant) in SHERPA_STAGES.items()
+            }
         execute(
             conn,
             "INSERT INTO runs(submission,number,snapshot) VALUES(:id,1,CAST(:snapshot AS jsonb))",
@@ -160,6 +169,13 @@ class VoiceService:
                 "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'comparison')",
                 id=reference,
             )
+            for kind in frozen["sherpa_models"]:
+                execute(
+                    conn,
+                    "INSERT INTO stages(submission,run,kind) VALUES(:id,1,:kind)",
+                    id=reference,
+                    kind=kind,
+                )
 
     def status(
         self, reference: str, visitor: str | None = None, *, admin: bool = False
@@ -183,7 +199,7 @@ class VoiceService:
             )
             primary_text = row(
                 conn,
-                "SELECT transcript FROM asr_candidates WHERE submission=:id AND engine='gigaam' ORDER BY run DESC LIMIT 1",
+                "SELECT transcript FROM asr_candidates WHERE submission=:id AND engine='gigaam' AND variant='onnx' ORDER BY run DESC LIMIT 1",
                 id=reference,
             )
             # Historical fallback text is retained in storage, never exposed to visitors.
@@ -223,9 +239,12 @@ class VoiceService:
             state = "transcription"
         else:
             state = "accepted"
+        location = dict(submission["metadata"]["location"])
+        if not admin:
+            location.pop("recognition_dictionary", None)
         result = {
             "reference": str(submission["reference"]),
-            "location": submission["metadata"]["location"],
+            "location": location,
             "state": state,
             "run": submission["active_run"],
             "transcript": submission["transcript"],
