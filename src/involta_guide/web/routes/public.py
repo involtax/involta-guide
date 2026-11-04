@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
-from involta_guide.domain.location_search import search_text
+from involta_guide.domain.location_search import search_locations
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
@@ -39,13 +39,21 @@ def routes(prefix: str) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid page number") from exc
         searching = bool(q.strip())
-        result = (
-            ctx.queries.public_directory(q, page_number)
-            if searching
-            else ctx.queries.directory(
+        catalogue = ctx.queries.public_location_catalogue()
+        if searching:
+            matches = search_locations(catalogue, q)
+            pages = max(1, (len(matches) + 59) // 60)
+            current = max(1, min(pages, page_number))
+            result = {
+                "rows": matches[(current - 1) * 60 : current * 60],
+                "total": len(matches),
+                "page": current,
+                "pages": pages,
+            }
+        else:
+            result = ctx.queries.directory(
                 kind="city", page=page_number, status="active", filled_only=True, public_only=True
             )
-        )
         request.state.audience_page = True
         return request.app.state.templates.TemplateResponse(
             request=request,
@@ -53,20 +61,7 @@ def routes(prefix: str) -> APIRouter:
             context={
                 "settings": ctx.settings,
                 "q": q,
-                "result": result,
-                "kinds": KINDS,
-                "indexable": True,
-                "page_query": lambda n: urlencode({"q": q, "page": n}),
-            },
-        )
-
-    @router.get(prefix + "/api/locations/suggest")
-    def suggestions(request: Request, q: str = Query("", max_length=100)) -> Response:
-        ctx = context(request)
-        rows = ctx.queries.public_directory(q)["rows"] if search_text(q) else []
-        return JSONResponse(
-            {
-                "items": [
+                "location_catalogue": [
                     {
                         "name": row["name"],
                         "context": " · ".join(
@@ -78,10 +73,13 @@ def routes(prefix: str) -> APIRouter:
                         ),
                         "url": ctx.settings.path("/" + row["slug"]),
                     }
-                    for row in rows
-                ]
+                    for row in catalogue
+                ],
+                "result": result,
+                "kinds": KINDS,
+                "indexable": True,
+                "page_query": lambda n: urlencode({"q": q, "page": n}),
             },
-            headers={"Cache-Control": "public, max-age=30", "X-Robots-Tag": "noindex"},
         )
 
     @router.get(prefix + "/about")

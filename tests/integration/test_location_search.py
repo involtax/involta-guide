@@ -1,10 +1,9 @@
+import json
 import re
 from uuid import uuid4
 
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from involta_guide.main import create_app
 
@@ -42,134 +41,125 @@ def add_location(
     return key
 
 
-def test_public_ranking_visibility_limit_and_full_form_share_one_search(database):
+def snapshot(response):
+    return json.loads(
+        re.search(
+            r'<script type="application/json" id="location-catalogue">(.*?)</script>',
+            response.text,
+            re.S,
+        )[1]
+    )
+
+
+def test_public_snapshot_is_one_select_public_fields_only_and_fresh_on_reload(database):
     settings, engine = database
-    add_location(engine, "Тестоград", "search-exact")
+    key = add_location(engine, "Открытый Тест", "snapshot-open")
+    add_location(engine, "Закрытый Тест", "snapshot-hidden", listed=False)
+    add_location(engine, "Выключенный Тест", "snapshot-inactive", active=0)
+    parent = add_location(engine, "Полезный Родитель", "snapshot-parent", listed=False)
     add_location(
-        engine, "Город Алиас", "search-alias", aliases=["Тестоград", "Тестоград"], ready=True
+        engine, "Наполненный Дочерний", "snapshot-child", listed=False, ready=True, parent=parent
     )
-    for number in range(7):
-        add_location(engine, f"Тестоград {number}", f"search-prefix-{number}", ready=number == 0)
+    selects = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        if "SELECT l.name,l.slug,l.region,l.kind,p.name parent_name" in statement:
+            selects.append(statement)
+
+    app = create_app(settings)
+    search_engine = app.state.context.engine
+    event.listen(search_engine, "before_cursor_execute", capture)
+    try:
+        with TestClient(app) as client:
+            response = client.get("/guide/")
+            items = snapshot(response)
+            urls = {item["url"] for item in items}
+            assert len(selects) == 1
+            assert all(set(item) == {"name", "context", "url"} for item in items)
+            assert {
+                "/guide/snapshot-open",
+                "/guide/snapshot-parent",
+                "/guide/snapshot-child",
+            } <= urls
+            assert "/guide/snapshot-hidden" not in urls and "/guide/snapshot-inactive" not in urls
+            with engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE locations SET name=:name WHERE id=:id"),
+                    {"name": "Новое Название", "id": key},
+                )
+            updated = snapshot(client.get("/guide/"))
+            assert (
+                next(item for item in updated if item["url"] == "/guide/snapshot-open")["name"]
+                == "Новое Название"
+            )
+            assert len(selects) == 2
+            assert client.get("/guide/api/locations/suggest?q=и").status_code == 404
+            assert client.get("/guide/", params={"q": "x" * 101}).status_code == 422
+    finally:
+        event.remove(search_engine, "before_cursor_execute", capture)
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
+
+
+def test_native_search_ranks_only_names_with_short_prefix_and_three_letter_substring(database):
+    settings, engine = database
+    add_location(engine, "Йцук", "name-exact")
+    add_location(engine, "Йцукоград", "name-prefix", ready=True)
+    add_location(engine, "Старый Йцукоград", "name-later-word", ready=True)
+    add_location(engine, "Айцукоград", "name-inside-word", ready=True)
+    add_location(engine, "Региональный", "name-region", region="Йцук", ready=True)
+    add_location(engine, "Алиасный", "name-alias", aliases=["Йцук"], ready=True)
     add_location(
-        engine, "Алиасный сосед", "search-prefix-alias", aliases=["Тестоград Новый"], ready=True
+        engine,
+        "Иной родитель",
+        "name-parent",
+        parent=add_location(engine, "Йцук родитель", "name-parent-title"),
     )
-    add_location(engine, "Контекстный", "search-context", region="Тестоград", ready=True)
-    add_location(engine, "Тестоград Скрытый", "search-hidden", listed=False)
-    add_location(engine, "Тестоград Отключённый", "search-inactive", active=0)
-    parent = add_location(engine, "Тестоград Узел", "search-hub", listed=False)
-    add_location(
-        engine, "Тестоград Дочерний", "search-child", listed=False, ready=True, parent=parent
-    )
+    add_location(engine, "Другой", "йцук-slug")
     with TestClient(create_app(settings)) as client:
-        result = client.get("/guide/api/locations/suggest", params={"q": "Тестоград"})
-        items = result.json()["items"]
-        assert result.status_code == 200 and len(items) == 6
-        assert [item["url"] for item in items[:3]] == [
-            "/guide/search-exact",
-            "/guide/search-alias",
-            "/guide/search-prefix-0",
-        ]
-        assert all(set(item) == {"name", "context", "url"} for item in items)
-        assert "search-hidden" not in result.text and "search-inactive" not in result.text
-        full = client.get("/guide/", params={"q": "Тестоград"})
-        urls = re.findall(r'<a class="city-link" href="([^"]+)"', full.text)
-        assert urls[:6] == [item["url"] for item in items]
-        assert len(urls) > 6 and len(urls) == len(set(urls))
-        assert "/guide/search-context" in urls and "/guide/search-hub" in urls
-        assert "/guide/search-hidden" not in urls and "/guide/search-inactive" not in urls
+        for query in ("й", "ЙЦ", "йцу"):
+            page = client.get("/guide/", params={"q": query})
+            urls = re.findall(r'<a class="city-link" href="([^"]+)"', page.text)
+            assert "/guide/name-exact" in urls and "/guide/name-prefix" in urls
+            if len(query) < 3:
+                assert (
+                    "/guide/name-later-word" not in urls and "/guide/name-inside-word" not in urls
+                )
+            else:
+                assert "/guide/name-later-word" in urls and "/guide/name-inside-word" in urls
+            for excluded in ("region", "alias", "parent"):
+                assert f"/guide/name-{excluded}" not in urls
+            assert "/guide/йцук-slug" not in urls
+        exact = client.get("/guide/", params={"q": "йцук"})
+        assert (
+            re.findall(r'<a class="city-link" href="([^"]+)"', exact.text)[0] == "/guide/name-exact"
+        )
 
 
-def test_real_catalogue_aliases_word_order_layout_and_typo_fallback(database):
-    settings, engine = database
-    add_location(engine, "Псевдогород", "search-real-alias", aliases=["Город Мечты"])
+def test_real_catalogue_name_search_normalization_keyboard_typo_and_empty(database):
+    settings, _ = database
     with TestClient(create_app(settings)) as client:
         for query, expected in [
             ("ПлЕс", "Плёс"),
             ("новгород нижний", "Нижний Новгород"),
-            ("sochi", "Сочи"),
             ("cjxb", "Сочи"),
             ("Сочии", "Сочи"),
-            ("Город-Мечты", "Псевдогород"),
         ]:
-            response = client.get("/guide/api/locations/suggest", params={"q": query})
-            assert response.status_code == 200, response.text
-            assert response.json()["items"][0]["name"] == expected, (query, response.text)
-        assert (
-            client.get("/guide/api/locations/suggest", params={"q": "жцфыщбъь"}).json()["items"]
-            == []
-        )
-        assert client.get("/guide/api/locations/suggest", params={"q": "жц"}).json()["items"] == []
+            page = client.get("/guide/", params={"q": query})
+            assert re.findall(r"<strong>(.*?)</strong>", page.text)[0] == expected
+        for query in ("sochi", "жцфыщбъь", "%_"):
+            page = client.get("/guide/", params={"q": query})
+            assert 'class="city-link"' not in page.text
 
 
-def test_suggestions_do_not_track_visitors_start_work_or_query_for_empty_input(
-    database, monkeypatch
-):
+def test_inline_snapshot_escapes_script_closing_tags_and_keeps_exact_name(database):
     settings, engine = database
-    app = create_app(settings)
-    with TestClient(app) as client:
-        response = client.get("/guide/api/locations/suggest?q=плес")
-        assert response.json()["items"][0]["name"] == "Плёс"
-        assert response.headers["cache-control"] == "public, max-age=30"
-        assert "set-cookie" not in response.headers
-        assert (
-            client.get("/guide/api/locations/suggest", params={"q": "x" * 101}).status_code == 422
-        )
-
-        def forbidden(*args, **kwargs):
-            raise AssertionError("No SQL for an empty normalized query")
-
-        monkeypatch.setattr(app.state.context.queries, "public_directory", forbidden)
-        for query in ("", "%_", "\\\x00"):
-            assert client.get("/guide/api/locations/suggest", params={"q": query}).json() == {
-                "items": []
-            }
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT count(*) FROM audience_daily")).scalar_one() == 0
-        assert connection.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
-
-
-def test_index_migration_rolls_back_without_changing_catalogue_or_shared_extension(database):
-    settings, engine = database
-    config = Config(str(settings.root_dir / "alembic.ini"))
-    with engine.connect() as connection:
-        before = connection.execute(text("SELECT count(*) FROM locations")).scalar_one()
-        assert connection.execute(text("SELECT to_regclass('locations_name_trgm')")).scalar_one()
-    command.downgrade(config, "audience_stats")
-    with engine.connect() as connection:
-        assert (
-            connection.execute(text("SELECT to_regclass('locations_name_trgm')")).scalar_one()
-            is None
-        )
-        assert connection.execute(text("SELECT count(*) FROM locations")).scalar_one() == before
-        assert (
-            connection.execute(text("SELECT public.similarity('сочи','сочии')")).scalar_one() > 0.45
-        )
-    command.upgrade(config, "head")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT to_regclass('locations_name_trgm')")).scalar_one()
-
-
-def test_one_and_two_letters_only_match_name_or_alias_start_then_three_match_inside(database):
-    settings, engine = database
-    add_location(engine, "Йцукоград", "prefix-start", ready=True)
-    add_location(engine, "Алиасный город", "prefix-alias", aliases=["Йцук"], ready=True)
-    add_location(engine, "Старый Йцукоград", "prefix-later-word", ready=True)
-    add_location(engine, "Айцукоград", "prefix-inside-word", ready=True)
-    add_location(engine, "Контекстный город", "prefix-region", region="Йцук", ready=True)
-    add_location(engine, "Йцук скрытый", "prefix-hidden", listed=False)
-    add_location(engine, "Йцук выключен", "prefix-inactive", active=0)
+    name = '</script><img src=x onerror="window.__searchXss=true">'
+    add_location(engine, name, "snapshot-unsafe")
     with TestClient(create_app(settings)) as client:
-        for query in ("й", "ЙЦ"):
-            response = client.get("/guide/api/locations/suggest", params={"q": query})
-            urls = [item["url"] for item in response.json()["items"]]
-            assert "/guide/prefix-start" in urls and "/guide/prefix-alias" in urls
-            for excluded in ("later-word", "inside-word", "region", "hidden", "inactive"):
-                assert f"/guide/prefix-{excluded}" not in urls
-            home = client.get("/guide/", params={"q": query})
-            assert re.findall(r'<a class="city-link" href="([^"]+)"', home.text)[:6] == urls
-        response = client.get("/guide/api/locations/suggest", params={"q": "йцу"})
-        urls = [item["url"] for item in response.json()["items"]]
-        for suffix in ("start", "alias", "later-word", "inside-word", "region"):
-            assert f"/guide/prefix-{suffix}" in urls
-        for suffix in ("hidden", "inactive"):
-            assert f"/guide/prefix-{suffix}" not in urls
+        page = client.get("/guide/")
+        assert name not in page.text
+        assert (
+            next(item for item in snapshot(page) if item["url"] == "/guide/snapshot-unsafe")["name"]
+            == name
+        )

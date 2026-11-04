@@ -1,6 +1,10 @@
 (() => {
   const form = document.querySelector('[data-location-search]');
-  if (!form || !window.autoComplete) return;
+  if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
+  let catalogue;
+  try { catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent); }
+  catch { return; }
+  const search = GuideLocationIndex(catalogue);
   const input = form.querySelector('input[name="q"]');
   const clear = form.querySelector('.search-clear');
   const panel = form.querySelector('.search-suggestions');
@@ -9,7 +13,7 @@
   const surface = form.querySelector('.search-surface');
   const inputRow = form.querySelector('.search-input-row');
   const status = form.querySelector('[role="status"]');
-  let rows = [], message = '', generation = 0, renderGeneration = -1, timer, request;
+  let rows = [];
   let composing = false;
   let expanded = false, closeTimer;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -35,7 +39,7 @@
   const widget = new autoComplete({
     selector: () => input, wrapper: false, threshold: 0, submit: true,
     data: {src: async () => rows, keys: ['name'], cache: false},
-    // Ranking belongs to the server; the library must not insert catalogue HTML.
+    // The in-memory index ranks names; the library only renders safe DOM nodes.
     searchEngine: () => ' ',
     resultsList: {
       class: 'destination-results', destination: () => content, position: 'beforeend',
@@ -44,10 +48,10 @@
         if (!data.results.length) {
           const item = document.createElement('li');
           item.className = 'search-message'; item.role = 'presentation';
-          item.textContent = message || 'Не нашли такую локацию. Попробуйте другое название.';
+          item.textContent = 'Не нашли такую локацию. Попробуйте другое название.';
           list.append(item);
         }
-        status.textContent = message || (data.results.length ? `Подсказок: ${data.results.length}` : 'Ничего не найдено');
+        status.textContent = data.results.length ? `Подсказок: ${data.results.length}` : 'Ничего не найдено';
         requestAnimationFrame(fitResults);
       }
     },
@@ -68,7 +72,7 @@
     events: {input: {
       input: () => begin(),
       focus: () => { if (!composing && !expanded) begin(); },
-      // A populated search stays open, including while its request finishes without focus.
+      // A populated search stays open when focus moves elsewhere.
       blur: () => {},
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
@@ -82,7 +86,6 @@
         const selected = event.detail.selection?.value;
         if (!selected) return;
         const url = selected.url;
-        invalidate(false);
         // Only canonical Guide links from this origin can be selected.
         const target = new URL(url, location.href);
         if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
@@ -90,7 +93,7 @@
         }
       },
       open: () => {
-        if (renderGeneration !== generation || !input.value.trim()) { widget.close(); return; }
+        if (!input.value.trim()) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -108,7 +111,6 @@
         control.classList.remove('is-open');
         // The library hides its list immediately; keep it painted while it fades out.
         widget.list.hidden = false;
-        panel.style.minHeight = '';
         resizeSurface();
         clearTimeout(closeTimer);
         closeTimer = setTimeout(() => {
@@ -120,60 +122,12 @@
   input.setAttribute('aria-autocomplete', 'list');
   clear.hidden = !input.value;
 
-  function invalidate(close = true) {
-    generation++;
-    clearTimeout(timer);
-    request?.abort(); request = undefined;
-    if (close) widget.close();
-    input.removeAttribute('aria-busy'); status.textContent = '';
-  }
-  function current(version) {
-    return version === generation && !!input.value.trim() && !composing;
-  }
-  function show(items, text = '', pending = false) {
-    if (!pending) panel.style.minHeight = '';
-    rows = items; message = text; renderGeneration = generation;
-    widget.start(input.value);
-  }
   function begin() {
     clear.hidden = !input.value;
-    invalidate(false);
-    const length = input.value.trim().length;
-    if (!length) { widget.close(); return; }
-    // Preserve the current height while fetching, without leaving stale options selectable.
-    if (expanded) panel.style.minHeight = panel.offsetHeight + 'px';
-    show([], 'Ищем…', true);
-    if (!composing) schedule();
-  }
-  function schedule() {
-    if (!input.value.trim()) return;
-    const version = generation;
-    timer = setTimeout(() => fetchRows(version), 180);
-  }
-  async function fetchRows(version) {
-    if (!current(version)) return;
-    const controller = new AbortController(); request = controller;
-    const timeout = setTimeout(() => controller.abort(), 4000);
-    input.setAttribute('aria-busy', 'true');
-    try {
-      const url = new URL(form.dataset.suggestUrl, location.href);
-      url.searchParams.set('q', input.value.trim());
-      const response = await fetch(url, {signal: controller.signal, credentials: 'omit'});
-      if (!response.ok) throw new Error('Search unavailable');
-      const data = await response.json();
-      if (!Array.isArray(data.items) || data.items.some(item =>
-        typeof item.name !== 'string' || typeof item.context !== 'string' || typeof item.url !== 'string')) {
-        throw new Error('Invalid search response');
-      }
-      if (current(version)) show(data.items);
-    } catch {
-      if (current(version)) show([], 'Подсказки временно недоступны.');
-    } finally {
-      clearTimeout(timeout);
-      if (current(version)) {
-        input.removeAttribute('aria-busy'); request = undefined;
-      }
-    }
+    if (!input.value.trim()) { widget.close(); status.textContent = ''; return; }
+    if (composing) return;
+    rows = search(input.value).slice(0, 6);
+    widget.start(input.value);
   }
   function fitResults() {
     if (!expanded) return;
@@ -190,10 +144,9 @@
   function resizeSurface() {
     surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
   }
-  input.addEventListener('compositionstart', () => { composing = true; begin(); });
+  input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
-  clear.addEventListener('click', () => { invalidate(); input.value = ''; clear.hidden = true; input.focus(); });
-  form.addEventListener('submit', () => invalidate(false));
+  clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
   window.addEventListener('resize', fitResults);
   window.visualViewport?.addEventListener('resize', fitResults);
   new ResizeObserver(resizeSurface).observe(content);

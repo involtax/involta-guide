@@ -1,14 +1,15 @@
 import json
 import os
-import re
 from urllib.parse import parse_qs, urlsplit
 
 from integration.editor_fixture import FixtureEditor
 from integration.test_editorial import CONTENT
+from integration.test_location_search import add_location
 from integration.test_voice_upload_transport import serving
 from playwright.sync_api import expect, sync_playwright
 
 from involta_guide.application.services.locations import Queries
+from involta_guide.domain.location_search import search_locations
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_guide.main import create_app
 
@@ -79,102 +80,106 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
         browser.close()
 
 
-def test_late_responses_escape_ime_error_and_untrusted_titles(database):
+def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metadata(database):
+    settings, engine = database
+    add_location(
+        engine,
+        "Иной город",
+        "uniqueslug777",
+        region="ТолькоРегионУникум777",
+        aliases=["ТолькоАлиасУникум777"],
+    )
+    add_location(engine, '</script><img src=x onerror="window.__searchXss=true">', "unsafe-name")
+    with serving(create_app(settings)) as origin, sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        page = browser.new_page()
+        page.goto(origin + "/guide/", wait_until="networkidle")
+        field = page.get_by_role("combobox", name="Куда отправимся?")
+        expect(field).to_be_visible()
+        page.evaluate("""() => {
+            window.searchMessages = [];
+            new MutationObserver(() => window.searchMessages.push(document.querySelector('.search-suggestions').textContent))
+                .observe(document.querySelector('.search-suggestions'), {subtree:true,childList:true,characterData:true});
+        }""")
+        requests = []
+        page.on("request", lambda request: requests.append(request.url))
+        page.context.set_offline(True)
+        result = page.evaluate("""async () => {
+            const input = document.querySelector('input[name=q]');
+            input.value = 'и'; input.dispatchEvent(new Event('input', {bubbles:true}));
+            await new Promise(requestAnimationFrame);
+            return {names:[...document.querySelectorAll('.result-name')].map(node=>node.textContent),
+                busy: input.getAttribute('aria-busy')};
+        }""")
+        assert "Иваново" in result["names"] and result["busy"] is None
+        page.locator("h1").click()
+        expect(page.locator(".search-suggestions")).to_be_visible()
+        for query in ("ТолькоРегионУникум777", "ТолькоАлиасУникум777", "uniqueslug777"):
+            field.fill(query)
+            expect(page.get_by_role("option")).to_have_count(0)
+        field.fill("img")
+        expect(page.get_by_role("option")).to_have_count(1)
+        assert page.locator(".destination-results img").count() == 0
+        assert not page.evaluate("Boolean(window.__searchXss)")
+        field.dispatch_event("compositionstart")
+        field.fill("москва")
+        expect(page.get_by_role("option")).to_contain_text("<img")
+        field.dispatch_event("compositionend")
+        expect(page.get_by_role("option").first).to_contain_text("Москва")
+        field.press("Escape")
+        expect(field).to_have_value("москва")
+        expect(page.locator(".search-suggestions")).to_be_visible()
+        page.get_by_role("button", name="Очистить поиск").click()
+        expect(page.locator(".search-suggestions")).to_be_hidden()
+        assert not requests
+        assert page.evaluate("searchMessages.every(text => !text.includes('Ищем'))")
+        browser.close()
+
+
+def test_browser_and_native_matching_agree_on_real_catalogue_and_five_thousand_rows(
+    database, tmp_path
+):
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         page = browser.new_page()
-        # Simulate a transport that cannot cancel: generation checks must still reject old replies.
-        page.add_init_script(
-            "const actualFetch=window.fetch;window.fetch=(url,options)=>actualFetch(url,{...options,signal:undefined});"
-        )
-        pending, seen = {}, []
-
-        def hold(route):
-            q = parse_qs(urlsplit(route.request.url).query)["q"][0]
-            assert "cookie" not in route.request.headers
-            pending[q] = route
-            seen.append(q)
-
-        page.route("**/api/locations/suggest?*", hold)
-        page.goto(origin + "/guide/")
-        field = page.get_by_role("combobox", name="Куда отправимся?")
-
-        def wait_pending(q):
-            for _ in range(100):
-                if q in pending:
-                    return
-                page.wait_for_timeout(10)
-            raise AssertionError("Missing suggestion request: " + q)
-
-        def send(q):
-            with page.expect_request(lambda r: parse_qs(urlsplit(r.url).query).get("q") == [q]):
-                field.fill(q)
-            wait_pending(q)
-
-        def complete(q, name="", status=200):
-            body = (
-                {"items": [{"name": name, "context": "Город · Область", "url": "/guide/ivanovo"}]}
-                if name
-                else {"items": []}
+        page.goto(origin + "/guide/", wait_until="networkidle")
+        catalogue = page.locator("#location-catalogue").evaluate("el=>JSON.parse(el.textContent)")
+        queries = [
+            "и",
+            "н",
+            "но",
+            "нов",
+            "ПЛЁС",
+            "новгород нижний",
+            "cjxb",
+            "Сочии",
+            "sochi",
+            "%_",
+            "жцфыщбъь",
+            "санкт—петербург",
+        ]
+        for query in queries:
+            actual = page.evaluate(
+                "([rows,q])=>GuideLocationIndex(rows)(q).map(row=>row.url)", [catalogue, query]
             )
-            with page.expect_response(
-                lambda r: parse_qs(urlsplit(r.url).query).get("q") == [q]
-            ) as received:
-                pending.pop(q).fulfill(
-                    status=status, content_type="application/json", body=json.dumps(body)
-                )
-            received.value.finished()
-            page.wait_for_timeout(40)
-
-        send("стар")
-        send("нов")
-        complete("нов", "Новое место")
-        expect(page.get_by_role("option")).to_contain_text("Новое место")
-        complete("стар", "Старое место")
-        expect(page.get_by_role("option")).to_contain_text("Новое место")
-        send("ожид")
-        expect(page.locator(".search-message")).to_have_text("Ищем…")
-        field.press("ArrowDown")
-        assert field.get_attribute("aria-activedescendant") in (None, "")
-        complete("ожид", "Ожидаемое место")
-        expect(page.get_by_role("option")).to_contain_text("Ожидаемое место")
-        send("фокус")
-        page.locator("h1").click()
-        complete("фокус", "Ответ без фокуса")
-        expect(page.get_by_role("option")).to_contain_text("Ответ без фокуса")
-        expect(page.locator(".search-suggestions")).to_be_visible()
-        field.press("Escape")
-        expect(page.locator(".search-suggestions")).to_be_visible()
-        expect(field).to_have_value("фокус")
-        send("сброс")
-        page.get_by_role("button", name="Очистить поиск").click()
-        complete("сброс", "Устаревший ответ после очистки")
-        expect(page.locator(".search-suggestions")).to_be_hidden()
-        expect(field).to_have_value("")
-        before = len(seen)
-        field.dispatch_event("compositionstart")
-        field.fill("моск")
-        page.wait_for_timeout(260)
-        assert len(seen) == before
-        field.dispatch_event("compositionend")
-        wait_pending("моск")
-        complete("моск", "Москва")
-        expect(page.get_by_role("option")).to_contain_text("Москва")
-        send("опас")
-        complete("опас", '<img src=x onerror="window.__searchXss=true">')
-        assert page.locator(".destination-results img").count() == 0
-        assert not page.evaluate("Boolean(window.__searchXss)")
-        expect(page.get_by_role("option")).to_contain_text("<img")
-        send("ошиб")
-        complete("ошиб", status=503)
-        expect(page.locator(".search-message")).to_have_text("Подсказки временно недоступны.")
-        field.press("ArrowDown")
-        field.press("Enter")
-        page.wait_for_url(re.compile(r"\?q="))
-        assert parse_qs(urlsplit(page.url).query)["q"] == ["ошиб"]
+            expected = [row["url"] for row in search_locations(catalogue, query)]
+            assert actual == expected, query
+        benchmark = page.evaluate("""() => {
+            const rows = Array.from({length:5000},(_,i)=>({name:'Город ' + i,context:'Подпись',url:'/guide/city-'+i}));
+            rows.push({name:'Иваново',context:'Город',url:'/guide/ivanovo'});
+            const started=performance.now(),search=GuideLocationIndex(rows),build=performance.now()-started;
+            const times=[];
+            for(let i=0;i<100;i++) {const start=performance.now(); search(i%2 ? 'и' : 'город 12');times.push(performance.now()-start);}
+            times.sort((a,b)=>a-b);
+            return {rows:rows.length,build_ms:build,median_ms:times[50],p95_ms:times[95],found:search('и')[0].name};
+        }""")
+        assert benchmark["found"] == "Иваново"
+        (tmp_path / "local-index-benchmark.json").write_text(json.dumps(benchmark))
         browser.close()
 
 
@@ -185,15 +190,6 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1100})
-        requests = []
-
-        def suggest(route):
-            requests.append(route.request.url)
-            route.fulfill(
-                json={"items": [{"name": "Новгород", "context": "Город", "url": "/guide/novgorod"}]}
-            )
-
-        page.route("**/api/locations/suggest?*", suggest)
         page.goto(origin + "/guide/")
         field = page.get_by_role("combobox", name="Куда отправимся?")
         shell = page.locator(".search-surface")
@@ -202,10 +198,10 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         assert shell.evaluate("el=>el.offsetHeight") == 80
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         field.fill("н")
-        expect(page.get_by_role("option")).to_have_count(1)
-        assert len(requests) == 1 and parse_qs(urlsplit(requests[0]).query)["q"] == ["н"]
+        expect(page.get_by_role("option")).to_have_count(6)
+
         field.fill("нов")
-        expect(page.get_by_role("option")).to_have_count(1)
+        expect(page.get_by_role("option")).to_have_count(6)
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         expanded_height = shell.evaluate("el=>el.getBoundingClientRect().height")
         assert expanded_height > 80
@@ -215,17 +211,14 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         page.wait_for_timeout(480)
         expect(panel).to_be_visible()
         expect(field).to_have_value("нов")
-        before = len(requests)
         field.focus()
-        page.wait_for_timeout(250)
-        assert len(requests) == before
         field.fill("")
         expect(panel).to_have_attribute("inert", "")
         page.wait_for_timeout(80)
         assert 80 < shell.evaluate("el=>el.getBoundingClientRect().height") < expanded_height
         field.fill("новг")
         expect(panel).to_have_attribute("aria-hidden", "false")
-        expect(page.get_by_role("option")).to_have_count(1)
+        expect(page.get_by_role("option")).to_have_count(2)
         page.wait_for_timeout(480)
         expect(panel).to_be_visible()
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "24px"

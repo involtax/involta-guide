@@ -12,7 +12,7 @@ from involta_guide.domain.location_search import russian_layout, search_text
         ("%_\\\x00", ""),
     ],
 )
-def test_search_normalizes_names_and_never_keeps_sql_wildcards(raw, expected):
+def test_search_normalizes_names_and_separators(raw, expected):
     assert search_text(raw) == expected
 
 

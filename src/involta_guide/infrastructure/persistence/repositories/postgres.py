@@ -11,7 +11,7 @@ from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import KINDS
 
 from ..models import Base
-from .public_search import PUBLIC, public_location_search
+from .public_catalogue import PUBLIC, public_location_catalogue
 
 
 def row_dict(row: Any) -> Record:
@@ -192,8 +192,8 @@ class PostgresRepository:
         )
         return {"rows": rows, "total": total, "page": page, "pages": pages}
 
-    def public_directory(self, query: str, page: int | None = None) -> Record:
-        return public_location_search(self.session, query, page)
+    def public_location_catalogue(self) -> list[Record]:
+        return public_location_catalogue(self.session)
 
     def allowed(self, restaurant_id: str, location_id: str) -> bool:
         return bool(
