@@ -172,7 +172,7 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                     assert page.locator(".review-city.selected").count() == 1
                     assert (
                         page.locator(".review-transcripts > div").count()
-                        == 2 * page.locator(".review-card").count()
+                        == page.locator(".review-card").count()
                     )
                     assert page.locator(".review-top audio").count() == 1
                     assert (

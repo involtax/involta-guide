@@ -164,11 +164,6 @@ class VoiceService:
             id=reference,
         )
         if frozen["asr_beta"]:
-            execute(
-                conn,
-                "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'comparison')",
-                id=reference,
-            )
             for kind in frozen["sherpa_models"]:
                 execute(
                     conn,

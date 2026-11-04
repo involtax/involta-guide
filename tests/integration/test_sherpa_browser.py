@@ -13,14 +13,14 @@ from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
 
 from .test_jobs import setup
-from .test_sherpa_comparison import SixResults
+from .test_sherpa_comparison import GigaResults
 from .test_voice_guide import client_for
 from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 from .test_web import login
 
 
-def test_six_recognitions_and_exact_dictionary_in_existing_admin_shell(database, voice_database):
+def test_three_recognitions_and_exact_dictionary_in_existing_admin_shell(database, voice_database):
     settings, engine, _, _, city, _, _ = setup(database)
     vs, ve = voice_database
     vs = vs.model_copy(update={"asr_beta_enabled": True})
@@ -32,16 +32,16 @@ def test_six_recognitions_and_exact_dictionary_in_existing_admin_shell(database,
                 slug=city["slug"],
                 name=city["name"],
                 content_epoch=1,
-                recognition_dictionary=["Алхимист", "Огонёк", "Сыроварня"],
+                recognition_dictionary=["Алхимист", "Иваново", "Огонёк", "Сыроварня"],
             )
         }
     )
     VoiceService(ve, vs).submit(meta, recording(), "audio/wav")
 
-    class Demo(SixResults):
+    class Demo(GigaResults):
         def call(self, kind, request, audio, mime):
             body = super().call(kind, request, audio, mime)
-            proper = request["model"] == "parakeet" or request.get("variant") == "sherpa_hotwords"
+            proper = request.get("variant") == "sherpa_hotwords"
             body["body"] = json.dumps(
                 {
                     "text": f"Был в {'Алхимисте' if proper else 'Оптимисте'}. Понравилась еда, обязательно вернусь.",
@@ -51,7 +51,7 @@ def test_six_recognitions_and_exact_dictionary_in_existing_admin_shell(database,
             return body
 
     worker = Worker(ve, vs, Demo())
-    assert all(worker.once() for _ in range(6))
+    assert all(worker.once() for _ in range(3))
     Consumer(engine, client_for(settings, vs)).once()
     app = create_app(settings)
     app.state.voice_client = client_for(settings, vs)
@@ -76,11 +76,12 @@ def test_six_recognitions_and_exact_dictionary_in_existing_admin_shell(database,
 
             page.route("**/*", respond)
             page.goto("http://localhost/guide/admin/reviews/ivanovo")
-            expect(page.locator(".review-transcripts > div")).to_have_count(6)
-            expect(page.get_by_text("Sherpa · со словарём", exact=True)).to_have_count(2)
+            expect(page.locator(".review-transcripts > div")).to_have_count(3)
+            expect(page.locator(".review-transcripts")).not_to_contain_text("Parakeet")
+            expect(page.get_by_text("Sherpa · со словарём", exact=True)).to_have_count(1)
             expect(
-                page.get_by_text("Словарь: Алхимист · Огонёк · Сыроварня", exact=True)
-            ).to_have_count(2)
+                page.get_by_text("Словарь: Алхимист · Иваново · Огонёк · Сыроварня", exact=True)
+            ).to_have_count(1)
             expect(page.get_by_role("button", name="Удалить отзыв", exact=False)).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             page.screenshot(path=str(folder / f"admin-{width}.png"), full_page=True)

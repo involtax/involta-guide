@@ -26,15 +26,6 @@ MODELS: dict[str, dict[str, Any]] = {
         "feature_dim": 64,
         "license": "MIT",
     },
-    "parakeet": {
-        "repository": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
-        "revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78",
-        "files": ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
-        "decoder": "decoder.int8.onnx",
-        "joiner": "joiner.int8.onnx",
-        "feature_dim": 128,
-        "license": "CC-BY-4.0",
-    },
 }
 
 
@@ -55,7 +46,7 @@ def options(settings: Settings, engine: str, variant: str, names: list[str]) -> 
         "decoding_method": "modified_beam_search",
         "max_active_paths": 4,
         "hotwords_score": 1.5,
-        "length_reward": 0.5 if engine == "parakeet" else 0.0,
+        "length_reward": 0.0,
         "dictionary": dictionary_names(names) if variant == "sherpa_hotwords" else [],
         "dictionary_encoding": "tokens-longest-match-v1",
         "vad_revision": VAD["revision"],

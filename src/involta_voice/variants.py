@@ -1,15 +1,12 @@
-"""The six explicit beta recognitions; only the original GigaAM publishes text."""
+"""The three GigaAM beta recognitions; only the original GigaAM publishes text."""
 
 SHERPA_STAGES = {
     "sherpa_gigaam_plain": ("gigaam", "sherpa_plain"),
     "sherpa_gigaam_hotwords": ("gigaam", "sherpa_hotwords"),
-    "sherpa_parakeet_plain": ("parakeet", "sherpa_plain"),
-    "sherpa_parakeet_hotwords": ("parakeet", "sherpa_hotwords"),
 }
-STAGES = ("transcription", "comparison", *SHERPA_STAGES)
+STAGES = ("transcription", *SHERPA_STAGES)
 RESULTS = (
     ("gigaam", "onnx"),
-    ("parakeet", "onnx"),
     *SHERPA_STAGES.values(),
 )
 VARIANT_LABELS = {

@@ -27,6 +27,18 @@ class Worker:
     def claim(self) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
             execute(conn, "SELECT pg_advisory_xact_lock(47032004)")
+            # Retire outstanding Parakeet work without deleting its saved diagnostics.
+            execute(
+                conn,
+                """UPDATE stages s SET state='failed',error='Parakeet удалён из эксперимента',
+                finished_at=now(),lease_token=NULL,lease_until=NULL FROM runs r
+                WHERE r.submission=s.submission AND r.number=s.run
+                AND (s.state='queued' OR (s.state='running' AND s.lease_until<now()))
+                AND (s.kind LIKE 'sherpa_parakeet_%' OR coalesce(s.request->>'model',
+                  CASE s.kind WHEN 'transcription' THEN r.snapshot->>'transcription_model'
+                    WHEN 'comparison' THEN CASE WHEN r.snapshot->>'transcription_model'='gigaam'
+                    THEN 'parakeet' ELSE 'gigaam' END END)='parakeet')""",
+            )
             # A saved response can be replayed. An interrupted external POST without one is unknown.
             expired = (
                 conn.execute(
@@ -62,7 +74,7 @@ class Worker:
             stage = row(
                 conn,
                 """SELECT s.* FROM stages s WHERE kind=ANY(:kinds) AND state='queued' AND available_at<=now() AND :local_busy=false
-                ORDER BY CASE kind WHEN 'transcription' THEN 0 WHEN 'comparison' THEN 1 ELSE 2 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
+                ORDER BY CASE kind WHEN 'transcription' THEN 0 ELSE 1 END,available_at,submission,run,kind FOR UPDATE SKIP LOCKED LIMIT 1""",
                 kinds=list(STAGES),
                 local_busy=bool(local_running),
             )

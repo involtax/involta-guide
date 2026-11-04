@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     service_secret: SecretStr
     openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
     data_dir: Path = Path("var/voice")
-    transcription_model: Literal["gigaam", "parakeet"] = "gigaam"
+    transcription_model: Literal["gigaam"] = "gigaam"
     asr_models_dir: Path = Path("var/asr-models")
     asr_cpu_threads: int = Field(default=2, ge=1, le=64)
     asr_beta_enabled: bool = True

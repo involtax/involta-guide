@@ -21,7 +21,7 @@ def settings(tmp_path):
     )
 
 
-@pytest.mark.parametrize("engine", ["gigaam", "parakeet"])
+@pytest.mark.parametrize("engine", ["gigaam"])
 def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(tmp_path, engine):
     config = settings(tmp_path)
     names = ["Алхимист", "Огонёк", "Алхимист", "  Сыроварня  "]
@@ -43,7 +43,7 @@ def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
         LocalSherpa(config).call(options(config, "gigaam", "sherpa_plain", []), b"fixture")
 
 
-@pytest.mark.parametrize("engine", ["gigaam", "parakeet"])
+@pytest.mark.parametrize("engine", ["gigaam"])
 def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     tmp_path, monkeypatch, engine
 ):
@@ -73,7 +73,7 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
 
         def set_option(self, name, value):
             assert name == "length_reward"
-            assert float(value) == (0.5 if engine == "parakeet" else 0)
+            assert float(value) == 0
 
         def accept_waveform(self, sample_rate, audio):
             assert sample_rate == 16000 and len(audio) == 8000

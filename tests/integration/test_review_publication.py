@@ -101,7 +101,7 @@ def test_comparison_failure_does_not_unpublish_primary_text(database, voice_data
 
     class ComparisonFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
-            if request["model"] == "parakeet":
+            if request.get("variant", "onnx") != "onnx":
                 raise ProviderFailure("Comparison test failure")
             return super().call(kind, request, audio, mime)
 

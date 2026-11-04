@@ -34,7 +34,7 @@ class Pair(FakeProvider):
         return result
 
 
-@pytest.mark.parametrize("failed", [None, "gigaam", "parakeet"])
+@pytest.mark.parametrize("failed", [None, "gigaam"])
 def test_primary_only_publication_and_independent_model_results(voice_database, failed):
     settings, engine = voice_database
     settings = settings.model_copy(update={"asr_beta_enabled": True})
@@ -42,19 +42,19 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     provider = Pair(failed)
     worker = Worker(engine, settings, provider)
-    assert all(worker.once() for _ in range(6))
+    assert all(worker.once() for _ in range(3))
     assert not worker.once()
     status = service.status(ref)
     assert status["transcript"] == (None if failed == "gigaam" else "Текст GigaAM")
     assert status["state"] == ("transcription_failed" if failed == "gigaam" else "result_ready")
     assert "parakeet" not in json.dumps(status).lower()
     pair = reports(engine, [ref])[ref]
-    assert {r["engine"] for r in pair} == {"gigaam", "parakeet"}
-    assert len(pair) == 6
+    assert {r["engine"] for r in pair} == {"gigaam"}
+    assert len(pair) == 3
     assert sum(r["state"] == "failed" for r in pair) == (3 if failed else 0)
-    assert len(report(engine, ref)["candidates"]) == (3 if failed else 6)
-    assert provider.calls[:2] == ["gigaam", "parakeet"]
-    assert provider.calls.count("gigaam") == provider.calls.count("parakeet") == 3
+    assert len(report(engine, ref)["candidates"]) == (0 if failed else 3)
+    assert provider.calls == ["gigaam"] * 3
+    assert "parakeet" not in provider.calls
     with engine.connect() as conn:
         assert conn.execute(
             text("SELECT count(*) FROM outbox WHERE kind='gigaam_ready'")
@@ -72,11 +72,11 @@ def test_saved_secondary_response_recovers_without_provider(voice_database):
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, FakeProvider())
     assert worker.once()
-    assert worker.claim()["kind"] == "comparison"
+    assert worker.claim()["kind"] == "sherpa_gigaam_hotwords"
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE stages SET raw_response=CAST(:raw AS jsonb),lease_until=now()-interval '1 second' WHERE kind='comparison'"
+                "UPDATE stages SET raw_response=CAST(:raw AS jsonb),lease_until=now()-interval '1 second' WHERE kind='sherpa_gigaam_hotwords'"
             ),
             {"raw": json.dumps({"status_code": 200, "body": '{"text":"Второй результат"}'})},
         )
@@ -86,7 +86,7 @@ def test_saved_secondary_response_recovers_without_provider(voice_database):
             raise AssertionError("Must reuse saved response")
 
     assert Worker(engine, settings, NoCalls()).once()
-    assert reports(engine, [ref])[ref][1]["text"] == "Второй результат"
+    assert reports(engine, [ref])[ref][2]["text"] == "Второй результат"
     assert service.status(ref)["transcript"] != "Второй результат"
 
 
@@ -97,7 +97,7 @@ def test_private_batch_results_and_deleted_manual_apis(voice_database):
         assert client.post("/internal/v1/admin/recognitions", json=[ref]).status_code == 401
         headers = {"authorization": "Bearer " + settings.service_secret.get_secret_value()}
         response = client.post("/internal/v1/admin/recognitions", json=[ref], headers=headers)
-        assert response.status_code == 200 and len(response.json()[ref]) == 2
+        assert response.status_code == 200 and len(response.json()[ref]) == 1
         assert (
             client.post(
                 "/internal/v1/admin/recognitions", json=[ref] * 31, headers=headers
@@ -184,23 +184,50 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
     assert service.status(ref)["transcript"] == ("Текст GigaAM" if with_primary else None)
 
 
-@pytest.mark.parametrize("failed", [None, "gigaam"])
-def test_frozen_pre_transition_parakeet_primary_never_becomes_public_source(voice_database, failed):
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_outstanding_parakeet_work_is_retired_without_provider_calls(voice_database, interrupted):
     settings, engine = voice_database
-    settings = settings.model_copy(update={"asr_beta_enabled": True})
     service = VoiceService(engine, settings)
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
+    worker = Worker(engine, settings, Pair())
+    assert worker.once()
     with engine.begin() as conn:
-        conn.execute(
-            text(
-                "UPDATE runs SET snapshot=jsonb_set(snapshot,'{transcription_model}','\"parakeet\"')"
+        for kind in ("comparison", "sherpa_parakeet_plain", "sherpa_parakeet_hotwords"):
+            conn.execute(
+                text("INSERT INTO stages(submission,run,kind) VALUES(:id,1,:kind)"),
+                {"id": ref, "kind": kind},
             )
+
+        conn.execute(
+            text("""INSERT INTO asr_candidates(submission,run,engine,revision,settings,transcript,elapsed_seconds,duration,details)
+          SELECT submission,run,'parakeet',revision,settings,'Старый Parakeet',elapsed_seconds,duration,details
+          FROM asr_candidates WHERE engine='gigaam' AND variant='onnx'""")
         )
-    worker = Worker(engine, settings, Pair(failed))
-    assert worker.once()
-    assert service.status(ref)["transcript"] is None
-    assert worker.once()
-    status = service.status(ref)
-    assert status["transcript"] == (None if failed else "Текст GigaAM")
-    assert status["state"] == ("transcription_failed" if failed else "result_ready")
-    assert "parakeet" not in json.dumps(status).lower()
+        if interrupted:
+            conn.execute(
+                text(
+                    "UPDATE stages SET state='running',lease_until=now()-interval '1 second',raw_response=CAST(:raw AS jsonb) WHERE kind<>'transcription'"
+                ),
+                {"raw": json.dumps({"status_code": 200, "body": "saved"})},
+            )
+
+    class NoCalls:
+        def call(self, *args):
+            raise AssertionError("Parakeet must never run")
+
+    assert not Worker(engine, settings, NoCalls()).once()
+    with engine.connect() as conn:
+        retired = (
+            conn.execute(text("SELECT state,error FROM stages WHERE kind<>'transcription'"))
+            .mappings()
+            .all()
+        )
+        assert len(retired) == 3
+        assert all(r["state"] == "failed" and "Parakeet" in r["error"] for r in retired)
+        assert conn.execute(text("SELECT count(*) FROM asr_candidates")).scalar_one() == 2
+    assert any(c["transcript"] == "Старый Parakeet" for c in report(engine, ref)["candidates"])
+    assert all(c["engine"] == "gigaam" for c in reports(engine, [ref])[ref])
+    with engine.connect() as conn:
+        audio = conn.execute(text("SELECT audio FROM submissions")).scalar_one()
+    assert service.storage.path(audio).exists()
+    assert service.status(ref)["transcript"] == "Текст GigaAM"

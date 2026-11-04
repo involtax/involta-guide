@@ -46,7 +46,7 @@ GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Recei
 primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
 analysis_ready, processing_failed принимаются только как история доставки.
 
-POST `/admin/recognitions` — приватный batch до 30 UUID: до шести строк результатов,
+POST `/admin/recognitions` — приватный batch до 30 UUID: до трёх строк результатов,
 без оценок и эталона. GET `/admin/submissions/{reference}` и `/asr` содержат
 подробности для лога. Ручные new-run/revalidate, ASR-run/evaluation и изменение
 настроек анализа удалены. GigaAM фиксирован как primary. Публичный SubmissionStatus
@@ -93,7 +93,7 @@ The widget retains each recording's original content_epoch until its single uplo
 Guide хранит reviews.publication_status: 0 — ошибка, 1 — опубликован,
 2 — резерв модерации. Поступление аудио и успешный GigaAM автоматически дают 1;
 терминальная ошибка/unknown/пустой результат GigaAM дают 0. Приложение не ставит 2.
-Ошибка Parakeet не меняет публикацию. Удаление даёт 0 и оставляет status=deleted
+Ошибка Sherpa не меняет публикацию. Удаление даёт 0 и оставляет status=deleted
 как защиту от позднего события.
 
 Voice отправляет OutboxEvent v2 kind=gigaam_failed, error:string|null, с прежними
@@ -113,18 +113,15 @@ UUID через запятую: ответ publication_statuses сообщает
 review_publication добавляет ограничение IN(0,1,2). Voice migration 7 создаёт новые
 события для уже сохранённых терминальных ошибок GigaAM, не вызывая ASR снова.
 
-## Шесть вариантов распознавания (бета)
+## Три варианта GigaAM (бета)
 
-Для **новых** отзывов профиль беты автоматически создаёт шесть независимых stages:
+Для **новых** отзывов профиль беты автоматически создаёт три независимых stages:
 
 | kind | Модель | variant |
 | --- | --- | --- |
 | transcription | GigaAM | onnx |
-| comparison | Parakeet | onnx |
 | sherpa_gigaam_plain | GigaAM | sherpa_plain |
 | sherpa_gigaam_hotwords | GigaAM | sherpa_hotwords |
-| sherpa_parakeet_plain | Parakeet | sherpa_plain |
-| sherpa_parakeet_hotwords | Parakeet | sherpa_hotwords |
 
 Контракт v2 дополнен `LocationContext.recognition_dictionary: string[]` (default []).
 Guide формирует его из **всех** строк `restaurants` выбранного города, включая
@@ -145,7 +142,8 @@ Voice schema 8 добавляет `asr_candidates.variant`; ключ резул�
 Приватный batch `/admin/recognitions` по-прежнему ограничен 30 references и тремя
 SQL-запросами; каждый элемент содержит engine/name/variant/variant_label,
 text/state/error и dictionary (null — данные не получены, [] — словаря нет).
-Новые отзывы имеют шесть строк; исторические — только ранее созданные варианты.
+Новые отзывы имеют три строки GigaAM; исторические — только имеющиеся варианты GigaAM.
+Parakeet исключён из карточек и новых заданий; сохранённые результаты остаются в логе.
 Чтение ничего не распознаёт. Ошибка одного сравнения не мешает остальным.
 
 События публикации неизменны: **только исходный GigaAM / onnx** может дать
@@ -155,5 +153,5 @@ text/state/error и dictionary (null — данные не получены, [] 
 
 Sherpa-варианты используют одинаковые modified_beam_search, max_active_paths=4,
 предобработку и Silero VAD; различается только dictionary (и имя варианта).
-Сила подсказок 1.5; length_reward=0.5 для Parakeet и 0 для GigaAM. Все параметры
+Сила подсказок 1.5; length_reward=0 для GigaAM. Все параметры
 и ревизии входят в сохранённый request и raw-результат.
