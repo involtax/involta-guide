@@ -110,7 +110,7 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
     with TestClient(create_app(settings)) as client:
         assert "Полное описание" not in client.get("/guide/admin/restaurants").text
         login(client)
-        response = client.get("/guide/admin/restaurants", params={"location": ivanovo["slug"]})
+        response = client.get("/guide/admin/restaurants/" + ivanovo["slug"])
         assert response.status_code == 200
         assert "restaurant-sidebar" in response.text and 'aria-current="page"' in response.text
         assert response.text.index("Лидер /") < response.text.index("Нулевая оценка /")
@@ -122,12 +122,28 @@ def test_restaurant_browser_filters_ranks_and_renders_complete_records(database)
         assert fragment.status_code == 200 and "<!doctype" not in fragment.text
         assert "Казанский" not in fragment.text
         assert client.get("/guide/admin/restaurants?q=пустой").status_code == 200
+        # Obsolete entity query is ignored; the root still selects the freshest city.
+        root = client.get("/guide/admin/restaurants?location=ivanovo&slug=ivanovo")
+        assert "Казанский /" in root.text and "Лидер /" not in root.text
+        filtered = client.get("/guide/admin/restaurants/ivanovo?q=казань&location=kazan")
+        assert "Лидер /" in filtered.text
+        assert 'href="/guide/admin/restaurants/kazan?q=' in filtered.text
+        assert (
+            'href="/guide/ivanovo" target="_blank" rel="noopener noreferrer" hx-boost="false"'
+            in filtered.text
+        )
+        assert "?location=" not in filtered.text
+        assert client.get("/guide/admin/restaurants/not-a-city").status_code == 404
+        empty = client.get("/guide/admin/restaurants/shuya")
+        assert empty.status_code == 200 and "0 ресторанов в базе" in empty.text
+        assert "Лидер /" not in empty.text and "Казанский /" not in empty.text
 
 
-def test_restaurant_browser_in_chromium(database, tmp_path):
+def test_restaurant_browser_in_chromium(database):
     import os
+    from pathlib import Path
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     settings, _ = database
     editor, queries, _ = services(database)
@@ -174,9 +190,9 @@ def test_restaurant_browser_in_chromium(database, tmp_path):
                 content_type=response.headers.get("content-type", "text/plain"),
             )
 
-        page.route("**/*", respond)
+        page.context.route("**/*", respond)
         page.goto(
-            "http://testserver/guide/admin/restaurants?location=" + city["slug"],
+            "http://testserver/guide/admin/restaurants/" + city["slug"],
             wait_until="networkidle",
         )
         assert page.locator(".restaurant-record").count() == 1
@@ -185,16 +201,29 @@ def test_restaurant_browser_in_chromium(database, tmp_path):
             < page.locator(".restaurant-results").bounding_box()["x"]
         )
         assert "10:00–23:00" in page.locator(".restaurant-hours").inner_text()
-        page.screenshot(path=tmp_path / "restaurant-desktop.png", full_page=True)
+        screenshots = Path("var/screenshots")
+        screenshots.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=screenshots / "admin-route-restaurants-desktop.png")
+        public_link = page.get_by_role("link", name="Открыть страницу локации ↗")
+        assert public_link.get_attribute("target") == "_blank"
+        with page.expect_popup() as popup:
+            public_link.click()
+        expect(popup.value).to_have_url("http://testserver/guide/ivanovo")
+        popup.value.close()
+        expect(page).to_have_url("http://testserver/guide/admin/restaurants/ivanovo")
         page.set_viewport_size({"width": 390, "height": 844})
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-        page.screenshot(path=tmp_path / "restaurant-mobile.png", full_page=True)
+        page.screenshot(path=screenshots / "admin-route-restaurants-mobile.png")
         page.locator(".restaurant-city", has_text="Казань").click()
         page.wait_for_selector(".restaurant-record h3:has-text('Казанский ресторан')")
         page.locator(".restaurant-city", has_text="Иваново").click()
         page.wait_for_selector(".restaurant-hours")
         page.locator("#restaurant-city-search").fill("ничего")
-        page.wait_for_selector(".restaurant-record", state="detached")
+        expect(page.locator(".restaurant-sidebar")).to_contain_text("наполненных городов нет")
+        assert page.locator(".restaurant-record").count() == 1
+        expect(page).to_have_url(
+            "http://testserver/guide/admin/restaurants/ivanovo?q=%D0%BD%D0%B8%D1%87%D0%B5%D0%B3%D0%BE"
+        )
         assert "наполненных городов нет" in page.locator(".restaurant-sidebar").inner_text()
         assert not errors
         browser.close()

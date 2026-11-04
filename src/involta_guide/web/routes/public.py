@@ -130,7 +130,7 @@ def routes(prefix: str) -> APIRouter:
                 "audit_jobs": listing,
                 "q": q,
                 "status": status,
-                "tab": "logs",
+                "active_section": "logs",
                 "title": "Логи — Инвольта гид",
                 "message": request.query_params.get("message", ""),
                 "audit_page": lambda n: urlencode({"q": q, "status": status, "page": n}),

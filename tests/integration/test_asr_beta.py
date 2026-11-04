@@ -184,7 +184,7 @@ def test_unimported_failed_recording_exposes_both_errors_and_can_run_comparison(
     assert worker.once() and worker.once()
     app = guide_app(settings)
     app.state.voice_client = client_for(settings, vs)
-    path = "/guide/admin/voice/submission/" + ref
+    path = "/guide/admin/reviews/submission/" + ref
     with TestClient(app) as client:
         login(client)
         page = client.get(path)

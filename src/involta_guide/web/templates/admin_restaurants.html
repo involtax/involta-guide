@@ -1,16 +1,17 @@
+{%set restaurant_list_path='/admin/restaurants'+('/'+restaurant_city.slug if restaurant_city else '')%}
 <section class="restaurant-browser" aria-label="База ресторанов">
 <aside class="restaurant-sidebar">
 <div class="restaurant-sidebar-heading"><h2>Города</h2><span>{{restaurant_cities|length}}</span></div>
-<form method="get" action="{{settings.path('/admin/restaurants')}}" class="restaurant-search" role="search">
+<form method="get" action="{{settings.path(restaurant_list_path)}}" class="restaurant-search" role="search">
 
 <label for="restaurant-city-search">Поиск города</label>
-<input id="restaurant-city-search" type="search" name="q" value="{{q}}" placeholder="Название или регион" hx-get="{{settings.path('/admin/restaurants')}}" hx-trigger="input changed delay:350ms, search" hx-push-url="true" hx-include="closest form">
+<input id="restaurant-city-search" type="search" name="q" value="{{q}}" placeholder="Название или регион" hx-get="{{settings.path(restaurant_list_path)}}" hx-trigger="input changed delay:350ms, search" hx-push-url="true" hx-include="closest form">
 <button type="submit">Найти</button>
 </form>
 <p class="restaurant-muted">Только наполненные · сначала свежие</p>
 <nav class="restaurant-city-list" aria-label="Наполненные города">
 {%for city in restaurant_cities%}
-<a class="restaurant-city {{'selected' if restaurant_city and city.id==restaurant_city.id else ''}}" href="{{settings.path('/admin/restaurants')}}?location={{city.slug}}&amp;q={{q|urlencode}}" {%if restaurant_city and city.id==restaurant_city.id%}aria-current="page"{%endif%}>
+<a class="restaurant-city {{'selected' if restaurant_city and city.id==restaurant_city.id else ''}}" href="{{settings.path('/admin/restaurants/'+city.slug)}}{%if q%}?q={{q|urlencode}}{%endif%}" {%if restaurant_city and city.id==restaurant_city.id%}aria-current="page"{%endif%}>
 <strong>{{city.name}}</strong><span>{{city.restaurant_count}} рест.</span>
 <small>{{city.region}}</small>
 <small>{%if city.filled_at%}Обновлено {{city.filled_at.strftime('%d.%m.%Y %H:%M')}} UTC{%else%}Дата наполнения не сохранена{%endif%}</small>
@@ -20,7 +21,7 @@
 </aside>
 <div class="restaurant-results">
 {%if restaurant_city%}
-<header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{listing.total if listing is defined else restaurant_cards|length}} ресторанов в базе</p></div><a href="{{settings.path('/admin/locations/'+restaurant_city.slug)}}">Редактировать подборку ↗</a></header>
+<header class="restaurant-results-heading"><div><p class="restaurant-eyebrow">База ресторанов / {{restaurant_city.region}}</p><h2>{{restaurant_city.name}}</h2><p>{{listing.total if listing is defined else restaurant_cards|length}} ресторанов в базе</p></div><div class="restaurant-heading-links"><a href="{{settings.path('/'+restaurant_city.slug)}}" target="_blank" rel="noopener noreferrer" hx-boost="false">Открыть страницу локации ↗</a><a href="{{settings.path('/admin/locations/'+restaurant_city.slug)}}">Редактировать подборку ↗</a></div></header>
 {%set quality_report=generation_quality%}{%include 'generation_quality.html'%}
 <p class="restaurant-sort-note">По убыванию оценки по 8 критериям текущей подборки. При равенстве или отсутствии оценки — по оценке одобренных отзывов, затем звезде Алекса и названию. Отсутствующие оценки не считаются нулём.</p>
 {%for r in restaurant_cards%}
@@ -51,7 +52,7 @@
 {%endfor%}</pre></details>
 </article>
 {%endfor%}
-{%if listing is defined%}<nav aria-label="Страницы ресторанов">{%for n in range(1,listing.pages+1)%}<a href="{{settings.path('/admin/restaurants')}}?location={{restaurant_city.slug}}&amp;q={{q|urlencode}}&amp;page={{n}}" {{'aria-current=page' if n==listing.page}}>{{n}}</a> {%endfor%}</nav>{%endif%}
+{%if listing is defined%}<nav aria-label="Страницы ресторанов">{%for n in range(1,listing.pages+1)%}<a href="{{settings.path(restaurant_list_path)}}?page={{n}}{%if q%}&amp;q={{q|urlencode}}{%endif%}" {{'aria-current=page' if n==listing.page}}>{{n}}</a> {%endfor%}</nav>{%endif%}
 {%else%}<div class="restaurant-empty"><h2>Выберите город</h2><p>Слева появятся города, в базе которых уже есть рестораны.</p>{%if q%}<a href="{{settings.path('/admin/restaurants')}}">Сбросить поиск</a>{%endif%}</div>{%endif%}
 </div>
 </section>

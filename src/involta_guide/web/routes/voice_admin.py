@@ -19,7 +19,6 @@ from involta_guide.web.routes.voice import voice_client
 def routes(prefix: str) -> APIRouter:
     router = APIRouter()
     base = prefix + "/admin/reviews"
-    old_base = prefix + "/admin/voice"
 
     def show(request: Request, review_id: str | None = None, run: int | None = None) -> Response:
         require_admin(request)
@@ -70,7 +69,7 @@ def routes(prefix: str) -> APIRouter:
             request,
             "voice_admin.html",
             {
-                "tab": "reviews",
+                "active_section": "reviews",
                 "queue": listing,
                 "failed_deliveries": ctx.queries.rows(
                     "voice_inbox", {"state": "failed"}, limit=100
@@ -99,32 +98,6 @@ def routes(prefix: str) -> APIRouter:
     def index(request: Request) -> Response:
         return show(request)
 
-    @router.get(old_base)
-    def old_index(request: Request) -> Response:
-        require_admin(request)
-        query = "?" + str(request.query_params) if request.query_params else ""
-        return RedirectResponse(base + query, status_code=308)
-
-    @router.get(old_base + "/{slug}/{number:int}")
-    @router.get(old_base + "/{slug}/{number:int}/runs/{run}")
-    def old_numbered(request: Request, slug: str, number: int, run: int | None = None) -> Response:
-        require_admin(request)
-        path = VoiceReadModel(context(request).engine).imported_path(slug, number)
-        if run is not None:
-            path += "/runs/" + str(run)
-        return RedirectResponse(context(request).settings.path(path), status_code=308)
-
-    @router.get(old_base + "/legacy/{review_id}")
-    def legacy(request: Request, review_id: UUID) -> Response:
-        require_admin(request)
-        path = VoiceReadModel(context(request).engine).path(str(review_id))
-        return RedirectResponse(context(request).settings.path(path), status_code=308)
-
-    @router.get(old_base + "/submission/{reference}")
-    def old_pending(request: Request, reference: UUID) -> Response:
-        require_admin(request)
-        return RedirectResponse(base + "/submission/" + str(reference), status_code=308)
-
     @router.get(base + "/submission/{reference}")
     def unimported(request: Request, reference: UUID) -> Response:
         require_admin(request)
@@ -136,7 +109,7 @@ def routes(prefix: str) -> APIRouter:
             request,
             "voice_pending.html",
             {
-                "tab": "reviews",
+                "active_section": "reviews",
                 "pending": data,
                 "asr_comparison": comparison,
                 "new_key": lambda: str(uuid4()),
@@ -165,7 +138,6 @@ def routes(prefix: str) -> APIRouter:
             payload["force"] = form.get("force") == "yes"
         voice_client(request).json("POST", path, json=payload, actor_session=session)
 
-    @router.post(old_base + "/submission/{reference}")
     @router.post(base + "/submission/{reference}")
     def unimported_action(
         request: Request, reference: UUID, form: FormData = Depends(form_data)
@@ -187,7 +159,6 @@ def routes(prefix: str) -> APIRouter:
         key, _ = VoiceReadModel(context(request).engine).resolve(slug, number)
         return show(request, key, run)
 
-    @router.get(old_base + "/media/audio/{reference}")
     @router.get(base + "/media/audio/{reference}")
     def audio(request: Request, reference: UUID) -> Response:
         require_admin(request)
@@ -221,7 +192,6 @@ def routes(prefix: str) -> APIRouter:
             status_code=303,
         )
 
-    @router.post(old_base + "/settings")
     @router.post(base + "/settings")
     def settings(request: Request, form: FormData = Depends(form_data)) -> Response:
         principal = require_admin(request)
@@ -278,10 +248,7 @@ def routes(prefix: str) -> APIRouter:
             )
         raise HTTPException(404, "Аудио недоступно")
 
-    @router.post(old_base + "/decision/{review_id}")
-    def decision(
-        request: Request, review_id: UUID, form: FormData = Depends(form_data)
-    ) -> Response:
+    def decision(request: Request, review_id: UUID, form: FormData) -> Response:
         principal = require_admin(request)
         check_csrf(request, form)
         ctx = context(request)

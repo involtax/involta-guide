@@ -123,7 +123,7 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         "locations": "/admin/locations",
         "city": "/admin/locations/ivanovo",
         "new-city": "/admin/locations/new",
-        "restaurants": "/admin/restaurants?location=ivanovo",
+        "restaurants": "/admin/restaurants/ivanovo",
         "restaurant": "/admin/restaurants/" + str(restaurant["number"]),
         "filling": "/admin/settings/filling",
         "voice": "/admin/reviews",

@@ -32,6 +32,9 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
         "/admin/locations/export",
         "/admin/locations/ivanovo",
         "/admin/restaurants",
+        "/admin/restaurants/ivanovo",
+        "/admin/ratings",
+        "/admin/contacts",
         "/admin/settings/filling",
         "/admin/sessions",
     ]
@@ -50,16 +53,44 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
             "sessions",
             "ai-audit",
         ):
-            assert client.get("/guide/admin?tab=" + tab, follow_redirects=False).status_code == 404
+            response = client.get("/guide/admin?tab=" + tab, follow_redirects=False)
+            assert response.status_code == 200 and "Рабочий стол." in response.text
+            assert 'href="/guide/admin" class="selected"' in response.text
+            assert "location" not in response.headers and "HX-Redirect" not in response.headers
+        for query in (
+            "tab=reviews&review=broken",
+            "city=old&location=broken",
+            "anything=123&page=bad",
+        ):
+            response = client.get("/guide/admin?" + query, headers={"HX-Request": "true"})
+            assert response.status_code == 200 and "Рабочий стол." in response.text
+            assert "HX-Redirect" not in response.headers
         for old in (
+            "/admin/voice",
+            "/admin/voice/ivanovo/1",
+            "/admin/voice/ivanovo/1/runs/2",
+            "/admin/voice/legacy/" + str(uuid4()),
+            "/admin/voice/submission/" + str(uuid4()),
+            "/admin/voice/media/audio/" + str(uuid4()),
+            "/api/admin/audio/" + str(uuid4()),
             "/admin/jobs",
             "/admin/api/locations-export",
             "/api/admin/locations-export",
             "/admin/ai-audit/" + str(uuid4()) + ".json",
         ):
             assert client.get("/guide" + old, follow_redirects=False).status_code == 404
-        assert client.get("/guide/admin/locations?location=" + str(uuid4())).status_code == 400
-        assert client.get("/guide/admin/restaurants?location=" + str(uuid4())).status_code == 404
+        assert client.get("/guide/admin/locations?location=" + str(uuid4())).status_code == 200
+        assert client.get("/guide/admin/restaurants/" + str(uuid4())).status_code == 404
+        for old in (
+            "/admin/voice/settings",
+            "/admin/voice/decision/" + str(uuid4()),
+            "/admin/voice/submission/" + str(uuid4()),
+        ):
+            assert (
+                client.post("/guide" + old, data={"_csrf": csrf}, headers=HEADERS).status_code
+                == 404
+            )
+        assert client.get("/guide/admin/restaurants?location=missing").status_code == 200
         assert "Иваново" in client.get("/guide/admin/locations?status=empty&q=Иваново").text
         assert "Выберите город" in client.get("/guide/admin/locations?status=filled").text
         for action in ("location", "prompt", "generation-model", "generate", "cancel", "attach"):
@@ -217,14 +248,18 @@ def test_restaurant_numbers_concurrent_stable_and_slug_updates_log_path(database
     assert queries.get("restaurants", first["id"])["number"] == first["number"]
     with TestClient(create_app(settings)) as client:
         login(client)
-        second_page = client.get("/guide/admin/restaurants?location=ivanovo-new&page=2")
+        second_page = client.get("/guide/admin/restaurants/ivanovo-new?page=2&q=Иван")
         assert second_page.status_code == 200
         assert second_page.text.count('<article class="restaurant-record">') == 6
+        assert 'href="/guide/admin/restaurants/ivanovo-new?page=1&amp;q=' in second_page.text
+        assert "?location=" not in second_page.text
         page = client.get("/guide/admin/restaurants/" + str(first["number"]))
         assert (
             page.status_code == 200 and "Переименованный" in page.text and "Казань" not in page.text
         )
         assert "/admin/locations/ivanovo-new" in page.text
+        assert 'href="/guide/ivanovo-new" target="_blank"' in page.text
+        assert client.get("/guide/admin/restaurants/ivanovo").status_code == 404
         assert client.get("/guide/admin/locations/ivanovo").status_code == 404
         assert client.get("/guide/admin/locations/ivanovo-new").status_code == 200
         assert client.get("/guide/logs/ivanovo-new/1").status_code == 200
@@ -260,6 +295,10 @@ def test_custom_prefix_and_htmx_history_restore(database):
         )
         assert "<!doctype" in restored.text
         assert client.get("/travel", follow_redirects=False).headers["location"] == "/travel/"
+        restaurants = client.get("/travel/admin/restaurants/ivanovo")
+        assert restaurants.status_code == 200
+        assert 'href="/travel/ivanovo" target="_blank"' in restaurants.text
+        assert "/guide/ivanovo" not in restaurants.text
 
 
 def test_location_create_settings_slug_validation_and_relationships(database):
@@ -283,7 +322,7 @@ def test_location_create_settings_slug_validation_and_relationships(database):
             "parent_id": parent["id"],
             "related_ids": related["id"],
         }
-        response = client.post("/guide/admin/locations", data=data, headers=HEADERS)
+        response = client.post("/guide/admin/locations?slug=ivanovo", data=data, headers=HEADERS)
         assert (
             response.status_code == 200
             and response.url.path == "/guide/admin/locations/admin-new-city"
