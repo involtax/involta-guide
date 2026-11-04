@@ -1,4 +1,7 @@
 {%extends 'base.html'%}
+{% block social_meta %}
+{% include 'open_graph.html' %}
+{% endblock %}
 {%macro card(r,i)%}
 <article class="restaurant">
 <span class="rank">{{'%02d'|format(i+1)}}</span>

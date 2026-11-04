@@ -7,6 +7,7 @@
 <meta name="description" content="{{ description|default('Короткие подборки ресторанов России') }}">
 <meta name="robots" content="{{ 'index' if indexable|default(false) else 'noindex' }}, follow">
 <link rel="canonical" href="{{ canonical|default(settings.url('/')) }}">
+{% block social_meta %}{% endblock %}
 <link rel="stylesheet" href="{{ settings.path('/assets/style.css') }}">
 {% if admin_ui|default(false) or audit_public is defined %}
 <link rel="stylesheet" href="{{ settings.path('/assets/admin.css') }}">
