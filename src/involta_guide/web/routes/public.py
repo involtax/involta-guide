@@ -51,6 +51,7 @@ def routes(prefix: str) -> APIRouter:
             if searching
             else result["total"]
         )
+        request.state.audience_page = True
         return request.app.state.templates.TemplateResponse(
             request=request,
             name="directory.html",
@@ -64,6 +65,32 @@ def routes(prefix: str) -> APIRouter:
                 "page_query": lambda n: urlencode({"q": q, "page": n}),
             },
         )
+
+    @router.get(prefix + "/about")
+    def about(request: Request) -> Response:
+        ctx = context(request)
+        request.state.audience_page = True
+        response = request.app.state.templates.TemplateResponse(
+            request=request,
+            name="about.html",
+            context={
+                "settings": ctx.settings,
+                "title": "О проекте — Инвольта гид",
+                "description": "Короткие подборки ресторанов и голосовые отзывы гостей.",
+                "canonical": ctx.settings.url("/about"),
+                "indexable": True,
+            },
+        )
+        response.set_cookie(
+            "guide_about_seen",
+            "1",
+            max_age=365 * 86400,
+            path=ctx.settings.base_path,
+            httponly=True,
+            secure=ctx.settings.cookie_secure,
+            samesite="lax",
+        )
+        return response
 
     @router.get(prefix + "/robots.txt")
     def robots(request: Request) -> Response:
@@ -79,6 +106,8 @@ def routes(prefix: str) -> APIRouter:
         body = (
             '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'
             + escape(ctx.settings.url("/"))
+            + "</loc></url><url><loc>"
+            + escape(ctx.settings.url("/about"))
             + "</loc></url>"
         )
         body += (
@@ -329,6 +358,7 @@ def routes(prefix: str) -> APIRouter:
         if data["redirect"]:
             return RedirectResponse(ctx.settings.path("/" + c["slug"]), status_code=308)
         public_reviews = VoiceReadModel(ctx.engine).public_texts(c["id"])
+        request.state.audience_page = True
         title = "Где поесть " + (c["in_phrase"] or "в " + c["name"])
         breadcrumbs = [{"name": "Все локации", "slug": ""}, *data["parents"], c]
         structured = [

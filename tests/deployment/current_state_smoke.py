@@ -110,6 +110,11 @@ def main() -> None:
             assert dump.startswith(b"PGDMP")
             call(["alembic", "upgrade", "head"])
             assert call([*backup_command, "needed"]).strip() == b"no"
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                conn.execute(
+                    "INSERT INTO audience_daily(day,visitor_id,hits) VALUES(CURRENT_DATE,%s,3)",
+                    (str(uuid4()),),
+                )
             if previous == "beta_core":
                 with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                     row = conn.execute("SELECT name,ranking,alex_star FROM restaurants").fetchone()
@@ -136,8 +141,9 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "review_publication"
+                    == "audience_stats"
                 )
+                assert conn.execute("SELECT sum(hits) FROM audience_daily").fetchone()[0] == 3
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
@@ -145,6 +151,7 @@ def main() -> None:
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
                     == previous
                 )
+                assert conn.execute("SELECT to_regclass('audience_daily')").fetchone()[0] is None
                 assert conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
                 if previous == "beta_core":
                     row = conn.execute(

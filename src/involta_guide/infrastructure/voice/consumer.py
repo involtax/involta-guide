@@ -1,4 +1,6 @@
+import logging
 import time
+from datetime import datetime
 from threading import Event
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -6,11 +8,15 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from pydantic import ValidationError
 from sqlalchemy import Engine
 from sqlalchemy import text as sql_text
+from sqlalchemy.exc import SQLAlchemyError
 
+from involta_stats import add_review
 from involta_voice.contracts import OutboxEvent, SubmissionMetadata
 from involta_voice.db import encoded, execute, row
 
 from .client import VoiceClient
+
+logger = logging.getLogger(__name__)
 
 
 class Consumer:
@@ -261,6 +267,16 @@ class Consumer:
                     ),
                 )
                 link = {"review_id": reference, "active_run": number}
+                if not metadata.statistics_excluded:
+                    try:
+                        with conn.begin_nested():
+                            add_review(
+                                conn,
+                                UUID(metadata.visitor),
+                                datetime.fromisoformat(event["created_at"]),
+                            )
+                    except SQLAlchemyError as exc:
+                        logger.warning("Audience review was not recorded (%s)", type(exc).__name__)
             if event["kind"] == "gigaam_ready":
                 execute(
                     conn,

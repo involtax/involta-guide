@@ -156,6 +156,22 @@ main {
   padding: 0 48px;
   margin: 0 auto;
 }
+.about-page {
+  max-width: 780px;
+  padding-top: 64px;
+  padding-bottom: 80px;
+}
+.about-page h1 {
+  font-size: clamp(44px, 7vw, 72px);
+  margin-bottom: 32px;
+}
+.about-page p {
+  margin-bottom: 24px;
+}
+.about-back {
+  display: inline-block;
+  margin-top: 20px;
+}
 .hero {
   padding: 75px 0 60px;
 }
@@ -259,9 +275,6 @@ footer {
   margin: 0 auto;
   border-top: 1px solid var(--line);
   padding: 30px 48px 40px;
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
   font-size: 11px;
   color: var(--muted);
 }
@@ -743,7 +756,6 @@ blockquote {
   }
   footer {
     padding: 25px;
-    flex-wrap: wrap;
   }
   .restaurant {
     grid-template-columns: 60px 1fr;
@@ -845,9 +857,6 @@ blockquote {
   }
   .city-hero h1 {
     overflow-wrap: anywhere;
-  }
-  footer > span {
-    display: none;
   }
 }
 .pagination {

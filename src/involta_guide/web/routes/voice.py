@@ -259,6 +259,9 @@ def routes(prefix: str) -> APIRouter:
                     ][:200],
                 ),
                 visitor=visitor,
+                statistics_excluded=bool(
+                    await run_in_threadpool(ctx.security.principal, admin_token(request))
+                ),
                 idempotency_key=UUID(str(form.get("idempotency_key") or "")),
                 ip=client_ip(request),
                 user_agent=request.headers.get("user-agent", ""),

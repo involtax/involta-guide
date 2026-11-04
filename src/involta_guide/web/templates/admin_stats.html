@@ -1,0 +1,43 @@
+{% extends 'admin_shell.html' %}
+{% block admin_content %}
+<section aria-labelledby="stats-title">
+<h1 id="stats-title" class="admin-page-title">Статистика</h1>
+<p class="admin-muted">Последние 30 дней, включая сегодня · UTC+3</p>
+<div class="stats-scroll" role="region" aria-label="Статистика за 30 дней" tabindex="0">
+<table class="stats-table">
+<caption class="sr-only">Посещения и новые отзывы по дням. Сегодня — первый столбец.</caption>
+<thead>
+<tr>
+<th scope="col" rowspan="2">Дата</th>
+{% for label,count in stats_months %}
+<th scope="colgroup" colspan="{{count}}" class="stats-month">{{label}}</th>
+{% endfor %}
+</tr>
+<tr>
+{% for day in stats %}
+<th scope="col" class="{{'stats-today' if loop.first else ''}}">
+<time datetime="{{day.day.isoformat()}}" title="{{day.day.strftime('%d.%m.%Y')}}" {%if loop.first%}aria-current="date"{%endif%}>{{day.day.strftime('%d')}}</time>
+</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for field,label in [('hits','Хиты'),('uniques','Уники'),('reviews','Отзывы'),('hits_per_unique','Хитов на уника')] %}
+<tr>
+<th scope="row">{{label}}</th>
+{% for day in stats %}
+<td class="{{'stats-today' if loop.first else ''}}">
+{% if field=='hits_per_unique' %}
+{{ ('%.1f'|format(day.hits_per_unique))|replace('.',',') if day.hits_per_unique is not none else '—' }}
+{% else %}
+{{day[field]}}
+{% endif %}
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
+{% endblock %}

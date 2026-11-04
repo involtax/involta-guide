@@ -4,6 +4,14 @@
 .admin-workspace .admin-tabs a { font-size: 13px; padding-bottom: 6px; }
 .admin-workspace .admin-tabs a.selected { border-bottom: 2px solid var(--black); }
 .admin-content { margin-top: 32px; min-width: 0; }
+.stats-scroll { overflow-x: auto; max-width: 100%; margin-top: 28px; }
+.stats-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.5; }
+.stats-table th, .stats-table td { min-width: 36px; padding: 13px 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; overflow-wrap: normal; }
+.stats-table thead th { border-top: 1px solid var(--black); font-size: 11px; font-weight: 400; }
+.stats-table tbody th, .stats-table thead th[rowspan] { position: sticky; left: 0; z-index: 1; min-width: 144px; border-left: 1px solid var(--line); text-align: left; background: var(--paper); font-weight: 400; }
+.stats-table .stats-month { text-align: left; padding-top: 8px; padding-bottom: 8px; color: var(--muted); }
+.stats-table .stats-today { background: var(--soft); font-weight: 700; }
+.stats-scroll:focus-visible { outline: 1px solid var(--black); outline-offset: 4px; }
 .admin-workspace h2 { font-size: 24px; }
 .admin-workspace h3 { font-size: 20px; }
 .admin-workspace h4 { font-size: 15px; }

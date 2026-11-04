@@ -1,6 +1,6 @@
 <nav class="admin-tabs" aria-label="Администрирование">
-{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Настройки наполнения'),('reviews','Отзывы'),('restaurants','Рестораны'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
-{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions','reviews':'/admin/reviews','ratings':'/admin/ratings','contacts':'/admin/contacts'}.get(key)%}
+{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Настройки наполнения'),('reviews','Отзывы'),('restaurants','Рестораны'),('stats','Статистика'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
+{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions','reviews':'/admin/reviews','ratings':'/admin/ratings','contacts':'/admin/contacts','stats':'/admin/stats'}.get(key)%}
 <a href="{{settings.path(route)}}" class="{{'selected' if active_section==key else ''}}" {%if active_section==key%}aria-current="page"{%endif%}>{{label}}</a>
 {%endfor%}
 <a href="{{settings.path('/logs')}}" hx-boost="false" class="{{'selected' if active_section=='logs' else ''}}" {%if active_section=='logs'%}aria-current="page"{%endif%}>Логи</a>
