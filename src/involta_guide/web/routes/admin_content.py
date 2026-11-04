@@ -81,7 +81,7 @@ def location_page(
         request,
         "admin.html",
         {
-            "tab": "locations",
+            "active_section": "locations",
             "message": message or params.get("message", ""),
             "q": params.get("q", ""),
             "status": status,
@@ -99,14 +99,34 @@ def location_page(
     )
 
 
+def restaurant_page(request: Request, slug: str | None = None) -> Response:
+    require_admin(request)
+    ctx = context(request)
+    location_id = ctx.queries.admin_location(slug)["location"]["id"] if slug else None
+    data = ctx.queries.restaurant_browser(request.query_params.get("q", ""), location_id)
+    cards = data["restaurant_cards"]
+    pages = max(1, (len(cards) + 19) // 20)
+    page = min(pages, number_param(request))
+    data["restaurant_cards"] = cards[(page - 1) * 20 : page * 20]
+    data["listing"] = {"page": page, "pages": pages, "total": len(cards)}
+    return render(
+        request,
+        "admin.html",
+        {
+            "active_section": "restaurants",
+            "message": "",
+            "q": request.query_params.get("q", ""),
+            **data,
+        },
+    )
+
+
 def routes(prefix: str) -> APIRouter:
     router = APIRouter()
 
     @router.get(prefix + "/admin/locations")
     def locations(request: Request) -> Response:
         require_admin(request)
-        if "location" in request.query_params or "city" in request.query_params:
-            raise HTTPException(400, "Выбранная локация должна быть в пути")
         return location_page(request)
 
     @router.get(prefix + "/admin/locations/new")
@@ -127,11 +147,7 @@ def routes(prefix: str) -> APIRouter:
         require_admin(request)
         return location_page(request, slug)
 
-    @router.post(prefix + "/admin/locations")
-    @router.post(prefix + "/admin/locations/{slug}")
-    def save_location(
-        request: Request, slug: str | None = None, form: FormData = Depends(form_data)
-    ) -> Response:
+    def save_location(request: Request, slug: str | None, form: FormData) -> Response:
         require_admin(request)
         check_csrf(request, form)
         ctx = context(request)
@@ -158,6 +174,16 @@ def routes(prefix: str) -> APIRouter:
             + "?"
             + urlencode({"message": "Локация сохранена"}),
         )
+
+    @router.post(prefix + "/admin/locations")
+    def create_location(request: Request, form: FormData = Depends(form_data)) -> Response:
+        return save_location(request, None, form)
+
+    @router.post(prefix + "/admin/locations/{slug}")
+    def update_location(
+        request: Request, slug: str, form: FormData = Depends(form_data)
+    ) -> Response:
+        return save_location(request, slug, form)
 
     @router.post(prefix + "/admin/locations/{slug}/intro")
     def intro(request: Request, slug: str, form: FormData = Depends(form_data)) -> Response:
@@ -209,23 +235,9 @@ def routes(prefix: str) -> APIRouter:
 
     @router.get(prefix + "/admin/restaurants")
     def restaurants(request: Request) -> Response:
-        require_admin(request)
-        ctx = context(request)
-        slug = request.query_params.get("location")
-        location_id = ctx.queries.admin_location(slug)["location"]["id"] if slug else None
-        data = ctx.queries.restaurant_browser(request.query_params.get("q", ""), location_id)
-        cards = data["restaurant_cards"]
-        pages = max(1, (len(cards) + 19) // 20)
-        page = min(pages, number_param(request))
-        data["restaurant_cards"] = cards[(page - 1) * 20 : page * 20]
-        data["listing"] = {"page": page, "pages": pages, "total": len(cards)}
-        return render(
-            request,
-            "admin.html",
-            {"tab": "restaurants", "message": "", "q": request.query_params.get("q", ""), **data},
-        )
+        return restaurant_page(request)
 
-    @router.get(prefix + "/admin/restaurants/{number}")
+    @router.get(prefix + "/admin/restaurants/{number:int}")
     def restaurant(request: Request, number: int) -> Response:
         require_admin(request)
         if number <= 0:
@@ -234,13 +246,17 @@ def routes(prefix: str) -> APIRouter:
             request,
             "admin.html",
             {
-                "tab": "restaurants",
+                "active_section": "restaurants",
                 "message": "",
                 "q": "",
                 "detail": True,
                 **context(request).queries.restaurant(number),
             },
         )
+
+    @router.get(prefix + "/admin/restaurants/{slug}")
+    def city_restaurants(request: Request, slug: str) -> Response:
+        return restaurant_page(request, slug)
 
     @router.get(prefix + "/admin/settings/filling")
     def filling(request: Request) -> Response:
@@ -249,7 +265,7 @@ def routes(prefix: str) -> APIRouter:
             request,
             "admin.html",
             {
-                "tab": "fill",
+                "active_section": "fill",
                 "message": request.query_params.get("message", ""),
                 "prompt": context(request).queries.setting("prompt"),
             },
@@ -268,7 +284,7 @@ def routes(prefix: str) -> APIRouter:
                 request,
                 "admin.html",
                 {
-                    "tab": "fill",
+                    "active_section": "fill",
                     "message": str(exc),
                     "prompt": str(form.get("prompt") or ""),
                     "generation_model": key(form, "model"),
@@ -285,7 +301,7 @@ def routes(prefix: str) -> APIRouter:
             request,
             "admin.html",
             {
-                "tab": "sessions",
+                "active_section": "sessions",
                 "message": "",
                 "sessions": context(request).queries.rows("admin_sessions"),
             },

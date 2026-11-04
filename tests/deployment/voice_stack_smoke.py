@@ -138,11 +138,13 @@ try:
             data={"_csrf": csrf, "password": "review-smoke-password"},
         )
         assert r.status_code in [200, 303], r.text
-        page = c.get("/guide/admin/voice/ivanovo/1").text
+        listing = c.get("/guide/admin/reviews").text
+        review_path = re.search(r'href="(/guide/admin/reviews/ivanovo/\d+)"', listing).group(1)
+        page = c.get(review_path).text
         csrf = re.search(r'name="_csrf" value="([^"]+)"', page).group(1)
         revision = re.search(r'name="review_revision" value="([^"]+)"', page).group(1)
         r = c.post(
-            "/guide/admin/voice/decision/" + ref,
+            review_path + "/actions",
             headers={"origin": "http://127.0.0.1:33080"},
             data={
                 "_csrf": csrf,

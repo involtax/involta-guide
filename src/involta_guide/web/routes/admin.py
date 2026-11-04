@@ -65,21 +65,9 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
     )
 
 
-def redirect(request: Request, tab: str = "overview", message: str = "", **params: str) -> Response:
-    ctx = context(request)
-    if tab == "reviews":
-        path = (
-            VoiceReadModel(ctx.engine).path(params.pop("review"))
-            if params.get("review")
-            else "/admin/reviews"
-        )
-    else:
-        path = {"overview": "/admin", "ratings": "/admin/ratings", "contacts": "/admin/contacts"}[
-            tab
-        ]
-    return RedirectResponse(
-        ctx.settings.path(path) + "?" + urlencode({"message": message, **params}), status_code=303
-    )
+def overview_redirect(request: Request, message: str = "") -> Response:
+    path = "/admin" + ("?" + urlencode({"message": message}) if message else "")
+    return log_redirect(request, path)
 
 
 def log_redirect(request: Request, path: str, *, code: int = 303) -> Response:
@@ -106,8 +94,6 @@ def routes(prefix: str) -> APIRouter:
     router = APIRouter()
 
     @router.get(prefix + "/admin")
-    @router.get(prefix + "/admin/ratings")
-    @router.get(prefix + "/admin/contacts")
     def admin(request: Request) -> Response:
         ctx = context(request)
         if not ctx.security.principal(admin_token(request)):
@@ -130,44 +116,38 @@ def routes(prefix: str) -> APIRouter:
                 samesite="strict",
             )
             return response
-        params = request.query_params
-        tab = {prefix + "/admin/ratings": "ratings", prefix + "/admin/contacts": "contacts"}.get(
-            request.url.path, params.get("tab", "overview")
+        return render(
+            request,
+            "admin.html",
+            {
+                "active_section": "overview",
+                "message": request.query_params.get("message", ""),
+                "overview": ctx.queries.overview(),
+            },
         )
-        if "tab" in params and tab in ("reviews", "ratings", "contacts"):
-            if tab == "reviews":
-                path = (
-                    VoiceReadModel(ctx.engine).path(uid(params["review"]))
-                    if params.get("review")
-                    else "/admin/reviews"
-                )
-            else:
-                path = "/admin/" + tab
-            filters = {k: v for k, v in params.items() if k not in ("tab", "review")}
-            target = ctx.settings.path(path) + ("?" + urlencode(filters) if filters else "")
-            if request.headers.get("HX-Request") == "true":
-                return Response(headers={"HX-Redirect": target})
-            return RedirectResponse(target, status_code=308)
-        if tab not in ("overview", "ratings", "contacts") or (
-            tab == "overview" and ("tab" in params or "location" in params or "city" in params)
-        ):
-            raise HTTPException(404, "Раздел перенесён на отдельный адрес")
-        q = params.get("q", "")
-        status = params.get("status", "all")
-        data: dict[str, Any] = {
-            "tab": tab,
-            "message": params.get("message", ""),
-            "overview": ctx.queries.overview(),
-            "q": q,
-            "status": status,
-        }
-        if tab == "ratings":
-            from involta_guide.domain.rules import aggregate_scores
 
-            data["ratings"] = aggregate_scores(ctx.queries.rows("reviews", limit=10000))
-        elif tab == "contacts":
-            data["contacts"] = ctx.queries.contacts()
-        return render(request, "admin.html", data)
+    @router.get(prefix + "/admin/ratings")
+    def ratings(request: Request) -> Response:
+        require_admin(request)
+        from involta_guide.domain.rules import aggregate_scores
+
+        return render(
+            request,
+            "admin.html",
+            {
+                "active_section": "ratings",
+                "ratings": aggregate_scores(context(request).queries.rows("reviews", limit=10000)),
+            },
+        )
+
+    @router.get(prefix + "/admin/contacts")
+    def contacts(request: Request) -> Response:
+        require_admin(request)
+        return render(
+            request,
+            "admin.html",
+            {"active_section": "contacts", "contacts": context(request).queries.contacts()},
+        )
 
     @router.post(prefix + "/admin/login")
     def login(request: Request, form: FormData = Depends(form_data)) -> Response:
@@ -178,7 +158,7 @@ def routes(prefix: str) -> APIRouter:
                 key(form, "password"), ctx.security.fingerprint(client_ip(request))
             )
         except RuleViolation as exc:
-            return redirect(request, message=str(exc))
+            return overview_redirect(request, message=str(exc))
         response = RedirectResponse(ctx.settings.path("/admin"), status_code=303)
         response.set_cookie(
             "guide_admin",
@@ -196,14 +176,9 @@ def routes(prefix: str) -> APIRouter:
         require_admin(request)
         check_csrf(request, form)
         context(request).security.revoke(admin_token(request))
-        response = redirect(request)
+        response = overview_redirect(request)
         response.delete_cookie("guide_admin", path=prefix)
         return response
-
-    @router.get(prefix + "/admin/contacts")
-    def contacts(request: Request) -> Response:
-        require_admin(request)
-        return redirect(request, "contacts")
 
     @router.post(prefix + "/admin/actions/{action}")
     def action(request: Request, action: str, form: FormData = Depends(form_data)) -> Response:
@@ -241,7 +216,7 @@ def routes(prefix: str) -> APIRouter:
                 return log_redirect(request, detail["job"]["log_path"])
             if action == "revoke-admin":
                 ctx.security.revoke(admin_token(request), all_sessions=True)
-                return redirect(request, message="Сессии завершены")
+                return overview_redirect(request, message="Сессии завершены")
             raise HTTPException(404, "Неизвестное действие")
         except ValueError as exc:
             message = (
@@ -258,6 +233,6 @@ def routes(prefix: str) -> APIRouter:
                     return log_redirect(
                         request, detail["job"]["log_path"] + "?" + urlencode({"message": message})
                     )
-            return redirect(request, message=message)
+            return overview_redirect(request, message=message)
 
     return router

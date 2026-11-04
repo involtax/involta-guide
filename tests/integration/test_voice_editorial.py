@@ -9,6 +9,7 @@ from involta_guide.domain.entities import Conflict
 from involta_guide.infrastructure.security import Security
 from involta_guide.infrastructure.voice.consumer import Consumer
 from involta_guide.infrastructure.voice.editorial import Decision, VoiceEditorial
+from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.main import create_app
 
 from .editor_fixture import FixtureEditor as EditorialService
@@ -54,10 +55,11 @@ def imported(database):
 
 def test_admin_ui_moderates_text_without_analysis_and_guards_stale_screen(database):
     settings, engine, uow, queries, city, ref, event = imported(database)
+    path = "/guide" + VoiceReadModel(engine).path(ref)
     with TestClient(create_app(settings)) as client:
-        assert client.get("/guide/admin/voice").status_code == 401
+        assert client.get("/guide/admin/reviews").status_code == 401
         login(client)
-        page = client.get("/guide/admin/voice/ivanovo/1")
+        page = client.get(path)
         assert page.status_code == 200, page.text
         assert event["transcript"] in page.text
         assert "Предложений нет" in page.text
@@ -66,7 +68,7 @@ def test_admin_ui_moderates_text_without_analysis_and_guards_stale_screen(databa
 
         def decide(action, revision, **values):
             return client.post(
-                "/guide/admin/voice/decision/" + ref,
+                path + "/actions",
                 data={
                     "_csrf": csrf,
                     "idempotency_key": str(uuid4()),

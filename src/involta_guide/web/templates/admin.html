@@ -2,7 +2,7 @@
 {%from 'macros.html' import csrf,restaurant,generation_model_picker with context%}
 {%from 'admin_components.html' import status_label%}
 {%block admin_content%}
-{%if tab=='overview'%}
+{%if active_section=='overview'%}
 <section class="stats">
 <article>
 <strong>{{overview.total}}</strong> локаций</article>
@@ -17,10 +17,10 @@
 <section class="panel"><h2>Использование OpenAI сегодня</h2><dl class="admin-facts">
 {%for label,value in [('Вызовы',overview.usage.calls),('Входные токены',overview.usage.input_tokens),('Выходные токены',overview.usage.output_tokens),('Стоимость, USD',overview.usage.cost if overview.usage.cost is not none else 'Не определена'),('Записи без тарифа',overview.usage.unpriced)]%}<div><dt>{{label}}</dt><dd>{{value}}</dd></div>{%endfor%}</dl></section>
 {%endif%}
-{%if tab=='locations'%}
+{%if active_section=='locations'%}
 {%include 'admin_locations.html'%}
 {%endif%}
-{%if tab=='fill'%}
+{%if active_section=='fill'%}
 <section class="panel">
 <h2>Настройки наполнения</h2>
 <p>Промпт и модель применяются только к будущим запросам. Сохранение не запускает наполнение и не меняет текущие задания.</p>
@@ -34,16 +34,16 @@
 <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
 </section>
 {%endif%}
-{%if tab=='restaurants'%}
+{%if active_section=='restaurants'%}
 {%include 'admin_restaurants.html'%}
 {%endif%}
-{%if tab=='ratings'%}
+{%if active_section=='ratings'%}
 <h2>Внутренние оценки</h2>
 <p>Только одобренные отзывы без фрода. Значения не меняют публичный топ автоматически.</p>
 <section class="panel admin-table-scroll"><table class="admin-table"><thead><tr><th>Ресторан</th><th>Авторов</th><th>Оценка</th><th>Тональность</th><th>Рекомендация</th></tr></thead><tbody>
 {%for r in ratings%}<tr><td>{{r.name}}</td><td>{{r.visitors}}</td>{%for value in [r.rating,r.sentiment,r.recommendation]%}<td>{{value if value is not none else 'Нет данных'}}</td>{%endfor%}</tr>{%else%}<tr><td colspan="5">Одобренных оценок пока нет.</td></tr>{%endfor%}</tbody></table></section>
 {%endif%}
-{%if tab=='contacts'%}
+{%if active_section=='contacts'%}
 <h2>Предложения телефонов</h2>
 <p>Число сообщений, браузеров и сетей — сигналы, а не подтверждение номера.</p>
 {%for g in contacts%}
@@ -58,7 +58,7 @@
 </article>
 {%else%}<p class="admin-empty">Предложений телефонов пока нет.</p>{%endfor%}
 {%endif%}
-{%if tab=='sessions'%}
+{%if active_section=='sessions'%}
 <h2>Сессии редакции</h2>
 <form method="post" action="{{settings.path('/admin/actions/revoke-admin')}}">{{csrf()}}<button>Завершить все сессии редакции</button>
 </form>

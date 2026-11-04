@@ -157,6 +157,9 @@ class Queries:
             repo = uow.repo
             cities = repo.restaurant_cities(query)
             selected = next((c for c in cities if c["id"] == location_id), None)
+            # City search filters the sidebar, never the explicitly selected location.
+            if selected is None and location_id:
+                selected = require(repo, "locations", location_id)
             if selected is None and not location_id and cities:
                 selected = cities[0]
             result: Record = {

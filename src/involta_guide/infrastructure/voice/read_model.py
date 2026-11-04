@@ -107,18 +107,6 @@ class VoiceReadModel:
             raise NotFound("Отзыв не найден")
         return "/admin/reviews/" + item["slug"] + "/" + str(item["number"])
 
-    def imported_path(self, slug: str, number: int) -> str:
-        with self.engine.connect() as conn:
-            item = row(
-                conn,
-                "SELECT v.review_id FROM voice_links v JOIN locations l ON l.id=v.location_id WHERE l.slug=:slug AND v.number=:n",
-                slug=slug,
-                n=number,
-            )
-        if item is None:
-            raise NotFound("Отзыв не найден")
-        return self.path(str(item["review_id"]))
-
     def resolve(self, slug: str, number: int) -> tuple[str, str]:
         with self.engine.connect() as conn:
             item = row(
