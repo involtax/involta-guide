@@ -113,7 +113,10 @@ def test_generation_saves_candidate_with_null_maps_url(database):
     assert queries.get("jobs", job["id"])["status"] == "done"
     content = queries.location(location["id"])["content"]
     assert len(content["restaurants"]) == 1
-    assert content["rankingReport"][1]["mapsUrl"] is None
+    assert len(content["rankingReport"]) == 1
+    historical_report = queries.get("jobs", job["id"])["report"]["rankingReport"]
+    assert len(historical_report) == 2
+    assert historical_report[1]["mapsUrl"] is None
 
 
 def test_ai_does_not_overwrite_editor_and_missing_key_fails_cleanly(database):

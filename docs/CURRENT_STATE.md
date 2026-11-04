@@ -3,8 +3,10 @@
 Нормативный документ: [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md).
 Он заменяет противоречащие ему положения старых MVP/Voice/маршрутных ТЗ.
 
-У ресторана один владелец `restaurants.location_id`. Порядок, активность и рейтинг
-хранятся в самой записи ресторана. Обычная страница собирается из локации и её
+У ресторана один владелец `restaurants.location_id`. В записи хранятся активность
+и исходные оценки восьми критериев. Балл и порядок вычисляются по единому правилу
+для сайта и админки; `position` и сохранённого `totalScore` нет
+([контракт рейтинга](RESTAURANT_RANKING.md)). Обычная страница собирается из локации и её
 активных ресторанов. `locations.page_data`, вторичные подборки и attach удалены.
 Надлокация `is_hub=true` содержит навигацию по детям, без ресторанов, наполнения и
 голосового виджета. Наличие детей само по себе не превращает город в надлокацию.
@@ -56,7 +58,7 @@ Guide подтверждает свои файлы и удаляет завис�
 
 ```mermaid
 flowchart LR
-    L[locations: epoch, initialized_at] -->|один владелец| R[restaurants: position, active, ranking]
+    L[locations: epoch, initialized_at] -->|один владелец| R[restaurants: active, ranking.scores]
     J[jobs generate: model, prompt, baseline, epoch] -->|атомарное первое применение| L
     W[Виджет: blob, key, исходный epoch] --> G[Guide gateway]
     G --> V[Voice: audio, ASR, analysis]

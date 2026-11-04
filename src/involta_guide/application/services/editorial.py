@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from involta_guide.application.ports.repositories import Record, Repository
 from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
-from involta_guide.domain.rules import assert_revision
+from involta_guide.domain.rules import assert_revision, restaurant_rank_key, restaurant_score
 
 
 def require(repo: Repository, table: str, key: str, *, lock: bool = False) -> Record:
@@ -33,10 +33,17 @@ def current_content(repo: Repository, location: Record) -> Record:
     report = []
     for record in sorted(
         repo.rows("restaurants", {"location_id": location["id"], "active": 1}, limit=10000),
-        key=lambda r: (r["position"], r["number"]),
+        key=restaurant_rank_key,
     ):
-        if record["ranking"]:
-            report.append(record["ranking"])
+        if isinstance(record["ranking"], dict):
+            report.append(
+                {
+                    **record["ranking"],
+                    "name": record["name"],
+                    "mapsUrl": record["maps_url"],
+                    "totalScore": restaurant_score(record),
+                }
+            )
         cards.append(
             {
                 "id": record["id"],
@@ -105,7 +112,7 @@ def save(
     payload = copy.deepcopy(content)
     ranking = payload.get("rankingReport", [])
     seen = set()
-    for position, card in enumerate(payload["restaurants"], 1):
+    for card in payload["restaurants"]:
         card["id"] = card.get("id") or str(uuid4())
         if card["id"] in seen:
             raise RuleViolation("Ресторан повторяется в подборке")
@@ -118,11 +125,10 @@ def save(
             phone=card.get("phone") or "",
             sources=card.get("sources") or [],
             alex_star=bool(previous and previous["alex_star"]),
-            position=position,
             active=1,
         )
         if job_id:
-            values["ranking"] = next(
+            candidate = next(
                 (
                     r
                     for r in ranking
@@ -130,6 +136,11 @@ def save(
                     and (not r.get("mapsUrl") or r["mapsUrl"] == card.get("mapsUrl"))
                 ),
                 None,
+            )
+            values["ranking"] = (
+                {key: value for key, value in candidate.items() if key != "totalScore"}
+                if candidate is not None
+                else None
             )
         if previous:
             repo.change("restaurants", card["id"], values)
