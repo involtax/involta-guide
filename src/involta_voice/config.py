@@ -22,8 +22,6 @@ class Settings(BaseSettings):
     min_free_bytes: int = 64 * 1024 * 1024
     queue_limit: int = Field(default=1000, ge=1)
     daily_calls: int = Field(default=100, ge=1)
-    daily_budget_usd: float = Field(default=20, gt=0)
-    per_call_reserve_usd: float = Field(default=2, gt=0)
     concurrency: int = Field(default=2, ge=1, le=10)
     lease_seconds: int = Field(default=180, ge=120)
     heartbeat_file: Path = Path("/tmp/involta-voice-worker")

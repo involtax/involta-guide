@@ -218,7 +218,6 @@ class AIUsageRow(Base):
     status: Mapped[str] = mapped_column(Text)
     input_tokens: Mapped[int] = mapped_column(Integer)
     output_tokens: Mapped[int] = mapped_column(Integer)
-    estimated_cost_usd: Mapped[float | None] = mapped_column(Float)
     detail: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

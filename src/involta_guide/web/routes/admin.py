@@ -14,8 +14,6 @@ from involta_guide.infrastructure.ai.catalog import (
     GENERATION_MODEL_IDS,
     GENERATION_MODELS,
     MODELS_URL,
-    PRICES_CHECKED,
-    PRICING_URL,
 )
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
@@ -56,8 +54,6 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
             "generation_model": ctx.jobs.generation_model(),
             "generation_models": GENERATION_MODELS,
             "generation_model_ids": GENERATION_MODEL_IDS,
-            "model_prices_checked": PRICES_CHECKED,
-            "model_pricing_url": PRICING_URL,
             "model_catalog_url": MODELS_URL,
             **data,
         },

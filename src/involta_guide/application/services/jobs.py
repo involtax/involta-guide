@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from involta_guide.application.commands.schemas import (
     ContentInput,
-    Generation,
+    GeneratedContent,
 )
 from involta_guide.application.ports.repositories import (
     AIProvider,
@@ -17,12 +17,11 @@ from involta_guide.application.ports.repositories import (
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import assert_publishable, rank
 
-from .editorial import current_content, require, save
+from .editorial import require, save
 from .generation_quality import (
     CANDIDATE_LIMIT,
     assess_coverage,
     normalize_generation,
-    prepare_generation_prompt,
 )
 
 
@@ -198,8 +197,6 @@ class JobService:
                 raise Conflict("Запуск больше не относится к текущему пустому циклу")
             baseline = job["baseline_revision"]
             saved_prompt = uow.repo.generation_prompt(job["id"])
-            content = current_content(uow.repo, location)
-            known = uow.repo.known(location["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
             baseline_changed = location["revision"] != baseline
         if job["kind"] == "generate":
@@ -215,17 +212,15 @@ class JobService:
                 "{родитель}": parents[-1]["name"] if parents else "нет",
                 "{охват}": scope,
             }
-            prompt = prepare_generation_prompt(job["prompt"] or "")
+            prompt = job["prompt"] or ""
             for key, value in replacements.items():
                 prompt = prompt.replace(key, value)
             prompt += "\nОБЯЗАТЕЛЬНЫЙ ГЕОГРАФИЧЕСКИЙ КОНТЕКСТ\n" + json.dumps(
                 {
                     "location": location["name"],
                     "scope": scope,
-                    "parent": parents,
-                    "knownRestaurants": known,
+                    "parent": [p["name"] for p in parents],
                     "candidateLimit": CANDIDATE_LIMIT,
-                    "previousCandidates": content.get("candidateReview") or [],
                 },
                 default=str,
                 ensure_ascii=False,
@@ -235,7 +230,7 @@ class JobService:
             normalized, normalization = normalize_generation(
                 self.provider.generate(prompt, job["id"])
             )
-            generated = Generation.model_validate(normalized).model_dump(mode="json")
+            generated = GeneratedContent.model_validate(normalized).model_dump(mode="json")
             # Finish retrieving an already-paid response even if an editor changed the page.
             # Save it for audit, but never overwrite the editor's new version.
             if baseline_changed:

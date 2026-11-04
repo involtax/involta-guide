@@ -17,7 +17,7 @@ entry review либо rating, а не обе. rating 0..10 только при �
 только name,cuisine,description,mapsUrl,phone,openingHours. Пропущенное поле не меняется,
 null означает явное удаление. Не выдумывай телефон, расписание, оценки и идентификаторы.
 Если нет ресторанного опыта/правки, верни outcome=no_action, reason, entries=[],suggestions=[].
-Не назначай alexStar, не публикуй и не подтверждай правки. Исходный текст отзыва хранится
+Не публикуй и не подтверждай правки. Исходный текст отзыва хранится
 отдельно независимо от entries и suggestions; пустые actions не являются ошибкой."""
 
 
@@ -59,11 +59,20 @@ def migrate(engine: Engine) -> None:
             conn.exec_driver_sql(
                 (Path(__file__).parent / "migrations/004_beta_core.sql").read_text()
             )
+        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=5"):
+            conn.exec_driver_sql(
+                (Path(__file__).parent / "migrations/005_no_money.sql").read_text()
+            )
 
 
 def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
     saved = {
-        r["key"]: r["value"] for r in conn.execute(text("SELECT * FROM voice_settings")).mappings()
+        r["key"]: r["value"]
+        for r in conn.execute(
+            text(
+                "SELECT key,value FROM voice_settings WHERE key IN ('transcription_model','analysis_model','prompt')"
+            )
+        ).mappings()
     }
     from .asr import MODELS, options
 
@@ -80,6 +89,5 @@ def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:
         "transcription_model": selected,
         "analysis_model": saved.get("analysis_model", settings.analysis_model),
         "prompt": saved.get("prompt", DEFAULT_PROMPT),
-        "prices": saved.get("prices", {}),
         "max_output_tokens": 6000,
     }

@@ -9,34 +9,63 @@ from involta_guide.domain.plain_text import clean_editorial_text
 from involta_guide.domain.rules import FACTOR_LABELS, FACTORS, score
 
 CANDIDATE_LIMIT = 10
-CONTRACT = """ОБЯЗАТЕЛЬНЫЙ КОНТРАКТ ПОЛНОТЫ ПОИСКА v2
-Лимит исследования — до 10 подходящих кандидатов. Количество сразу видимых карточек задаёт только интерфейс и не ограничивает поиск или restaurants.
-Сначала найди широкий список, затем проверь кандидатов, затем ранжируй. Не заканчивай проверку после первых двух или трёх карточек.
-В candidateReview перечисли КАЖДОЕ обнаруженное место: name, mapsUrl (или null), status, reason, sources.
-status=verified — проверено и включено; excluded — исключено с конкретной причиной; needs_verification — проверка не закончена или данных недостаточно, с объяснением.
-Для excluded укажи exclusionCode: outside_area / closed / not_restaurant / duplicate. Недостаток доказательств, телефона или времени — needs_verification, а не исключение.
-Для verified обязательны полные восемь scores в rankingReport и карточка в restaurants. Верни карточки всех оценённых и подтверждённых кандидатов, независимо от их места в рейтинге.
-Нехватка данных не означает нулевую оценку: оставляй null и needs_verification. Не выдумывай баллы, телефон, часы или причины исключения.
-Не превращай ограничение времени или числа карточек в исключение ресторана: незавершённую проверку помечай needs_verification.
-Описание и вступление — обычный связный текст без Markdown, ссылочных вставок, цитатных маркеров и HTML. Ссылки помещай в sources, обоснования — в evidence.
-Сохранение проверенного результата сразу обновляет сайт; отдельного черновика или ручной публикации нет.
-qualityReport рассчитает сервер по фактическим данным; не подменяй им candidateReview.
-"""
 
 
-def prepare_generation_prompt(prompt: str) -> str:
-    prompt = re.sub(
-        r"Размер подборки определяется полем (?:\{лимит\}|\d+), заданным редактором\.",
-        "Количество карточек не ограничивается настройкой показа: верни всех проверенных кандидатов до 10.",
-        prompt,
-    )
-    prompt = prompt.replace(
-        "Твой результат — черновик. Решение о публикации принимает человек.",
-        "Проверенный результат сразу обновляет актуальную страницу.",
-    )
-    # Old editable templates may still contain this placeholder. It never receives the UI limit.
-    prompt = prompt.replace("{лимит}", str(CANDIDATE_LIMIT))
-    return prompt.rstrip() + "\n\n" + CONTRACT
+def generation_content(raw: dict[str, Any]) -> dict[str, Any]:
+    """Build the existing server views from one validated research record per candidate."""
+    from involta_guide.application.commands.schemas import GenerationResult
+
+    research = GenerationResult.model_validate(raw)
+    cards, ranking, manifest = [], [], []
+    for candidate in research.candidates:
+        item = candidate.model_dump(mode="json")
+        manifest.append(
+            {
+                key: item[key]
+                for key in ("name", "mapsUrl", "status", "reason", "sources", "exclusionCode")
+            }
+        )
+        if candidate.status == "verified":
+            cards.append(
+                {
+                    key: item[key]
+                    for key in (
+                        "name",
+                        "cuisine",
+                        "description",
+                        "mapsUrl",
+                        "sources",
+                        "phone",
+                        "openingHours",
+                        "latitude",
+                        "longitude",
+                    )
+                }
+            )
+        if candidate.scores:
+            ranking.append(
+                {
+                    "name": candidate.name,
+                    "mapsUrl": candidate.mapsUrl,
+                    "scores": candidate.scores,
+                    "evidence": [
+                        {
+                            "factor": e.factor,
+                            "reason": e.reason,
+                            "confidence": e.confidence,
+                            "sources": [candidate.sources[n - 1] for n in e.sourceRefs],
+                        }
+                        for e in candidate.evidence
+                    ],
+                }
+            )
+    return {
+        "intro": research.intro,
+        "restaurants": cards,
+        "rankingReport": ranking,
+        "candidateReview": manifest,
+        "warnings": research.warnings,
+    }
 
 
 def normalize_generation(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:

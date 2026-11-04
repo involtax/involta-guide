@@ -233,9 +233,39 @@ class AIAudit:
                 return None
             if public_only and (job["kind"] != "generate" or not job["public_log"]):
                 return None
+            generation = (
+                conn.execute(
+                    text(
+                        "SELECT request_json,response_json FROM generation_requests WHERE job_id=:id"
+                    ),
+                    {"id": job_id},
+                )
+                .mappings()
+                .first()
+            )
+            diagnostics = None
+            if generation:
+                request_body = generation["request_json"] or {}
+                response_body = generation["response_json"] or {}
+                usage = response_body.get("usage") or {}
+                reason = (response_body.get("incomplete_details") or {}).get("reason")
+                diagnostics = {
+                    "max_output_tokens": request_body.get("max_output_tokens"),
+                    "input_tokens": usage.get("input_tokens"),
+                    "output_tokens": usage.get("output_tokens"),
+                    "reasoning_tokens": (usage.get("output_tokens_details") or {}).get(
+                        "reasoning_tokens"
+                    ),
+                    "incomplete_reason": reason,
+                    "next_step": "Лимит ответа исчерпан. Генерация завершена. Нужен новый запрос с изменённым промптом или лимитом; проверка того же ответа его не продолжит."
+                    if reason == "max_output_tokens"
+                    else "",
+                }
             calls = (
                 conn.execute(
-                    text("SELECT * FROM ai_usage WHERE job_id=:id ORDER BY created_at,id"),
+                    text(
+                        "SELECT id,job_id,model,operation,status,input_tokens,output_tokens,detail,created_at FROM ai_usage WHERE job_id=:id ORDER BY created_at,id"
+                    ),
                     {"id": job_id},
                 )
                 .mappings()
@@ -277,6 +307,7 @@ class AIAudit:
                     {
                         "job": self._job(dict(job)),
                         "calls": [dict(c) for c in calls],
+                        "diagnostics": diagnostics,
                         "events": events,
                         "review": dict(review) if review else None,
                         "changes": job["changes"],

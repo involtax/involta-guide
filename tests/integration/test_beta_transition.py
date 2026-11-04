@@ -125,7 +125,10 @@ def test_populated_released_transition_preserves_owners_and_clears_incompatible_
                 conn.execute(text("SELECT value FROM settings WHERE key='beta-marker'")).scalar()
                 == "keep"
             )
-            for table in ["reviews", "jobs", "request_logs", "audit"]:
+            assert conn.execute(text("SELECT action FROM audit")).scalars().all() == [
+                "prompt_contract"
+            ]
+            for table in ["reviews", "jobs", "request_logs"]:
                 assert conn.execute(text("SELECT count(*) FROM " + table)).scalar() == 0
         cleanup_files(engine, settings)
         assert not path.exists()

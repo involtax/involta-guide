@@ -915,16 +915,6 @@ pre.audit-json {
   border: 1px solid #ddd;
   font-size: 13px;
 }
-.model-prices {
-  max-width: 100%;
-  overflow-x: auto;
-}
-.model-prices th, .model-prices td {
-  padding: 10px 14px;
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid #ddd;
-}
 .logs-layout {
   display: grid;
   grid-template-columns: minmax(190px, 280px) minmax(0, 1fr);

@@ -9,7 +9,7 @@ from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
-from .test_jobs import FakeAI, setup
+from .test_jobs import provider_payload, setup
 from .test_web import login
 
 
@@ -18,8 +18,8 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     settings = settings.model_copy(update={"openai_api_key": SecretStr("sk-private-never-store")})
     queue.settings = settings
     provider = OpenAIProvider(settings, engine)
-    response = FakeAI().generate("", "")
-    response["restaurants"][0] = {**response["restaurants"][0], "phone": "wrong phone"}
+    response = provider_payload()
+    response["candidates"][0] = {**response["candidates"][0], "phone": "wrong phone"}
     response["intro"] = "<script>alert('xss')</script> sk-private-never-store"
     envelope = {
         "id": "resp_test_full_response",
@@ -65,7 +65,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
     assert "resp_test_full_response" in raw["data"]["body"]
     assert raw["data"]["headers"]["x-request-id"] == "req_audit123"
     failure = next(e for e in events if e["event"] == "job_failed")
-    assert failure["data"]["validation_errors"][0]["loc"] == ["restaurants", 0, "phone"]
+    assert failure["data"]["validation_errors"][0]["loc"] == ["candidates", 0, "phone"]
     assert "wrong phone" in failure["data"]["traceback"]
     assert detail["calls"][0]["input_tokens"] == 125
     assert not [r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]

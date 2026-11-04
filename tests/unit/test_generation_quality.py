@@ -5,11 +5,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from involta_guide.application.commands.schemas import CandidateReview, ContentInput, Generation
+from involta_guide.application.commands.schemas import (
+    CandidateReview,
+    ContentInput,
+    GeneratedContent,
+)
 from involta_guide.application.services.generation_quality import (
     assess_coverage,
     normalize_generation,
-    prepare_generation_prompt,
 )
 from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.plain_text import clean_editorial_text
@@ -20,7 +23,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/pereslavl-generation-r
 
 def process(raw):
     normalized, details = normalize_generation(raw)
-    content = Generation.model_validate(normalized).model_dump(mode="json")
+    content = GeneratedContent.model_validate(normalized).model_dump(mode="json")
     result = assess_coverage(rank(content), details)
     ContentInput.model_validate(result)
     return result
@@ -169,13 +172,14 @@ def test_untrusted_link_is_never_promoted_to_sources():
     assert not urls and rejected
 
 
-def test_new_prompt_and_runtime_context_are_independent_of_display_limit():
-    legacy = "Мой стиль. Размер подборки определяется полем {лимит}, заданным редактором. Твой результат — черновик. Решение о публикации принимает человек."
-    current = prepare_generation_prompt(legacy)
-    assert current.startswith("Мой стиль.")
-    assert "{лимит}" not in current and "Размер подборки определяется" not in current
-    assert "candidateReview" in current and "exclusionCode" in current
-    prompt = (FIXTURE.parents[2] / "data/prompts/restaurant-ranking-v1.txt").read_text()
+def test_research_prompt_has_one_contract_and_city_voice():
+    prompt = (FIXTURE.parents[2] / "data/prompts/restaurant-research-v3.txt").read_text()
+    assert "candidates" in prompt and "sourceRefs" in prompt
+    assert "личный рейтинг Алекса" in prompt
+    assert "одно-два живых" in prompt
+    assert "не выдумывай" in prompt.lower()
+    assert "alexStar" not in prompt
+    assert "rankingReport" not in prompt and "candidateReview" not in prompt
     assert "{лимит}" not in prompt and "Размер подборки определяется" not in prompt
 
 

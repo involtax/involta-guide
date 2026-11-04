@@ -1,0 +1,7 @@
+<section aria-label="Модели наполнения">
+<h3>Какую модель выбрать</h3>
+<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Модель</th><th>Когда выбрать</th></tr></thead><tbody>
+{%for m in generation_models%}<tr><td><strong>{{m.name}}</strong>{{' · рекомендую' if m.recommended}}</td><td>{{m.purpose}}</td></tr>{%endfor%}
+</tbody></table></div>
+<p>Доступность модели определяется проектом OpenAI; ответ и причина отказа сохраняются в журнале. <a href="{{model_catalog_url}}" target="_blank" rel="noopener noreferrer">Каталог моделей ↗</a></p>
+</section>

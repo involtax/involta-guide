@@ -16,7 +16,7 @@ from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
 from .editor_fixture import enqueue_fixture
-from .test_jobs import FakeAI, setup
+from .test_jobs import provider_payload, setup
 from .test_web import login, token
 
 
@@ -61,7 +61,7 @@ def envelope(status="completed", content=None):
                 "content": [
                     {
                         "type": "output_text",
-                        "text": json.dumps(content or FakeAI().generate("", "")),
+                        "text": json.dumps(provider_payload(content)),
                     }
                 ],
             }

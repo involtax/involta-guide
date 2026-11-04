@@ -70,23 +70,31 @@ def main() -> None:
                 if mode == "compatibility":
                     print("beta" if beta else "previous" if "locations" in tables else "empty")
                 else:
-                    columns = (
-                        {
+                    if "locations" in tables and not beta:
+                        print("manual-beta-transition")
+                    elif beta:
+                        from alembic.config import Config
+                        from alembic.script import ScriptDirectory
+                        from sqlalchemy import text
+
+                        config = Config(str(settings.root_dir / "alembic.ini"))
+                        config.set_main_option(
+                            "script_location", str(settings.root_dir / "migrations")
+                        )
+                        head = ScriptDirectory.from_config(config).get_current_head()
+                        current = conn.execute(
+                            text("SELECT version_num FROM alembic_version")
+                        ).scalar_one()
+                        columns = {
                             c["name"]
                             for c in inspect(conn).get_columns(
                                 "restaurants", schema=settings.database_schema
                             )
                         }
-                        if "restaurants" in tables
-                        else set()
-                    )
-                    print(
-                        "manual-beta-transition"
-                        if "locations" in tables and not beta
-                        else "yes"
-                        if "position" in columns
-                        else "no"
-                    )
+                        print("yes" if current != head or "position" in columns else "no")
+                    else:
+                        print("no")
+
         finally:
             engine.dispose()
         return

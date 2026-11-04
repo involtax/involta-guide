@@ -15,7 +15,7 @@
 </section>
 <p><a href="{{settings.path('/admin/locations')}}">Все локации</a> · <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые</a> · <a href="{{settings.path('/admin/locations')}}?status=filled">Наполненные</a> · <a href="{{settings.path('/logs')}}">Логи наполнения</a></p>
 <section class="panel"><h2>Использование OpenAI сегодня</h2><dl class="admin-facts">
-{%for label,value in [('Вызовы',overview.usage.calls),('Входные токены',overview.usage.input_tokens),('Выходные токены',overview.usage.output_tokens),('Стоимость, USD',overview.usage.cost if overview.usage.cost is not none else 'Не определена'),('Записи без тарифа',overview.usage.unpriced)]%}<div><dt>{{label}}</dt><dd>{{value}}</dd></div>{%endfor%}</dl></section>
+{%for label,value in [('Вызовы',overview.usage.calls),('Входные токены',overview.usage.input_tokens),('Выходные токены',overview.usage.output_tokens)]%}<div><dt>{{label}}</dt><dd>{{value}}</dd></div>{%endfor%}</dl></section>
 {%endif%}
 {%if active_section=='locations'%}
 {%include 'admin_locations.html'%}
@@ -29,7 +29,7 @@
 <label>Промпт наполнения<textarea name="prompt" rows="18" minlength="50" maxlength="30000">{{prompt}}</textarea></label>
 <button>Сохранить настройки наполнения</button>
 </form>
-</section><section class="panel">{%include 'model_prices.html'%}
+</section><section class="panel">{%include 'generation_models.html'%}
 <p>Первичное наполнение запускается на публичной странице пустого города. Повторный запрос и переобработка доступны администратору в конкретном логе.</p>
 <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
 </section>

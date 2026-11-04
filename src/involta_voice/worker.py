@@ -192,26 +192,14 @@ class Worker:
                 )
                 if kind == "analysis" and count and count["n"] >= self.settings.daily_calls:
                     raise ProviderFailure("Дневной лимит обращений Voice к OpenAI исчерпан")
-                reserved = row(
-                    conn,
-                    "SELECT coalesce(sum(cost),0) usd FROM daily_usage WHERE day=(now() AT TIME ZONE 'UTC')::date",
-                )
-                if (
-                    kind == "analysis"
-                    and reserved
-                    and reserved["usd"] + self.settings.per_call_reserve_usd
-                    > self.settings.daily_budget_usd
-                ):
-                    raise ProviderFailure("Дневной бюджет Voice исчерпан")
                 execute(
                     conn,
-                    "INSERT INTO provider_calls(id,submission,run,kind,request,reserved_usd) VALUES(:call,:id,:n,:kind,CAST(:request AS jsonb),:reserve)",
+                    "INSERT INTO provider_calls(id,submission,run,kind,request) VALUES(:call,:id,:n,:kind,CAST(:request AS jsonb))",
                     call=call_id,
                     id=reference,
                     n=number,
                     kind=kind,
                     request=encoded(self.clean(request)),
-                    reserve=self.settings.per_call_reserve_usd if kind == "analysis" else 0,
                 )
                 execute(
                     conn,
@@ -287,26 +275,13 @@ class Worker:
                     usage = json.loads(raw["body"]).get("usage") or {}
                 except (ValueError, AttributeError):
                     pass
-                prices = snapshot["prices"].get(request["model"], {})
-                cost = 0.0 if kind != "analysis" else None
-                if (
-                    "input" in prices
-                    and "output" in prices
-                    and "input_tokens" in usage
-                    and "output_tokens" in usage
-                ):
-                    cost = (
-                        usage["input_tokens"] * prices["input"]
-                        + usage["output_tokens"] * prices["output"]
-                    ) / 1_000_000
                 execute(
                     conn,
-                    "UPDATE provider_calls SET response=CAST(:response AS jsonb),input_tokens=:input,output_tokens=:output,cost_usd=:cost WHERE id=:call",
+                    "UPDATE provider_calls SET response=CAST(:response AS jsonb),input_tokens=:input,output_tokens=:output WHERE id=:call",
                     response=encoded(raw),
                     call=call_id,
                     input=usage.get("input_tokens"),
                     output=usage.get("output_tokens"),
-                    cost=cost,
                 )
                 execute(
                     conn,

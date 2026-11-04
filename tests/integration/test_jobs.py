@@ -53,6 +53,59 @@ class FakeAI:
         }
 
 
+def provider_payload(content=None):
+    content = content or FakeAI().generate("", "")
+    by_name = {r["name"]: r for r in content.get("rankingReport", [])}
+    candidates = []
+    for card in content["restaurants"]:
+        ranking = by_name[card["name"]]
+        sources = list(
+            dict.fromkeys(
+                [
+                    *card.get("sources", []),
+                    *[url for e in ranking["evidence"] for url in e.get("sources", [])],
+                ]
+            )
+        )
+        candidates.append(
+            {
+                **{
+                    k: v
+                    for k, v in card.items()
+                    if k
+                    in {
+                        "name",
+                        "cuisine",
+                        "description",
+                        "mapsUrl",
+                        "phone",
+                        "openingHours",
+                        "latitude",
+                        "longitude",
+                    }
+                },
+                "status": "verified",
+                "reason": "Подтверждены карточка и восемь факторов",
+                "sources": sources,
+                "scores": ranking["scores"],
+                "evidence": [
+                    {
+                        "factor": e["factor"],
+                        "reason": e["reason"],
+                        "confidence": e["confidence"],
+                        "sourceRefs": [sources.index(url) + 1 for url in e.get("sources", [])],
+                    }
+                    for e in ranking["evidence"]
+                ],
+            }
+        )
+    return {
+        "intro": content["intro"],
+        "candidates": candidates,
+        "warnings": content.get("warnings", []),
+    }
+
+
 def setup(database, provider=None):
     settings, engine = database
 
@@ -165,7 +218,7 @@ def test_bounded_retries_and_owner_guard(database):
     assert row["error"] == "OpenAI HTTP 429"
 
 
-def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
+def test_httpx_adapter_usage_search_and_call_limit_without_paid_calls(database):
     import httpx
     from pydantic import SecretStr
 
@@ -176,7 +229,6 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
         update={
             "openai_api_key": SecretStr("fake-test-only"),
             "daily_ai_calls": 1,
-            "ai_prices_json": '{"gpt-4.1":{"input":1,"output":2}}',
         }
     )
     service.set_generation_model("gpt-4.1")
@@ -194,17 +246,20 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
         return httpx.Response(
             200,
             json={
-                "id": "resp_budget",
+                "id": "resp_call_limit",
                 "status": "completed",
                 "usage": {"input_tokens": 100, "output_tokens": 50},
-                "output": [{"content": [{"type": "output_text", "text": '{"ok":true}'}]}],
+                "output": [
+                    {"content": [{"type": "output_text", "text": json.dumps(provider_payload())}]}
+                ],
             },
         )
 
     provider.client.close()
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
-    assert provider.generate("test prompt", job["id"]) == {"ok": True}
-    assert provider.generate("test prompt", job["id"]) == {"ok": True}
+    first = provider.generate("test prompt", job["id"])
+    assert first["intro"] == "Сгенерировано"
+    assert provider.generate("test prompt", job["id"]) == first
     other = queries.directory(query="Шуя")["rows"][0]
     enqueue_fixture(service, other["id"])
     other_job = next(j for j in queries.rows("jobs") if j["location_id"] == other["id"])
@@ -212,7 +267,7 @@ def test_httpx_adapter_usage_search_and_budget_without_paid_calls(database):
         provider.generate("another", other_job["id"])
     usage = queries.rows("ai_usage")[0]
     assert usage["input_tokens"] == 100 and usage["output_tokens"] == 50
-    assert usage["estimated_cost_usd"] == 0.0002
+    assert "estimated_cost_usd" not in usage
     assert len(captured) == 1
     provider.close()
 
