@@ -145,6 +145,7 @@ class OutboxEvent(DTO):
     kind: Literal[
         "recording_received",
         "gigaam_ready",
+        "gigaam_failed",
         "transcript_ready",
         "analysis_ready",
         "processing_failed",
@@ -159,6 +160,8 @@ class OutboxEvent(DTO):
     duration: float = Field(ge=1, le=121)
     created_at: str
     repeat_signals: dict[str, int] = Field(default_factory=dict)
+
+    error: str | None = None
 
 
 def validate_analysis(value: Any, transcript: str, context: LocationContext) -> AnalysisResult:

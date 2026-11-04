@@ -127,7 +127,7 @@
         }));
     }
     class Diagnostics {
-      constructor(root, { api, location = "" }) {
+      constructor({ api, location = "" }) {
         this.api = api;
         this.location = location;
         this.epoch = null;
@@ -137,48 +137,8 @@
           location,
           events: [],
         };
-        this.panel = document.createElement("details");
-        this.panel.open = false;
-        const title = document.createElement("summary");
-        title.textContent = "Диагностика записи · бета";
-        this.info = document.createElement("pre");
-        this.info.style.cssText =
-          "white-space:pre-wrap;overflow-wrap:anywhere;max-height:32em;overflow:auto";
-        this.raw = document.createElement("pre");
-        this.raw.style.cssText = this.info.style.cssText;
-        this.logLink = document.createElement("a");
-        this.logLink.textContent = "Открыть журнал отправки ↗";
-        this.logLink.target = "_blank";
-        this.logLink.rel = "noopener";
-        this.logLink.style.marginInline = "12px";
-        this.logLink.hidden = true;
-        const copy = document.createElement("button");
-        copy.type = "button";
-        copy.textContent = "Скопировать отчёт";
-        copy.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(
-              JSON.stringify(this.report, null, 2),
-            );
-            copy.textContent = "Отчёт скопирован";
-          } catch {
-            copy.textContent = "Выделите и скопируйте отчёт ниже";
-          }
-        };
-        const heading = document.createElement("p");
-        heading.textContent = "Полный ответ сервера";
-        this.panel.append(
-          title,
-          this.logLink,
-          copy,
-          this.info,
-          heading,
-          this.raw,
-        );
-        root.append(this.panel);
         this.origin = performance.now();
         this.disposed = false;
-        this.render();
       }
       mark(name, detail = {}) {
         (this.report.timeline ||= []).push({
@@ -186,20 +146,12 @@
           ms: Math.round(performance.now() - this.origin),
           ...detail,
         });
-        this.render();
-      }
-      reveal() {
-        this.panel.open = true;
       }
       clean(text) {
         return text.replace(
           /("(?:csrf_token|_csrf|authorization|cookie|set-cookie|api_key|password)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi,
           '$1"[REDACTED]"',
         );
-      }
-      render() {
-        if (this.disposed) return;
-        this.info.textContent = JSON.stringify(this.report, null, 2);
       }
       recording(blob, durationMs, epoch) {
         this.epoch = epoch;
@@ -209,21 +161,11 @@
           durationMs,
           content_epoch: epoch,
         };
-        this.render();
       }
       begin() {
         this.id = crypto.randomUUID();
-        const logs = new URL(this.api);
-        logs.pathname =
-          logs.pathname.replace(/\/voice\/api\/v1\/?$/, "/logs/") +
-          `${encodeURIComponent(this.location || "unassigned")}/uploads/${this.id}`;
-        logs.search = "";
-        logs.hash = "";
-        this.logLink.href = logs.href;
-        this.logLink.hidden = false;
         this.report.request_id = this.id;
         this.report.events = [];
-        this.render();
       }
       async request(url, options = {}) {
         const start = performance.now();
@@ -234,7 +176,6 @@
           started: new Date().toISOString(),
         };
         this.report.events.push(entry);
-        this.render();
         const headers = new Headers(options.headers || {});
         headers.set("X-Voice-Request-ID", this.id);
         try {
@@ -254,14 +195,12 @@
             ),
           );
           entry.response_body = this.clean(body);
-          this.raw.textContent = entry.response_body;
-          this.render();
           let data;
           try {
             data = JSON.parse(body);
           } catch {
             throw new Error(
-              `Сервер вернул неожиданный ответ (HTTP ${response.status}). Полный ответ — в диагностике ниже.`,
+              `Не удалось отправить отзыв (HTTP ${response.status}).`,
             );
           }
           if (!response.ok) {
@@ -282,12 +221,11 @@
         } catch (error) {
           entry.elapsed_ms = Math.round(performance.now() - start);
           entry.exception = { name: error.name, message: error.message };
-          this.render();
           throw error;
         }
       }
       async publish() {
-        if (!this.id) return;
+        if (this.disposed || !this.id) return;
         const id = this.id;
         try {
           const response = await fetch(
@@ -308,32 +246,10 @@
           this.report.diagnostics_saved = false;
           this.report.diagnostics_error = e.message;
         }
-        this.render();
-      }
-      async serverTrace() {
-        if (!this.id) return;
-        const id = this.id;
-        try {
-          const r = await fetch(
-            `${this.api}/debug/${this.id}?location=${encodeURIComponent(this.location)}&content_epoch=${this.epoch || 0}`,
-            {
-              credentials: "same-origin",
-              signal: AbortSignal.timeout(5000),
-            },
-          );
-          const data = r.ok ? await r.json() : null;
-          if (this.id !== id) return;
-          if (r.ok) this.report.server = data;
-          else this.report.server_trace_status = r.status;
-        } catch (e) {
-          if (this.id !== id) return;
-          this.report.server_trace_error = e.message;
-        }
-        this.render();
       }
       dispose() {
         this.disposed = true;
-        this.panel.remove();
+        this.id = null;
       }
     }
 
@@ -479,29 +395,11 @@
           font-variant-numeric: tabular-nums;
           font-size: 18px;
         }
-        .hint {
-          margin-block-start: 4px;
-          font-size: 13px;
-          color: #747474;
-        }
-        .cancel {
-          font: inherit;
-          background: none;
-          border: 0;
-          text-decoration: underline;
-          text-underline-offset: 4px;
-          cursor: pointer;
-          padding: 10px 16px;
-          min-block-size: 44px;
-          color: inherit;
-        }
         button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
-        button:focus-visible,
-        a:focus-visible,
-        summary:focus-visible {
+        button:focus-visible {
           outline: 2px solid #151515;
           outline-offset: 4px;
         }
@@ -513,9 +411,8 @@
           margin: 12px 0 0;
           overflow-wrap: anywhere;
         }
-        .error {
-          color: #922626;
-        }
+        .error { color: #151515; }
+        .error.permission::before { content: "🔒"; font-size: .85em; margin-inline-end: 6px; }
         .vad-status {
           font-size: 13px;
           color: #666;
@@ -532,30 +429,6 @@
         }
         .history time {
           color: #747474;
-          font-size: 12px;
-        }
-        details {
-          text-align: start;
-          max-inline-size: 760px;
-          margin: 0 0 28px;
-          font-size: 13px;
-        }
-        summary {
-          cursor: pointer;
-          min-block-size: 44px;
-          padding: 10px 0;
-        }
-        details button {
-          padding: 10px;
-          min-block-size: 44px;
-          margin: 4px;
-        }
-        details a {
-          display: inline-block;
-          margin: 8px;
-        }
-        pre {
-          max-inline-size: 100%;
           font-size: 12px;
         }
         @keyframes waiting {
@@ -610,13 +483,7 @@
       const timerText = document.createElement("span");
       timerText.className = "timer";
       timerText.setAttribute("aria-hidden", "true");
-      const hint = document.createElement("span");
-      hint.className = "hint";
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "cancel";
-      cancel.textContent = "Отменить";
-      stage.append(primary, controlStatus, timerText, hint, cancel);
+      stage.append(primary, controlStatus, timerText);
       const status = document.createElement("p");
       status.className = "status";
       status.setAttribute("role", "status");
@@ -625,19 +492,23 @@
       error.setAttribute("role", "alert");
       const vadStatus = document.createElement("p");
       vadStatus.className = "vad-status";
-      const existingFeed = target.parentElement.querySelector("[data-public-reviews]");
+      const existingFeed = target.parentElement.querySelector(
+        "[data-public-reviews]",
+      );
       const history = existingFeed || document.createElement("div");
       history.classList.add("history");
       const reviewsTitle = document.createElement("h3");
       reviewsTitle.textContent = "Отзывы";
-      const reviewList = existingFeed?.querySelector(".reviews") || document.createElement("div");
+      const reviewList =
+        existingFeed?.querySelector(".reviews") ||
+        document.createElement("div");
       reviewList.className = "reviews";
       if (!existingFeed) history.append(reviewsTitle, reviewList);
       history.hidden = !reviewList.children.length;
       panel.append(kicker, heading, stage, status, error, vadStatus);
       if (!existingFeed) panel.append(history);
       root.replaceChildren(style, panel);
-      const diagnostics = new Diagnostics(root, {
+      const diagnostics = new Diagnostics({
         api: api.href,
         location: options.location || "",
       });
@@ -733,14 +604,13 @@
           primary.dataset.icon = iconState;
           primary.innerHTML = icon;
         }
-        controlStatus.hidden = !waiting;
-        controlStatus.textContent = waiting
-          ? state === "starting"
-            ? "Разреши доступ к микрофону"
-            : state === "uploading"
-              ? "Отправляем отзыв…"
-              : "Завершаем запись…"
-          : "";
+        controlStatus.hidden = !["stopping", "uploading"].includes(state);
+        controlStatus.textContent =
+          state === "uploading"
+            ? "Отправляем отзыв…"
+            : state === "stopping"
+              ? "Завершаем запись…"
+              : "";
         const elapsed =
           recording && session
             ? Math.max(0, performance.now() - session.started)
@@ -751,10 +621,6 @@
         if (timerText.textContent !== timerValue)
           timerText.textContent = timerValue;
         timerText.hidden = !recording;
-        hint.textContent = "Минимум 5 секунд";
-        hint.hidden = !recording || elapsed >= MIN_MS;
-        cancel.hidden = !["starting", "recording"].includes(state);
-        cancel.disabled = !["starting", "recording"].includes(state);
       }
       function release(s, unlock = true) {
         clearInterval(s.timer);
@@ -943,6 +809,7 @@
       async function start() {
         if (disposed || !canStart() || activeCapture) return;
         error.textContent = "";
+        error.classList.remove("permission");
         status.textContent = "";
         vadStatus.textContent = "";
         const s = {
@@ -958,8 +825,6 @@
         activeCapture = instance;
         diagnostics.origin = performance.now();
         diagnostics.id = null;
-        diagnostics.logLink.hidden = true;
-        diagnostics.raw.textContent = "";
         diagnostics.report = {
           version: 3,
           browser: navigator.userAgent,
@@ -1079,13 +944,16 @@
       function failStart(s, message, cause = null) {
         release(s);
         session = null;
+        error.classList.toggle(
+          "permission",
+          ["NotAllowedError", "SecurityError"].includes(cause?.name),
+        );
         error.textContent = message;
         diagnostics.mark("capture_error", {
           error: cause
             ? { name: cause.name, message: cause.message, stack: cause.stack }
             : null,
         });
-        diagnostics.reveal();
         transition("error");
       }
       function stop(reason = "manual") {
@@ -1115,7 +983,6 @@
             error.textContent =
               "Не удалось завершить кодирование записи. Запиши заново.";
             diagnostics.mark("encoding_timeout");
-            diagnostics.reveal();
             transition("error");
           }
         }, 5000);
@@ -1157,7 +1024,6 @@
               ? "Запись больше 10 МБ. Запиши более короткий отзыв."
               : "Не удалось завершить аудиозапись. Запиши заново.";
           release(s);
-          diagnostics.reveal();
           if (!disposed) transition("error");
           return;
         }
@@ -1293,7 +1159,6 @@
         resetDrag("pointercancel");
         interrupt("pointercancel");
       });
-      cancel.onclick = cancelAttempt;
       const escape = (event) => {
         if (event.key === "Escape" && activeCapture === instance) {
           event.preventDefault();
@@ -1323,7 +1188,6 @@
         status.textContent = "";
         transition("uploading");
         diagnostics.begin();
-        const requestId = diagnostics.id;
         diagnostics.mark("upload_requested");
         const audio = blob;
         const params = new URLSearchParams({
@@ -1353,14 +1217,12 @@
             },
           );
           if (!data.reference || typeof data.reference !== "string")
-            throw new Error(
-              "Сервер не подтвердил получение отзыва. Подробности — в диагностике.",
-            );
+            throw new Error("Сервер не подтвердил получение отзыва.");
           if (disposed) return;
           ++historyVersion;
           const item = upsertReview(data);
-          item.dataset.awaitingList = "true";
-          history.hidden = false;
+          if (item) item.dataset.awaitingList = "true";
+          history.hidden = !reviewList.children.length;
           diagnostics.mark("upload_accepted");
           clearBlob();
           transition("idle");
@@ -1374,14 +1236,12 @@
           }
           error.textContent =
             e.name === "TypeError"
-              ? "Связь прервалась. Получение отзыва не подтверждено. Подробности — в диагностике."
+              ? "Связь прервалась. Получение отзыва не подтверждено."
               : e.message || "Не удалось отправить запись.";
           clearBlob();
           transition("error");
           scheduleHistory(2000);
-          diagnostics.reveal();
           await diagnostics.publish();
-          if (diagnostics.id === requestId) await diagnostics.serverTrace();
         }
       }
       function showReview(element, data) {
@@ -1404,28 +1264,24 @@
         }
         const text = document.createElement("span");
         text.className = "transcript";
-        const failed = /failed|unknown/.test(data.state || "");
-        text.textContent =
-          data.transcript ||
-          (failed
-            ? "Не удалось расшифровать. Подробности — в журнале отзыва."
-            : "Расшифровка…");
+        text.textContent = data.transcript || "Расшифровка…";
         if (element.childNodes.length)
           element.append(document.createElement("br"));
         element.append(text);
-        if (data.log_url) {
-          const log = document.createElement("a");
-          log.href = data.log_url;
-          log.textContent = "Лог ↗";
-          log.className = "review-log";
-          element.append(log);
-        }
-        element.dataset.processing = String(!data.transcript && !failed);
+        element.dataset.processing = String(!data.transcript);
       }
       function upsertReview(data) {
         let item = [...reviewList.children].find(
           (node) => node.dataset.reference === data.reference,
         );
+        if (
+          (data.publication_status !== undefined &&
+            data.publication_status !== 1) ||
+          /failed|unknown/.test(data.state || "")
+        ) {
+          item?.remove();
+          return null;
+        }
         if (!item) {
           item = document.createElement("p");
           item.dataset.reference = data.reference;
@@ -1448,12 +1304,17 @@
         const version = ++historyVersion;
         let ongoing = true;
         try {
-          const response = await fetch(
-            api.href +
-              "/reviews?location=" +
-              encodeURIComponent(options.location || ""),
-            { credentials: "same-origin", signal: AbortSignal.timeout(10000) },
-          );
+          const params = new URLSearchParams({
+            location: options.location || "",
+          });
+          const pending = [...reviewList.children]
+            .filter((item) => item.dataset.awaitingList)
+            .map((item) => item.dataset.reference);
+          if (pending.length) params.set("pending", pending.join(","));
+          const response = await fetch(api.href + "/reviews?" + params, {
+            credentials: "same-origin",
+            signal: AbortSignal.timeout(10000),
+          });
           if (!response.ok) throw new Error("history unavailable");
           const data = await response.json();
           if (disposed || version !== historyVersion) return;
@@ -1464,10 +1325,18 @@
             knownEpoch = data.content_epoch;
           }
           const seen = new Set();
+          for (const item of [...reviewList.children]) {
+            const publication =
+              data.publication_statuses?.[item.dataset.reference];
+            if (publication === undefined) continue;
+            delete item.dataset.awaitingList;
+            if (publication !== 1) item.remove();
+          }
           for (const dataItem of data.rows || []) {
             if (!dataItem.reference) continue;
             seen.add(dataItem.reference);
             const item = upsertReview(dataItem);
+            if (!item) continue;
             delete item.dataset.awaitingList;
             reviewList.append(item);
           }

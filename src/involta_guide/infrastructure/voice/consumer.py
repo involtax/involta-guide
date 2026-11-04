@@ -212,7 +212,7 @@ class Consumer:
                 raise ValueError("Локация не принимает отзыв в этом цикле")
             # Old analysis/fallback events remain in the inbox as diagnostic history.
             # Only the explicit primary-result contract can publish a review.
-            if event["kind"] not in ("recording_received", "gigaam_ready"):
+            if event["kind"] not in ("recording_received", "gigaam_ready", "gigaam_failed"):
                 execute(
                     conn,
                     "UPDATE voice_inbox SET state='imported',error=NULL WHERE event_id=:id",
@@ -264,9 +264,19 @@ class Consumer:
             if event["kind"] == "gigaam_ready":
                 execute(
                     conn,
-                    "UPDATE reviews SET transcript=:text,status='transcribed',error=NULL WHERE id=:id AND status<>'deleted'",
+                    "UPDATE reviews SET transcript=:text,status='transcribed',publication_status=1,error=NULL WHERE id=:id AND status<>'deleted'",
                     text=transcript,
                     id=reference,
+                )
+            elif event["kind"] == "gigaam_failed":
+                execute(
+                    conn,
+                    """UPDATE reviews SET status='failed',publication_status=0,error=:error
+                    WHERE id=:id AND status NOT IN ('transcribed','deleted')
+                    AND :run >= (SELECT active_run FROM voice_links WHERE review_id=:id)""",
+                    id=reference,
+                    run=number,
+                    error=event.get("error") or "GigaAM не распознал запись",
                 )
             elif not row(
                 conn,
@@ -276,7 +286,7 @@ class Consumer:
                 # The receipt can arrive after the primary event; never erase a ready result.
                 execute(
                     conn,
-                    "UPDATE reviews SET status='received' WHERE id=:id AND status NOT IN ('transcribed','deleted')",
+                    "UPDATE reviews SET status='received' WHERE id=:id AND status NOT IN ('transcribed','failed','deleted')",
                     id=reference,
                 )
             execute(

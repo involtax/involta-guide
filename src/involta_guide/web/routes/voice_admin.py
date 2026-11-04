@@ -146,7 +146,7 @@ def routes(prefix: str) -> APIRouter:
         with PostgresUow(ctx.engine) as uow:
             removed = row(
                 uow.session.connection(),
-                "UPDATE reviews SET status='deleted' WHERE id=:id AND status<>'deleted' RETURNING id",
+                "UPDATE reviews SET status='deleted',publication_status=0 WHERE id=:id AND status<>'deleted' RETURNING id",
                 id=identity,
             )
             if removed:

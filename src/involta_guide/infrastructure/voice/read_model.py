@@ -63,13 +63,27 @@ class VoiceReadModel:
                 dict(r)
                 for r in conn.execute(
                     text("""SELECT id::text reference,
-                transcript,created_at,number,
+                transcript,created_at,number,publication_status,
                 CASE WHEN status='transcribed' THEN 'result_ready' ELSE 'accepted' END state
-                FROM reviews WHERE location_id=:location AND status IN ('received','transcribed')
+                FROM reviews WHERE location_id=:location AND publication_status=1 AND status IN ('received','transcribed')
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
                     {"location": location_id},
                 ).mappings()
             ]
+
+    def publication_states(self, location_id: str, references: list[str]) -> dict[str, int]:
+        if not references:
+            return {}
+        with self.engine.connect() as conn:
+            return {
+                str(r["id"]): r["publication_status"]
+                for r in conn.execute(
+                    text(
+                        "SELECT id,publication_status FROM reviews WHERE location_id=:location AND id=ANY(CAST(:references AS uuid[]))"
+                    ),
+                    {"location": location_id, "references": references},
+                ).mappings()
+            }
 
     def cities(self, query: str = "") -> list[dict[str, Any]]:
         with self.engine.connect() as conn:

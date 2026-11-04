@@ -99,7 +99,6 @@
 <button type="submit" {%if not temporary_fill.can_start%}disabled{%endif%}>Запарсить эти данные</button>
 </form>
 <p class="muted" role="status" aria-live="polite">{{temporary_fill.message}}</p>
-{%if settings.public_fill_logs_enabled%}<p><a href="{{settings.path('/logs/'+location.slug)}}">Открыть логи наполнения ↗</a></p>{%endif%}
 <noscript><p>После запуска обновите страницу через несколько минут.</p></noscript>
 </section>
 {%endif%}
@@ -129,7 +128,7 @@
 <div id="guide-voice"></div>
 <section data-public-reviews class="public-reviews" aria-label="Отзывы" {%if not public_reviews%}hidden{%endif%}>
 <h2>Отзывы</h2><div class="reviews">
-{%for review in public_reviews%}<p data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}"><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}}</time><br><span class="transcript">{{review.transcript or 'Расшифровка…'}}</span><a class="review-log" href="{{settings.path('/logs/reviews/'+location.slug+'/'+review.number|string)}}">Лог ↗</a></p>{%endfor%}
+{%for review in public_reviews%}<p data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}"><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}}</time><br><span class="transcript">{{review.transcript or 'Расшифровка…'}}</span></p>{%endfor%}
 </div></section>
 {%endif%}
 <script type="application/ld+json">{{structured|tojson}}</script>

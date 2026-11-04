@@ -82,24 +82,30 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                 expect(page.get_by_role("heading", name="Подборка в работе")).to_be_visible()
                 assert "noindex" in page.locator("meta[name=robots]").get_attribute("content")
                 assert "/_next/" not in page.content()
-                # Exercise the real same-origin WASM/model delivery, not a mocked VAD.
+                # Keep exercising the real WASM/model, without a diagnostic UI.
+                bundle = (
+                    Path(__file__).parents[2] / "src/involta_voice/static/vad/bundle.min.js"
+                ).read_text()
+                probe = """;const create=window.vad.MicVAD.new.bind(window.vad.MicVAD);
+                  window.vad.MicVAD.new=options=>{const frame=options.onFrameProcessed;
+                    return create({...options,onFrameProcessed:(...args)=>{window.__vadFrame=true;frame(...args)}})};"""
+                page.route(
+                    "**/voice/vad/bundle.min.js",
+                    lambda route: route.fulfill(
+                        content_type="application/javascript", body=bundle + probe
+                    ),
+                )
                 widget = page.locator("#guide-voice")
                 widget.get_by_role("button", name="Записать отзыв", exact=True).click()
                 expect(widget).to_have_attribute("data-voice-state", "recording")
-                page.wait_for_function(
-                    """() => {
-                      const report = document.querySelector('#guide-voice').shadowRoot.querySelector('details pre');
-                      return report && JSON.parse(report.textContent).vad?.state === 'ready';
-                    }""",
-                    timeout=15000,
-                )
-                widget.get_by_role("button", name="Отменить", exact=True).click()
+                page.wait_for_function("window.__vadFrame===true", timeout=15000)
+                page.keyboard.press("Escape")
                 expect(widget).to_have_attribute("data-voice-state", "idle")
                 # The temporary public button needs no login and shows async progress/errors.
                 fill = page.locator("[data-public-fill]")
                 fill_button = fill.get_by_role("button", name="Запарсить эти данные", exact=True)
                 expect(fill_button).to_be_visible()
-                expect(page.get_by_role("link", name="Открыть логи наполнения ↗")).to_be_visible()
+                expect(page.get_by_role("link", name="Открыть логи наполнения ↗")).to_have_count(0)
                 logs = context.new_page()
                 logs.goto(base + "/logs")
                 expect(logs.get_by_role("heading", name="Логи", exact=True)).to_be_visible()

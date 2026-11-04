@@ -24,7 +24,7 @@
 <dl class="review-transcripts">
 {%for candidate in review.pair%}<div><dt>{{candidate.name}}</dt><dd>{%if candidate.text%}{{candidate.text}}{%else%}<span class="admin-muted">{%if candidate.state=='running'%}Распознаётся…{%elif candidate.state=='queued'%}В очереди{%elif candidate.state in ['failed','unknown']%}Не удалось распознать. Подробности в логе.{%elif candidate.state=='unavailable'%}Временно недоступно{%else%}Результата пока нет{%endif%}</span>{%endif%}</dd></div>{%endfor%}
 </dl>
-<footer class="review-metadata">{{review.browser}} · {{review.ip}}{%if review.duration_seconds%} · {{review.duration_seconds|round(1)}} с{%endif%}</footer>
+<footer class="review-metadata">{{ {0:'Ошибка',1:'Опубликован',2:'На модерации'}[review.publication_status] }} · {{review.browser}} · {{review.ip}}{%if review.duration_seconds%} · {{review.duration_seconds|round(1)}} с{%endif%}</footer>
 </article>
 {%else%}<p class="admin-empty">В этом городе пока нет отзывов.</p>{%endfor%}
 {%if feed.pages>1%}<nav class="review-pagination" aria-label="Страницы отзывов">{%if feed.page>1%}<a href="{{settings.path('/admin/reviews/'+feed.city.slug)}}?{{page_query(feed.page-1)}}">← Новее</a>{%endif%}<span>{{feed.page}} / {{feed.pages}}</span>{%if feed.page<feed.pages%}<a href="{{settings.path('/admin/reviews/'+feed.city.slug)}}?{{page_query(feed.page+1)}}">Ещё отзывы ↓</a>{%endif%}</nav>{%endif%}
