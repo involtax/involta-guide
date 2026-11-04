@@ -101,7 +101,7 @@ def test_real_catalogue_aliases_word_order_layout_and_typo_fallback(database):
         assert client.get("/guide/api/locations/suggest", params={"q": "жц"}).json()["items"] == []
 
 
-def test_suggestions_do_not_track_visitors_start_work_or_query_for_short_input(
+def test_suggestions_do_not_track_visitors_start_work_or_query_for_empty_input(
     database, monkeypatch
 ):
     settings, engine = database
@@ -116,10 +116,10 @@ def test_suggestions_do_not_track_visitors_start_work_or_query_for_short_input(
         )
 
         def forbidden(*args, **kwargs):
-            raise AssertionError("No SQL for an empty/short normalized query")
+            raise AssertionError("No SQL for an empty normalized query")
 
         monkeypatch.setattr(app.state.context.queries, "public_directory", forbidden)
-        for query in ("", "я", "%_", "\\\x00"):
+        for query in ("", "%_", "\\\x00"):
             assert client.get("/guide/api/locations/suggest", params={"q": query}).json() == {
                 "items": []
             }
@@ -147,3 +147,29 @@ def test_index_migration_rolls_back_without_changing_catalogue_or_shared_extensi
     command.upgrade(config, "head")
     with engine.connect() as connection:
         assert connection.execute(text("SELECT to_regclass('locations_name_trgm')")).scalar_one()
+
+
+def test_one_and_two_letters_only_match_name_or_alias_start_then_three_match_inside(database):
+    settings, engine = database
+    add_location(engine, "Йцукоград", "prefix-start", ready=True)
+    add_location(engine, "Алиасный город", "prefix-alias", aliases=["Йцук"], ready=True)
+    add_location(engine, "Старый Йцукоград", "prefix-later-word", ready=True)
+    add_location(engine, "Айцукоград", "prefix-inside-word", ready=True)
+    add_location(engine, "Контекстный город", "prefix-region", region="Йцук", ready=True)
+    add_location(engine, "Йцук скрытый", "prefix-hidden", listed=False)
+    add_location(engine, "Йцук выключен", "prefix-inactive", active=0)
+    with TestClient(create_app(settings)) as client:
+        for query in ("й", "ЙЦ"):
+            response = client.get("/guide/api/locations/suggest", params={"q": query})
+            urls = [item["url"] for item in response.json()["items"]]
+            assert "/guide/prefix-start" in urls and "/guide/prefix-alias" in urls
+            for excluded in ("later-word", "inside-word", "region", "hidden", "inactive"):
+                assert f"/guide/prefix-{excluded}" not in urls
+            home = client.get("/guide/", params={"q": query})
+            assert re.findall(r'<a class="city-link" href="([^"]+)"', home.text)[:6] == urls
+        response = client.get("/guide/api/locations/suggest", params={"q": "йцу"})
+        urls = [item["url"] for item in response.json()["items"]]
+        for suffix in ("start", "alias", "later-word", "inside-word", "region"):
+            assert f"/guide/prefix-{suffix}" in urls
+        for suffix in ("hidden", "inactive"):
+            assert f"/guide/prefix-{suffix}" not in urls

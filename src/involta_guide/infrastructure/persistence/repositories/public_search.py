@@ -49,6 +49,12 @@ def public_location_search(session: Session, query: str, page: int | None = None
                     f"(n LIKE :c{i} OR EXISTS(SELECT 1 FROM unnest(a) v WHERE v LIKE :c{i}))"
                 )
                 anywhere.append(f"corpus LIKE :c{i}")
+            # One/two letters must not match the middle of names or regional context.
+            if len(value.replace(" ", "")) < 3:
+                params["start"] = value + "%"
+                matching = "n LIKE :start OR EXISTS(SELECT 1 FROM unnest(a) v WHERE v LIKE :start)"
+            else:
+                matching = " AND ".join(anywhere)
             source = f"""SELECT *,0.0 score,CASE WHEN n=:q THEN 0
               WHEN :q=ANY(a) THEN 1 WHEN {" AND ".join(name_prefix)} THEN 2
               WHEN {" AND ".join(alias_prefix)} THEN 3
@@ -61,7 +67,7 @@ def public_location_search(session: Session, query: str, page: int | None = None
                 {normalized("l.name||' '||l.slug||' '||l.region||' '||coalesce(p.name,'')||' '||array_to_string(l.aliases,' ')")} corpus
                 FROM locations l LEFT JOIN locations p ON p.id=l.parent_id
                 WHERE l.active=1 AND {PUBLIC}
-              ) candidates WHERE {" AND ".join(anywhere)}"""
+              ) candidates WHERE {matching}"""
         cte = "WITH matched AS (" + source + ") "
         result: Record = {}
         if page is not None:

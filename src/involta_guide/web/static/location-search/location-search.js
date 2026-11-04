@@ -8,7 +8,6 @@
   const control = form.querySelector('.search-control');
   const surface = form.querySelector('.search-surface');
   const inputRow = form.querySelector('.search-input-row');
-  const footer = form.querySelector('.search-menu-footer');
   const status = form.querySelector('[role="status"]');
   let rows = [], message = '', generation = 0, renderGeneration = -1, timer, request;
   let composing = false;
@@ -39,7 +38,7 @@
     // Ranking belongs to the server; the library must not insert catalogue HTML.
     searchEngine: () => ' ',
     resultsList: {
-      class: 'destination-results', destination: () => footer, position: 'beforebegin',
+      class: 'destination-results', destination: () => content, position: 'beforeend',
       maxResults: 6, noResults: true,
       element: (list, data) => {
         if (!data.results.length) {
@@ -68,11 +67,12 @@
     },
     events: {input: {
       input: () => begin(),
-      focus: () => { if (!composing) begin(); },
-      blur: () => invalidate(),
+      focus: () => { if (!composing && !expanded) begin(); },
+      // A populated search stays open, including while its request finishes without focus.
+      blur: () => {},
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Escape') { event.preventDefault(); invalidate(); return; }
+        if (event.key === 'Escape') { event.preventDefault(); return; }
         if (!widget.isOpen || !widget.feedback?.results.length) return;
         if (event.key === 'ArrowDown') { event.preventDefault(); widget.next(); }
         else if (event.key === 'ArrowUp') { event.preventDefault(); widget.previous(); }
@@ -82,7 +82,7 @@
         const selected = event.detail.selection?.value;
         if (!selected) return;
         const url = selected.url;
-        invalidate();
+        invalidate(false);
         // Only canonical Guide links from this origin can be selected.
         const target = new URL(url, location.href);
         if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
@@ -90,7 +90,7 @@
         }
       },
       open: () => {
-        if (renderGeneration !== generation || document.activeElement !== input || composing) { widget.close(); return; }
+        if (renderGeneration !== generation || !input.value.trim()) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -128,27 +128,25 @@
     input.removeAttribute('aria-busy'); status.textContent = '';
   }
   function current(version) {
-    return version === generation && document.activeElement === input && !composing;
+    return version === generation && !!input.value.trim() && !composing;
   }
   function show(items, text = '', pending = false) {
     if (!pending) panel.style.minHeight = '';
     rows = items; message = text; renderGeneration = generation;
-    footer.hidden = !items.length && !!text;
     widget.start(input.value);
   }
   function begin() {
     clear.hidden = !input.value;
     invalidate(false);
-    if (composing) { widget.close(); return; }
     const length = input.value.trim().length;
     if (!length) { widget.close(); return; }
     // Preserve the current height while fetching, without leaving stale options selectable.
-    if (expanded && length >= 2) panel.style.minHeight = panel.offsetHeight + 'px';
-    show([], length < 2 ? 'Продолжайте ввод…' : 'Ищем…', length >= 2);
-    if (length >= 2) schedule();
+    if (expanded) panel.style.minHeight = panel.offsetHeight + 'px';
+    show([], 'Ищем…', true);
+    if (!composing) schedule();
   }
   function schedule() {
-    if (input.value.trim().length < 2) return;
+    if (!input.value.trim()) return;
     const version = generation;
     timer = setTimeout(() => fetchRows(version), 180);
   }
@@ -181,24 +179,24 @@
     if (!expanded) return;
     const viewport = window.visualViewport;
     const bottom = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight);
-    if (innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
+    if (document.activeElement === input && innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
       control.scrollIntoView({block: 'start', behavior: 'instant'});
     }
     const list = form.querySelector('.destination-results');
-    const room = bottom - list.getBoundingClientRect().top - footer.getBoundingClientRect().height - 24;
+    const room = bottom - list.getBoundingClientRect().top - 24;
     form.style.setProperty('--search-results-height', Math.max(72, Math.min(456, room)) + 'px');
     resizeSurface();
   }
   function resizeSurface() {
     surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
   }
-  input.addEventListener('compositionstart', () => { composing = true; invalidate(); });
+  input.addEventListener('compositionstart', () => { composing = true; begin(); });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { invalidate(); input.value = ''; clear.hidden = true; input.focus(); });
-  footer.addEventListener('mousedown', event => event.preventDefault());
-  form.addEventListener('submit', () => invalidate());
+  form.addEventListener('submit', () => invalidate(false));
   window.addEventListener('resize', fitResults);
   window.visualViewport?.addEventListener('resize', fitResults);
   new ResizeObserver(resizeSurface).observe(content);
   resizeSurface();
+  if (input.value.trim()) begin();
 })();

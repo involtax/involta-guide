@@ -13,7 +13,7 @@ from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_guide.main import create_app
 
 
-def test_real_search_keyboard_touch_footer_and_javascript_free_form(database, tmp_path):
+def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(database, tmp_path):
     settings, engine = database
 
     def factory():
@@ -34,9 +34,7 @@ def test_real_search_keyboard_touch_footer_and_javascript_free_form(database, tm
             page.goto(origin + "/guide/")
             field = page.get_by_role("combobox", name="Куда отправимся?")
             button = page.get_by_role("button", name="Найти", exact=True)
-            assert button.evaluate("el=>getComputedStyle(el).fontSize") == (
-                "13px" if width == 390 else "14px"
-            )
+            assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
             assert button.evaluate("el=>getComputedStyle(el).backgroundColor") == "rgb(40, 97, 235)"
             field.fill("нов")
             expect(page.get_by_role("option")).to_have_count(6)
@@ -55,7 +53,8 @@ def test_real_search_keyboard_touch_footer_and_javascript_free_form(database, tm
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
             field.fill("пле")
             expect(page.get_by_role("option")).to_have_count(1)
-            page.get_by_role("button", name="Все результаты").click()
+            expect(page.get_by_role("button", name="Все результаты")).to_have_count(0)
+            button.click()
             page.wait_for_url(lambda u: parse_qs(urlsplit(u).query).get("q") == ["пле"])
             expect(page.locator(".city-link")).to_have_count(1)
             field = page.get_by_role("combobox", name="Куда отправимся?")
@@ -142,11 +141,19 @@ def test_late_responses_escape_ime_error_and_untrusted_titles(database):
         assert field.get_attribute("aria-activedescendant") in (None, "")
         complete("ожид", "Ожидаемое место")
         expect(page.get_by_role("option")).to_contain_text("Ожидаемое место")
-        send("закр")
+        send("фокус")
+        page.locator("h1").click()
+        complete("фокус", "Ответ без фокуса")
+        expect(page.get_by_role("option")).to_contain_text("Ответ без фокуса")
+        expect(page.locator(".search-suggestions")).to_be_visible()
         field.press("Escape")
-        complete("закр", "Закрытый результат")
+        expect(page.locator(".search-suggestions")).to_be_visible()
+        expect(field).to_have_value("фокус")
+        send("сброс")
+        page.get_by_role("button", name="Очистить поиск").click()
+        complete("сброс", "Устаревший ответ после очистки")
         expect(page.locator(".search-suggestions")).to_be_hidden()
-        expect(field).to_have_value("закр")
+        expect(field).to_have_value("")
         before = len(seen)
         field.dispatch_event("compositionstart")
         field.fill("моск")
@@ -195,9 +202,8 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         assert shell.evaluate("el=>el.offsetHeight") == 80
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         field.fill("н")
-        expect(page.locator(".search-message")).to_have_text("Продолжайте ввод…")
-        page.wait_for_timeout(250)
-        assert not requests
+        expect(page.get_by_role("option")).to_have_count(1)
+        assert len(requests) == 1 and parse_qs(urlsplit(requests[0]).query)["q"] == ["н"]
         field.fill("нов")
         expect(page.get_by_role("option")).to_have_count(1)
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
@@ -205,8 +211,16 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         assert expanded_height > 80
         assert page.locator(".cities").bounding_box()["y"] == city_top
         field.press("Escape")
-        expect(panel).to_have_attribute("inert", "")
+        page.get_by_role("button", name="Найти", exact=True).focus()
+        page.wait_for_timeout(480)
+        expect(panel).to_be_visible()
         expect(field).to_have_value("нов")
+        before = len(requests)
+        field.focus()
+        page.wait_for_timeout(250)
+        assert len(requests) == before
+        field.fill("")
+        expect(panel).to_have_attribute("inert", "")
         page.wait_for_timeout(80)
         assert 80 < shell.evaluate("el=>el.getBoundingClientRect().height") < expanded_height
         field.fill("новг")
@@ -216,7 +230,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         expect(panel).to_be_visible()
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "24px"
         page.emulate_media(reduced_motion="reduce")
-        field.press("Escape")
+        page.get_by_role("button", name="Очистить поиск").click()
         expect(panel).to_be_hidden()
         page.wait_for_function("document.querySelector('.search-surface').offsetHeight === 80")
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"

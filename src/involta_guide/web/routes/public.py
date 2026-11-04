@@ -63,7 +63,7 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix + "/api/locations/suggest")
     def suggestions(request: Request, q: str = Query("", max_length=100)) -> Response:
         ctx = context(request)
-        rows = ctx.queries.public_directory(q)["rows"] if len(search_text(q)) >= 2 else []
+        rows = ctx.queries.public_directory(q)["rows"] if search_text(q) else []
         return JSONResponse(
             {
                 "items": [

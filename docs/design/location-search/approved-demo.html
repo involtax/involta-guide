@@ -1025,7 +1025,7 @@ pre.audit-json {
 .search-clear[hidden] { opacity:0;visibility:hidden;pointer-events:none; }
 .search-clear::before { content:'';position:absolute;inset:-2px -8px; }
 .search-clear svg { width:18px;height:18px; }
-.search-control .search-submit { flex:0 0 132px;height:54px;padding:0;border:0;border-radius:27px;background:#2861eb;color:#fff;font-size:14px;line-height:1.5;transition:flex-basis var(--search-duration) var(--search-ease),height var(--search-duration) var(--search-ease),border-radius var(--search-duration) var(--search-ease),background 150ms; }
+.search-control .search-submit { flex:0 0 132px;height:54px;padding:0;border:0;border-radius:27px;background:#2861eb;color:#fff;font-size:22px;line-height:1.5;transition:flex-basis var(--search-duration) var(--search-ease),height var(--search-duration) var(--search-ease),border-radius var(--search-duration) var(--search-ease),background 150ms; }
 .search-control .search-submit:hover { background:#1d53d5;opacity:1; }
 .search-control .search-submit:active { background:#1847bc; }
 .is-open .search-submit { flex-basis:122px;height:50px;border-radius:25px; }
@@ -1043,10 +1043,6 @@ pre.audit-json {
 .result-context { display:block;margin-top:3px;font-size:12px;color:#797979; }
 .result-arrow { color:#858585;font-size:18px; }
 .destination-result mark { padding:0;background:transparent;color:inherit;font-weight:700; }
-.search-menu-footer { min-height:48px;margin:8px 10px 0;border-top:1px solid #e9e9e9; }
-.search-menu-footer[hidden] { display:none; }
-.search-menu-footer button { display:flex;align-items:center;justify-content:space-between;width:100%;min-height:48px;padding:0 8px;border:0;background:transparent;color:#797979;font-size:12px;text-align:left; }
-.search-menu-footer button:hover { background:transparent;opacity:1; }
 .search-message { padding:25px 18px 28px;font-size:15px;color:#797979; }
 .search-intro { color:var(--muted);font-size:14px;line-height:1.7;margin:20px 0 0; }
 .search-hero:has(.search-suggestions:not([hidden])) .search-intro { visibility:hidden; }
@@ -1066,7 +1062,7 @@ pre.audit-json {
   .search-input-row { gap:10px;padding-left:20px; }
   .search-control input { font-size:16px; }
   .search-symbol { width:18px;height:18px;flex-basis:18px; }
-  .search-control .search-submit,.is-open .search-submit { flex-basis:82px;font-size:13px; }
+  .search-control .search-submit,.is-open .search-submit { flex-basis:82px; }
   .search-clear,.search-clear[hidden] { flex-basis:22px;width:22px;margin-left:-4px; }
   .search-clear::before { inset:-2px -11px; }
   .result-name { display:block;font-size:16px; }
@@ -1109,7 +1105,6 @@ pre.audit-json {
 <div class="search-suggestions" hidden inert aria-hidden="true">
 <div class="search-panel-content">
 <div class="search-separator" aria-hidden="true"></div>
-<div class="search-menu-footer"><button type="submit">Все результаты <span aria-hidden="true">→</span></button></div>
 </div>
 </div>
 </div>
@@ -1427,12 +1422,12 @@ window.fetch=async (url,options={})=>{
  await new Promise(resolve=>setTimeout(resolve,120));
  if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
  const query=folded(new URL(url,location.href).searchParams.get('q')||'');
- const items=records.filter(row=>folded(row.name+' '+row.context+' '+(row.alias||'')).includes(query)).slice(0,6).map(row=>({name:row.name,context:row.context,url:'/guide/'+row.slug}));
+ const items=records.filter(row=>query.replaceAll(' ','').length<3 ? [row.name,row.alias||''].some(value=>folded(value).startsWith(query)) : folded(row.name+' '+row.context+' '+(row.alias||'')).includes(query)).slice(0,6).map(row=>({name:row.name,context:row.context,url:'/guide/'+row.slug}));
  return new Response(JSON.stringify({items}),{headers:{'Content-Type':'application/json'}});
 };
-const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');demoNote.textContent='Демо · тестовые данные. Введите «нов», «плес» или «сочи». Escape закрывает список.';
+const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');demoNote.textContent='Демо · тестовые данные. Введите «нов», «плес» или «сочи». Крестик очищает поиск. При потере фокуса список остаётся раскрытым.';
 document.querySelector('.header').after(demoNote);
-document.querySelector('form[data-location-search]').addEventListener('submit',event=>{event.preventDefault();demoNote.textContent='Демо: поиск по запросу «'+event.target.querySelector('input[name=q]').value+'». Переход отключён.';});
+document.querySelector('form[data-location-search]').addEventListener('submit',event=>{event.preventDefault();demoNote.textContent='Демо: поиск по запросу «'+event.target.querySelector('input[name=q]').value+'». Переход отключён.';requestAnimationFrame(()=>event.target.querySelector('input[name=q]').dispatchEvent(new Event('input',{bubbles:true})));});
 document.addEventListener('click',event=>{const link=event.target.closest('a');if(link){event.preventDefault();demoNote.textContent='Демо: переход «'+link.textContent.trim()+'».';}});
 
 </script>
@@ -1447,7 +1442,6 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
   const control = form.querySelector('.search-control');
   const surface = form.querySelector('.search-surface');
   const inputRow = form.querySelector('.search-input-row');
-  const footer = form.querySelector('.search-menu-footer');
   const status = form.querySelector('[role="status"]');
   let rows = [], message = '', generation = 0, renderGeneration = -1, timer, request;
   let composing = false;
@@ -1478,7 +1472,7 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
     // Ranking belongs to the server; the library must not insert catalogue HTML.
     searchEngine: () => ' ',
     resultsList: {
-      class: 'destination-results', destination: () => footer, position: 'beforebegin',
+      class: 'destination-results', destination: () => content, position: 'beforeend',
       maxResults: 6, noResults: true,
       element: (list, data) => {
         if (!data.results.length) {
@@ -1507,11 +1501,12 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
     },
     events: {input: {
       input: () => begin(),
-      focus: () => { if (!composing) begin(); },
-      blur: () => invalidate(),
+      focus: () => { if (!composing && !expanded) begin(); },
+      // A populated search stays open, including while its request finishes without focus.
+      blur: () => {},
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Escape') { event.preventDefault(); invalidate(); return; }
+        if (event.key === 'Escape') { event.preventDefault(); return; }
         if (!widget.isOpen || !widget.feedback?.results.length) return;
         if (event.key === 'ArrowDown') { event.preventDefault(); widget.next(); }
         else if (event.key === 'ArrowUp') { event.preventDefault(); widget.previous(); }
@@ -1521,15 +1516,15 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
         const selected = event.detail.selection?.value;
         if (!selected) return;
         const url = selected.url;
-        invalidate();
+        invalidate(false);
         // Only canonical Guide links from this origin can be selected.
         const target = new URL(url, location.href);
         if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
-          input.value = selected.name; demoNote.textContent = 'Демо: выбрано «' + selected.name + '».';
+          input.value = selected.name; demoNote.textContent = 'Демо: выбрано «' + selected.name + '».'; requestAnimationFrame(() => input.dispatchEvent(new Event('input', {bubbles: true})));
         }
       },
       open: () => {
-        if (renderGeneration !== generation || document.activeElement !== input || composing) { widget.close(); return; }
+        if (renderGeneration !== generation || !input.value.trim()) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -1567,27 +1562,25 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
     input.removeAttribute('aria-busy'); status.textContent = '';
   }
   function current(version) {
-    return version === generation && document.activeElement === input && !composing;
+    return version === generation && !!input.value.trim() && !composing;
   }
   function show(items, text = '', pending = false) {
     if (!pending) panel.style.minHeight = '';
     rows = items; message = text; renderGeneration = generation;
-    footer.hidden = !items.length && !!text;
     widget.start(input.value);
   }
   function begin() {
     clear.hidden = !input.value;
     invalidate(false);
-    if (composing) { widget.close(); return; }
     const length = input.value.trim().length;
     if (!length) { widget.close(); return; }
     // Preserve the current height while fetching, without leaving stale options selectable.
-    if (expanded && length >= 2) panel.style.minHeight = panel.offsetHeight + 'px';
-    show([], length < 2 ? 'Продолжайте ввод…' : 'Ищем…', length >= 2);
-    if (length >= 2) schedule();
+    if (expanded) panel.style.minHeight = panel.offsetHeight + 'px';
+    show([], 'Ищем…', true);
+    if (!composing) schedule();
   }
   function schedule() {
-    if (input.value.trim().length < 2) return;
+    if (!input.value.trim()) return;
     const version = generation;
     timer = setTimeout(() => fetchRows(version), 180);
   }
@@ -1620,26 +1613,26 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
     if (!expanded) return;
     const viewport = window.visualViewport;
     const bottom = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight);
-    if (innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
+    if (document.activeElement === input && innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
       control.scrollIntoView({block: 'start', behavior: 'instant'});
     }
     const list = form.querySelector('.destination-results');
-    const room = bottom - list.getBoundingClientRect().top - footer.getBoundingClientRect().height - 24;
+    const room = bottom - list.getBoundingClientRect().top - 24;
     form.style.setProperty('--search-results-height', Math.max(72, Math.min(456, room)) + 'px');
     resizeSurface();
   }
   function resizeSurface() {
     surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
   }
-  input.addEventListener('compositionstart', () => { composing = true; invalidate(); });
+  input.addEventListener('compositionstart', () => { composing = true; begin(); });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { invalidate(); input.value = ''; clear.hidden = true; input.focus(); });
-  footer.addEventListener('mousedown', event => event.preventDefault());
-  form.addEventListener('submit', () => invalidate());
+  form.addEventListener('submit', () => invalidate(false));
   window.addEventListener('resize', fitResults);
   window.visualViewport?.addEventListener('resize', fitResults);
   new ResizeObserver(resizeSurface).observe(content);
   resizeSurface();
+  if (input.value.trim()) begin();
 })();
 
 </script>
