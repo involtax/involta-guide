@@ -193,6 +193,107 @@ e.dispose()
         )
         if code == 0:
             report["recent_voice_status"] = json.loads(output)
+    # Technical-only runtime evidence: no SQL text, audio, transcripts or credentials.
+    code, sockets, _ = run(["ss", "-Hntip"])
+    connections = []
+    connection = None
+    for line in sockets.splitlines():
+        fields = line.split()
+        if fields and fields[0] in {"ESTAB", "CLOSE-WAIT", "FIN-WAIT-1", "FIN-WAIT-2"}:
+            connection = None
+            try:
+                local_port = int(fields[3].rsplit(":", 1)[-1])
+                peer_port = int(fields[4].rsplit(":", 1)[-1])
+            except (IndexError, ValueError):
+                continue
+            if not {local_port, peer_port} & {3001, 13100, 15432, 55439}:
+                continue
+            connection = {
+                "local_port": local_port,
+                "peer_port": peer_port,
+                "recv_q": fields[1],
+                "send_q": fields[2],
+                "state": fields[0],
+            }
+            connections.append(connection)
+        elif connection is not None and "bytes_received:" in line:
+            connection.update(
+                {
+                    k: int(v)
+                    for k, v in re.findall(
+                        r"\b(bytes_received|bytes_sent|bytes_acked|data_segs_in|data_segs_out):(\d+)",
+                        line,
+                    )
+                }
+            )
+    report["guide_connections"] = connections
+    if report.get("docker_binary"):
+        runtime_program = """
+import json,sys
+from pathlib import Path
+from sqlalchemy import text
+voice=sys.argv[1]=='voice'
+if voice:
+ from involta_voice.config import Settings
+ from involta_voice.db import database
+ engine=database(Settings())
+else:
+ from involta_guide.config import Settings
+ from involta_guide.infrastructure.persistence.unit_of_work import create_database
+ engine=create_database(Settings())
+with engine.connect() as c:
+ c.exec_driver_sql('SET TRANSACTION READ ONLY')
+ c.exec_driver_sql('SET LOCAL statement_timeout=2000')
+ rows=c.execute(text('''SELECT pid,state,wait_event_type,wait_event,
+ extract(epoch FROM clock_timestamp()-xact_start)::int AS transaction_seconds,
+ extract(epoch FROM clock_timestamp()-query_start)::int AS query_seconds,
+ pg_blocking_pids(pid) AS blockers,
+ CASE WHEN query ILIKE '%location_epochs%' THEN 'epoch_fence'
+ WHEN query ILIKE '%FOR SHARE%' THEN 'location_guard'
+ WHEN query ILIKE '%intake_windows%' THEN 'intake_limits'
+ WHEN query ILIKE '%audit%' THEN 'upload_audit'
+ WHEN query ILIKE '%submissions%' THEN 'voice_intake'
+ WHEN query ILIKE '%stages%' THEN 'worker_stage'
+ WHEN query ILIKE '%session%' THEN 'session'
+ ELSE 'other' END AS operation
+ FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()
+ AND state<>'idle' ORDER BY query_start LIMIT 40''')).mappings().all()
+ result={'database_activity':[dict(r) for r in rows]}
+ if voice:
+  result['recent_intake']=[dict(r) for r in c.execute(text('''SELECT reference,size,duration,created_at
+  FROM submissions ORDER BY created_at DESC LIMIT 10''')).mappings()]
+  root=Settings().data_dir/'audio'
+  result['recent_audio_files']=[{'name':p.name,'size':p.stat().st_size,'modified':p.stat().st_mtime}
+   for p in sorted(root.glob('*'),key=lambda p:p.stat().st_mtime,reverse=True)[:12] if p.is_file()]
+print(json.dumps(result,default=str))
+engine.dispose()
+"""
+        report["voice_upload_runtime"] = {}
+        for container, kind in [
+            ("involta-guide", "guide"),
+            ("involta-guide-production-voice-api-1", "voice"),
+        ]:
+            code, output, _ = run(
+                ["docker", "exec", container, "python", "-c", runtime_program, kind], timeout=10
+            )
+            report["voice_upload_runtime"][kind] = (
+                json.loads(output) if code == 0 else {"unavailable": True}
+            )
+        code, output, _ = run(
+            [
+                "docker",
+                "stats",
+                "--no-stream",
+                "--format",
+                "{{json .}}",
+                "involta-guide",
+                "involta-guide-production-voice-api-1",
+                "involta-guide-production-voice-worker-1",
+            ]
+        )
+        report["voice_container_resources"] = [
+            json.loads(line) for line in output.splitlines() if line.startswith("{")
+        ]
     try:
         report["involta_ru_addresses"] = sorted(
             {item[4][0] for item in socket.getaddrinfo("involta.ru", 443)}

@@ -61,6 +61,13 @@
 .admin-table th { font-size: 12px; color: var(--muted); font-weight: 500; }
 .admin-table-scroll { overflow-x: auto; max-width: 100%; }
 .admin-section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+.log-kinds { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0 0 28px; }
+.log-kinds .selected { border-bottom: 2px solid var(--black); padding-bottom: 6px; }
+.admin-workspace .upload-request { white-space: normal; }
+.upload-request small { display: block; color: var(--muted); }
+.upload-events { padding-left: 20px; }
+.upload-events li { padding: 10px 0; overflow-wrap: anywhere; }
+.upload-events small { color: var(--muted); }
 .admin-record { border-top: 1px solid var(--line); padding: 18px 0; }
 .admin-muted { color: var(--muted); font-size: 13px; }
 .admin-empty { border: 1px solid var(--line); padding: 24px; color: var(--muted); }

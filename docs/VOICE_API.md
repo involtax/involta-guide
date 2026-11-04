@@ -13,6 +13,11 @@ Gateway Guide под BASE_PATH `/voice/api/v1`:
 - GET `/submissions/{reference}`, GET `/submissions/mine?location={slug}` — собственные записи.
 - GET/POST `/debug/{request_id}` — приватные диагностические события, флаг VOICE_DEBUG_ENABLED.
 
+Общий журнал `/guide/logs?kind=uploads` показывает техническое представление
+этих же сохранённых событий. Карточка `/guide/logs/{slug}/uploads/{request_id}`
+и её `.json` не содержат публичных raw-метаданных или текста отзыва; администратор
+видит полный сохранённый отчёт. Правила доступа и этапы: [LOGS.md](LOGS.md).
+
 SubmissionMetadata v2 содержит location (id, slug, name, revision, **content_epoch**,
 restaurants), точное `visitor=guide_visitor`, `idempotency_key`, **raw ip**, полный
 **user_agent**, widget_version, language/timezone, correlation_id. Actor/purpose,

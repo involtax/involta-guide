@@ -1,4 +1,5 @@
 from urllib.parse import urlencode
+from uuid import UUID
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
@@ -8,6 +9,7 @@ from involta_guide.domain.hours import DAYS, opening_status
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
+from involta_guide.infrastructure.voice.upload_logs import UploadLogs
 from involta_guide.web.http import admin_token, check_origin, context
 from involta_guide.web.routes.admin import render
 
@@ -95,12 +97,16 @@ def routes(prefix: str) -> APIRouter:
         "X-Content-Type-Options": "nosniff",
     }
 
-    def log_store(request: Request) -> AIAudit:
+    def check_log_access(request: Request) -> None:
         ctx = context(request)
         if not ctx.settings.public_fill_logs_enabled and not ctx.security.principal(
             admin_token(request)
         ):
             raise HTTPException(404, "Публичные логи отключены")
+
+    def log_store(request: Request) -> AIAudit:
+        check_log_access(request)
+        ctx = context(request)
         return AIAudit(ctx.engine, ctx.settings)
 
     def log_page(
@@ -128,6 +134,7 @@ def routes(prefix: str) -> APIRouter:
                 if admin and detail
                 else None,
                 "audit_jobs": listing,
+                "log_kind": "fill",
                 "q": q,
                 "status": status,
                 "active_section": "logs",
@@ -140,8 +147,78 @@ def routes(prefix: str) -> APIRouter:
         return response
 
     @router.get(prefix + "/logs")
-    def public_logs(request: Request, q: str = "", page: int = 1, status: str = "") -> Response:
+    def public_logs(
+        request: Request, q: str = "", page: int = 1, status: str = "", kind: str = ""
+    ) -> Response:
+        if kind == "uploads":
+            return upload_log_page(request, None, q, page, status)
         return log_page(request, None, q, page, status)
+
+    def upload_log_page(
+        request: Request, request_id: str | None, q: str, page: int, status: str
+    ) -> Response:
+        check_log_access(request)
+        ctx = context(request)
+        admin = bool(ctx.security.principal(admin_token(request)))
+        store = UploadLogs(ctx.engine, ctx.settings)
+        listing = store.listing(page, q, status)
+        selected = request_id is not None
+        if not request_id and listing["rows"]:
+            request_id = listing["rows"][0]["request_id"]
+        detail = store.detail(request_id, admin=admin) if request_id else None
+        if request_id and detail is None:
+            raise HTTPException(404, "Журнал отправки не найден")
+        if selected and detail:
+            canonical = ctx.settings.path(detail["request"]["log_path"])
+            if request.url.path != canonical:
+                return RedirectResponse(canonical, status_code=308, headers=log_headers)
+        response = render(
+            request,
+            "logs.html",
+            {
+                "admin_ui": admin,
+                "fragment": False,
+                "logs_admin": admin,
+                "audit_public": not admin,
+                "log_kind": "uploads",
+                "upload_requests": listing,
+                "upload_detail": detail,
+                "q": q,
+                "status": status,
+                "active_section": "logs",
+                "title": "Загрузки голоса — Логи — Инвольта гид",
+                "audit_page": lambda n: urlencode(
+                    {"kind": "uploads", "q": q, "status": status, "page": n}
+                ),
+            },
+        )
+        response.headers.update({**log_headers, "Vary": "Cookie"})
+        return response
+
+    @router.get(prefix + "/logs/{slug}/uploads/{request_id}.json")
+    def upload_log_json(request: Request, slug: str, request_id: UUID) -> Response:
+        check_log_access(request)
+        ctx = context(request)
+        detail = UploadLogs(ctx.engine, ctx.settings).detail(
+            str(request_id), admin=bool(ctx.security.principal(admin_token(request)))
+        )
+        if detail is None:
+            raise HTTPException(404, "Журнал отправки не найден")
+        canonical = ctx.settings.path(detail["request"]["log_path"])
+        if request.url.path != canonical + ".json":
+            return RedirectResponse(canonical + ".json", status_code=308, headers=log_headers)
+        headers = {**log_headers, "Vary": "Cookie"}
+        if request.query_params.get("download") == "1":
+            headers["Content-Disposition"] = (
+                f'attachment; filename="voice-upload-{request_id}.json"'
+            )
+        return JSONResponse(detail, headers=headers)
+
+    @router.get(prefix + "/logs/{slug}/uploads/{request_id}")
+    def upload_log(
+        request: Request, slug: str, request_id: UUID, q: str = "", page: int = 1, status: str = ""
+    ) -> Response:
+        return upload_log_page(request, str(request_id), q, page, status)
 
     def numbered_detail(request: Request, slug: str, number: int) -> dict:
         store = log_store(request)

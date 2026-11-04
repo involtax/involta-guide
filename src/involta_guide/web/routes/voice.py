@@ -286,6 +286,10 @@ def routes(prefix: str) -> APIRouter:
                 if getattr(request.state, "voice_request_id", None)
                 else uuid4(),
             )
+            audio_content = await audio.read()
+            # Audit outside the epoch guard: a reset waiting for FOR UPDATE must
+            # not deadlock with a diagnostic insert acquiring its own FOR SHARE.
+            await request.state.voice_upload_record({"stage": "forwarding"})
             with ctx.engine.begin() as guard:
                 live = (
                     guard.execute(
@@ -311,8 +315,11 @@ def routes(prefix: str) -> APIRouter:
                     "POST",
                     "/submissions",
                     data={"metadata": metadata.model_dump_json()},
-                    files={"audio": ("recording", await audio.read(), audio.content_type or "")},
+                    files={"audio": ("recording", audio_content, audio.content_type or "")},
                 )
+            await request.state.voice_upload_record(
+                {"stage": "upstream_response", "status": response.status_code}
+            )
             try:
                 payload = response.json()
             except ValueError:
@@ -346,7 +353,17 @@ def routes(prefix: str) -> APIRouter:
                 samesite="lax",
             )
             return result
-        except VoiceUnavailable:
+        except VoiceUnavailable as exc:
+            await request.state.voice_upload_record(
+                {
+                    "stage": "upstream_error",
+                    "message": str(exc),
+                    "exception_type": type(exc.__cause__).__name__
+                    if exc.__cause__
+                    else type(exc).__name__,
+                    "exception": str(exc.__cause__ or ""),
+                }
+            )
             return JSONResponse(
                 {
                     "error": {
