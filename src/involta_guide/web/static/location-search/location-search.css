@@ -3,7 +3,7 @@
 .destination-search { position:relative;max-width:860px;--search-duration:420ms;--search-ease:cubic-bezier(.22,1,.36,1); }
 .destination-search label { display:block;font-size:20px;font-weight:400;margin-bottom:14px;letter-spacing:-.02em; }
 .search-control { position:relative;z-index:5;height:80px;min-width:0;scroll-margin-top:16px;--search-radius:40px; }
-.search-control.is-open { --search-radius:24px; }
+.search-control.is-open { --search-radius:34px; }
 .search-surface { position:absolute;top:0;left:0;right:0;height:80px;overflow:hidden;border:1px solid #e7e7e7;border-radius:var(--search-radius);background:#fcfcfc;box-shadow:0 2px 7px rgb(0 0 0 / 3.5%);transition:height var(--search-duration) var(--search-ease),border-radius var(--search-duration) var(--search-ease),box-shadow var(--search-duration) var(--search-ease); }
 .is-open .search-surface { box-shadow:0 4px 14px rgb(0 0 0 / 4.5%); }
 .search-control:focus-within .search-surface { border-color:#ddd; }

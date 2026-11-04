@@ -48,7 +48,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
             }""")
             assert (
                 page.locator(".search-surface").evaluate("el=>getComputedStyle(el).borderRadius")
-                == "24px"
+                == "34px"
             )
             page.screenshot(path=str(tmp_path / f"search-{label}.png"), full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
@@ -221,7 +221,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         expect(page.get_by_role("option")).to_have_count(2)
         page.wait_for_timeout(480)
         expect(panel).to_be_visible()
-        assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "24px"
+        assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "34px"
         page.emulate_media(reduced_motion="reduce")
         page.get_by_role("button", name="Очистить поиск").click()
         expect(panel).to_be_hidden()
