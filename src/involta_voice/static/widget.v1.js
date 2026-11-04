@@ -29,15 +29,14 @@
     const TOO_SHORT =
       "Слишком коротко. Запиши хотя бы 5 секунд: назови ресторан и расскажи, что думаешь.";
     const allowed = {
-      idle: ["starting", "preview"],
-      starting: ["recording", "stopping", "idle", "error", "preview"],
+      idle: ["starting", "retry"],
+      starting: ["recording", "stopping", "idle", "error", "retry"],
       recording: ["stopping", "idle", "error"],
-      stopping: ["preview", "idle", "error"],
-      preview: ["starting", "uploading", "idle"],
+      stopping: ["uploading", "retry", "idle", "error"],
       uploading: ["accepted", "retry", "idle"],
       accepted: ["starting"],
       retry: ["starting", "uploading", "idle"],
-      error: ["starting", "idle", "preview"],
+      error: ["starting", "idle", "retry"],
     };
     class Machine {
       state = "idle";
@@ -218,9 +217,11 @@
             const records = tx.objectStore("drafts");
             const operation =
               mode === "put" ? records.put(value) : records.get(this.key);
-            if (mode === "delete")
+            if (mode === "delete" || mode === "block")
               operation.onsuccess = () => {
-                if (operation.result?.id === value) records.delete(this.key);
+                if (operation.result?.id !== value) return;
+                if (mode === "delete") records.delete(this.key);
+                else records.put({ ...operation.result, blocked: true });
               };
             tx.oncomplete = () => resolve(operation.result);
             tx.onerror = () => reject(tx.error);
@@ -297,6 +298,15 @@
         this.audioURL = null;
         this.download.hidden = true;
         this.report.draft = null;
+        this.render();
+      }
+      async block(id) {
+        try {
+          await this.store("block", id);
+        } catch (e) {
+          this.report.storage_error = e.message;
+        }
+        if (this.report.draft?.id === id) this.report.draft.blocked = true;
         this.render();
       }
       begin() {
@@ -428,7 +438,6 @@
         blob,
         key,
         durationMs = 0,
-        previewUrl,
         reference,
         poll,
         historyPoll,
@@ -465,13 +474,19 @@
         }
         .stage {
           padding-block-start: 64px;
-          min-block-size: 248px;
           display: grid;
-          grid-template-rows: 80px 28px 28px 28px 44px;
+          grid-template-rows: 80px 28px 28px;
           grid-template-columns: 1fr;
           justify-items: center;
           align-content: start;
           gap: 4px;
+        }
+        .stage.capturing {
+          grid-template-rows: 80px 28px 28px 28px 44px;
+        }
+        .stage:not(.capturing) .timer,
+        .stage:not(.capturing) .cancel {
+          display: none;
         }
         .primary {
           position: relative;
@@ -558,8 +573,7 @@
         .quiet {
           visibility: hidden;
         }
-        .cancel,
-        .secondary {
+        .cancel {
           font: inherit;
           background: none;
           border: 0;
@@ -569,27 +583,6 @@
           padding: 10px 16px;
           min-block-size: 44px;
           color: inherit;
-        }
-        .preview {
-          min-block-size: 248px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 12px;
-        }
-        audio {
-          display: block;
-          inline-size: min(100%, 560px);
-          margin: 0 auto 10px;
-        }
-        .send {
-          min-block-size: 48px;
-          padding: 12px 28px;
-          background: #111;
-          color: #fff;
-          border: 1px solid #111;
-          font: inherit;
-          cursor: pointer;
         }
         button:disabled {
           opacity: 0.5;
@@ -694,9 +687,6 @@
       cancel.className = "cancel";
       cancel.textContent = "Отменить";
       stage.append(primary, caption, timerText, hint, cancel);
-      const preview = document.createElement("div");
-      preview.className = "preview";
-      preview.hidden = true;
       const status = document.createElement("p");
       status.className = "status";
       status.setAttribute("role", "status");
@@ -712,7 +702,6 @@
       panel.append(
         heading,
         stage,
-        preview,
         status,
         error,
         vadStatus,
@@ -802,14 +791,8 @@
         '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="6" y="6" width="16" height="16" rx="1" fill="currentColor" stroke="none"/></svg>';
       const spinner =
         '<svg aria-hidden="true" viewBox="0 0 28 28"><path d="M24 14A10 10 0 1 1 14 4"/></svg>';
-      function button(label, fn, className) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = label;
-        b.className = className;
-        b.onclick = fn;
-        return b;
-      }
+      const upload =
+        '<svg aria-hidden="true" viewBox="0 0 28 28"><path d="M14 20V4M8 10l6-6 6 6M5 19v5h18v-5"/></svg>';
       function refreshAll() {
         for (const i of instances.values()) i.refresh();
       }
@@ -818,8 +801,6 @@
         render();
       }
       function clearBlob() {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = null;
         blob = null;
         key = null;
         durationMs = 0;
@@ -829,18 +810,25 @@
         if (disposed) return;
         const state = machine.state,
           recording = state === "recording",
-          waiting = state === "starting" || state === "stopping";
+          retrying = state === "retry" && !blocked,
+          waiting = ["starting", "stopping", "uploading"].includes(state);
         if (!["starting", "recording"].includes(state)) resetDrag(state);
         target.dataset.voiceState = state;
-        const showingPreview =
-          !!blob && ["preview", "retry", "uploading"].includes(state);
-        stage.hidden = showingPreview;
-        preview.hidden = !showingPreview;
+        stage.classList.toggle(
+          "capturing",
+          ["starting", "recording"].includes(state),
+        );
         primary.classList.toggle("recording", recording);
         primary.classList.toggle("waiting", waiting);
         primary.setAttribute(
           "aria-label",
-          recording ? "Остановить запись" : "Записать отзыв",
+          recording
+            ? "Остановить запись"
+            : state === "uploading"
+              ? "Отправляем отзыв"
+              : retrying
+                ? "Повторить отправку"
+                : "Записать отзыв",
         );
         primary.setAttribute("aria-busy", String(waiting));
         primary.disabled =
@@ -851,12 +839,20 @@
           "aria-disabled",
           String(waiting || primary.disabled),
         );
-        const icon = recording ? square : waiting ? spinner : mic;
+        const icon = recording
+          ? square
+          : waiting
+            ? spinner
+            : retrying
+              ? upload
+              : mic;
         const iconState = recording
           ? "stop"
           : waiting
             ? "waiting"
-            : "microphone";
+            : retrying
+              ? "upload"
+              : "microphone";
         if (primary.dataset.icon !== iconState) {
           primary.dataset.icon = iconState;
           primary.innerHTML = icon;
@@ -866,8 +862,12 @@
           : waiting
             ? state === "starting"
               ? "Разреши доступ к микрофону"
-              : "Сохраняем запись"
-            : "Записать отзыв";
+              : state === "uploading"
+                ? "Отправляем отзыв…"
+                : "Сохраняем запись"
+            : retrying
+              ? "Повторить отправку"
+              : "Записать отзыв";
         const elapsed =
           recording && session
             ? Math.max(0, performance.now() - session.started)
@@ -881,41 +881,13 @@
         hint.style.gridRow = recording ? "4" : "3";
         hint.classList.toggle(
           "quiet",
-          waiting || (recording && elapsed >= MIN_MS),
+          waiting || retrying || (recording && elapsed >= MIN_MS),
         );
         cancel.classList.toggle(
           "quiet",
           !["starting", "recording"].includes(state),
         );
         cancel.disabled = !["starting", "recording"].includes(state);
-        if (
-          showingPreview &&
-          preview.dataset.key !== `${key}:${state}:${blocked}`
-        ) {
-          preview.dataset.key = `${key}:${state}:${blocked}`;
-          preview.replaceChildren();
-          if (!previewUrl) previewUrl = URL.createObjectURL(blob);
-          const player = document.createElement("audio");
-          player.controls = true;
-          player.src = previewUrl;
-          player.setAttribute("aria-label", "Прослушать запись");
-          const sendButton = button(
-            state === "uploading" ? "Отправляем…" : "Отправить отзыв",
-            send,
-            "send",
-          );
-          sendButton.disabled = state === "uploading" || blocked;
-          const again = button(
-            "Записать заново",
-            () => start(true),
-            "secondary",
-          );
-          again.disabled = state === "uploading" || !!activeCapture;
-          const length = document.createElement("span");
-          length.className = "timer";
-          length.textContent = `${String(Math.floor(durationMs / 60000)).padStart(2, "0")}:${String(Math.floor(durationMs / 1000) % 60).padStart(2, "0")}`;
-          preview.append(player, length, sendButton, again);
-        }
       }
       function release(s, unlock = true) {
         clearInterval(s.timer);
@@ -1098,18 +1070,20 @@
           primary.style.setProperty("--level", String(Math.min(1, rms * 8)));
         }
       }
-      async function start(replace = false) {
-        if (
-          disposed ||
-          !["idle", "preview", "retry", "accepted", "error"].includes(
-            machine.state,
-          ) ||
-          activeCapture
-        )
-          return;
+      function canStart() {
+        return (
+          ["idle", "accepted", "error"].includes(machine.state) ||
+          (machine.state === "retry" && blocked)
+        );
+      }
+      async function start() {
+        if (disposed || !canStart() || activeCapture) return;
         error.textContent = "";
         status.textContent = "";
         vadStatus.textContent = "";
+        currentText.textContent = "";
+        clearTimeout(poll);
+        reference = null;
         const s = {
           token: ++token,
           id: crypto.randomUUID(),
@@ -1129,9 +1103,6 @@
         requestAnimationFrame(() => {
           if (session === s) diagnostics.mark("controls_painted");
         });
-        const replacement =
-          replace && key ? diagnostics.clear(key) : Promise.resolve();
-        if (replace) clearBlob();
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
           failStart(s, "Запись недоступна. Нужен современный браузер и HTTPS.");
           return;
@@ -1167,7 +1138,6 @@
           diagnostics.epoch = epoch;
           await discardStale(epoch);
           // A late IndexedDB restore must never be overwritten by a short/cancelled new attempt.
-          await replacement;
           let saved = null;
           try {
             saved = await diagnostics.store("get");
@@ -1178,11 +1148,16 @@
             incoming.getTracks().forEach((t) => t.stop());
             return;
           }
-          if (saved?.blob && !replace && !blob) {
+          if (
+            saved?.blob &&
+            !blob &&
+            !saved.blocked &&
+            (saved.durationMs ?? saved.seconds * 1000) >= MIN_MS
+          ) {
             release(s);
             session = null;
             restoreBlob(saved);
-            transition("preview");
+            transition("retry");
             return;
           }
           clearBlob();
@@ -1358,11 +1333,14 @@
         await diagnostics.save(blob, key, durationMs, s.epoch);
         release(s);
         if (disposed) return;
-        status.textContent = diagnostics.report.draft?.local_copy_saved
-          ? "Запись сохранена в браузере. Прослушай и отправь отзыв."
-          : "Запись готова. Скачай аудио перед закрытием страницы: локальное сохранение недоступно.";
         vadStatus.textContent = "";
-        transition("preview");
+        if (["manual", "silence", "no_speech", "limit"].includes(s.reason)) {
+          await send();
+        } else {
+          status.textContent =
+            "Запись прервалась. Аудио сохранено — можно повторить отправку.";
+          transition("retry");
+        }
       }
       function cancelAttempt() {
         const s = session;
@@ -1386,8 +1364,8 @@
       }
       function primaryAction() {
         if (machine.state === "recording") stop("manual");
-        else if (["idle", "accepted", "error"].includes(machine.state))
-          void start();
+        else if (machine.state === "retry" && !blocked) void send();
+        else if (canStart()) void start();
       }
       function resetDrag(reason = "released") {
         const previous = drag;
@@ -1407,7 +1385,7 @@
       primary.addEventListener("pointerdown", (event) => {
         if (!event.isPrimary || event.button !== 0 || primary.disabled || drag)
           return;
-        if (["idle", "accepted", "error"].includes(machine.state)) {
+        if (canStart()) {
           // Only the original start gesture follows the finger. Its release must
           // never activate the stop that has appeared on this same button.
           drag = {
@@ -1485,10 +1463,12 @@
           !key ||
           blocked ||
           durationMs < MIN_MS ||
-          !["preview", "retry"].includes(machine.state)
+          disposed ||
+          !["stopping", "retry"].includes(machine.state)
         )
           return;
         error.textContent = "";
+        status.textContent = "";
         transition("uploading");
         diagnostics.begin();
         diagnostics.mark("upload_requested");
@@ -1501,6 +1481,7 @@
         });
         try {
           const currentEpoch = await identity();
+          if (disposed) return;
           if (!intentEpoch || currentEpoch !== intentEpoch) {
             await stale();
             return;
@@ -1537,6 +1518,7 @@
             return;
           }
           blocked = e.code === "audio_too_short";
+          if (blocked) void diagnostics.block(key);
           error.textContent =
             e.name === "TypeError"
               ? "Связь прервалась. Запись сохранена — повтори отправку."
@@ -1559,19 +1541,20 @@
         if (!disposed) poll = setTimeout(pollStatus, delay);
       }
       async function pollStatus() {
-        if (disposed) return;
+        if (disposed || !reference) return;
+        const pollingReference = reference;
         if (document.hidden) {
           schedule();
           return;
         }
         try {
           const response = await fetch(
-            api.href + "/submissions/" + encodeURIComponent(reference),
+            api.href + "/submissions/" + encodeURIComponent(pollingReference),
             { credentials: "same-origin" },
           );
           if (!response.ok) throw new Error("status");
           const data = await response.json();
-          if (disposed) return;
+          if (disposed || reference !== pollingReference) return;
           status.textContent = data.transcript
             ? "Текст отзыва сохранён. " +
               (labels[data.editorial_state || data.moderation] ||
@@ -1593,6 +1576,7 @@
           delay = Math.min(delay * 1.5, 60000);
           schedule();
         } catch {
+          if (disposed || reference !== pollingReference) return;
           delay = Math.min(delay * 2, 60000);
           schedule();
         }
@@ -1645,10 +1629,13 @@
         intentEpoch = saved.content_epoch;
         diagnostics.epoch = intentEpoch;
         durationMs = saved.durationMs ?? saved.seconds * 1000;
-        blocked = !Number.isFinite(durationMs) || durationMs < MIN_MS;
+        blocked =
+          !!saved.blocked ||
+          !Number.isFinite(durationMs) ||
+          durationMs < MIN_MS;
         status.textContent = blocked
-          ? "Сохранённая запись короче 5 секунд. Прослушай её и запиши отзыв заново."
-          : "Восстановлена неотправленная запись. Можно прослушать и отправить её.";
+          ? "Сохранённая запись не прошла проверку аудио. Её можно скачать в диагностике. Запиши новый отзыв."
+          : "Восстановлена неотправленная запись. Нажми, чтобы повторить отправку.";
         if (blocked) diagnostics.reveal();
       }
       function unmount() {
@@ -1696,7 +1683,7 @@
             return;
           }
           restoreBlob(saved);
-          transition("preview");
+          transition("retry");
         }
       });
       return instance;
