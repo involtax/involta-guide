@@ -107,16 +107,16 @@ html[data-search-variant="10"] .search-submit { min-width:46px;width:46px;height
 html[data-search-variant="10"] .search-submit > span:first-child { display:none; }
 
 /* The gallery embeds this same interactive component in every candidate. */
-html[data-preview="component"] .header,
-html[data-preview="component"] .search-hero > .eyebrow,
-html[data-preview="component"] .search-hero > h1,
-html[data-preview="component"] .search-intro,
-html[data-preview="component"] .cities,
-html[data-preview="component"] footer { display:none; }
-html[data-preview="component"] main { max-width:none;margin:0;padding:18px; }
-html[data-preview="component"] .search-hero { padding:0; }
-html[data-preview="component"] .destination-search { max-width:none; }
-html[data-preview="component"] .destination-search > label { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%); }
+html[data-preview] .header,
+html[data-preview] .search-hero > .eyebrow,
+html[data-preview] .search-hero > h1,
+html[data-preview] .search-intro,
+html[data-preview] .cities,
+html[data-preview] footer { display:none; }
+html[data-preview] main { max-width:none;margin:0;padding:18px; }
+html[data-preview] .search-hero { padding:0; }
+html[data-preview] .destination-search { max-width:none; }
+html[data-preview] .destination-search > label { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%); }
 html[data-preview="component"] .search-control { height:64px; }
 html[data-preview="component"] .search-input-row { min-height:62px; }
 html[data-preview="component"] .search-control input { height:62px;font-size:20px; }

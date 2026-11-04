@@ -1,15 +1,20 @@
 // Interactive visual prototype only: test data, no Guide endpoint or production navigation.
 (() => {
   const params=new URLSearchParams(location.search);
-  const buttonVariant=window.SEARCH_BUTTON_VARIANTS.find(item=>item.id===params.get('button'));
+  const selectedButton=params.get('button')||(params.has('variant')?null:'02');
+  const buttonVariant=window.SEARCH_BUTTON_VARIANTS.find(item=>item.id===selectedButton);
   const porcelain=window.SEARCH_VARIANTS.find(item=>item.id==='04');
   const variant=buttonVariant?porcelain:(window.SEARCH_VARIANTS.find(item=>item.id===params.get('variant'))||porcelain);
   const gallery=params.get('gallery')==='1';
+  const comparison=params.get('comparison')==='1';
+  const reference=params.get('geometry')==='reference';
   document.documentElement.dataset.searchVariant=variant.id;
   if(buttonVariant)document.documentElement.dataset.buttonVariant=buttonVariant.id;
+  if(reference)document.documentElement.dataset.searchGeometry='reference';
   if(gallery)document.documentElement.dataset.preview='component';
+  if(comparison)document.documentElement.dataset.preview='geometry';
   document.title=buttonVariant?'Кнопка '+buttonVariant.id+' · '+buttonVariant.name+' — Макет':variant.id+' · '+variant.name+' — Макет поиска';
-  document.querySelector('.prototype-label').textContent=buttonVariant?'Макет · Фарфор · '+buttonVariant.id:'Макет '+variant.id+' · '+variant.name;
+  document.querySelector('.prototype-label').textContent=reference?'Макет · по референсу':buttonVariant?'Макет · Фарфор · '+buttonVariant.id:'Макет '+variant.id+' · '+variant.name;
   if(buttonVariant&&!buttonVariant.arrow)document.querySelector('.search-submit > span:last-child').hidden=true;
   const records = [
     {name:'Великий Новгород',context:'Город · Новгородская область',alias:'Новгород',slug:'velikiy-novgorod'},
@@ -45,13 +50,13 @@
     selector:'#destination',wrapper:false,threshold:2,debounce:180,submit:true,
     data:{src:async query=>unavailable?[]:records.filter(row=>normalize(row.name+' '+row.context+' '+(row.alias||'')).includes(normalize(query))),keys:['name'],cache:false},
     searchEngine:()=> ' ',
-    resultsList:{class:'destination-results',destination:'.search-menu-footer',position:'beforebegin',maxResults:gallery?3:6,noResults:true,element:(list,data)=>{
+    resultsList:{class:'destination-results',destination:'.search-menu-footer',position:'beforebegin',maxResults:gallery||comparison?3:6,noResults:true,element:(list,data)=>{
       if(!data.results.length){
         const empty=document.createElement('li');empty.className='search-empty';empty.role='presentation';
         empty.textContent=unavailable?'Подсказки временно недоступны.':'Не нашли такую локацию. Попробуйте другое название.';list.append(empty);
       }
       status.textContent=data.results.length?`Подсказок: ${data.results.length}`:'Ничего не найдено';
-      if(gallery&&data.results.length)requestAnimationFrame(()=>widget.goTo(0));
+      if((gallery||comparison)&&data.results.length)requestAnimationFrame(()=>widget.goTo(0));
     }},
     resultItem:{class:'destination-result',element:(li,data)=>{
       li.replaceChildren();
@@ -85,5 +90,5 @@
   input.addEventListener('input',()=>{clear.hidden=!input.value;delete input.dataset.selected;if(input.value.length<2){widget.close();status.textContent='';}});
   clear.addEventListener('click',()=>{input.value='';widget.close();clear.hidden=true;status.textContent='';input.focus();});
   form.addEventListener('submit',event=>{event.preventDefault();widget.close();status.textContent='Демонстрация поиска: '+input.value;input.dataset.submitted=input.value;});
-  if(gallery){input.value='нов';clear.hidden=false;widget.start('нов');}
+  if(gallery||(comparison&&params.get('state')!=='idle')){input.value='нов';clear.hidden=false;widget.start('нов');}
 })();
