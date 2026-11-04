@@ -6,6 +6,8 @@
 <title>Макет поиска — Инвольта гид</title>
 <link rel="stylesheet" href="../../../src/involta_guide/web/static/style.css">
 <link rel="stylesheet" href="search.css">
+<link rel="stylesheet" href="variants.css">
+<script defer src="variants.js"></script>
 <script defer src="vendor/autoComplete-10.2.10.min.js"></script>
 <script defer src="demo.js"></script>
 </head>
@@ -21,12 +23,16 @@
 <form class="destination-search" action="#" role="search">
 <label for="destination">Куда отправимся?</label>
 <div class="search-control">
+<div class="search-surface">
+<div class="search-input-row">
 <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
 <input id="destination" type="search" name="q" placeholder="Город, район, курорт" autocomplete="off" spellcheck="false" enterkeyhint="search" autocapitalize="none" aria-describedby="search-status">
 <button type="button" class="search-clear" aria-label="Очистить поиск" hidden>×</button>
 <button type="submit" class="search-submit" aria-label="Найти"><span>Найти</span><span aria-hidden="true">→</span></button>
+</div>
 <div class="search-suggestions" hidden>
 <div class="search-menu-footer" hidden><button type="submit">Все результаты <span aria-hidden="true">→</span></button></div>
+</div>
 </div>
 </div>
 <p id="search-status" role="status" aria-live="polite" class="search-status"></p>

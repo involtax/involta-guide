@@ -1,5 +1,12 @@
 // Interactive visual prototype only: test data, no Guide endpoint or production navigation.
 (() => {
+  const params=new URLSearchParams(location.search);
+  const variant=window.SEARCH_VARIANTS.find(item=>item.id===params.get('variant'))||window.SEARCH_VARIANTS[0];
+  const gallery=params.get('gallery')==='1';
+  document.documentElement.dataset.searchVariant=variant.id;
+  if(gallery)document.documentElement.dataset.preview='component';
+  document.title=variant.id+' · '+variant.name+' — Макет поиска';
+  document.querySelector('.prototype-label').textContent='Макет '+variant.id+' · '+variant.name;
   const records = [
     {name:'Великий Новгород',context:'Город · Новгородская область',alias:'Новгород',slug:'velikiy-novgorod'},
     {name:'Нижний Новгород',context:'Город · Нижегородская область',alias:'Нижний',slug:'nizhniy-novgorod'},
@@ -20,7 +27,7 @@
   const clear=document.querySelector('.search-clear');
   const footer=document.querySelector('.search-menu-footer');
   const panel=document.querySelector('.search-suggestions');
-  const unavailable=new URLSearchParams(location.search).get('state')==='error';
+  const unavailable=params.get('state')==='error';
   const normalize=text=>text.toLowerCase().replaceAll('ё','е').trim();
   const safeHighlight=(element,text,query)=>{
     const at=normalize(text).indexOf(normalize(query));
@@ -34,12 +41,13 @@
     selector:'#destination',wrapper:false,threshold:2,debounce:180,submit:true,
     data:{src:async query=>unavailable?[]:records.filter(row=>normalize(row.name+' '+row.context+' '+(row.alias||'')).includes(normalize(query))),keys:['name'],cache:false},
     searchEngine:()=> ' ',
-    resultsList:{class:'destination-results',destination:'.search-menu-footer',position:'beforebegin',maxResults:6,noResults:true,element:(list,data)=>{
+    resultsList:{class:'destination-results',destination:'.search-menu-footer',position:'beforebegin',maxResults:gallery?3:6,noResults:true,element:(list,data)=>{
       if(!data.results.length){
         const empty=document.createElement('li');empty.className='search-empty';empty.role='presentation';
         empty.textContent=unavailable?'Подсказки временно недоступны.':'Не нашли такую локацию. Попробуйте другое название.';list.append(empty);
       }
       status.textContent=data.results.length?`Подсказок: ${data.results.length}`:'Ничего не найдено';
+      if(gallery&&data.results.length)requestAnimationFrame(()=>widget.goTo(0));
     }},
     resultItem:{class:'destination-result',element:(li,data)=>{
       li.replaceChildren();
@@ -73,4 +81,5 @@
   input.addEventListener('input',()=>{clear.hidden=!input.value;delete input.dataset.selected;if(input.value.length<2){widget.close();status.textContent='';}});
   clear.addEventListener('click',()=>{input.value='';widget.close();clear.hidden=true;status.textContent='';input.focus();});
   form.addEventListener('submit',event=>{event.preventDefault();widget.close();status.textContent='Демонстрация поиска: '+input.value;input.dataset.submitted=input.value;});
+  if(gallery){input.value='нов';clear.hidden=false;widget.start('нов');}
 })();
