@@ -151,10 +151,6 @@ h4 {
   padding-top: 9px;
   font-weight: 400;
 }
-.header-note {
-  font-size: 12px;
-  color: var(--muted);
-}
 main {
   max-width: 1232px;
   padding: 0 48px;
@@ -707,9 +703,6 @@ blockquote {
   }
   .hero-bottom p {
     font-size: 14px;
-  }
-  .header-note {
-    display: none;
   }
   .voice-section {
     padding: 30px;
