@@ -42,10 +42,14 @@
   </main>
   <script>
     (() => {
-      const original = window.fetch.bind(window),
-        accepted = new Map();
-      let uploads = 0,
-        lost = false;
+      const nativeFetch = window.fetch.bind(window);
+      const submissions = new Map();
+      let uploads = 0;
+      const json = (data, status = 200) =>
+        new Response(JSON.stringify(data), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
       window.fetch = async (input, options = {}) => {
         const url = new URL(
           typeof input === "string" ? input : input.url,
@@ -57,25 +61,35 @@
         )
           throw new TypeError("Stand: VAD model unavailable");
         if (!url.pathname.startsWith("/guide/voice/api/v1/"))
-          return original(input, options);
-        const json = (data, status = 200) =>
-          new Response(JSON.stringify(data), {
-            status,
-            headers: { "Content-Type": "application/json" },
-          });
+          return nativeFetch(input, options);
         if (url.pathname.endsWith("/identity"))
           return json({ ready: true, content_epoch: 1 });
-        if (url.pathname.endsWith("/mine")) return json({ rows: [] });
         if (url.pathname.includes("/debug/"))
           return json(
             options.method === "POST" ? { saved: true } : { events: [] },
           );
+        if (url.pathname.endsWith("/mine"))
+          return json({
+            content_epoch: 1,
+            rows: [...submissions.values()].reverse().map((item) => ({
+              reference: item.reference,
+              created_at: item.created_at,
+              state:
+                Date.now() - item.accepted >= 5000
+                  ? "result_ready"
+                  : "accepted",
+              transcript:
+                Date.now() - item.accepted >= 5000
+                  ? "Тестовая расшифровка: это демонстрация интерфейса. ASR и OpenAI не запускались."
+                  : null,
+            })),
+          });
         if (url.pathname.endsWith("/submissions")) {
           ++uploads;
           document.getElementById("mock-status").textContent =
             `Отправок: ${uploads}. Mock: ${options.body.size} байт, ${options.body.type}.`;
           const scenario = document.getElementById("scenario").value;
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
           if (scenario === "html")
             return new Response(
               "<html><h1>502 Bad Gateway</h1><p>Полный тестовый ответ прокси.</p></html>",
@@ -86,28 +100,32 @@
               {
                 error: {
                   code: "audio_too_short",
-                  message:
-                    "Сервер определил: аудио короче 5 секунд. Запиши заново.",
+                  message: "Сервер определил: аудио короче 5 секунд.",
                   min_duration_seconds: 5,
                 },
               },
               422,
             );
           const key = url.searchParams.get("idempotency_key");
-          if (!accepted.has(key)) accepted.set(key, crypto.randomUUID());
-          if (scenario === "lost" && !lost) {
-            lost = true;
-            throw new TypeError("Mock: accepted response lost");
-          }
-          return json({ reference: accepted.get(key), state: "accepted" }, 202);
+          if (!submissions.has(key))
+            submissions.set(key, {
+              reference: crypto.randomUUID(),
+              created_at: new Date().toISOString(),
+              accepted: Date.now(),
+            });
+          if (scenario === "lost")
+            throw new TypeError("Mock: response lost after acceptance");
+          const item = submissions.get(key);
+          return json(
+            {
+              reference: item.reference,
+              created_at: item.created_at,
+              state: "accepted",
+            },
+            202,
+          );
         }
-        return json({
-          state: "result_ready",
-          moderation: "pending",
-          created_at: "2026-11-04T12:00:00Z",
-          transcript:
-            "Тестовая расшифровка: это демонстрация интерфейса. ASR и OpenAI не запускались.",
-        });
+        return json({ error: { message: "Unknown mock endpoint" } }, 404);
       };
     })();
   </script>

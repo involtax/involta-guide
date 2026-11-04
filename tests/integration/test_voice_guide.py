@@ -183,6 +183,7 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
             "/guide/voice/api/v1/submissions/mine", params={"location": city["slug"]}
         )
         assert history.status_code == 200
+        assert history.json()["content_epoch"] == 1
         assert history.json()["rows"][0]["reference"] == reference
         assert history.json()["rows"][0]["transcript"]
         offline_status = client.get("/guide/voice/api/v1/submissions/" + reference).json()

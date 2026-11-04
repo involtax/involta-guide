@@ -129,7 +129,9 @@ def test_all_roles_share_normal_flow_retries_audio_and_private_debug(database, v
         assert second.status_code == 202, second.text
         assert upload().json()["reference"] == second.json()["reference"]
         assert queries.rows("reviews") == [] and queries.rows("jobs") == []
-        history = client.get("/guide/voice/api/v1/submissions/mine?location=ivanovo").json()["rows"]
+        listing = client.get("/guide/voice/api/v1/submissions/mine?location=ivanovo").json()
+        assert listing["content_epoch"] == 1
+        history = listing["rows"]
         assert {r["reference"] for r in history} == {
             first.json()["reference"],
             second.json()["reference"],
@@ -143,6 +145,13 @@ def test_all_roles_share_normal_flow_retries_audio_and_private_debug(database, v
                 debug_path,
                 headers=headers,
                 json={
+                    "version": 3,
+                    "recording": {
+                        "bytes": len(recording()),
+                        "durationMs": 6000,
+                        "mime": "audio/wav",
+                        "content_epoch": 1,
+                    },
                     "timeline": [{"name": "stop_requested", "reason": "silence"}],
                     "vad": {"state": "ready"},
                     "events": [
@@ -161,6 +170,10 @@ def test_all_roles_share_normal_flow_retries_audio_and_private_debug(database, v
         event = browser_report["events"][-1]
         assert event["report"]["timeline"][0]["reason"] == "silence"
         assert event["report"]["vad"]["state"] == "ready"
+        assert event["report"]["recording"]["durationMs"] == 6000
+        public_log = client.get(f"/guide/logs/ivanovo/uploads/{trace}.json").json()
+        assert public_log["facts"]["duration_ms"] == 6000
+        assert public_log["facts"]["bytes"] == len(recording())
         assert upload().json()["reference"] == second.json()["reference"]
         with ve.connect() as conn:
             values = list(conn.execute(text("SELECT metadata FROM submissions")).scalars())

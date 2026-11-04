@@ -9,7 +9,7 @@ Gateway Guide под BASE_PATH `/voice/api/v1`:
 
 - POST `/identity?location={slug}` назначает/сохраняет `guide_visitor`, возвращает content_epoch.
 - POST `/submissions?location={slug}&content_epoch={epoch}` принимает тот же blob/key
-  при retry. Заголовки/поля actor, visitor, IP клиента не назначают права/владельца.
+  одной отправкой; серверная идемпотентность сохраняется. Actor, visitor и IP клиента не назначают права/владельца.
 - GET `/submissions/{reference}`, GET `/submissions/mine?location={slug}` — собственные записи.
 - GET/POST `/debug/{request_id}` — приватные диагностические события, флаг VOICE_DEBUG_ENABLED.
 
@@ -47,10 +47,12 @@ reference; зависимые события одного reference ждут. П
 Guide-исполнителя нет. ЧПУ карточки Guide `/admin/reviews/{slug}/{number}`, действия
 `/actions`, аудио `/audio`; сравнение двух моделей показывается в этой же карточке.
 
-Виджет сохраняет blob/key/**исходный epoch** в IndexedDB. После reset старый blob/key
-не получает свежую метку: очередь очищается при следующем контакте, пользователь
-видит сообщение и может сознательно записать новый отзыв. Сервер не удаляет файлы
-из закрытого чужого браузера, но не принимает их повторно в новый цикл.
+Виджет держит blob/key/исходный epoch только в памяти одной отправки. После
+ошибки, отмены или reload старое аудио не отправляется. IndexedDB-очередь удалена.
+Серверная защита owner/key/epoch и сохранённые отзывы/аудио/логи остаются прежними.
+Список GET /submissions/mine?location={slug} дополнен content_epoch локации для
+очистки устаревшего отображения после reset. В UI один список «Отзывы»: после
+приёма — «Расшифровка…», затем серверный текст в той же записи.
 
 ## Minimum duration for new reviews
 

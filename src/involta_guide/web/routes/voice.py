@@ -172,6 +172,7 @@ def routes(prefix: str) -> APIRouter:
                         "role",
                         "location",
                         "draft",
+                        "recording",
                         "events",
                         "timeline",
                         "vad",
@@ -368,7 +369,7 @@ def routes(prefix: str) -> APIRouter:
                 {
                     "error": {
                         "code": "unavailable",
-                        "message": "Сервис временно недоступен. Повторите отправку этой записи.",
+                        "message": "Сервис временно недоступен. Запишите новый отзыв позже.",
                     }
                 },
                 status_code=503,
@@ -410,6 +411,7 @@ def routes(prefix: str) -> APIRouter:
                     data["rows"].append(own)
         if location:
             public = context(request).queries.public(location)
+            data["content_epoch"] = public["location"]["content_epoch"] if public else None
             data["rows"] = [
                 r
                 for r in data["rows"]
