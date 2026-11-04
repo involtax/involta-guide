@@ -24,8 +24,6 @@
     const MIN_MS = 5000,
       MAX_MS = 120000,
       MAX_BYTES = 10 * 1024 * 1024;
-    const REQUEST =
-      "твой голос важен. скажи что ты думаешь и о каком ресторане";
     const TOO_SHORT =
       "Слишком коротко. Запиши хотя бы 5 секунд: назови ресторан и расскажи, что думаешь.";
     const allowed = {
@@ -450,7 +448,8 @@
           display: block;
           inline-size: 100%;
           min-inline-size: 0;
-          font: 16px/1.5 system-ui;
+          container-type: inline-size;
+          font: 15px/1.6 Arial, Helvetica, sans-serif;
           color: #151515;
         }
         * {
@@ -460,41 +459,46 @@
           display: none !important;
         }
         section {
-          padding: 48px 0;
+          padding: 27px 0 42px;
+          border-block-start: 1px solid #151515;
           background: #fff;
-          text-align: center;
+          text-align: start;
+        }
+        .kicker {
+          margin: 0 0 19px;
+          font-size: 10px;
+          font-weight: 600;
+          line-height: 1.6;
+          letter-spacing: 2px;
+          text-transform: uppercase;
         }
         h2 {
-          font-size: clamp(22px, 3vw, 32px);
+          font-size: 34px;
           font-weight: 500;
-          line-height: 1.28;
-          max-inline-size: 760px;
-          margin: 0 auto 32px;
+          line-height: 1.14;
+          letter-spacing: -0.04em;
+          max-inline-size: 620px;
+          margin: 0;
           text-wrap: balance;
+          overflow-wrap: anywhere;
+        }
+        h2 em {
+          font: italic 1.06em/1 Georgia, "Times New Roman", serif;
+          letter-spacing: -0.055em;
         }
         .stage {
-          padding-block-start: 64px;
-          display: grid;
-          grid-template-rows: 80px 28px 28px;
-          grid-template-columns: 1fr;
-          justify-items: center;
-          align-content: start;
-          gap: 4px;
-        }
-        .stage.capturing {
-          grid-template-rows: 80px 28px 28px 28px 44px;
-        }
-        .stage:not(.capturing) .timer,
-        .stage:not(.capturing) .cancel {
-          display: none;
+          margin-block-start: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         .primary {
           position: relative;
-          inline-size: 80px;
-          block-size: 80px;
+          inline-size: 72px;
+          block-size: 72px;
           border: 0;
           border-radius: 50%;
-          background: #111;
+          background: #151515;
           color: white;
           padding: 0;
           display: grid;
@@ -538,40 +542,32 @@
           animation: waiting 1.2s linear infinite;
         }
         .primary svg {
-          width: 28px;
-          height: 28px;
+          width: 25px;
+          height: 25px;
           fill: none;
           stroke: currentColor;
-          stroke-width: 1.8;
+          stroke-width: 1.5;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
         .primary:disabled {
           cursor: wait;
           opacity: 0.5;
         }
-        .stage > * {
-          grid-column: 1;
-        }
-        .primary {
-          grid-row: 1;
-        }
-        .caption {
-          grid-row: 2;
-          font-size: 15px;
-        }
-        .cancel {
-          grid-row: 5;
+        .control-status {
+          margin: 12px 0 0;
+          font-size: 14px;
+          text-align: center;
         }
         .timer {
-          grid-row: 3;
+          margin-block-start: 20px;
           font-variant-numeric: tabular-nums;
           font-size: 18px;
         }
         .hint {
+          margin-block-start: 4px;
           font-size: 13px;
-          color: #666;
-        }
-        .quiet {
-          visibility: hidden;
+          color: #747474;
         }
         .cancel {
           font: inherit;
@@ -591,8 +587,8 @@
         button:focus-visible,
         a:focus-visible,
         summary:focus-visible {
-          outline: 3px solid #606060;
-          outline-offset: 5px;
+          outline: 2px solid #151515;
+          outline-offset: 4px;
         }
         .status,
         .error,
@@ -600,7 +596,7 @@
         .current,
         .history {
           max-inline-size: 720px;
-          margin: 12px auto;
+          margin: 12px 0 0;
           overflow-wrap: anywhere;
         }
         .error {
@@ -609,16 +605,27 @@
         .vad-status {
           font-size: 13px;
           color: #666;
-          min-block-size: 20px;
         }
         .history {
           text-align: start;
           white-space: pre-wrap;
         }
+        .status:empty,
+        .error:empty,
+        .vad-status:empty,
+        .current:empty,
+        .history:empty {
+          display: none;
+        }
+        .current time,
+        .history time {
+          color: #747474;
+          font-size: 12px;
+        }
         details {
           text-align: start;
           max-inline-size: 760px;
-          margin: 28px auto 0;
+          margin: 0 0 28px;
           font-size: 13px;
         }
         summary {
@@ -644,6 +651,11 @@
             transform: rotate(360deg);
           }
         }
+        @container (max-width: 500px) {
+          section { padding-block-start: 28px; }
+          h2 { font-size: 31px; line-height: 1.12; max-inline-size: 300px; }
+          .stage { margin-block-start: 30px; }
+        }
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before {
@@ -668,15 +680,21 @@
       `;
       const panel = document.createElement("section");
       panel.setAttribute("aria-label", "Голосовой отзыв");
+      const kicker = document.createElement("p");
+      kicker.className = "kicker";
+      kicker.textContent = "Твой голос важен";
       const heading = document.createElement("h2");
-      heading.textContent = REQUEST;
+      const emphasis = document.createElement("em");
+      emphasis.textContent = "ресторане.";
+      heading.append("Скажи, что ты думаешь и о каком ", emphasis);
       const stage = document.createElement("div");
       stage.className = "stage";
       const primary = document.createElement("button");
       primary.type = "button";
       primary.className = "primary";
-      const caption = document.createElement("span");
-      caption.className = "caption";
+      const controlStatus = document.createElement("p");
+      controlStatus.className = "control-status";
+      controlStatus.hidden = true;
       const timerText = document.createElement("span");
       timerText.className = "timer";
       timerText.setAttribute("aria-hidden", "true");
@@ -686,7 +704,7 @@
       cancel.type = "button";
       cancel.className = "cancel";
       cancel.textContent = "Отменить";
-      stage.append(primary, caption, timerText, hint, cancel);
+      stage.append(primary, controlStatus, timerText, hint, cancel);
       const status = document.createElement("p");
       status.className = "status";
       status.setAttribute("role", "status");
@@ -700,6 +718,7 @@
       const currentText = document.createElement("p");
       currentText.className = "current";
       panel.append(
+        kicker,
         heading,
         stage,
         status,
@@ -709,7 +728,7 @@
         history,
       );
       root.replaceChildren(style, panel);
-      const diagnostics = new Diagnostics(panel, {
+      const diagnostics = new Diagnostics(root, {
         key: "voice",
         api: api.href,
         location: options.location || "",
@@ -786,7 +805,7 @@
         else render();
       }
       const mic =
-        '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="10" y="3" width="8" height="14" rx="4"/><path d="M6 12v2a8 8 0 0 0 16 0v-2M14 22v4M9 26h10"/></svg>';
+        '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
       const square =
         '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="6" y="6" width="16" height="16" rx="1" fill="currentColor" stroke="none"/></svg>';
       const spinner =
@@ -814,10 +833,6 @@
           waiting = ["starting", "stopping", "uploading"].includes(state);
         if (!["starting", "recording"].includes(state)) resetDrag(state);
         target.dataset.voiceState = state;
-        stage.classList.toggle(
-          "capturing",
-          ["starting", "recording"].includes(state),
-        );
         primary.classList.toggle("recording", recording);
         primary.classList.toggle("waiting", waiting);
         primary.setAttribute(
@@ -857,17 +872,16 @@
           primary.dataset.icon = iconState;
           primary.innerHTML = icon;
         }
-        caption.textContent = recording
-          ? "Стоп"
-          : waiting
-            ? state === "starting"
-              ? "Разреши доступ к микрофону"
-              : state === "uploading"
-                ? "Отправляем отзыв…"
-                : "Сохраняем запись"
-            : retrying
-              ? "Повторить отправку"
-              : "Записать отзыв";
+        controlStatus.hidden = !waiting && !retrying;
+        controlStatus.textContent = waiting
+          ? state === "starting"
+            ? "Разреши доступ к микрофону"
+            : state === "uploading"
+              ? "Отправляем отзыв…"
+              : "Сохраняем запись"
+          : retrying
+            ? "Повторить отправку"
+            : "";
         const elapsed =
           recording && session
             ? Math.max(0, performance.now() - session.started)
@@ -877,16 +891,10 @@
           : "";
         if (timerText.textContent !== timerValue)
           timerText.textContent = timerValue;
-        hint.textContent = recording ? "Минимум 5 секунд" : "От 5 секунд";
-        hint.style.gridRow = recording ? "4" : "3";
-        hint.classList.toggle(
-          "quiet",
-          waiting || retrying || (recording && elapsed >= MIN_MS),
-        );
-        cancel.classList.toggle(
-          "quiet",
-          !["starting", "recording"].includes(state),
-        );
+        timerText.hidden = !recording;
+        hint.textContent = "Минимум 5 секунд";
+        hint.hidden = !recording || elapsed >= MIN_MS;
+        cancel.hidden = !["starting", "recording"].includes(state);
         cancel.disabled = !["starting", "recording"].includes(state);
       }
       function release(s, unlock = true) {
@@ -1194,7 +1202,6 @@
             if (session !== s || s.token !== token || disposed) return;
             s.started = performance.now();
             diagnostics.mark("recorder_start");
-            status.textContent = "Идёт запись.";
             transition("recording");
             s.timer = setInterval(() => tick(s), 100);
             s.analysisFrame = requestAnimationFrame(() => {
@@ -1394,6 +1401,15 @@
             y: event.clientY,
             started: performance.now(),
             lift: 0,
+            liftLimit: Math.min(
+              80,
+              Math.max(
+                0,
+                primary.getBoundingClientRect().top -
+                  heading.getBoundingClientRect().bottom -
+                  12,
+              ),
+            ),
           };
           primary.classList.add("dragging");
           try {
@@ -1410,10 +1426,10 @@
         if (!drag || event.pointerId !== drag.id) return;
         const dx = event.clientX - drag.x,
           dy = event.clientY - drag.y,
-          verticalLimit = dy < 0 ? 80 : 16;
+          verticalLimit = dy < 0 ? drag.liftLimit : 16;
         drag.lift = Math.max(drag.lift, -dy);
-        // Follow small movements directly, then resist long drags. The reserved
-        // space above the circle keeps even the maximum lift clear of the request.
+        // Follow the finger with resistance, within the space below the request.
+        // Compact idle needs no invisible spacer to preserve the same gesture.
         primary.style.setProperty("--drag-x", `${36 * Math.tanh(dx / 36)}px`);
         primary.style.setProperty(
           "--drag-y",
@@ -1529,13 +1545,31 @@
           await diagnostics.serverTrace();
         }
       }
-      const labels = {
-        pending: "Ожидает редактора",
-        approved: "Принято",
-        rejected: "Отклонено",
-        fraud: "Помечено как фрод",
-        published: "Опубликовано",
-      };
+      function showReview(element, data) {
+        element.replaceChildren();
+        const created =
+          typeof data.created_at === "string"
+            ? new Date(data.created_at.replace(" ", "T"))
+            : null;
+        if (created && Number.isFinite(created.getTime())) {
+          const time = document.createElement("time");
+          time.dateTime = created.toISOString();
+          time.textContent = new Intl.DateTimeFormat("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(created);
+          element.append(time);
+        }
+        if (data.transcript) {
+          if (element.childNodes.length) element.append(" · ");
+          const text = document.createElement("span");
+          text.textContent = data.transcript;
+          element.append(text);
+        }
+      }
       function schedule() {
         clearTimeout(poll);
         if (!disposed) poll = setTimeout(pollStatus, delay);
@@ -1556,15 +1590,13 @@
           const data = await response.json();
           if (disposed || reference !== pollingReference) return;
           status.textContent = data.transcript
-            ? "Текст отзыва сохранён. " +
-              (labels[data.editorial_state || data.moderation] ||
-                "Ожидает редактора")
+            ? "Текст отзыва сохранён."
             : "Запись доставлена. Обрабатываем.";
-          currentText.textContent = data.transcript || "";
+          showReview(currentText, data);
           if (data.state.includes("failed") || data.state.includes("unknown")) {
             status.textContent = data.transcript
-              ? "Текст отзыва сохранён и доступен редактору. Дополнительный анализ не завершён."
-              : "Запись сохранена. Расшифровка не завершена; редактор может проверить ошибку.";
+              ? "Текст отзыва сохранён. Дополнительный анализ не завершён."
+              : "Запись сохранена. Расшифровка не завершена; подробности в диагностике.";
             return;
           }
           if (
@@ -1607,9 +1639,7 @@
           for (const item of data.rows || []) {
             const paragraph = document.createElement("p");
             const state = item.editorial_state || item.moderation;
-            paragraph.textContent =
-              (labels[state] || "Обрабатывается") +
-              (item.transcript ? ": " + item.transcript : "");
+            showReview(paragraph, item);
             history.append(paragraph);
             ongoing ||= ![
               "approved",

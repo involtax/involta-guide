@@ -55,6 +55,7 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
         "transcript": text["original_text"] if text else review["transcript"],
         "moderation": review["moderation"],
         "editorial_state": state,
+        "created_at": str(review["created_at"]),
         "state": "result_ready"
         if review["transcript"]
         else ("processing_failed" if review["status"] == "failed" else "accepted"),
@@ -372,7 +373,10 @@ def routes(prefix: str) -> APIRouter:
             for item in data["rows"]:
                 imported = editorial_status(request, item["reference"], visitor)
                 if imported:
-                    item.update({k: v for k, v in imported.items() if k != "state"})
+                    item.update(
+                        {k: v for k, v in imported.items() if k not in {"state", "created_at"}}
+                    )
+                    item.setdefault("created_at", imported["created_at"])
         except VoiceUnavailable:
             rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
             data = {
@@ -386,7 +390,6 @@ def routes(prefix: str) -> APIRouter:
             if item["id"] not in known:
                 own = editorial_status(request, item["id"], visitor)
                 if own:
-                    own["created_at"] = str(item["created_at"])
                     data["rows"].append(own)
         if location:
             public = context(request).queries.public(location)
@@ -417,7 +420,8 @@ def routes(prefix: str) -> APIRouter:
                 raise HTTPException(503, "Статус временно недоступен") from None
             data = imported
         if imported:
-            data.update({k: v for k, v in imported.items() if k != "state"})
+            data.update({k: v for k, v in imported.items() if k not in {"state", "created_at"}})
+            data.setdefault("created_at", imported["created_at"])
         return JSONResponse(data, headers={"Cache-Control": "private,no-store"})
 
     return router

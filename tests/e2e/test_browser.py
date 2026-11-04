@@ -197,6 +197,38 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                     page.get_by_role("button", name="Запарсить эти данные", exact=True)
                 ).to_have_count(0)
                 expect(page.locator("[data-consent]")).to_have_count(0)
+                # Real Guide carrier, real microphone/MediaRecorder, no upload or AI calls.
+                screenshots = Path("var/screenshots")
+                screenshots.mkdir(parents=True, exist_ok=True)
+                voice = page.locator("#guide-voice")
+                for width, name in [(1440, "desktop"), (390, "mobile")]:
+                    page.set_viewport_size({"width": width, "height": 1000 if width > 500 else 844})
+                    voice.scroll_into_view_if_needed()
+                    voice.locator(".primary").evaluate("e=>e.blur()")
+                    expect(
+                        voice.get_by_role(
+                            "heading", name="Скажи, что ты думаешь и о каком ресторане."
+                        )
+                    ).to_be_visible()
+                    before = voice.locator(".primary").bounding_box()
+                    assert (
+                        abs(
+                            before["x"]
+                            + 36
+                            - (voice.bounding_box()["x"] + voice.bounding_box()["width"] / 2)
+                        )
+                        <= 1
+                    )
+                    page.screenshot(path=screenshots / f"voice-guide-idle-{name}.png")
+                    voice.get_by_role("button", name="Записать отзыв", exact=True).click()
+                    expect(voice).to_have_attribute("data-voice-state", "recording")
+                    during = voice.locator(".primary").bounding_box()
+                    assert abs(before["y"] - during["y"]) <= 2
+                    expect(voice.locator(".timer")).to_contain_text("00:")
+                    page.screenshot(path=screenshots / f"voice-guide-recording-{name}.png")
+                    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+                    page.keyboard.press("Escape")
+                    expect(voice).to_have_attribute("data-voice-state", "idle")
                 page.goto(base + "/admin/locations/ivanovo")
                 reset = page.locator('form[action$="/reset-and-fill"]')
                 expect(

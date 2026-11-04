@@ -163,6 +163,8 @@ Authorization-заголовков и сессионных cookies. Их иск�
 - [Текущее состояние данных и диффы](docs/CURRENT_STATE.md).
 - [Целевая архитектура беты](docs/BETA_CORE_SIMPLIFICATION_SPEC.md).
 - [Маршруты админки](docs/ADMIN_ROUTES.md) и [дизайн](docs/ADMIN_DESIGN.md).
+- [Визуальный язык публичного сайта](docs/VISUAL_STYLE.md) — читать перед изменением
+  публичного интерфейса; новые макеты становятся эталоном только после выбора Алекса.
 - [Voice API](docs/VOICE_API.md) и [UX кнопки записи](docs/VOICE_WIDGET_UX_SPEC.md).
 - [Логи](docs/LOGS.md), [эксплуатация Voice](docs/VOICE_RUNBOOK.md), [деплой](docs/DEPLOY.md).
 

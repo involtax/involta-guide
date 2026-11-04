@@ -5,8 +5,22 @@
 перезаписи и состояния preview нет. Смысл записи виджет не фильтрует.
 
 База — main `67c1db6` с упрощённой архитектурой беты и content_epoch. Один существующий
-SDK в Shadow DOM, один элемент управления на странице. Backend, ASR/анализ,
-модерация, схемы БД и серверные контракты в этой правке не меняются.
+SDK в Shadow DOM, один элемент управления на странице. В Guide gateway исправлено
+наличие created_at в fallback при недоступном Voice; онлайн сохраняется исходное
+время Voice. ASR/анализ, модерация и схемы БД не меняются.
+
+## Выбранный вариант №2
+
+[ТЗ и эталон](VOICE_WIDGET_DESIGN_SPEC.md) взяты из ветки design/voice-section-options.
+Тонкая линия #151515, слева uppercase-рубрика и заголовок Arial 34 px (31 px на
+узкой ширине), Georgia italic только на «ресторане.». Микрофон 72 px / SVG 25 px
+центрируется по всей доступной ширине, заголовок ограничен 620 px. Адаптивность
+учитывает ширину контейнера через container query, включая узкий standalone на
+широком экране. В idle нет подписи, строки «От 5 секунд» и пустых CSS-рядов.
+
+В истории и под новой расшифровкой — time с настоящим created_at, отформатированным
+в часовом поясе браузера, без «Ожидает редактора». Неверное/отсутствующее время
+не заменяется временем открытия страницы. Подсказка «Прослушай и отправь отзыв» удалена.
 
 ## Проверить на стенде
 
@@ -28,16 +42,17 @@ upload перехватывается в браузере, Guide/Voice worker/AS
 
 ## Управление и гарантии
 
-- Круглый микрофон 80 px / SVG 28 px, центр основной доступной ширины; дословная
-  просьба постоянно над ним. Во время записи на том же button появляется стоп.
+- Круглый микрофон 72 px / SVG 25 px, центр основной доступной ширины; рубрика и
+  инструкция постоянно над ним слева. Во время записи на том же button появляется стоп.
 - Запуск по pointerdown без искусственных задержек. Изначальный pointerup/click
   не нажимает стоп; Enter/Space и screen reader также выполняют одно действие.
 - Голубая браузерная подсветка отключена внутри Shadow DOM. Только на кружке
   touch-action: none и запрет выделения/callout; страница вокруг скроллится.
 - Pointer capture сохраняет исходный жест за пределами круга. Движение вверх
   возможно сразу или после нескольких секунд удержания; одна запись продолжается.
-- Круг следует transform с сопротивлением (вверх 80 px, в стороны 36, вниз 16),
-  лёгкой тенью/увеличением, возвращается за 240 мс. Зазор 64 px защищает просьбу;
+- Круг следует transform с сопротивлением (вверх в доступном зазоре под заголовком,
+  в стороны до 36 px, вниз до 16), лёгкой тенью/увеличением, возвращается за 240 мс.
+  Компактный idle не требует пустого резерва 64 px, инструкция не перекрывается;
   текст/таймер не прыгают. Reduced motion отключает пружину/масштабирование.
 - Ручной стоп, тишина, no-speech и 120 с финализируют/сохраняют/отправляют запись.
   Отмена не отправляет; системное прерывание/unmount сохраняет допустимую запись
@@ -87,7 +102,8 @@ gesture_start/gesture_end, причина и длительность удерж
 
 ## Проверки
 
-Локально: **30 браузерных тестов** UX/native MediaRecorder; Ruff/format/mypy,
+Локально: **42 целевые проверки** UX/native MediaRecorder/реального Guide и API;
+Ruff/format/mypy,
 node --check и проверка pinned assets. Полный CI актуального HEAD указан в PR.
 
 Проверено: границы 4,999/5,000/5,001; отдельный минимум backend сохранён; удержание
@@ -96,6 +112,10 @@ node --check и проверка pinned assets. Полный CI актуальн
 reload, lost accepted response и прежний ключ; старое короткое аудио и persisted 422;
 позднее разрешение, capture loss, unmount до POST; отмена при удержании; reduced motion;
 reset/content_epoch и поздний статус предыдущего отзыва.
+Также проверены 360/390/768/1440 px, узкий standalone при широком viewport,
+увеличенный текст, Tab/Enter/Space, компактный idle, центр круга и отсутствие
+горизонтальной прокрутки. Время проверено с UTC-offset/часовым поясом браузера,
+через Voice и в локальном fallback Guide.
 
 Стенд: Chromium 154/Linux с синтетическим русским input (не личная запись).
 Настоящий MediaRecorder/Silero, удержание → движение вверх → отпускание → стоп →
@@ -107,6 +127,26 @@ upload при съёмке его mock-ответ задержан, это не 
 фонем в этом окружении не проверены. Мобильный viewport не является телефоном.
 
 ## Скриншоты настоящего компонента стенда
+
+Реальный Guide (изолированная БД с тестовой подборкой, настоящий MediaRecorder,
+запись отменена без upload):
+
+| Состояние | Широкая страница | Телефонная ширина |
+| --- | --- | --- |
+| Idle | ![Guide desktop](screenshots/voice-widget/guide-idle-desktop.png) | ![Guide mobile](screenshots/voice-widget/guide-idle-mobile.png) |
+| Запись | ![Guide recording desktop](screenshots/voice-widget/guide-recording-desktop.png) | ![Guide recording mobile](screenshots/voice-widget/guide-recording-mobile.png) |
+
+Standalone SDK в предоставленном контейнере (idle/запись — настоящий recorder;
+для ожидания/ошибки разрешения использована управляемая тестовая media fixture):
+
+| Состояние | Широкий контейнер | Узкий контейнер |
+| --- | --- | --- |
+| Idle | ![Embed desktop](screenshots/voice-widget/embed-idle-desktop.png) | ![Embed mobile](screenshots/voice-widget/embed-idle-mobile.png) |
+| Запись | ![Embed recording desktop](screenshots/voice-widget/embed-recording-desktop.png) | ![Embed recording mobile](screenshots/voice-widget/embed-recording-mobile.png) |
+| Разрешение | ![Embed waiting desktop](screenshots/voice-widget/embed-waiting-desktop.png) | ![Embed waiting mobile](screenshots/voice-widget/embed-waiting-mobile.png) |
+| Ошибка | ![Embed error desktop](screenshots/voice-widget/embed-error-desktop.png) | ![Embed error mobile](screenshots/voice-widget/embed-error-mobile.png) |
+
+Ниже полный сценарий демостенда с mock upload и синтетическим русским input:
 
 ![Мобильный сценарий](screenshots/voice-widget/touch-drag-mobile.gif)
 

@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import expect, sync_playwright
 
 WIDGET = (Path(__file__).parents[2] / "src/involta_voice/static/widget.v1.js").read_text()
-REQUEST = "твой голос важен. скажи что ты думаешь и о каком ресторане"
+REQUEST = "Скажи, что ты думаешь и о каком ресторане."
 FAKE_RECORDER = r"""
 window.__streams=[];window.__contexts=[];window.__recorders=[];
 const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -44,7 +44,10 @@ def browser():
 @pytest.fixture
 def widget_page(browser):
     context = browser.new_context(
-        permissions=["microphone"], viewport={"width": 390, "height": 844}, has_touch=True
+        permissions=["microphone"],
+        viewport={"width": 390, "height": 844},
+        has_touch=True,
+        timezone_id="Europe/Moscow",
     )
     context.add_init_script(FAKE_RECORDER)
     page = context.new_page()
@@ -88,6 +91,8 @@ def widget_page(browser):
     expect(page.locator("audio")).to_have_count(0)
     expect(page.get_by_role("button", name="Отправить отзыв", exact=True)).to_have_count(0)
     expect(page.get_by_role("button", name="Записать заново", exact=True)).to_have_count(0)
+    expect(page.get_by_text("Ожидает редактора", exact=False)).to_have_count(0)
+    expect(page.get_by_text("Прослушай и отправь отзыв", exact=False)).to_have_count(0)
     assert not errors
     context.close()
 
@@ -140,7 +145,7 @@ def test_native_upward_drag_after_holding_continues_one_recording(widget_page, h
     page.clock.run_for(hold_ms)
     touch(cdp, "touchMove", x + 20, y - 140)
     offset = primary.evaluate("e=>parseFloat(e.style.getPropertyValue('--drag-y'))")
-    assert -80 < offset < -60
+    assert -30 < offset < -5
     assert primary.evaluate("e=>e.hasPointerCapture(window.__dragPointer)")
     assert (
         primary.bounding_box()["y"]
@@ -329,7 +334,7 @@ def test_cancel_permission_late_stream_and_second_embed_are_safe(widget_page):
     state(widget, "idle")
     page.clock.run_for(1)
     assert uploads == []
-    expect(widget.get_by_role("status")).to_be_empty()
+    expect(widget.locator(".status")).to_be_empty()
 
 
 def test_interruption_needs_retry_and_limit_sends_once(widget_page):
@@ -377,7 +382,8 @@ def test_unmount_keeps_finalized_valid_draft_and_closes_resources(widget_page):
 
 def test_keyboard_repeat_and_pointer_holds_never_toggle_twice(widget_page):
     page, widget, uploads = widget_page
-    widget.locator(".primary").focus()
+    page.keyboard.press("Tab")
+    expect(widget.locator(".primary")).to_be_focused()
     page.keyboard.down("Enter")
     state(widget, "recording")
     page.keyboard.down("Enter")
@@ -638,7 +644,112 @@ def test_late_status_of_previous_review_cannot_overwrite_a_new_recording(widget_
     press(page, widget)
     state(widget, "recording")
     pending[0].fulfill(json={"state": "result_ready", "transcript": "Старый результат"})
-    expect(widget.get_by_role("status")).to_have_text("Идёт запись.")
+    expect(widget.locator(".status")).to_be_empty()
     expect(widget.locator(".current")).to_be_empty()
     page.keyboard.press("Escape")
     assert len(uploads) == 1
+
+
+def test_history_uses_creation_time_in_browser_timezone_instead_of_editor_status(widget_page):
+    page, widget, uploads = widget_page
+    page.route(
+        "**/submissions/mine?*",
+        lambda route: route.fulfill(
+            json={
+                "rows": [
+                    {
+                        "created_at": "2026-11-04T05:07:00Z",
+                        "transcript": "Первый отзыв",
+                        "moderation": "pending",
+                    },
+                    {
+                        "created_at": "2026-11-04 11:12:00+03:00",
+                        "transcript": "Второй отзыв",
+                        "moderation": "approved",
+                    },
+                    {
+                        "created_at": "invalid",
+                        "transcript": "Старый отзыв",
+                        "moderation": "pending",
+                    },
+                ]
+            }
+        ),
+    )
+    page.reload()
+    times = widget.locator(".history time")
+    expect(times).to_have_count(2)
+    expect(times.nth(0)).to_have_attribute("datetime", "2026-11-04T05:07:00.000Z")
+    expect(times.nth(0)).to_contain_text("04.11.2026")
+    expect(times.nth(0)).to_contain_text("08:07")
+    expect(times.nth(1)).to_contain_text("11:12")
+    expect(widget.get_by_text("Старый отзыв", exact=True)).to_be_visible()
+    expect(widget.get_by_text("Invalid Date", exact=False)).to_have_count(0)
+    assert not uploads
+
+
+def test_current_transcript_shows_its_server_creation_time(widget_page):
+    page, widget, _ = widget_page
+    page.route(
+        "**/submissions/saved",
+        lambda route: route.fulfill(
+            json={
+                "state": "result_ready",
+                "moderation": "pending",
+                "created_at": "2026-11-04T05:07:00Z",
+                "transcript": "Новый отзыв",
+            }
+        ),
+    )
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "accepted")
+    page.clock.run_for(2000)
+    expect(widget.locator(".current time")).to_contain_text("08:07")
+    expect(widget.locator(".current span")).to_have_text("Новый отзыв")
+    expect(widget.get_by_role("status")).to_have_text("Текст отзыва сохранён.")
+
+
+@pytest.mark.parametrize("width", [360, 390, 768, 1440])
+def test_selected_design_has_only_invitation_and_centered_microphone_in_idle(widget_page, width):
+    page, widget, _ = widget_page
+    page.set_viewport_size({"width": width, "height": 1000})
+    title = widget.locator("h2")
+    primary = widget.get_by_role("button", name="Записать отзыв", exact=True)
+    expect(widget.locator(".kicker")).to_have_text("Твой голос важен")
+    expect(title).to_have_text(REQUEST)
+    expect(title.locator("em")).to_have_text("ресторане.")
+    expect(title.locator("br")).to_have_count(0)
+    expect(widget.locator(".caption")).to_have_count(0)
+    assert title.evaluate("e=>getComputedStyle(e).fontFamily").startswith("Arial")
+    assert widget.locator("section").evaluate("e=>getComputedStyle(e).borderTopWidth") == "1px"
+    box, container, heading = primary.bounding_box(), widget.bounding_box(), title.bounding_box()
+    assert box["width"] == box["height"] == 72
+    assert abs(box["x"] + 36 - (container["x"] + container["width"] / 2)) <= 1
+    assert heading["x"] == container["x"]
+    assert widget.locator(".stage").bounding_box()["height"] == 72
+    expect(widget.get_by_text("Записать отзыв", exact=True)).to_have_count(0)
+    expect(widget.get_by_text("От 5 секунд", exact=True)).to_have_count(0)
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    if width in {390, 1440}:
+        screenshots = Path("var/screenshots")
+        screenshots.mkdir(parents=True, exist_ok=True)
+        widget.screenshot(path=screenshots / f"voice-embed-idle-{width}.png")
+
+
+def test_narrow_standalone_uses_container_width_and_survives_large_text(widget_page):
+    page, widget, _ = widget_page
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    widget.evaluate("e=>e.style.width='280px'")
+    assert widget.locator("h2").evaluate("e=>getComputedStyle(e).fontSize") == "31px"
+    assert widget.locator("h2").bounding_box()["width"] <= 280
+    page.evaluate("""()=>{const r=document.querySelector('#a').shadowRoot;const s=document.createElement('style');
+      s.textContent='h2{font-size:62px}.kicker{font-size:20px}';r.append(s)}""")
+    assert widget.locator("h2").bounding_box()["width"] <= 280
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    assert widget.evaluate("e=>e.scrollWidth<=e.clientWidth")
+    primary = widget.locator(".primary").bounding_box()
+    assert abs(primary["x"] + 36 - (widget.bounding_box()["x"] + 140)) <= 1

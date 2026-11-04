@@ -129,7 +129,9 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         reference = result.json()["reference"]
         owner_cookie = client.cookies.get("guide_visitor")
         assert upload().json()["reference"] == reference
-        assert client.get("/guide/voice/api/v1/submissions/" + reference).status_code == 200
+        initial_status = client.get("/guide/voice/api/v1/submissions/" + reference)
+        assert initial_status.status_code == 200
+        intake_created_at = initial_status.json()["created_at"]
         client.cookies.clear()
         assert client.get("/guide/voice/api/v1/submissions/" + reference).status_code == 404
         assert (
@@ -154,6 +156,16 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
     worker = Worker(voice_engine, voice_settings, FakeProvider())
     assert worker.once() and worker.once()
     Consumer(engine, client_for(settings, voice_settings)).once()
+    with TestClient(app) as client:
+        client.cookies.set("guide_visitor", owner_cookie)
+        assert (
+            client.get("/guide/voice/api/v1/submissions/" + reference).json()["created_at"]
+            == intake_created_at
+        )
+        online = client.get(
+            "/guide/voice/api/v1/submissions/mine", params={"location": city["slug"]}
+        )
+        assert online.json()["rows"][0]["created_at"] == intake_created_at
     # Imported history remains usable with its location filter when Voice is down.
     from involta_guide.infrastructure.voice.client import VoiceUnavailable
 
@@ -173,7 +185,12 @@ def test_gateway_rewrites_actor_and_ownership_before_lost_202_retry(database, vo
         assert history.status_code == 200
         assert history.json()["rows"][0]["reference"] == reference
         assert history.json()["rows"][0]["transcript"]
-        assert client.get("/guide/voice/api/v1/submissions/" + reference).json()["transcript"]
+        offline_status = client.get("/guide/voice/api/v1/submissions/" + reference).json()
+        assert offline_status["transcript"]
+        assert history.json()["rows"][0]["created_at"] == str(
+            queries.get("reviews", reference)["created_at"]
+        )
+        assert offline_status["created_at"] == history.json()["rows"][0]["created_at"]
         app.state.context.settings.voice_enabled = False
         assert (
             client.post(
