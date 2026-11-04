@@ -111,7 +111,7 @@
 .review-transcripts > div + div { border-top: 1px solid var(--line); }
 .review-transcripts dt { font-size: 12px; font-weight: 600; }
 .review-transcripts dt small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 3px; line-height: 1.5; }
-.review-transcripts .recognition-dictionary { font-size: 12px; color: var(--muted); margin: 5px 0 0; white-space: normal; }
+.review-transcripts .recognition-dictionary, .review-transcripts .recognition-parameters { font-size: 12px; color: var(--muted); margin: 5px 0 0; white-space: normal; }
 .review-transcripts dd { margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .review-metadata { display: block; border-top: 1px solid var(--line); margin: 6px 0 0; padding: 11px 0 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .review-pagination { display: flex; justify-content: space-between; gap: 20px; font-size: 13px; }
@@ -125,7 +125,7 @@
   .review-label time { font-size: 10px; }
   .review-top > a { font-size: 11px; }
   .review-transcripts > div { grid-template-columns: 90px minmax(0,1fr); gap: 8px; }
-  .review-transcripts .recognition-dictionary { font-size: 11px; }
+  .review-transcripts .recognition-dictionary, .review-transcripts .recognition-parameters { font-size: 11px; }
   .review-transcripts dd { font-size: 13px; }
   .review-feed-heading { gap: 12px; }
   .review-feed-heading > a { max-width: 100px; }

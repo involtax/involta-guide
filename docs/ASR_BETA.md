@@ -1,5 +1,5 @@
 > Историческое сравнение GigaAM/Parakeet. Parakeet исключён владельцем.
-> Текущий профиль: [три варианта GigaAM](VOICE_SHERPA_COMPARISON.md).
+> Текущий профиль: [семь профилей GigaAM](VOICE_SHERPA_COMPARISON.md).
 
 # GigaAM / Parakeet: локальная бета распознавания
 

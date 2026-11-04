@@ -10,6 +10,7 @@ from involta_voice.asr import VAD
 from involta_voice.config import Settings
 from involta_voice.provider import ProviderFailure
 from involta_voice.sherpa import LocalSherpa, model_path, options
+from involta_voice.variants import SHERPA_PROFILES
 
 
 def settings(tmp_path):
@@ -43,14 +44,15 @@ def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
         LocalSherpa(config).call(options(config, "gigaam", "sherpa_plain", []), b"fixture")
 
 
-@pytest.mark.parametrize("engine", ["gigaam"])
+@pytest.mark.parametrize("variant", list(SHERPA_PROFILES))
 def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
-    tmp_path, monkeypatch, engine
+    tmp_path, monkeypatch, variant
 ):
     from involta_voice import sherpa
 
     config = settings(tmp_path)
-    request = options(config, engine, "sherpa_hotwords", ["Алхимист", "Бар / Кухня"])
+    engine = "gigaam"
+    request = options(config, engine, variant, ["Алхимист", "Бар / Кухня"], location_name="Плёс")
     for path in (model_path(config, engine), config.asr_models_dir / "vad" / VAD["revision"]):
         path.mkdir(parents=True)
         (path / "READY.json").write_text("{}")
@@ -90,7 +92,12 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
 
         assert kwargs["provider"] == "cpu" and kwargs["model_type"] == "nemo_transducer"
         assert kwargs["decoding_method"] == "modified_beam_search"
-        assert Path(kwargs["hotwords_file"]).read_text().splitlines() == request["dictionary"]
+        assert kwargs["max_active_paths"] == request["max_active_paths"]
+        assert kwargs["hotwords_score"] == request["hotwords_score"]
+        if request["dictionary"]:
+            assert Path(kwargs["hotwords_file"]).read_text().splitlines() == request["dictionary"]
+        else:
+            assert kwargs["hotwords_file"] == ""
         captured.update(kwargs)
         return Model()
 
@@ -121,7 +128,8 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     ]
     from pathlib import Path
 
-    assert not Path(captured["hotwords_file"]).exists()
+    if captured["hotwords_file"]:
+        assert not Path(captured["hotwords_file"]).exists()
     vad.silent = True
     with pytest.raises(ProviderFailure, match="Речь не обнаружена"):
         local.call(request, b"fixture")

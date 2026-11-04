@@ -17,7 +17,7 @@ from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 
 
-@pytest.fixture(params=[5, 6, 7, 8])
+@pytest.fixture(params=[5, 6, 7, 8, 9])
 def legacy_source(voice_database, request):
     settings, _ = voice_database
     settings = settings.model_copy(update={"database_schema": "public"})

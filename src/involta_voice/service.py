@@ -149,7 +149,9 @@ class VoiceService:
 
             names = frozen["location"].get("recognition_dictionary", [])
             frozen["sherpa_models"] = {
-                kind: sherpa_options(self.settings, engine, variant, names)
+                kind: sherpa_options(
+                    self.settings, engine, variant, names, location_name=frozen["location"]["name"]
+                )
                 for kind, (engine, variant) in SHERPA_STAGES.items()
             }
         execute(

@@ -66,7 +66,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         stages = (
             conn.execute(
                 text(
-                    "SELECT s.submission,s.run,s.kind,s.state,s.error,coalesce(s.request,r.snapshot->'sherpa_models'->s.kind) AS request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND s.kind IN ('transcription','comparison','evaluate_gigaam','sherpa_gigaam_plain','sherpa_gigaam_hotwords') ORDER BY s.run DESC"
+                    "SELECT s.submission,s.run,s.kind,s.state,s.error,coalesce(s.request,r.snapshot->'sherpa_models'->s.kind) AS request,r.snapshot->>'transcription_model' AS primary_engine FROM stages s JOIN runs r ON r.submission=s.submission AND r.number=s.run WHERE s.submission=ANY(CAST(:ids AS uuid[])) AND (s.kind IN ('transcription','comparison','evaluate_gigaam') OR s.kind LIKE 'sherpa_gigaam_%') ORDER BY s.run DESC"
                 ),
                 {"ids": references},
             )
@@ -105,7 +105,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                 ),
                 None,
             )
-            # Existing reviews retain their two original rows; no comparison is scheduled by reads.
+            # Existing reviews retain their saved profiles; no comparison is scheduled by reads.
             if variant != "onnx" and candidate is None and stage is None:
                 continue
             request = (
@@ -118,6 +118,8 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     "name": "GigaAM",
                     "variant_label": VARIANT_LABELS[variant],
                     "dictionary": request.get("dictionary", []) if stage or candidate else None,
+                    "max_active_paths": request.get("max_active_paths"),
+                    "hotwords_score": request.get("hotwords_score"),
                     "text": candidate["transcript"] if candidate else None,
                     "state": "completed"
                     if candidate

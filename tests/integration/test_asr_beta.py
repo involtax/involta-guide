@@ -42,7 +42,7 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     provider = Pair(failed)
     worker = Worker(engine, settings, provider)
-    assert all(worker.once() for _ in range(3))
+    assert all(worker.once() for _ in range(7))
     assert not worker.once()
     status = service.status(ref)
     assert status["transcript"] == (None if failed == "gigaam" else "Текст GigaAM")
@@ -50,10 +50,10 @@ def test_primary_only_publication_and_independent_model_results(voice_database, 
     assert "parakeet" not in json.dumps(status).lower()
     pair = reports(engine, [ref])[ref]
     assert {r["engine"] for r in pair} == {"gigaam"}
-    assert len(pair) == 3
-    assert sum(r["state"] == "failed" for r in pair) == (3 if failed else 0)
-    assert len(report(engine, ref)["candidates"]) == (0 if failed else 3)
-    assert provider.calls == ["gigaam"] * 3
+    assert len(pair) == 7
+    assert sum(r["state"] == "failed" for r in pair) == (7 if failed else 0)
+    assert len(report(engine, ref)["candidates"]) == (0 if failed else 7)
+    assert provider.calls == ["gigaam"] * 7
     assert "parakeet" not in provider.calls
     with engine.connect() as conn:
         assert conn.execute(
@@ -86,7 +86,7 @@ def test_saved_secondary_response_recovers_without_provider(voice_database):
             raise AssertionError("Must reuse saved response")
 
     assert Worker(engine, settings, NoCalls()).once()
-    assert reports(engine, [ref])[ref][2]["text"] == "Второй результат"
+    assert reports(engine, [ref])[ref][3]["text"] == "Второй результат"
     assert service.status(ref)["transcript"] != "Второй результат"
 
 
