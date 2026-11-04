@@ -166,10 +166,11 @@ def public_event(event: dict[str, Any]) -> dict[str, Any]:
         result["response_body"] = technical_body(event["response_body"], event.get("status"))
     report = event.get("report")
     if isinstance(report, dict):
-        draft = report.get("draft")
+        recording_field = "recording" if "recording" in report else "draft"
+        draft = report.get(recording_field)
         visible: dict[str, Any] = {
             "version": report.get("version"),
-            "draft": {
+            recording_field: {
                 k: draft[k]
                 for k in (
                     "bytes",
@@ -325,7 +326,7 @@ class UploadLogs:
             report = event.get("report")
             if not isinstance(report, dict):
                 continue
-            draft = report.get("draft")
+            draft = report.get("recording", report.get("draft"))
             if isinstance(draft, dict):
                 facts.update(
                     {
