@@ -1,4 +1,9 @@
 {% extends 'base.html' %}
+{% block social_meta %}
+{% with og_title='Инвольта гид', og_description='Города. Места, где вкусно.' %}
+{% include 'open_graph.html' %}
+{% endwith %}
+{% endblock %}
 {% block body %}
 <main>
 <section class="hero">
