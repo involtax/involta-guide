@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import expect, sync_playwright
 
 WIDGET = (Path(__file__).parents[2] / "src/involta_voice/static/widget.v1.js").read_text()
-REQUEST = "твой голос важен. скажи что ты думаешь и о каком ресторане"
+REQUEST = "Скажи, что ты думаешь и о каком ресторане."
 FAKE_RECORDER = r"""
 window.__streams=[];window.__contexts=[];window.__recorders=[];
 const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -44,7 +44,10 @@ def browser():
 @pytest.fixture
 def widget_page(browser):
     context = browser.new_context(
-        permissions=["microphone"], viewport={"width": 390, "height": 844}
+        permissions=["microphone"],
+        viewport={"width": 390, "height": 844},
+        has_touch=True,
+        timezone_id="Europe/Moscow",
     )
     context.add_init_script(FAKE_RECORDER)
     page = context.new_page()
@@ -85,6 +88,11 @@ def widget_page(browser):
     page.clock.install()
     page.clock.pause_at(datetime.now(UTC))
     yield page, page.locator("#a"), uploads
+    expect(page.locator("audio")).to_have_count(0)
+    expect(page.get_by_role("button", name="Отправить отзыв", exact=True)).to_have_count(0)
+    expect(page.get_by_role("button", name="Записать заново", exact=True)).to_have_count(0)
+    expect(page.get_by_text("Ожидает редактора", exact=False)).to_have_count(0)
+    expect(page.get_by_text("Прослушай и отправь отзыв", exact=False)).to_have_count(0)
     assert not errors
     context.close()
 
@@ -102,6 +110,7 @@ def press(page, widget):
     widget.locator(".primary").dispatch_event(
         "pointerdown", {"isPrimary": True, "button": 0, "pointerType": "touch"}
     )
+    widget.locator(".primary").dispatch_event("pointerup")
 
 
 def state(widget, value):
@@ -110,6 +119,150 @@ def state(widget, value):
 
 def report(widget):
     return json.loads(widget.locator("details pre").first.text_content())
+
+
+def touch(cdp, kind, x=0, y=0):
+    cdp.send(
+        "Input.dispatchTouchEvent",
+        {"type": kind, "touchPoints": [] if kind == "touchEnd" else [{"x": x, "y": y, "id": 1}]},
+    )
+
+
+@pytest.mark.parametrize("hold_ms", [0, 3000, 7000])
+def test_native_upward_drag_after_holding_continues_one_recording(widget_page, hold_ms):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    primary.evaluate(
+        "e=>e.addEventListener('pointerdown',event=>window.__dragPointer=event.pointerId)"
+    )
+    if hold_ms == 7000:
+        page.emulate_media(reduced_motion="reduce")
+    touch(cdp, "touchStart", x, y)
+    state(widget, "recording")
+    page.clock.run_for(hold_ms)
+    touch(cdp, "touchMove", x + 20, y - 140)
+    offset = primary.evaluate("e=>parseFloat(e.style.getPropertyValue('--drag-y'))")
+    assert -30 < offset < -5
+    assert primary.evaluate("e=>e.hasPointerCapture(window.__dragPointer)")
+    assert (
+        primary.bounding_box()["y"]
+        >= widget.locator("h2").bounding_box()["y"] + widget.locator("h2").bounding_box()["height"]
+    )
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    if hold_ms == 7000:
+        assert primary.evaluate("e=>getComputedStyle(e).transitionDuration") == "0s"
+    assert primary.evaluate("e=>getComputedStyle(e).webkitTapHighlightColor") == "rgba(0, 0, 0, 0)"
+    assert primary.evaluate("e=>getComputedStyle(e).touchAction") == "none"
+    touch(cdp, "touchEnd")
+    state(widget, "recording")
+    assert primary.evaluate(
+        "e=>!e.classList.contains('dragging') && !e.style.getPropertyValue('--drag-y')"
+    )
+    assert page.evaluate("__recorders.length===1 && !__recorders[0].stops")
+    assert not uploads
+    gesture = next(e for e in report(widget)["timeline"] if e["name"] == "gesture_end")
+    assert gesture["reason"] == "released" and gesture["lift_px"] == 140
+    expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
+    page.keyboard.press("Escape")
+
+
+def test_native_drag_owns_its_touch_but_outside_scroll_does_not_stop_recording(widget_page):
+    page, widget, uploads = widget_page
+    page.add_style_tag(content="body{margin:0;min-height:4000px}")
+    events = []
+    page.expose_function("capturePointerEvent", lambda event: events.append(event))
+    primary = widget.locator(".primary")
+    primary.evaluate(
+        "e=>{for(const t of ['pointerdown','pointercancel','pointerup'])e.addEventListener(t,event=>capturePointerEvent(event.type))}"
+    )
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    touch(cdp, "touchStart", x, y)
+    state(widget, "recording")
+    for delta in [20, 60, 100, 150]:
+        touch(cdp, "touchMove", x, y - delta)
+    touch(cdp, "touchEnd")
+    assert page.evaluate("scrollY") == 0
+    assert events == ["pointerdown", "pointerup"]
+    touch(cdp, "touchStart", 12, 700)
+    for delta in [20, 60, 100, 200]:
+        touch(cdp, "touchMove", 12, 700 - delta)
+    touch(cdp, "touchEnd")
+    assert page.evaluate("scrollY") > 0
+    state(widget, "recording")
+    assert not uploads
+    page.keyboard.press("Escape")
+
+
+def test_late_permission_drag_release_never_cancels_or_restarts_capture(widget_page):
+    page, widget, uploads = widget_page
+    page.evaluate("window.__delayPermission=true")
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    x, y = box["x"] + 40, box["y"] + 40
+    cdp = page.context.new_cdp_session(page)
+    touch(cdp, "touchStart", x, y)
+    state(widget, "starting")
+    wait_expression(page, "!!window.__latePermission")
+    page.clock.run_for(7000)
+    touch(cdp, "touchMove", x, y - 140)
+    touch(cdp, "touchEnd")
+    state(widget, "starting")
+    page.evaluate("__latePermission();window.__delayPermission=false")
+    state(widget, "recording")
+    assert page.evaluate("__recorders.length") == 1
+    assert not uploads
+    page.keyboard.press("Escape")
+
+
+def test_lost_capture_resets_drag_and_finalizes_valid_audio_once(widget_page):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    primary.dispatch_event("pointerdown", {"isPrimary": True, "button": 0, "pointerId": 4})
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    primary.dispatch_event("pointermove", {"pointerId": 4, "clientY": -120})
+    primary.dispatch_event("lostpointercapture", {"pointerId": 4})
+    primary.dispatch_event("pointercancel", {"pointerId": 4})
+    page.clock.run_for(1)
+    state(widget, "retry")
+    assert page.evaluate("__recorders[0].stops") == 1
+    assert not primary.evaluate("e=>e.classList.contains('dragging')")
+    assert not uploads
+
+
+@pytest.mark.parametrize("ending", ["escape", "limit", "unmount"])
+def test_ending_while_finger_is_held_releases_capture_without_restarting(widget_page, ending):
+    page, widget, uploads = widget_page
+    primary = widget.locator(".primary")
+    box = primary.bounding_box()
+    cdp = page.context.new_cdp_session(page)
+    primary.evaluate(
+        "e=>{window.__heldButton=e;e.addEventListener('pointerdown',event=>window.__heldPointer=event.pointerId)}"
+    )
+    touch(cdp, "touchStart", box["x"] + 40, box["y"] + 40)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    if ending == "escape":
+        page.keyboard.press("Escape")
+    elif ending == "limit":
+        page.clock.fast_forward(120000)
+    else:
+        page.evaluate("InvoltaVoice.unmount('a')")
+    page.clock.run_for(1)
+    touch(cdp, "touchEnd")
+    assert page.evaluate(
+        "!__heldButton.hasPointerCapture(__heldPointer) && !__heldButton.classList.contains('dragging')"
+    )
+    assert page.evaluate("__recorders.length===1 && __recorders[0].stops===1")
+    assert page.evaluate("__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
+    if ending == "limit":
+        state(widget, "accepted")
+    assert len(uploads) == (1 if ending == "limit" else 0)
 
 
 def test_gate_exact_pause_reset_unknown_frames_and_no_speech(widget_page):
@@ -133,7 +286,7 @@ def test_gate_exact_pause_reset_unknown_frames_and_no_speech(widget_page):
 
 
 @pytest.mark.parametrize("duration", [4999, 5000, 5001])
-def test_minimum_uses_stop_time_not_encoding_and_never_sends_automatically(widget_page, duration):
+def test_minimum_uses_stop_time_and_only_valid_audio_is_sent_automatically(widget_page, duration):
     page, widget, uploads = widget_page
     page.evaluate("window.__encodingDelay=250")
     original = widget.locator(".primary").element_handle()
@@ -149,8 +302,8 @@ def test_minimum_uses_stop_time_not_encoding_and_never_sends_automatically(widge
     press(page, widget)
     state(widget, "stopping")
     page.clock.run_for(250)
-    state(widget, "idle" if duration < 5000 else "preview")
-    assert uploads == []
+    state(widget, "idle" if duration < 5000 else "accepted")
+    assert len(uploads) == (0 if duration < 5000 else 1)
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
     events = report(widget)["timeline"]
     assert next(e["duration_ms"] for e in events if e["name"] == "stop_requested") == duration
@@ -159,8 +312,8 @@ def test_minimum_uses_stop_time_not_encoding_and_never_sends_automatically(widge
         assert "draft" not in report(widget)
         assert page.evaluate("__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
     else:
-        expect(widget.get_by_role("button", name="Отправить отзыв")).to_be_enabled()
-        assert report(widget)["draft"]["durationMs"] == duration
+        assert next(e["duration_ms"] for e in events if e["name"] == "blob_ready") == duration
+        assert report(widget)["draft"] is None
 
 
 def test_cancel_permission_late_stream_and_second_embed_are_safe(widget_page):
@@ -181,25 +334,28 @@ def test_cancel_permission_late_stream_and_second_embed_are_safe(widget_page):
     state(widget, "idle")
     page.clock.run_for(1)
     assert uploads == []
-    expect(widget.get_by_role("status")).to_be_empty()
+    expect(widget.locator(".status")).to_be_empty()
 
 
-def test_interruption_and_limit_finalize_once_without_upload(widget_page):
+def test_interruption_needs_retry_and_limit_sends_once(widget_page):
     page, widget, uploads = widget_page
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
     widget.locator(".primary").dispatch_event("pointercancel")
     page.clock.run_for(1)
-    state(widget, "preview")
+    state(widget, "retry")
     assert page.evaluate("__recorders[0].stops") == 1 and not uploads
-    widget.get_by_role("button", name="Записать заново").dispatch_event("click")
+    press(page, widget)
+    state(widget, "accepted")
+    assert len(uploads) == 1
+    press(page, widget)
     state(widget, "recording")
     page.clock.fast_forward(120000)
     page.clock.run_for(1)
-    state(widget, "preview")
+    state(widget, "accepted")
     assert page.evaluate("__recorders[1].stops") == 1
-    assert not uploads
+    assert len(uploads) == 2
     assert (
         next(e for e in report(widget)["timeline"] if e["name"] == "stop_requested")["reason"]
         == "limit"
@@ -219,14 +375,15 @@ def test_unmount_keeps_finalized_valid_draft_and_closes_resources(widget_page):
         "__contexts.every(c=>c.state==='closed') && __streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))",
     )
     page.evaluate("InvoltaVoice.mount('a',{location:'ivanovo'})")
-    state(widget, "preview")
+    state(widget, "retry")
     expect(widget.get_by_role("status")).to_contain_text("Восстановлена")
     assert not uploads
 
 
 def test_keyboard_repeat_and_pointer_holds_never_toggle_twice(widget_page):
     page, widget, uploads = widget_page
-    widget.locator(".primary").focus()
+    page.keyboard.press("Tab")
+    expect(widget.locator(".primary")).to_be_focused()
     page.keyboard.down("Enter")
     state(widget, "recording")
     page.keyboard.down("Enter")
@@ -241,13 +398,13 @@ def test_keyboard_repeat_and_pointer_holds_never_toggle_twice(widget_page):
     page.clock.run_for(2100)
     page.keyboard.press("Space")
     page.clock.run_for(1)
-    state(widget, "preview")
+    state(widget, "accepted")
     assert page.evaluate("__recorders.length===1 && __recorders[0].stops===1")
-    assert not uploads
+    assert len(uploads) == 1
 
 
 @pytest.mark.parametrize("speech", [True, False])
-def test_vad_autostop_finalizes_without_sending(widget_page, speech):
+def test_vad_autostop_sends_once_even_when_speech_was_not_detected(widget_page, speech):
     page, widget, uploads = widget_page
     press(page, widget)
     state(widget, "recording")
@@ -261,8 +418,8 @@ def test_vad_autostop_finalizes_without_sending(widget_page, speech):
             probability,
         )
     page.clock.run_for(1)
-    state(widget, "preview")
-    assert not uploads
+    state(widget, "accepted")
+    assert len(uploads) == 1
     assert page.evaluate("__recorders[0].stops") == 1
     reason = next(e for e in report(widget)["timeline"] if e["name"] == "stop_requested")["reason"]
     assert reason == ("silence" if speech else "no_speech")
@@ -279,46 +436,71 @@ def test_vad_failure_keeps_manual_stop_and_never_treats_missing_frames_as_silenc
     state(widget, "recording")
     press(page, widget)
     page.clock.run_for(1)
-    state(widget, "preview")
-    assert not uploads
+    state(widget, "accepted")
+    assert len(uploads) == 1
 
 
-def test_old_short_draft_is_playable_but_not_sendable(widget_page):
+def test_old_short_draft_remains_downloadable_and_does_not_block_new_recording(widget_page):
     page, widget, uploads = widget_page
     page.evaluate("""async()=>{
       InvoltaVoice.unmount('a');const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('involta-voice-drafts',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject});
       await new Promise(resolve=>{const tx=db.transaction('drafts','readwrite');tx.objectStore('drafts').put({key:'voice:visitor:ivanovo',id:'old-short',blob:new Blob(['old'],{type:'audio/webm'}),seconds:2,content_epoch:1,location:'ivanovo'});tx.oncomplete=resolve});db.close();
       InvoltaVoice.mount('a',{location:'ivanovo'});
     }""")
-    state(widget, "preview")
-    expect(widget.locator("audio")).to_be_visible()
-    expect(widget.get_by_role("button", name="Отправить отзыв")).to_be_disabled()
+    state(widget, "retry")
+    expect(widget.get_by_role("button", name="Записать отзыв")).to_be_enabled()
+    expect(widget.get_by_role("button", name="Повторить отправку")).to_have_count(0)
     expect(widget.get_by_role("link", name="Скачать аудио")).to_be_visible()
     assert not uploads
+    primary = widget.locator(".primary")
+    primary.dispatch_event("pointerdown", {"isPrimary": True, "button": 0, "pointerId": 4})
+    state(widget, "recording")
+    primary.dispatch_event("pointermove", {"pointerId": 4, "clientY": -100})
+    assert primary.evaluate(
+        "e=>e.classList.contains('dragging') && parseFloat(e.style.getPropertyValue('--drag-y'))<0"
+    )
+    primary.dispatch_event("pointerup", {"pointerId": 4})
+    page.keyboard.press("Escape")
 
 
 def test_server_rejected_duration_preserves_download_without_invalid_retry(widget_page):
     page, widget, uploads = widget_page
-    page.route(
-        "**/submissions?*",
-        lambda route: route.fulfill(
+    rejected = []
+
+    def reject(route):
+        rejected.append(route.request)
+        route.fulfill(
             status=422,
             content_type="application/json",
             body='{"error":{"code":"audio_too_short","message":"Запись короче 5 секунд","min_duration_seconds":5}}',
-        ),
-    )
+        )
+
+    page.route("**/submissions?*", reject)
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
     press(page, widget)
     page.clock.run_for(1)
-    state(widget, "preview")
-    widget.get_by_role("button", name="Отправить отзыв").dispatch_event("click")
     state(widget, "retry")
     expect(widget.get_by_role("alert")).to_contain_text("короче 5 секунд")
-    expect(widget.get_by_role("button", name="Отправить отзыв")).to_be_disabled()
+    expect(widget.get_by_role("button", name="Повторить отправку")).to_have_count(0)
+    expect(widget.get_by_role("button", name="Записать отзыв")).to_be_enabled()
     expect(widget.get_by_role("link", name="Скачать аудио")).to_be_visible()
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
+    wait_expression(
+        page,
+        """(async()=>{
+      const db=await new Promise(r=>{const q=indexedDB.open('involta-voice-drafts',1);q.onsuccess=()=>r(q.result)});
+      const saved=await new Promise(r=>{const q=db.transaction('drafts').objectStore('drafts').get('voice:visitor:ivanovo');q.onsuccess=()=>r(q.result)});
+      db.close();return !!saved?.blocked;
+    })()""",
+    )
+    page.reload()
+    state(widget, "retry")
+    expect(widget.get_by_role("button", name="Повторить отправку")).to_have_count(0)
+    expect(widget.get_by_role("button", name="Записать отзыв")).to_be_enabled()
+    expect(widget.get_by_role("link", name="Скачать аудио")).to_be_visible()
+    assert len(rejected) == 1
 
 
 def test_permission_wait_is_not_audio_duration(widget_page):
@@ -349,7 +531,7 @@ def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
     page.clock.run_for(5100)
     page.evaluate("__recorders[0].stop()")
     page.clock.run_for(1)
-    state(widget, "preview")
+    state(widget, "retry")
     assert report(widget)["draft"]["durationMs"] == 5100
     assert not uploads
 
@@ -360,10 +542,6 @@ def test_reset_rejects_new_widget_draft_without_relabelling_its_epoch(widget_pag
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
-    press(page, widget)
-    page.clock.run_for(1)
-    state(widget, "preview")
-    assert report(widget)["draft"]["content_epoch"] == 1
     attempted_epochs = []
     if reset_at == "identity":
         page.route(
@@ -384,7 +562,8 @@ def test_reset_rejects_new_widget_draft_without_relabelling_its_epoch(widget_pag
             )
 
         page.route("**/submissions?*", reject_stale)
-    widget.get_by_role("button", name="Отправить отзыв").dispatch_event("click")
+    press(page, widget)
+    page.clock.run_for(1)
     state(widget, "idle")
     expect(widget.get_by_role("alert")).to_contain_text("Локация сброшена")
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
@@ -398,3 +577,179 @@ def test_reset_rejects_new_widget_draft_without_relabelling_its_epoch(widget_pag
     }""")
         == 0
     )
+
+
+def test_auto_upload_disables_control_and_coalesces_duplicate_stop_events(widget_page):
+    page, widget, _ = widget_page
+    pending = []
+    page.route("**/submissions?*", lambda route: pending.append(route))
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    with page.expect_request("**/submissions?*"):
+        press(page, widget)
+        widget.locator(".primary").dispatch_event("pointercancel")
+        page.clock.run_for(1)
+    state(widget, "uploading")
+    expect(widget.get_by_role("button", name="Отправляем отзыв", exact=True)).to_be_disabled()
+    assert report(widget)["draft"]["local_copy_saved"]
+    press(page, widget)
+    widget.locator(".primary").dispatch_event("click", {"detail": 0})
+    assert len(pending) == 1
+    pending[0].fulfill(status=202, json={"reference": "saved", "state": "accepted"})
+    state(widget, "accepted")
+    assert page.evaluate("__recorders.length===1 && __recorders[0].stops===1")
+    expect(widget.get_by_role("button", name="Записать отзыв", exact=True)).to_be_enabled()
+
+
+def test_unmount_during_upload_identity_keeps_audio_without_a_late_post(widget_page):
+    page, widget, uploads = widget_page
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    pending = []
+    page.route("**/identity?*", lambda route: pending.append(route))
+    page.evaluate("""()=>{const native=fetch;window.__identityResolved=false;window.fetch=async(...args)=>{
+      const response=await native(...args);if(String(args[0]).includes('/identity?'))window.__identityResolved=true;return response;
+    }}""")
+    with page.expect_request("**/identity?*"):
+        press(page, widget)
+        page.clock.run_for(1)
+    state(widget, "uploading")
+    page.evaluate("InvoltaVoice.unmount('a')")
+    pending[0].fulfill(json={"ready": True, "content_epoch": 1})
+    wait_expression(page, "window.__identityResolved")
+    page.unroute("**/identity?*")
+    page.evaluate("InvoltaVoice.mount('a',{location:'ivanovo'})")
+    state(widget, "retry")
+    assert not uploads
+    press(page, widget)
+    state(widget, "accepted")
+    assert len(uploads) == 1
+    assert page.evaluate("__recorders.length") == 1
+
+
+def test_late_status_of_previous_review_cannot_overwrite_a_new_recording(widget_page):
+    page, widget, uploads = widget_page
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "accepted")
+    pending = []
+    page.route("**/submissions/saved", lambda route: pending.append(route))
+    with page.expect_request("**/submissions/saved"):
+        page.clock.run_for(2000)
+    press(page, widget)
+    state(widget, "recording")
+    pending[0].fulfill(json={"state": "result_ready", "transcript": "Старый результат"})
+    expect(widget.locator(".status")).to_be_empty()
+    expect(widget.locator(".current")).to_be_empty()
+    page.keyboard.press("Escape")
+    assert len(uploads) == 1
+
+
+def test_history_uses_creation_time_in_browser_timezone_instead_of_editor_status(widget_page):
+    page, widget, uploads = widget_page
+    page.route(
+        "**/submissions/mine?*",
+        lambda route: route.fulfill(
+            json={
+                "rows": [
+                    {
+                        "created_at": "2026-11-04T05:07:00Z",
+                        "transcript": "Первый отзыв",
+                        "moderation": "pending",
+                    },
+                    {
+                        "created_at": "2026-11-04 11:12:00+03:00",
+                        "transcript": "Второй отзыв",
+                        "moderation": "approved",
+                    },
+                    {
+                        "created_at": "invalid",
+                        "transcript": "Старый отзыв",
+                        "moderation": "pending",
+                    },
+                ]
+            }
+        ),
+    )
+    page.reload()
+    times = widget.locator(".history time")
+    expect(times).to_have_count(2)
+    expect(times.nth(0)).to_have_attribute("datetime", "2026-11-04T05:07:00.000Z")
+    expect(times.nth(0)).to_contain_text("04.11.2026")
+    expect(times.nth(0)).to_contain_text("08:07")
+    expect(times.nth(1)).to_contain_text("11:12")
+    expect(widget.get_by_text("Старый отзыв", exact=True)).to_be_visible()
+    expect(widget.get_by_text("Invalid Date", exact=False)).to_have_count(0)
+    assert not uploads
+
+
+def test_current_transcript_shows_its_server_creation_time(widget_page):
+    page, widget, _ = widget_page
+    page.route(
+        "**/submissions/saved",
+        lambda route: route.fulfill(
+            json={
+                "state": "result_ready",
+                "moderation": "pending",
+                "created_at": "2026-11-04T05:07:00Z",
+                "transcript": "Новый отзыв",
+            }
+        ),
+    )
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "accepted")
+    page.clock.run_for(2000)
+    expect(widget.locator(".current time")).to_contain_text("08:07")
+    expect(widget.locator(".current span")).to_have_text("Новый отзыв")
+    expect(widget.get_by_role("status")).to_have_text("Текст отзыва сохранён.")
+
+
+@pytest.mark.parametrize("width", [360, 390, 768, 1440])
+def test_selected_design_has_only_invitation_and_centered_microphone_in_idle(widget_page, width):
+    page, widget, _ = widget_page
+    page.set_viewport_size({"width": width, "height": 1000})
+    title = widget.locator("h2")
+    primary = widget.get_by_role("button", name="Записать отзыв", exact=True)
+    expect(widget.locator(".kicker")).to_have_text("Твой голос важен")
+    expect(title).to_have_text(REQUEST)
+    expect(title.locator("em")).to_have_text("ресторане.")
+    expect(title.locator("br")).to_have_count(0)
+    expect(widget.locator(".caption")).to_have_count(0)
+    assert title.evaluate("e=>getComputedStyle(e).fontFamily").startswith("Arial")
+    assert widget.locator("section").evaluate("e=>getComputedStyle(e).borderTopWidth") == "1px"
+    box, container, heading = primary.bounding_box(), widget.bounding_box(), title.bounding_box()
+    assert box["width"] == box["height"] == 72
+    assert abs(box["x"] + 36 - (container["x"] + container["width"] / 2)) <= 1
+    assert heading["x"] == container["x"]
+    assert widget.locator(".stage").bounding_box()["height"] == 72
+    expect(widget.get_by_text("Записать отзыв", exact=True)).to_have_count(0)
+    expect(widget.get_by_text("От 5 секунд", exact=True)).to_have_count(0)
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    if width in {390, 1440}:
+        screenshots = Path("var/screenshots")
+        screenshots.mkdir(parents=True, exist_ok=True)
+        widget.screenshot(path=screenshots / f"voice-embed-idle-{width}.png")
+
+
+def test_narrow_standalone_uses_container_width_and_survives_large_text(widget_page):
+    page, widget, _ = widget_page
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    widget.evaluate("e=>e.style.width='280px'")
+    assert widget.locator("h2").evaluate("e=>getComputedStyle(e).fontSize") == "31px"
+    assert widget.locator("h2").bounding_box()["width"] <= 280
+    page.evaluate("""()=>{const r=document.querySelector('#a').shadowRoot;const s=document.createElement('style');
+      s.textContent='h2{font-size:62px}.kicker{font-size:20px}';r.append(s)}""")
+    assert widget.locator("h2").bounding_box()["width"] <= 280
+    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+    assert widget.evaluate("e=>e.scrollWidth<=e.clientWidth")
+    primary = widget.locator(".primary").bounding_box()
+    assert abs(primary["x"] + 36 - (widget.bounding_box()["x"] + 140)) <= 1

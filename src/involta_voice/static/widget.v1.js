@@ -24,20 +24,17 @@
     const MIN_MS = 5000,
       MAX_MS = 120000,
       MAX_BYTES = 10 * 1024 * 1024;
-    const REQUEST =
-      "твой голос важен. скажи что ты думаешь и о каком ресторане";
     const TOO_SHORT =
       "Слишком коротко. Запиши хотя бы 5 секунд: назови ресторан и расскажи, что думаешь.";
     const allowed = {
-      idle: ["starting", "preview"],
-      starting: ["recording", "stopping", "idle", "error", "preview"],
+      idle: ["starting", "retry"],
+      starting: ["recording", "stopping", "idle", "error", "retry"],
       recording: ["stopping", "idle", "error"],
-      stopping: ["preview", "idle", "error"],
-      preview: ["starting", "uploading", "idle"],
+      stopping: ["uploading", "retry", "idle", "error"],
       uploading: ["accepted", "retry", "idle"],
       accepted: ["starting"],
       retry: ["starting", "uploading", "idle"],
-      error: ["starting", "idle", "preview"],
+      error: ["starting", "idle", "retry"],
     };
     class Machine {
       state = "idle";
@@ -218,9 +215,11 @@
             const records = tx.objectStore("drafts");
             const operation =
               mode === "put" ? records.put(value) : records.get(this.key);
-            if (mode === "delete")
+            if (mode === "delete" || mode === "block")
               operation.onsuccess = () => {
-                if (operation.result?.id === value) records.delete(this.key);
+                if (operation.result?.id !== value) return;
+                if (mode === "delete") records.delete(this.key);
+                else records.put({ ...operation.result, blocked: true });
               };
             tx.oncomplete = () => resolve(operation.result);
             tx.onerror = () => reject(tx.error);
@@ -297,6 +296,15 @@
         this.audioURL = null;
         this.download.hidden = true;
         this.report.draft = null;
+        this.render();
+      }
+      async block(id) {
+        try {
+          await this.store("block", id);
+        } catch (e) {
+          this.report.storage_error = e.message;
+        }
+        if (this.report.draft?.id === id) this.report.draft.blocked = true;
         this.render();
       }
       begin() {
@@ -428,10 +436,10 @@
         blob,
         key,
         durationMs = 0,
-        previewUrl,
         reference,
         poll,
         historyPoll,
+        drag = null,
         delay = 2000,
         blocked = false;
       const style = document.createElement("style");
@@ -440,7 +448,8 @@
           display: block;
           inline-size: 100%;
           min-inline-size: 0;
-          font: 16px/1.5 system-ui;
+          container-type: inline-size;
+          font: 15px/1.6 Arial, Helvetica, sans-serif;
           color: #151515;
         }
         * {
@@ -450,41 +459,67 @@
           display: none !important;
         }
         section {
-          padding: 48px 0;
+          padding: 27px 0 42px;
+          border-block-start: 1px solid #151515;
           background: #fff;
-          text-align: center;
+          text-align: start;
+        }
+        .kicker {
+          margin: 0 0 19px;
+          font-size: 10px;
+          font-weight: 600;
+          line-height: 1.6;
+          letter-spacing: 2px;
+          text-transform: uppercase;
         }
         h2 {
-          font-size: clamp(22px, 3vw, 32px);
+          font-size: 34px;
           font-weight: 500;
-          line-height: 1.28;
-          max-inline-size: 760px;
-          margin: 0 auto 32px;
+          line-height: 1.14;
+          letter-spacing: -0.04em;
+          max-inline-size: 620px;
+          margin: 0;
           text-wrap: balance;
+          overflow-wrap: anywhere;
+        }
+        h2 em {
+          font: italic 1.06em/1 Georgia, "Times New Roman", serif;
+          letter-spacing: -0.055em;
         }
         .stage {
-          min-block-size: 248px;
-          display: grid;
-          grid-template-rows: 80px 28px 28px 28px 44px;
-          grid-template-columns: 1fr;
-          justify-items: center;
-          align-content: start;
-          gap: 4px;
+          margin-block-start: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         .primary {
           position: relative;
-          inline-size: 80px;
-          block-size: 80px;
+          inline-size: 72px;
+          block-size: 72px;
           border: 0;
           border-radius: 50%;
-          background: #111;
+          background: #151515;
           color: white;
           padding: 0;
           display: grid;
           place-items: center;
-          touch-action: manipulation;
+          touch-action: none;
+          -webkit-tap-highlight-color: transparent;
+          -webkit-user-select: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+          transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
+          transition:
+            transform 240ms cubic-bezier(0.2, 0.85, 0.3, 1.15),
+            box-shadow 180ms ease;
           cursor: pointer;
           isolation: isolate;
+        }
+        .primary.dragging {
+          transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0) scale(1.03);
+          box-shadow: 0 14px 30px #0002;
+          transition: box-shadow 180ms ease;
+          will-change: transform;
         }
         .primary::before {
           content: "";
@@ -507,43 +542,34 @@
           animation: waiting 1.2s linear infinite;
         }
         .primary svg {
-          width: 28px;
-          height: 28px;
+          width: 25px;
+          height: 25px;
           fill: none;
           stroke: currentColor;
-          stroke-width: 1.8;
+          stroke-width: 1.5;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
         .primary:disabled {
           cursor: wait;
           opacity: 0.5;
         }
-        .stage > * {
-          grid-column: 1;
-        }
-        .primary {
-          grid-row: 1;
-        }
-        .caption {
-          grid-row: 2;
-          font-size: 15px;
-        }
-        .cancel {
-          grid-row: 5;
+        .control-status {
+          margin: 12px 0 0;
+          font-size: 14px;
+          text-align: center;
         }
         .timer {
-          grid-row: 3;
+          margin-block-start: 20px;
           font-variant-numeric: tabular-nums;
           font-size: 18px;
         }
         .hint {
+          margin-block-start: 4px;
           font-size: 13px;
-          color: #666;
+          color: #747474;
         }
-        .quiet {
-          visibility: hidden;
-        }
-        .cancel,
-        .secondary {
+        .cancel {
           font: inherit;
           background: none;
           border: 0;
@@ -554,27 +580,6 @@
           min-block-size: 44px;
           color: inherit;
         }
-        .preview {
-          min-block-size: 248px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 12px;
-        }
-        audio {
-          display: block;
-          inline-size: min(100%, 560px);
-          margin: 0 auto 10px;
-        }
-        .send {
-          min-block-size: 48px;
-          padding: 12px 28px;
-          background: #111;
-          color: #fff;
-          border: 1px solid #111;
-          font: inherit;
-          cursor: pointer;
-        }
         button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
@@ -582,8 +587,8 @@
         button:focus-visible,
         a:focus-visible,
         summary:focus-visible {
-          outline: 3px solid #606060;
-          outline-offset: 5px;
+          outline: 2px solid #151515;
+          outline-offset: 4px;
         }
         .status,
         .error,
@@ -591,7 +596,7 @@
         .current,
         .history {
           max-inline-size: 720px;
-          margin: 12px auto;
+          margin: 12px 0 0;
           overflow-wrap: anywhere;
         }
         .error {
@@ -600,16 +605,27 @@
         .vad-status {
           font-size: 13px;
           color: #666;
-          min-block-size: 20px;
         }
         .history {
           text-align: start;
           white-space: pre-wrap;
         }
+        .status:empty,
+        .error:empty,
+        .vad-status:empty,
+        .current:empty,
+        .history:empty {
+          display: none;
+        }
+        .current time,
+        .history time {
+          color: #747474;
+          font-size: 12px;
+        }
         details {
           text-align: start;
           max-inline-size: 760px;
-          margin: 28px auto 0;
+          margin: 0 0 28px;
           font-size: 13px;
         }
         summary {
@@ -635,6 +651,11 @@
             transform: rotate(360deg);
           }
         }
+        @container (max-width: 500px) {
+          section { padding-block-start: 28px; }
+          h2 { font-size: 31px; line-height: 1.12; max-inline-size: 300px; }
+          .stage { margin-block-start: 30px; }
+        }
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before {
@@ -644,19 +665,36 @@
           .primary.recording::before {
             transform: none;
           }
+          .primary,
+          .primary.dragging {
+            transition: none;
+            box-shadow: none;
+          }
+          .primary.dragging {
+            transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
+          }
+          .primary.waiting svg {
+            animation: none;
+          }
         }
       `;
       const panel = document.createElement("section");
       panel.setAttribute("aria-label", "Голосовой отзыв");
+      const kicker = document.createElement("p");
+      kicker.className = "kicker";
+      kicker.textContent = "Твой голос важен";
       const heading = document.createElement("h2");
-      heading.textContent = REQUEST;
+      const emphasis = document.createElement("em");
+      emphasis.textContent = "ресторане.";
+      heading.append("Скажи, что ты думаешь и о каком ", emphasis);
       const stage = document.createElement("div");
       stage.className = "stage";
       const primary = document.createElement("button");
       primary.type = "button";
       primary.className = "primary";
-      const caption = document.createElement("span");
-      caption.className = "caption";
+      const controlStatus = document.createElement("p");
+      controlStatus.className = "control-status";
+      controlStatus.hidden = true;
       const timerText = document.createElement("span");
       timerText.className = "timer";
       timerText.setAttribute("aria-hidden", "true");
@@ -666,10 +704,7 @@
       cancel.type = "button";
       cancel.className = "cancel";
       cancel.textContent = "Отменить";
-      stage.append(primary, caption, timerText, hint, cancel);
-      const preview = document.createElement("div");
-      preview.className = "preview";
-      preview.hidden = true;
+      stage.append(primary, controlStatus, timerText, hint, cancel);
       const status = document.createElement("p");
       status.className = "status";
       status.setAttribute("role", "status");
@@ -683,9 +718,9 @@
       const currentText = document.createElement("p");
       currentText.className = "current";
       panel.append(
+        kicker,
         heading,
         stage,
-        preview,
         status,
         error,
         vadStatus,
@@ -693,7 +728,7 @@
         history,
       );
       root.replaceChildren(style, panel);
-      const diagnostics = new Diagnostics(panel, {
+      const diagnostics = new Diagnostics(root, {
         key: "voice",
         api: api.href,
         location: options.location || "",
@@ -770,19 +805,13 @@
         else render();
       }
       const mic =
-        '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="10" y="3" width="8" height="14" rx="4"/><path d="M6 12v2a8 8 0 0 0 16 0v-2M14 22v4M9 26h10"/></svg>';
+        '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
       const square =
         '<svg aria-hidden="true" viewBox="0 0 28 28"><rect x="6" y="6" width="16" height="16" rx="1" fill="currentColor" stroke="none"/></svg>';
       const spinner =
         '<svg aria-hidden="true" viewBox="0 0 28 28"><path d="M24 14A10 10 0 1 1 14 4"/></svg>';
-      function button(label, fn, className) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = label;
-        b.className = className;
-        b.onclick = fn;
-        return b;
-      }
+      const upload =
+        '<svg aria-hidden="true" viewBox="0 0 28 28"><path d="M14 20V4M8 10l6-6 6 6M5 19v5h18v-5"/></svg>';
       function refreshAll() {
         for (const i of instances.values()) i.refresh();
       }
@@ -791,8 +820,6 @@
         render();
       }
       function clearBlob() {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = null;
         blob = null;
         key = null;
         durationMs = 0;
@@ -802,17 +829,21 @@
         if (disposed) return;
         const state = machine.state,
           recording = state === "recording",
-          waiting = state === "starting" || state === "stopping";
+          retrying = state === "retry" && !blocked,
+          waiting = ["starting", "stopping", "uploading"].includes(state);
+        if (!["starting", "recording"].includes(state)) resetDrag(state);
         target.dataset.voiceState = state;
-        const showingPreview =
-          !!blob && ["preview", "retry", "uploading"].includes(state);
-        stage.hidden = showingPreview;
-        preview.hidden = !showingPreview;
         primary.classList.toggle("recording", recording);
         primary.classList.toggle("waiting", waiting);
         primary.setAttribute(
           "aria-label",
-          recording ? "Остановить запись" : "Записать отзыв",
+          recording
+            ? "Остановить запись"
+            : state === "uploading"
+              ? "Отправляем отзыв"
+              : retrying
+                ? "Повторить отправку"
+                : "Записать отзыв",
         );
         primary.setAttribute("aria-busy", String(waiting));
         primary.disabled =
@@ -823,23 +854,34 @@
           "aria-disabled",
           String(waiting || primary.disabled),
         );
-        const icon = recording ? square : waiting ? spinner : mic;
+        const icon = recording
+          ? square
+          : waiting
+            ? spinner
+            : retrying
+              ? upload
+              : mic;
         const iconState = recording
           ? "stop"
           : waiting
             ? "waiting"
-            : "microphone";
+            : retrying
+              ? "upload"
+              : "microphone";
         if (primary.dataset.icon !== iconState) {
           primary.dataset.icon = iconState;
           primary.innerHTML = icon;
         }
-        caption.textContent = recording
-          ? "Стоп"
-          : waiting
-            ? state === "starting"
-              ? "Разреши доступ к микрофону"
+        controlStatus.hidden = !waiting && !retrying;
+        controlStatus.textContent = waiting
+          ? state === "starting"
+            ? "Разреши доступ к микрофону"
+            : state === "uploading"
+              ? "Отправляем отзыв…"
               : "Сохраняем запись"
-            : "Записать отзыв";
+          : retrying
+            ? "Повторить отправку"
+            : "";
         const elapsed =
           recording && session
             ? Math.max(0, performance.now() - session.started)
@@ -849,45 +891,11 @@
           : "";
         if (timerText.textContent !== timerValue)
           timerText.textContent = timerValue;
-        hint.textContent = recording ? "Минимум 5 секунд" : "От 5 секунд";
-        hint.style.gridRow = recording ? "4" : "3";
-        hint.classList.toggle(
-          "quiet",
-          waiting || (recording && elapsed >= MIN_MS),
-        );
-        cancel.classList.toggle(
-          "quiet",
-          !["starting", "recording"].includes(state),
-        );
+        timerText.hidden = !recording;
+        hint.textContent = "Минимум 5 секунд";
+        hint.hidden = !recording || elapsed >= MIN_MS;
+        cancel.hidden = !["starting", "recording"].includes(state);
         cancel.disabled = !["starting", "recording"].includes(state);
-        if (
-          showingPreview &&
-          preview.dataset.key !== `${key}:${state}:${blocked}`
-        ) {
-          preview.dataset.key = `${key}:${state}:${blocked}`;
-          preview.replaceChildren();
-          if (!previewUrl) previewUrl = URL.createObjectURL(blob);
-          const player = document.createElement("audio");
-          player.controls = true;
-          player.src = previewUrl;
-          player.setAttribute("aria-label", "Прослушать запись");
-          const sendButton = button(
-            state === "uploading" ? "Отправляем…" : "Отправить отзыв",
-            send,
-            "send",
-          );
-          sendButton.disabled = state === "uploading" || blocked;
-          const again = button(
-            "Записать заново",
-            () => start(true),
-            "secondary",
-          );
-          again.disabled = state === "uploading" || !!activeCapture;
-          const length = document.createElement("span");
-          length.className = "timer";
-          length.textContent = `${String(Math.floor(durationMs / 60000)).padStart(2, "0")}:${String(Math.floor(durationMs / 1000) % 60).padStart(2, "0")}`;
-          preview.append(player, length, sendButton, again);
-        }
       }
       function release(s, unlock = true) {
         clearInterval(s.timer);
@@ -1070,18 +1078,20 @@
           primary.style.setProperty("--level", String(Math.min(1, rms * 8)));
         }
       }
-      async function start(replace = false) {
-        if (
-          disposed ||
-          !["idle", "preview", "retry", "accepted", "error"].includes(
-            machine.state,
-          ) ||
-          activeCapture
-        )
-          return;
+      function canStart() {
+        return (
+          ["idle", "accepted", "error"].includes(machine.state) ||
+          (machine.state === "retry" && blocked)
+        );
+      }
+      async function start() {
+        if (disposed || !canStart() || activeCapture) return;
         error.textContent = "";
         status.textContent = "";
         vadStatus.textContent = "";
+        currentText.textContent = "";
+        clearTimeout(poll);
+        reference = null;
         const s = {
           token: ++token,
           id: crypto.randomUUID(),
@@ -1101,9 +1111,6 @@
         requestAnimationFrame(() => {
           if (session === s) diagnostics.mark("controls_painted");
         });
-        const replacement =
-          replace && key ? diagnostics.clear(key) : Promise.resolve();
-        if (replace) clearBlob();
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
           failStart(s, "Запись недоступна. Нужен современный браузер и HTTPS.");
           return;
@@ -1139,7 +1146,6 @@
           diagnostics.epoch = epoch;
           await discardStale(epoch);
           // A late IndexedDB restore must never be overwritten by a short/cancelled new attempt.
-          await replacement;
           let saved = null;
           try {
             saved = await diagnostics.store("get");
@@ -1150,11 +1156,16 @@
             incoming.getTracks().forEach((t) => t.stop());
             return;
           }
-          if (saved?.blob && !replace && !blob) {
+          if (
+            saved?.blob &&
+            !blob &&
+            !saved.blocked &&
+            (saved.durationMs ?? saved.seconds * 1000) >= MIN_MS
+          ) {
             release(s);
             session = null;
             restoreBlob(saved);
-            transition("preview");
+            transition("retry");
             return;
           }
           clearBlob();
@@ -1191,7 +1202,6 @@
             if (session !== s || s.token !== token || disposed) return;
             s.started = performance.now();
             diagnostics.mark("recorder_start");
-            status.textContent = "Идёт запись.";
             transition("recording");
             s.timer = setInterval(() => tick(s), 100);
             s.analysisFrame = requestAnimationFrame(() => {
@@ -1330,11 +1340,14 @@
         await diagnostics.save(blob, key, durationMs, s.epoch);
         release(s);
         if (disposed) return;
-        status.textContent = diagnostics.report.draft?.local_copy_saved
-          ? "Запись сохранена в браузере. Прослушай и отправь отзыв."
-          : "Запись готова. Скачай аудио перед закрытием страницы: локальное сохранение недоступно.";
         vadStatus.textContent = "";
-        transition("preview");
+        if (["manual", "silence", "no_speech", "limit"].includes(s.reason)) {
+          await send();
+        } else {
+          status.textContent =
+            "Запись прервалась. Аудио сохранено — можно повторить отправку.";
+          transition("retry");
+        }
       }
       function cancelAttempt() {
         const s = session;
@@ -1358,12 +1371,78 @@
       }
       function primaryAction() {
         if (machine.state === "recording") stop("manual");
-        else if (["idle", "accepted", "error"].includes(machine.state))
-          void start();
+        else if (machine.state === "retry" && !blocked) void send();
+        else if (canStart()) void start();
+      }
+      function resetDrag(reason = "released") {
+        const previous = drag;
+        drag = null;
+        primary.classList.remove("dragging");
+        primary.style.removeProperty("--drag-x");
+        primary.style.removeProperty("--drag-y");
+        if (previous && primary.hasPointerCapture(previous.id))
+          primary.releasePointerCapture(previous.id);
+        if (previous)
+          diagnostics.mark("gesture_end", {
+            reason,
+            held_ms: performance.now() - previous.started,
+            lift_px: previous.lift,
+          });
       }
       primary.addEventListener("pointerdown", (event) => {
-        if (!event.isPrimary || event.button !== 0) return;
+        if (!event.isPrimary || event.button !== 0 || primary.disabled || drag)
+          return;
+        if (canStart()) {
+          // Only the original start gesture follows the finger. Its release must
+          // never activate the stop that has appeared on this same button.
+          drag = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            started: performance.now(),
+            lift: 0,
+            liftLimit: Math.min(
+              80,
+              Math.max(
+                0,
+                primary.getBoundingClientRect().top -
+                  heading.getBoundingClientRect().bottom -
+                  12,
+              ),
+            ),
+          };
+          primary.classList.add("dragging");
+          try {
+            primary.setPointerCapture(event.pointerId);
+          } catch {
+            // Synthetic activations have no native pointer to capture.
+          }
+        }
         primaryAction();
+        if (drag)
+          diagnostics.mark("gesture_start", { pointer: event.pointerType });
+      });
+      primary.addEventListener("pointermove", (event) => {
+        if (!drag || event.pointerId !== drag.id) return;
+        const dx = event.clientX - drag.x,
+          dy = event.clientY - drag.y,
+          verticalLimit = dy < 0 ? drag.liftLimit : 16;
+        drag.lift = Math.max(drag.lift, -dy);
+        // Follow the finger with resistance, within the space below the request.
+        // Compact idle needs no invisible spacer to preserve the same gesture.
+        primary.style.setProperty("--drag-x", `${36 * Math.tanh(dx / 36)}px`);
+        primary.style.setProperty(
+          "--drag-y",
+          `${verticalLimit * Math.tanh(dy / verticalLimit)}px`,
+        );
+      });
+      primary.addEventListener("pointerup", (event) => {
+        if (drag?.id === event.pointerId) resetDrag();
+      });
+      primary.addEventListener("lostpointercapture", (event) => {
+        if (drag?.id !== event.pointerId) return;
+        resetDrag("capture_lost");
+        interrupt("pointer_capture_lost");
       });
       primary.addEventListener("click", (event) => {
         if (event.detail === 0) primaryAction();
@@ -1372,9 +1451,11 @@
         if (event.repeat && ["Enter", " "].includes(event.key))
           event.preventDefault();
       });
-      primary.addEventListener("pointercancel", () =>
-        interrupt("pointercancel"),
-      );
+      primary.addEventListener("pointercancel", (event) => {
+        if (drag && event.pointerId !== drag.id) return;
+        resetDrag("pointercancel");
+        interrupt("pointercancel");
+      });
       cancel.onclick = cancelAttempt;
       const escape = (event) => {
         if (event.key === "Escape" && activeCapture === instance) {
@@ -1398,10 +1479,12 @@
           !key ||
           blocked ||
           durationMs < MIN_MS ||
-          !["preview", "retry"].includes(machine.state)
+          disposed ||
+          !["stopping", "retry"].includes(machine.state)
         )
           return;
         error.textContent = "";
+        status.textContent = "";
         transition("uploading");
         diagnostics.begin();
         diagnostics.mark("upload_requested");
@@ -1414,6 +1497,7 @@
         });
         try {
           const currentEpoch = await identity();
+          if (disposed) return;
           if (!intentEpoch || currentEpoch !== intentEpoch) {
             await stale();
             return;
@@ -1450,6 +1534,7 @@
             return;
           }
           blocked = e.code === "audio_too_short";
+          if (blocked) void diagnostics.block(key);
           error.textContent =
             e.name === "TypeError"
               ? "Связь прервалась. Запись сохранена — повтори отправку."
@@ -1460,41 +1545,58 @@
           await diagnostics.serverTrace();
         }
       }
-      const labels = {
-        pending: "Ожидает редактора",
-        approved: "Принято",
-        rejected: "Отклонено",
-        fraud: "Помечено как фрод",
-        published: "Опубликовано",
-      };
+      function showReview(element, data) {
+        element.replaceChildren();
+        const created =
+          typeof data.created_at === "string"
+            ? new Date(data.created_at.replace(" ", "T"))
+            : null;
+        if (created && Number.isFinite(created.getTime())) {
+          const time = document.createElement("time");
+          time.dateTime = created.toISOString();
+          time.textContent = new Intl.DateTimeFormat("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(created);
+          element.append(time);
+        }
+        if (data.transcript) {
+          if (element.childNodes.length) element.append(" · ");
+          const text = document.createElement("span");
+          text.textContent = data.transcript;
+          element.append(text);
+        }
+      }
       function schedule() {
         clearTimeout(poll);
         if (!disposed) poll = setTimeout(pollStatus, delay);
       }
       async function pollStatus() {
-        if (disposed) return;
+        if (disposed || !reference) return;
+        const pollingReference = reference;
         if (document.hidden) {
           schedule();
           return;
         }
         try {
           const response = await fetch(
-            api.href + "/submissions/" + encodeURIComponent(reference),
+            api.href + "/submissions/" + encodeURIComponent(pollingReference),
             { credentials: "same-origin" },
           );
           if (!response.ok) throw new Error("status");
           const data = await response.json();
-          if (disposed) return;
+          if (disposed || reference !== pollingReference) return;
           status.textContent = data.transcript
-            ? "Текст отзыва сохранён. " +
-              (labels[data.editorial_state || data.moderation] ||
-                "Ожидает редактора")
+            ? "Текст отзыва сохранён."
             : "Запись доставлена. Обрабатываем.";
-          currentText.textContent = data.transcript || "";
+          showReview(currentText, data);
           if (data.state.includes("failed") || data.state.includes("unknown")) {
             status.textContent = data.transcript
-              ? "Текст отзыва сохранён и доступен редактору. Дополнительный анализ не завершён."
-              : "Запись сохранена. Расшифровка не завершена; редактор может проверить ошибку.";
+              ? "Текст отзыва сохранён. Дополнительный анализ не завершён."
+              : "Запись сохранена. Расшифровка не завершена; подробности в диагностике.";
             return;
           }
           if (
@@ -1506,6 +1608,7 @@
           delay = Math.min(delay * 1.5, 60000);
           schedule();
         } catch {
+          if (disposed || reference !== pollingReference) return;
           delay = Math.min(delay * 2, 60000);
           schedule();
         }
@@ -1536,9 +1639,7 @@
           for (const item of data.rows || []) {
             const paragraph = document.createElement("p");
             const state = item.editorial_state || item.moderation;
-            paragraph.textContent =
-              (labels[state] || "Обрабатывается") +
-              (item.transcript ? ": " + item.transcript : "");
+            showReview(paragraph, item);
             history.append(paragraph);
             ongoing ||= ![
               "approved",
@@ -1558,14 +1659,18 @@
         intentEpoch = saved.content_epoch;
         diagnostics.epoch = intentEpoch;
         durationMs = saved.durationMs ?? saved.seconds * 1000;
-        blocked = !Number.isFinite(durationMs) || durationMs < MIN_MS;
+        blocked =
+          !!saved.blocked ||
+          !Number.isFinite(durationMs) ||
+          durationMs < MIN_MS;
         status.textContent = blocked
-          ? "Сохранённая запись короче 5 секунд. Прослушай её и запиши отзыв заново."
-          : "Восстановлена неотправленная запись. Можно прослушать и отправить её.";
+          ? "Сохранённая запись не прошла проверку аудио. Её можно скачать в диагностике. Запиши новый отзыв."
+          : "Восстановлена неотправленная запись. Нажми, чтобы повторить отправку.";
         if (blocked) diagnostics.reveal();
       }
       function unmount() {
         if (disposed) return;
+        resetDrag("unmount");
         if (machine.state === "recording") stop("unmount");
         else if (machine.state === "starting") cancelAttempt();
         disposed = true;
@@ -1608,7 +1713,7 @@
             return;
           }
           restoreBlob(saved);
-          transition("preview");
+          transition("retry");
         }
       });
       return instance;

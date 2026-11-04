@@ -59,3 +59,11 @@ validation; historical >=1-second OutboxEvent records remain readable.
 The centered microphone/stop UI, silence detection, demo and pinned browser assets
 are described in [VOICE_WIDGET_UX_IMPLEMENTATION.md](VOICE_WIDGET_UX_IMPLEMENTATION.md).
 The widget retains each recording's original content_epoch across all retries.
+
+## Время в пользовательском списке и результате
+
+`GET /voice/api/v1/submissions/mine` и `GET /voice/api/v1/submissions/{reference}`
+сохраняют исходный `created_at` Voice. Если Voice недоступен, локальный ответ Guide
+содержит сохранённый `reviews.created_at`; время загрузки страницы не подставляется.
+Виджет показывает дату/время в часовом поясе браузера через `<time datetime="…">`
+вместо редакторского статуса. Поля состояния API сохраняются для обработки/опроса.
