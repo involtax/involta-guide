@@ -14,6 +14,9 @@ from uuid import uuid4
 
 import psycopg
 from psycopg import sql
+from psycopg.types.json import Jsonb
+
+from involta_guide.domain.rules import FACTORS
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,7 +37,7 @@ def main() -> None:
         }
     }
     docker = ["docker", "--host=unix:///var/run/docker.sock"]
-    for previous in ["review_urls"]:
+    for previous in ["review_urls", "beta_core"]:
         schema = "test_release_" + uuid4().hex
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
@@ -86,16 +89,38 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 conn.execute(
                     "INSERT INTO locations(id,name,region,slug,intro) VALUES(%s,'Current city','Region','current-city','Current intro')",
-                    (str(uuid4()),),
+                    (location_id := str(uuid4()),),
                 )
+                if previous == "beta_core":
+                    conn.execute(
+                        "INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,position,ranking,alex_star) VALUES(%s,%s,'Restaurant','Cuisine','Description','https://yandex.ru/maps/',37,%s,true)",
+                        (
+                            str(uuid4()),
+                            location_id,
+                            Jsonb({"scores": dict.fromkeys(FACTORS, 8), "totalScore": 10}),
+                        ),
+                    )
                 conn.execute("INSERT INTO settings VALUES('test-marker','keep')")
                 conn.execute("CREATE TABLE unrelated_original(payload text)")
                 conn.execute("INSERT INTO unrelated_original VALUES('before')")
-            assert call([*backup_command, "needed"]).strip() == b"manual-beta-transition"
+            assert call([*backup_command, "needed"]).strip() == (
+                b"yes" if previous == "beta_core" else b"manual-beta-transition"
+            )
             dump = call([*backup_command, "backup"])
             assert dump.startswith(b"PGDMP")
             call(["alembic", "upgrade", "head"])
             assert call([*backup_command, "needed"]).strip() == b"no"
+            if previous == "beta_core":
+                with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                    row = conn.execute("SELECT name,ranking,alex_star FROM restaurants").fetchone()
+                    assert row == ("Restaurant", {"scores": dict.fromkeys(FACTORS, 8)}, True)
+                    assert (
+                        conn.execute(
+                            "SELECT count(*) FROM information_schema.columns WHERE table_schema=%s AND table_name='restaurants' AND column_name='position'",
+                            (schema,),
+                        ).fetchone()[0]
+                        == 0
+                    )
             # A foreign object's dependency must make restore fail atomically, never CASCADE it.
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 conn.execute("UPDATE unrelated_original SET payload='changed independently'")
@@ -111,7 +136,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "beta_core"
+                    == "canonical_rank"
                 )
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)
@@ -121,6 +146,15 @@ def main() -> None:
                     == previous
                 )
                 assert conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
+                if previous == "beta_core":
+                    row = conn.execute(
+                        "SELECT position,ranking,alex_star FROM restaurants"
+                    ).fetchone()
+                    assert row == (
+                        37,
+                        {"scores": dict.fromkeys(FACTORS, 8), "totalScore": 10},
+                        True,
+                    )
                 assert (
                     conn.execute("SELECT value FROM settings WHERE key='test-marker'").fetchone()[0]
                     == "keep"
