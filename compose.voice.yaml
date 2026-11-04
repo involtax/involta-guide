@@ -1,34 +1,21 @@
-# Local Voice deployment: own PostgreSQL cluster/role and persistent audio volume.
+# Local Voice uses the same DATABASE_URL as Guide, schema voice and its audio volume.
 # Use a digest-qualified VOICE_IMAGE for a reviewed deployment; no production workflow changes.
 services:
-  voice-db:
-    image: ${VOICE_POSTGRES_IMAGE:-postgres:17-alpine}
-    environment:
-      POSTGRES_DB: voice
-      POSTGRES_USER: voice
-      POSTGRES_PASSWORD: ${VOICE_POSTGRES_PASSWORD:?Set VOICE_POSTGRES_PASSWORD}
-    volumes: [voice-postgres:/var/lib/postgresql/data]
-    healthcheck:
-      test: [CMD-SHELL, "pg_isready -U voice -d voice"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
   voice-migrate:
     image: ${VOICE_IMAGE:-involta-voice:local}
     build: .
-    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    env_file: ["${VOICE_ENV_FILE:-.env.voice}", "${GUIDE_ENV_FILE:-.env.local}"]
     command: [voice, migrate]
-    depends_on:
-      voice-db:
-        condition: service_healthy
     restart: "no"
-  voice-api:
+  voice:
+    stop_grace_period: 90s
     image: ${VOICE_IMAGE:-involta-voice:local}
     build: .
-    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    env_file: ["${VOICE_ENV_FILE:-.env.voice}", "${GUIDE_ENV_FILE:-.env.local}"]
     environment:
+      VOICE_URL: http://127.0.0.1:3100
       VOICE_DATA_DIR: /app/var/voice
-    command: [uvicorn, "involta_voice.main:create_app", --factory, --host, "0.0.0.0", --port, "3100", --no-access-log, --no-proxy-headers]
+    command: [uvicorn, "involta_guide.infrastructure.voice.runtime:create_app", --factory, --host, "0.0.0.0", --port, "3100", --no-access-log, --no-proxy-headers, --timeout-graceful-shutdown, "15"]
     ports: ["127.0.0.1:3100:3100"]
     volumes: [voice-audio:/app/var/voice]
     depends_on:
@@ -39,10 +26,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+    init: true
     restart: unless-stopped
   voice-worker:
     image: ${VOICE_IMAGE:-involta-voice:local}
-    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    env_file: ["${VOICE_ENV_FILE:-.env.voice}", "${GUIDE_ENV_FILE:-.env.local}"]
     environment:
       VOICE_DATA_DIR: /app/var/voice
       VOICE_HEARTBEAT_FILE: /tmp/involta-voice-worker
@@ -61,10 +49,11 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    init: true
     restart: unless-stopped
   voice-prepare-model:
     image: ${VOICE_IMAGE:-involta-voice:local}
-    env_file: ${VOICE_ENV_FILE:-.env.voice}
+    env_file: ["${VOICE_ENV_FILE:-.env.voice}", "${GUIDE_ENV_FILE:-.env.local}"]
     environment:
       VOICE_ASR_MODELS_DIR: /app/var/asr-models
       HF_HOME: /tmp/huggingface
@@ -73,6 +62,5 @@ services:
     volumes: [asr-models:/app/var/asr-models]
     restart: "no"
 volumes:
-  voice-postgres:
   voice-audio:
   asr-models:

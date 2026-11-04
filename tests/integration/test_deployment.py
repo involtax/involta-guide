@@ -46,8 +46,8 @@ if args[:2]==['volume','inspect']:sys.exit(0)
 if args[:2]==['image','inspect']:print(state['labels'][args[-1]]);sys.exit(0)
 if args[0]=='inspect':
  target=args[-1]
- if target in ('involta-guide','involta-guide-production-worker-1'):
-  service='web' if target=='involta-guide' else 'worker'
+ if target=='involta-guide' or target.startswith('involta-guide-production-'):
+  service='web' if target=='involta-guide' else target.removeprefix('involta-guide-production-').removesuffix('-1')
   if not state.get('services',{}).get(service):sys.exit(1)
   if '--format' in args:print(os.getenv('FAKE_OWNER','production'))
   sys.exit(0)
@@ -57,7 +57,14 @@ if args[0]=='inspect':
 if args[0]=='run' and '--entrypoint' in args:
  sys.exit(1 if os.getenv('FAKE_PRE_VOICE_IMAGE') in args else 0)
 if args[0]=='compose':
- command=next(x for x in args if x in ('up','ps','stop','rm','logs','run'))
+ command=next(x for x in args if x in ('up','ps','stop','rm','logs','run','config'))
+ if command=='config':
+  names=['web','worker']
+  for i,arg in enumerate(args):
+   if arg=='-f':names.extend(json.loads(Path(args[i+1]).read_text()).get('services',{}))
+  print('\n'.join(dict.fromkeys(names)));sys.exit(0)
+ if command=='run' and 'involta_guide.infrastructure.voice.shared_database' in args:
+  sys.exit(1 if os.getenv('FAKE_SHARED_FAIL') else 0)
  if command=='run' and 'involta_guide.infrastructure.persistence.release_backup' in args:
   operation=args[-1]
   if operation=='needed':print(os.getenv('FAKE_CUTOVER','no'))
@@ -67,11 +74,14 @@ if args[0]=='compose':
   sys.exit(0)
  if command=='run' and 'alembic' in args and os.getenv('FAKE_MIGRATION_FAIL')=='1':sys.exit(1)
  if command=='up':
-  services=[s for s in ('web','worker') if s in args]
+  services=[s for s in ('web','worker','voice','voice-worker','voice-api','voice-consumer') if s in args]
   for service in services:state.setdefault('services',{})[service]={'sha':os.environ['RELEASE_SHA'],'image':os.environ['IMAGE_REF']}
   save()
  elif command=='ps':print(args[-1])
- elif command=='rm':state['services']={};save()
+ elif command=='rm':
+  for service in list(state.get('services',{})):
+   if service in args:state['services'].pop(service)
+  save()
  sys.exit(0)
 raise SystemExit('Unexpected fake Docker invocation: '+str(args))
 """
@@ -80,7 +90,9 @@ raise SystemExit('Unexpected fake Docker invocation: '+str(args))
 def harness(tmp_path):
     root = tmp_path / "production"
     root.mkdir()
-    (root / ".env.production").write_text("PRIVATE_CONFIGURATION=unchanged\n")
+    (root / ".env.production").write_text(
+        "PRIVATE_CONFIGURATION=unchanged\nDATABASE_URL=postgresql://guide:fake-password@localhost/guide\n"
+    )
     (root / "deploy.env").write_text(
         "AUDIO_VOLUME=involta-guide_audio\nGUIDE_HTTP_PORT=3000\nBASE_PATH=/guide\nNETWORK_MODE=host\n"
     )
@@ -132,7 +144,10 @@ def test_success_pins_digest_and_cleans_credentials(tmp_path):
     assert not list(root.glob(".registry.*"))
     assert "test-only-registry-password" not in result.stdout + result.stderr
     assert json.loads(state.read_text())["services"]["worker"]["sha"] == A
-    assert (root / ".env.production").read_text() == "PRIVATE_CONFIGURATION=unchanged\n"
+    assert (
+        (root / ".env.production").read_text()
+        == "PRIVATE_CONFIGURATION=unchanged\nDATABASE_URL=postgresql://guide:fake-password@localhost/guide\n"
+    )
 
 
 def test_failed_update_restores_previous_release_without_deleting_data(tmp_path):
@@ -423,3 +438,51 @@ def test_image_only_rollback_never_starts_pre_beta_image_on_beta_database(tmp_pa
         call[0] == "docker" and "compose" in call[1] and "up" in call[1] and call[2] == A
         for call in commands
     )
+
+
+@pytest.mark.parametrize("failure", ["", "after_copy", "during_copy"])
+def test_combined_voice_rollout_and_rollback_use_matching_topology(tmp_path, failure):
+    root, state, env = harness(tmp_path)
+    assert deploy(root, env, A).returncode == 0
+    legacy = {"voice-api": {}, "voice-worker": {}, "voice-consumer": {}, "voice-db": {}}
+    (root / "releases" / A / "compose.voice.yaml").write_text(json.dumps({"services": legacy}))
+    with (root / "deploy.env").open("a") as stream:
+        stream.write("VOICE_STACK=1\n")
+    source = "VOICE_DATABASE_URL=postgresql://voice:fake-old@retired-db/voice\n"
+    (root / ".env.voice").write_text(source)
+    current = json.loads(state.read_text())
+    current["services"].update({name: {"sha": A, "image": IMAGES[A]} for name in legacy})
+    state.write_text(json.dumps(current))
+    options = dict(env)
+    if failure == "after_copy":
+        options["FAKE_FAIL_SHA"] = B
+    elif failure == "during_copy":
+        options["FAKE_SHARED_FAIL"] = "1"
+    result = deploy(root, options, B, "2-1")
+    services = json.loads(state.read_text())["services"]
+    if not failure:
+        assert result.returncode == 0, result.stderr
+        assert services["voice"]["sha"] == B
+        assert not {"voice-api", "voice-consumer", "voice-db"} & services.keys()
+    else:
+        assert result.returncode != 0
+        assert "Rollback to " + A + " succeeded" in result.stderr, result.stderr
+        assert services["voice-api"]["sha"] == A and services["voice-consumer"]["sha"] == A
+        assert "voice" not in services
+    if failure == "during_copy":
+        assert (root / ".env.voice").read_text() == source
+        assert "voice-db" in services
+    else:
+        assert "search_path%3Dvoice" in (root / ".env.voice").read_text()
+        assert "retired-db" not in (root / ".env.voice").read_text()
+        assert "voice-db" not in services
+    if not failure:
+        # A later external-health rollback must use the same topology and DSN
+        # as automatic rollback, without resurrecting the frozen source DB.
+        rollback = deploy(root, env, B, "2-1", "rollback")
+        assert rollback.returncode == 0, rollback.stderr
+        services = json.loads(state.read_text())["services"]
+        assert services["voice-api"]["sha"] == A
+        assert services["voice-consumer"]["sha"] == A
+        assert not {"voice", "voice-db"} & services.keys()
+        assert "search_path%3Dvoice" in (root / ".env.voice").read_text()

@@ -120,8 +120,6 @@ def main():
             assert app.get("OPENAI_API_KEY"), "OPENAI_API_KEY required for text analysis"
             postgres = inspect("involta-guide-postgres")
             assert postgres["Config"]["Labels"].get(OWNER) == "production"
-            pinned_postgres = postgres["Config"]["Image"]
-            assert re.fullmatch(r"postgres@sha256:[0-9a-f]{64}", pinned_postgres)
             backup = ROOT / "backups" / ("voice-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
             backup.mkdir(parents=True, mode=0o700)
             hashes = {}
@@ -165,7 +163,10 @@ def main():
                 capture_output=True,
                 text=True,
             )
-            if existing_voice.returncode == 0:
+            if (
+                existing_voice.returncode == 0
+                and json.loads(existing_voice.stdout)[0]["State"]["Running"]
+            ):
                 voice_db = json.loads(existing_voice.stdout)[0]
                 assert voice_file.exists() and app.get("VOICE_SERVICE_SECRET"), (
                     "Existing Voice configuration missing"
@@ -182,6 +183,14 @@ def main():
                     ],
                     backup / "voice.dump",
                 )
+            audio_exists = (
+                subprocess.run(
+                    [*DOCKER, "volume", "inspect", "involta-guide-production_voice-audio"],
+                    capture_output=True,
+                ).returncode
+                == 0
+            )
+            if audio_exists:
                 hashes["voice-audio.tar.gz"] = save_backup(
                     [
                         *DOCKER,
@@ -206,16 +215,8 @@ def main():
                 shutil.copyfile(voice_file, backup / ".env.voice")
                 (backup / ".env.voice").chmod(0o600)
             else:
-                password = secrets.token_hex(32)
-                write_config(
-                    voice_file,
-                    {
-                        "VOICE_DATABASE_URL": f"postgresql://voice:{password}@127.0.0.1:55439/voice",
-                        "VOICE_POSTGRES_PASSWORD": password,
-                        "VOICE_POSTGRES_IMAGE": pinned_postgres,
-                    },
-                )
-            # Preserve existing Voice DB/audio; no volume creation/reset outside Compose.
+                write_config(voice_file, {"VOICE_DATABASE_SCHEMA": "voice"})
+            # Voice shares DATABASE_URL with Guide; retain audio and existing settings.
             write_config(
                 voice_file,
                 {
@@ -265,7 +266,7 @@ def main():
             return
         assert sha == target_sha, "Another release is running; refusing to change it"
         command = compose(sha, image, deployment)
-        for service in ("web", "worker", "voice-db", "voice-api", "voice-worker", "voice-consumer"):
+        for service in ("web", "worker", "voice", "voice-worker"):
             healthy(command, service)
         if action == "activate":
             assert config(ROOT / ".env.voice")["VOICE_FAKE_PROVIDER"] == "false"
@@ -279,7 +280,7 @@ def main():
                 )
             )
         elif action == "backfill":
-            for service, cli in (("voice-api", "voice"),):
+            for service, cli in (("voice", "voice"),):
                 args = [cli, "asr-backfill"]
                 for execute in (False, True):
                     result = json.loads(
@@ -298,7 +299,7 @@ def main():
                     print(json.dumps({"service": service, "inventory": result}, ensure_ascii=False))
         else:
             result = json.loads(
-                run([*command, "exec", "-T", "voice-api", "voice", "asr-report"], timeout=600)
+                run([*command, "exec", "-T", "voice", "voice", "asr-report"], timeout=600)
             )
             print(
                 json.dumps({"healthy": True, "revision": sha, "beta": result}, ensure_ascii=False)

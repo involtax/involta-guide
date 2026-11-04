@@ -7,9 +7,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="VOICE_", env_file=".env.voice", extra="ignore", populate_by_name=True
+        env_prefix="VOICE_",
+        env_file=(".env.local", ".env.voice"),
+        extra="ignore",
+        populate_by_name=True,
     )
-    database_url: SecretStr
+    database_url: SecretStr = Field(validation_alias="DATABASE_URL")
+    database_schema: str = Field(default="voice", pattern=r"^[a-z_][a-z0-9_]{0,62}$")
     service_secret: SecretStr
     openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
     data_dir: Path = Path("var/voice")
@@ -34,5 +38,5 @@ class Settings(BaseSettings):
         if not self.database_url.get_secret_value().startswith(
             ("postgresql://", "postgresql+psycopg://")
         ):
-            raise ValueError("Voice requires a separate PostgreSQL database")
+            raise ValueError("Voice requires PostgreSQL DATABASE_URL")
         return self

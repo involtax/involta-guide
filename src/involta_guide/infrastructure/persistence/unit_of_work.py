@@ -18,7 +18,8 @@ def create_database(settings: Settings) -> Engine:
         pool_size=8,
         max_overflow=8,
         connect_args={
-            "options": f"-c search_path={settings.database_schema} -c statement_timeout=30000"
+            "connect_timeout": 10,
+            "options": f"-c search_path={settings.database_schema} -c statement_timeout=30000",
         },
         hide_parameters=True,
     )

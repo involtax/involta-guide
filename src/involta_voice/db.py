@@ -25,7 +25,15 @@ def database(settings: Settings) -> Engine:
     url = settings.database_url.get_secret_value().replace(
         "postgresql://", "postgresql+psycopg://", 1
     )
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        hide_parameters=True,
+        connect_args={
+            "connect_timeout": 10,
+            "options": f"-c search_path={settings.database_schema} -c statement_timeout=30000",
+        },
+    )
 
 
 def row(conn: Connection, query: str, **params: Any) -> dict[str, Any] | None:
@@ -43,26 +51,29 @@ def encoded(value: Any) -> str:
 
 def migrate(engine: Engine) -> None:
     with engine.begin() as conn:
-        execute(conn, "SELECT pg_advisory_xact_lock(47032001)")
-        exists = row(conn, "SELECT to_regclass('voice_schema_versions') AS name")
-        if not exists or not exists["name"]:
-            conn.exec_driver_sql((Path(__file__).parent / "migrations/001_initial.sql").read_text())
-        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=2"):
-            conn.exec_driver_sql(
-                (Path(__file__).parent / "migrations/002_guide_transcription.sql").read_text()
-            )
-        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=3"):
-            conn.exec_driver_sql(
-                (Path(__file__).parent / "migrations/003_asr_beta.sql").read_text()
-            )
-        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=4"):
-            conn.exec_driver_sql(
-                (Path(__file__).parent / "migrations/004_beta_core.sql").read_text()
-            )
-        if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=5"):
-            conn.exec_driver_sql(
-                (Path(__file__).parent / "migrations/005_no_money.sql").read_text()
-            )
+        migrate_connection(conn)
+
+
+def migrate_connection(conn: Connection) -> None:
+    # The connection's search_path selects the Voice-owned schema. No fallback
+    # to public: an absent Voice table must never resolve to a Guide table.
+    schema = conn.execute(text("SHOW search_path")).scalar_one()
+    quoted = conn.dialect.identifier_preparer.quote(schema)
+    execute(conn, "SELECT pg_advisory_xact_lock(47032001)")
+    conn.exec_driver_sql(f"CREATE SCHEMA IF NOT EXISTS {quoted}")
+    exists = row(conn, "SELECT to_regclass('voice_schema_versions') AS name")
+    if not exists or not exists["name"]:
+        conn.exec_driver_sql((Path(__file__).parent / "migrations/001_initial.sql").read_text())
+    if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=2"):
+        conn.exec_driver_sql(
+            (Path(__file__).parent / "migrations/002_guide_transcription.sql").read_text()
+        )
+    if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=3"):
+        conn.exec_driver_sql((Path(__file__).parent / "migrations/003_asr_beta.sql").read_text())
+    if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=4"):
+        conn.exec_driver_sql((Path(__file__).parent / "migrations/004_beta_core.sql").read_text())
+    if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=5"):
+        conn.exec_driver_sql((Path(__file__).parent / "migrations/005_no_money.sql").read_text())
 
 
 def snapshot(conn: Connection, settings: Settings) -> dict[str, Any]:

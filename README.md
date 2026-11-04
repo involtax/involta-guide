@@ -218,3 +218,9 @@ Production filesystem read-only, аудио хранится в отдельно
 
 Единый интерфейс админки, причины прежнего разнобоя и матрица ручной проверки:
 [ADMIN_DESIGN.md](docs/ADMIN_DESIGN.md).
+
+### Voice runtime
+
+Voice остаётся отдельным backend: контейнер `voice` объединяет API и доставку
+результатов в Guide, `voice-worker` выполняет ASR/анализ. PostgreSQL и база общие;
+таблицы Voice находятся в схеме `voice`. [Схема, переход и остановка](docs/VOICE_RUNTIME.md).

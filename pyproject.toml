@@ -17,7 +17,6 @@ guide = "involta_guide.cli:main"
 guide-worker = "involta_guide.infrastructure.jobs.worker:main"
 voice = "involta_voice.cli:main"
 voice-worker = "involta_voice.worker:main"
-guide-voice-consumer = "involta_guide.infrastructure.voice.consumer:main"
 [dependency-groups]
 dev = [
     "pytest>=8",

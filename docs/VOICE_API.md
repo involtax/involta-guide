@@ -1,6 +1,6 @@
 # Voice API, контракт 2
 
-Voice — отдельный backend с собственной БД/файлами. Guide — каталог и модерация.
+Voice — отдельный backend со схемой `voice` в общей PostgreSQL БД и своим аудиотомом. Guide — каталог и модерация. Runtime: [VOICE_RUNTIME.md](VOICE_RUNTIME.md).
 [OpenAPI](voice-openapi.json) · [DTO JSON Schema](voice-dtos.schema.json).
 Внутренние пути `/internal/v1` требуют Bearer service secret; настройки и ASR-оценки
 также передают административную сессию. Публичного доступа к Voice DB/API нет.

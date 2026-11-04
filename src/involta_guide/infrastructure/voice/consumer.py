@@ -1,4 +1,5 @@
 import time
+from threading import Event
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -6,8 +7,6 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 from sqlalchemy import text as sql_text
 
-from involta_guide.config import Settings
-from involta_guide.infrastructure.persistence.unit_of_work import create_database
 from involta_voice.contracts import OutboxEvent, SubmissionMetadata, validate_analysis
 from involta_voice.db import encoded, execute, row
 
@@ -17,6 +16,7 @@ from .client import VoiceClient
 class Consumer:
     def __init__(self, engine: Engine, client: VoiceClient) -> None:
         self.engine, self.client = engine, client
+        self.stopped = Event()
 
     def once(self) -> int:
         try:
@@ -38,6 +38,8 @@ class Consumer:
         )["events"]
         imported = 0
         for event in events:
+            if self.stopped.is_set():
+                break
             # Receipt must commit before a later event can advance the global cursor.
             # A database failure here aborts the batch and leaves the event unacknowledged.
             if self._receive(event):
@@ -56,6 +58,8 @@ class Consumer:
                 .all()
             )
         for event in pending:
+            if self.stopped.is_set():
+                break
             try:
                 imported += self._apply(event)
             except Exception as exc:
@@ -383,26 +387,3 @@ class Consumer:
                 id=event_id,
             )
         return 1
-
-
-def main() -> None:
-    settings = Settings()
-    engine = create_database(settings)
-    consumer = Consumer(engine, VoiceClient(settings))
-    backoff = 3
-    try:
-        while True:
-            try:
-                worked = consumer.once()
-                backoff = 3
-            except Exception as exc:
-                from .diagnostics import failure
-
-                if not getattr(exc, "voice_diagnosed", False):
-                    failure(exc, engine=engine)
-                worked = 0
-                backoff = min(60, backoff * 2)
-            if not worked:
-                time.sleep(backoff)
-    finally:
-        engine.dispose()

@@ -4,23 +4,21 @@
 rollback описаны в [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Старых архивных
 команд, Guide-транскрипции и редакторского голоса нет.
 
-Voice имеет отдельную PostgreSQL БД/роль и audio-том. Не давать его роли доступ
-к Guide DB и не публиковать internal API через nginx. Gateway Guide передаёт
-доверенный контекст, raw IP/UA/cookie и epoch. Единственный normal flow действует
-для посетителя и администратора. Отложенные жесты виджета не входят в изменение.
+Voice использует ту же PostgreSQL БД, что Guide, со схемой `voice` и отдельным
+аудиотомом. Контейнер `voice` запускает API и доставку результатов в Guide;
+`voice-worker` — ASR/анализ. Internal API не публикуется через Nginx.
+[Устройство, остановка и перенос существующей БД](VOICE_RUNTIME.md).
 
 Для локального запуска нужны Python 3.13, uv, PostgreSQL 17 и ffprobe:
 
 ```bash
 uv sync --frozen --extra voice-local
-# Настроить .env.voice по .env.voice.example; отдельные DB URL и service secret.
+# Настроить общий DATABASE_URL в .env.local и Voice параметры в .env.voice.
 uv run voice migrate
 uv run voice prepare-model
-uv run uvicorn involta_voice.main:create_app --factory --host 127.0.0.1 --port 3100 --no-access-log
+uv run uvicorn involta_guide.infrastructure.voice.runtime:create_app --factory --host 127.0.0.1 --port 3100 --no-access-log --timeout-graceful-shutdown 15
 # Другой процесс с тем же Voice окружением:
 uv run voice-worker
-# Guide окружение содержит только свой DATABASE_URL, VOICE_URL и общий service secret:
-uv run guide-voice-consumer
 ```
 
 В изолированной проверочной установке `VOICE_FAKE_PROVIDER=true` исключает реальные

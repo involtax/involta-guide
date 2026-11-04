@@ -150,8 +150,8 @@ def test_populated_voice_v3_transition_deletes_files_explicitly_and_keeps_sequen
     settings, engine = voice_database
     # This DB/role is disposable and belongs solely to this test.
     with engine.begin() as conn:
-        conn.exec_driver_sql("DROP SCHEMA public CASCADE")
-        conn.exec_driver_sql("CREATE SCHEMA public")
+        conn.exec_driver_sql(f"DROP SCHEMA {settings.database_schema} CASCADE")
+        conn.exec_driver_sql(f"CREATE SCHEMA {settings.database_schema}")
         from pathlib import Path
 
         import involta_voice

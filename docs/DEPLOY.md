@@ -1,3 +1,7 @@
+> Актуальная топология: общий PostgreSQL/одна БД; `voice` = API + доставка,
+> отдельного `voice-db`/`voice-consumer` нет. Переход, остановка и rollback:
+> [VOICE_RUNTIME.md](VOICE_RUNTIME.md).
+
 > Для beta_core сначала выполнить согласованный переход по [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Старые команды archive/backfill/guide-transcription больше не применяются. Обычный image-only rollback через эту границу запрещён.
 
 # Production через GitHub Actions
@@ -177,7 +181,7 @@ snapshots и image digests нужно сохранять для rollback.
 Нет `docker compose down`, `prune`, удаления volumes, firewall/SSH/DNS/TLS команд.
 При переходе `current_state` контроллер делает приватную резервную копию таблиц Guide
 и восстанавливает их перед возвратом старого образа, если проверка релиза провалилась.
-Одновременно остановлен consumer; отдельная БД Voice сохраняется. Подробности:
+Останавливаются все writers; Voice теперь находится в отдельной схеме общей БД. Подробности:
 [CURRENT_STATE.md](CURRENT_STATE.md). Последующие совместимые миграции выполняются
 через Alembic из нового образа; без конвертации используется обычный откат образа.
 Остановка web/worker на этапе миграции не затрагивает основной сайт.

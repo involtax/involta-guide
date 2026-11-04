@@ -49,4 +49,4 @@ USER 10001:10001
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import os,urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:3000'+os.environ.get('BASE_PATH','/guide')+'/health/ready',timeout=3)"]
-CMD ["uvicorn", "involta_guide.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "3000", "--no-access-log", "--no-proxy-headers"]
+CMD ["uvicorn", "involta_guide.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "3000", "--no-access-log", "--no-proxy-headers", "--timeout-graceful-shutdown", "15"]
