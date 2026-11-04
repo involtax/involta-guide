@@ -34,7 +34,7 @@ def render(base):
         page = browser.new_page(viewport={"width": 1238, "height": 650}, device_scale_factor=1)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        for number in range(1, 5):
+        for number in range(1, 6):
             page.goto(base + f"/preview.html?variant={number}", wait_until="load")
             for frame in page.frames[1:]:
                 frame.wait_for_selector("button svg")
@@ -42,10 +42,13 @@ def render(base):
                 button = frame.locator("button").bounding_box()
                 assert button and button["width"] >= 44 and button["height"] >= 44
                 assert frame.locator("h2").is_visible()
-            page.screenshot(path=ROOT / "screenshots" / f"{number:02d}.png", full_page=True)
+            name = "02-approved.png" if number == 5 else f"{number:02d}.png"
+            page.screenshot(path=ROOT / "screenshots" / name, full_page=True)
         assert not errors, errors
         browser.close()
-        print("Rendered 4 comparisons: desktop + mobile, no horizontal overflow or JS errors.")
+        print(
+            "Rendered 4 alternatives and the selected revision: desktop + mobile, no horizontal overflow or JS errors."
+        )
 
 
 if __name__ == "__main__":

@@ -25,3 +25,6 @@ button svg{width:25px;height:25px}button:focus-visible{outline:2px solid var(--i
  .variant-3 .voice{padding-top:58px}.variant-3 h2{font-size:30px;letter-spacing:-.05em}.variant-3 .invitation{font-size:14px;margin-top:18px}.variant-3 .action{margin-top:27px}
  .variant-4 .voice{padding-top:26px;min-height:385px}.variant-4 .frame{padding:26px 16px}.variant-4 h2{font-size:33px;max-width:230px;margin:auto}.variant-4 h2 em{display:block}.variant-4 .invitation{font-size:14px;margin-top:17px}
 }
+
+/* Selected variant: only the invitation and microphone in idle. */
+.variant-2.approved .voice{min-height:0;padding-bottom:42px}
