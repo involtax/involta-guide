@@ -11,8 +11,7 @@ from involta_guide.domain.entities import RuleViolation
 from involta_guide.domain.rules import KINDS
 
 from ..models import Base
-
-PUBLIC = """(l.listed OR l.id IN (WITH RECURSIVE useful AS (SELECT id,parent_id FROM locations WHERE active=1 AND initialized_at IS NOT NULL UNION SELECT p.id,p.parent_id FROM locations p JOIN useful u ON p.id=u.parent_id WHERE p.active=1) SELECT id FROM useful))"""
+from .public_catalogue import PUBLIC, public_location_catalogue
 
 
 def row_dict(row: Any) -> Record:
@@ -192,6 +191,9 @@ class PostgresRepository:
             params,
         )
         return {"rows": rows, "total": total, "page": page, "pages": pages}
+
+    def public_location_catalogue(self) -> list[Record]:
+        return public_location_catalogue(self.session)
 
     def allowed(self, restaurant_id: str, location_id: str) -> bool:
         return bool(

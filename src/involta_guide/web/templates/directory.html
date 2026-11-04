@@ -4,36 +4,43 @@
 {% include 'open_graph.html' %}
 {% endwith %}
 {% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{settings.path('/assets/location-search/location-search.css')}}">
+{% endblock %}
 {% block body %}
 <main>
-<section class="hero">
+<section class="hero search-hero">
 <p class="eyebrow">ЕДА. МЕСТА. ЛИЧНЫЙ ОПЫТ.</p>
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-<div class="hero-bottom">
-<p>Короткие подборки ресторанов в городах, районах и на курортах. Выбираем внимательно. Прислушиваемся к вам.</p>
-<span class="counter">{{ total }}<small>городов с подборками</small>
-</span>
+<form class="destination-search" action="{{settings.path('/')}}" method="get" role="search" data-location-search>
+<label for="destination">Куда отправимся?</label>
+<div class="search-control">
+<div class="search-surface">
+<div class="search-input-row">
+<svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+<input id="destination" type="search" name="q" value="{{q}}" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-describedby="search-status">
+<button type="button" class="search-clear" aria-label="Очистить поиск" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+<button type="submit" class="search-submit">Найти</button>
 </div>
+<div class="search-suggestions" hidden inert aria-hidden="true">
+<div class="search-panel-content">
+<div class="search-separator" aria-hidden="true"></div>
+</div>
+</div>
+</div>
+</div>
+<script type="application/json" id="location-catalogue">{{location_catalogue|tojson}}</script>
+<p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
+</form>
+<p class="search-intro">Короткие подборки ресторанов в городах, районах и на курортах.<br class="desktop-break"> Выбираем внимательно. Прислушиваемся к вам.</p>
 </section>
 <section class="cities">
 <div class="section-heading">
-<h2>Куда отправимся?</h2>
-<span class="muted">01 / География</span>
+<h2>{{'Результаты поиска' if q else 'Города с подборками'}}</h2>
+<span class="muted">{{result.total}} {{'найдено' if q else 'городов'}}</span>
 </div>
-<form class="search location-search" action="{{ settings.path('/') }}">
-<label class="sr-only" for="q">Город, район или курорт</label>
-<input id="q" name="q" value="{{ q }}" placeholder="Город, район или курорт">
-<button>Найти ↗</button>
-</form>
-<p class="muted">
-{%if q%}
-Найдено: {{ result.total }}
-{%else%}
-Города с готовыми подборками
-{%endif%}
-</p>
 <div class="city-grid">
 {%for c in result.rows%}
 <a class="city-link" href="{{settings.path('/'+c.slug)}}">
@@ -52,7 +59,7 @@
 {%if not result.total%}
 <p>Пока не нашли такую локацию. Попробуйте другое название.</p>
 {%endif%}
-<nav class="pagination" aria-label="Страницы справочника">
+{%if result.pages>1%}<nav class="pagination" aria-label="Страницы справочника">
 {%if result.page>1%}
 <a href="?{{page_query(result.page-1)}}">← Назад</a>
 {%endif%}
@@ -60,7 +67,12 @@
 {%if result.page<result.pages%}
 <a href="?{{page_query(result.page+1)}}">Дальше →</a>
 {%endif%}
-</nav>
+</nav>{%endif%}
 </section>
 </main>
 {%endblock%}
+{% block scripts %}
+<script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
+<script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
+<script defer src="{{settings.path('/assets/location-search/location-search.js')}}"></script>
+{% endblock %}

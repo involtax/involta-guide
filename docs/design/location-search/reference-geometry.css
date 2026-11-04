@@ -1,0 +1,23 @@
+/* Same porcelain palette/shadows and blue 02; only spacing and radii change. */
+html[data-search-geometry="reference"] { --search-radius:40px; }
+html[data-search-geometry="reference"] .search-control { height:80px; }
+html[data-search-geometry="reference"] .search-input-row { min-height:78px; }
+html[data-search-geometry="reference"] .search-control input { height:78px; }
+html[data-search-geometry="reference"] .search-submit { width:132px;min-width:132px;height:54px;margin:12px;padding:12px 24px;border-radius:999px; }
+html[data-search-geometry="reference"] .search-symbol { margin-left:26px; }
+html[data-search-geometry="reference"] .search-suggestions { padding:10px 12px 12px; }
+html[data-search-geometry="reference"] .destination-results { border-radius:22px;max-height:min(456px,47dvh); }
+html[data-search-geometry="reference"] .destination-result { min-height:72px;padding:14px 18px;border-radius:20px; }
+html[data-search-geometry="reference"] .search-menu-footer { margin-left:12px;margin-right:12px; }
+html[data-search-geometry="reference"] .search-input-row::after { left:26px;right:26px; }
+html[data-preview="geometry"] .destination-results { max-height:none; }
+@media (max-width:650px) {
+  html[data-preview="geometry"] main { padding:14px; }
+  html[data-search-geometry="reference"] { --search-radius:35px; }
+  html[data-search-geometry="reference"] .search-control { height:70px; }
+  html[data-search-geometry="reference"] .search-input-row { min-height:68px; }
+  html[data-search-geometry="reference"] .search-control input { height:68px; }
+  html[data-search-geometry="reference"] .search-submit { width:90px;min-width:90px;height:46px;margin:11px;padding:10px 15px; }
+  html[data-search-geometry="reference"] .search-suggestions { padding:8px 8px 12px; }
+  html[data-search-geometry="reference"] .destination-result { padding-left:14px;padding-right:14px;border-radius:20px; }
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кнопка 02: две геометрии — Инвольта гид</title>
+<link rel="stylesheet" href="gallery.css">
+<style>
+.comparison-state { margin:28px 0 16px;color:#747474;font-size:12px;font-weight:400;letter-spacing:.06em; }
+.closed-preview { height:150px; }
+.open-preview { height:450px; }
+@media(max-width:800px) { .closed-preview { height:135px; }.open-preview { height:470px; } }
+</style>
+</head>
+<body>
+<header>
+<p class="eyebrow">ИНВОЛЬТА ГИД · МАКЕТЫ НА ТЕСТОВЫХ ДАННЫХ</p>
+<h1>Синяя капсула. <em>Две геометрии.</em></h1>
+<p>А — выбранный вариант №02. Б — отступы и скругления по вашему референсу. Цвет и тени одинаковые.</p>
+</header>
+<h2 class="comparison-state">ЗАКРЫТОЕ ПОЛЕ</h2>
+<div class="variant-grid">
+<section class="variant-card"><div class="variant-heading"><h2>А · Выбранный №02</h2><a href="index.html?button=02" target="_blank" rel="noopener">На главной →</a></div><p class="variant-description">Исходные пропорции поля и кнопки.</p><iframe class="closed-preview" src="index.html?button=02&comparison=1&state=idle" title="А: исходный вариант, закрыт"></iframe></section>
+<section class="variant-card"><div class="variant-heading"><h2>Б · По референсу</h2><a href="index.html?button=02&geometry=reference" target="_blank" rel="noopener">На главной →</a></div><p class="variant-description">Полная капсула, одинаковые зазоры вокруг кнопки.</p><iframe class="closed-preview" src="index.html?button=02&geometry=reference&comparison=1&state=idle" title="Б: по референсу, закрыт"></iframe></section>
+</div>
+<h2 class="comparison-state">РАСКРЫТЫЙ ПОИСК</h2>
+<div class="variant-grid">
+<section class="variant-card"><div class="variant-heading"><h2>А · Выбранный №02</h2></div><p class="variant-description">Скругление корпуса 24 px. Кнопка 50 px высотой.</p><iframe class="open-preview" src="index.html?button=02&comparison=1" title="А: исходный вариант, раскрыт"></iframe></section>
+<section class="variant-card"><div class="variant-heading"><h2>Б · По референсу</h2></div><p class="variant-description">Скругление корпуса 40 px. Кнопка 54 px, внутренний зазор 12 px.</p><iframe class="open-preview" src="index.html?button=02&geometry=reference&comparison=1" title="Б: по референсу, раскрыт"></iframe></section>
+</div>
+<footer>В обоих случаях поисковая строка и подсказки образуют одну общую форму. Отступы адаптированы под размер поля гида.</footer>
+</body>
+</html>

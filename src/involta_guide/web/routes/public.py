@@ -2,10 +2,11 @@ from urllib.parse import urlencode
 from uuid import UUID
 from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
+from involta_guide.domain.location_search import search_locations
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
@@ -29,28 +30,30 @@ def routes(prefix: str) -> APIRouter:
         )
 
     @router.get(prefix + "/")
-    def directory(request: Request, q: str = "", page: str = "1") -> Response:
+    def directory(
+        request: Request, q: str = Query("", max_length=100), page: str = "1"
+    ) -> Response:
         ctx = context(request)
         try:
             page_number = int(page)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid page number") from exc
         searching = bool(q.strip())
-        result = ctx.queries.directory(
-            query=q,
-            kind="" if searching else "city",
-            page=page_number,
-            status="active",
-            filled_only=not searching,
-            public_only=True,
-        )
-        total = (
-            ctx.queries.directory(kind="city", status="active", filled_only=True, public_only=True)[
-                "total"
-            ]
-            if searching
-            else result["total"]
-        )
+        catalogue = ctx.queries.public_location_catalogue()
+        if searching:
+            matches = search_locations(catalogue, q)
+            pages = max(1, (len(matches) + 59) // 60)
+            current = max(1, min(pages, page_number))
+            result = {
+                "rows": matches[(current - 1) * 60 : current * 60],
+                "total": len(matches),
+                "page": current,
+                "pages": pages,
+            }
+        else:
+            result = ctx.queries.directory(
+                kind="city", page=page_number, status="active", filled_only=True, public_only=True
+            )
         request.state.audience_page = True
         return request.app.state.templates.TemplateResponse(
             request=request,
@@ -58,8 +61,21 @@ def routes(prefix: str) -> APIRouter:
             context={
                 "settings": ctx.settings,
                 "q": q,
+                "location_catalogue": [
+                    {
+                        "name": row["name"],
+                        "context": " · ".join(
+                            dict.fromkeys(
+                                value
+                                for value in (KINDS[row["kind"]], row["parent_name"], row["region"])
+                                if value
+                            )
+                        ),
+                        "url": ctx.settings.path("/" + row["slug"]),
+                    }
+                    for row in catalogue
+                ],
                 "result": result,
-                "total": total,
                 "kinds": KINDS,
                 "indexable": True,
                 "page_query": lambda n: urlencode({"q": q, "page": n}),

@@ -97,6 +97,10 @@ class Queries:
         with self.uow() as uow:
             return uow.repo.search_locations(**options)
 
+    def public_location_catalogue(self) -> list[Record]:
+        with self.uow() as uow:
+            return uow.repo.public_location_catalogue()
+
     def overview(self) -> Record:
         with self.uow() as uow:
             return uow.repo.summary()
