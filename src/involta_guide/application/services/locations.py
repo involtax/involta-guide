@@ -97,6 +97,10 @@ class Queries:
         with self.uow() as uow:
             return uow.repo.search_locations(**options)
 
+    def public_directory(self, query: str, page: int | None = None) -> Record:
+        with self.uow() as uow:
+            return uow.repo.public_directory(query, page)
+
     def overview(self) -> Record:
         with self.uow() as uow:
             return uow.repo.summary()

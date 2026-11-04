@@ -375,7 +375,7 @@ e.dispose()
                 assert pending == 0, result
             self.log(service=service, pending_files=pending)
         current = self.guide_inventory(self.new)
-        assert current["revision"] == "audience_stats", current
+        assert current["revision"] == "location_suggestions", current
 
         for key in ("locations", "owned_restaurants", "stars"):
             assert current[key] == self.inventory[key], f"Inventory changed: {key}"

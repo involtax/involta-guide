@@ -183,26 +183,6 @@ main {
   margin-bottom: 29px;
   line-height: 1.5;
 }
-.hero-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 45px;
-}
-.hero-bottom p {
-  max-width: 360px;
-  font-size: 16px;
-  margin: 0;
-}
-.counter {
-  font-size: 57px;
-  line-height: 1;
-  letter-spacing: -3px;
-}
-.counter small {
-  letter-spacing: 0;
-  margin-top: 10px;
-}
 .section-heading {
   display: flex;
   align-items: center;
@@ -708,15 +688,6 @@ blockquote {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0 25px;
   }
-  .hero-bottom {
-    gap: 30px;
-  }
-  .counter {
-    font-size: 42px;
-  }
-  .hero-bottom p {
-    font-size: 14px;
-  }
   .voice-section {
     padding: 30px;
     gap: 30px;
@@ -765,21 +736,6 @@ blockquote {
 @media (max-width: 550px) {
   h1 {
     font-size: 57px;
-  }
-  .hero-bottom {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .counter {
-    font-size: 36px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-  }
-  .counter small {
-    margin: 0;
-    font-size: 10px;
-    max-width: 80px;
   }
   .section-heading h2 {
     font-size: 22px;
@@ -899,12 +855,6 @@ blockquote {
   gap: 12px;
 }
 @media (max-width: 550px) {
-  .location-search {
-    flex-wrap: wrap;
-  }
-  .location-search input {
-    width: 100%;
-  }
   .city-hero h1 {
     font-size: 48px;
   }
