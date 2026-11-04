@@ -128,6 +128,7 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
     )
     names = [f"Ресторан {i:03}" for i in range(205)] + ["Алхимист"]
     with engine.begin() as conn:
+        conn.execute(text("UPDATE locations SET name='Плёс' WHERE id=:id"), {"id": city["id"]})
         conn.execute(
             text(
                 "INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,active) VALUES(:id,:city,:name,'','','',0)"
@@ -155,7 +156,7 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
         reference = response.json()["reference"]
         with ve.connect() as conn:
             saved = conn.execute(text("SELECT metadata FROM submissions")).scalar_one()
-            assert saved["location"]["recognition_dictionary"] == sorted(names)
+            assert saved["location"]["recognition_dictionary"] == sorted(["Плёс", *names])
         with engine.begin() as conn:
             conn.execute(text("UPDATE restaurants SET name='Переименован' WHERE name='Алхимист'"))
         worker = Worker(ve, vs, SixResults())
@@ -166,6 +167,7 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
         assert page.status_code == 200
         assert page.text.count('class="recognition-dictionary"') == 6
         assert page.text.count("Алхимист") == 2
+        assert page.text.count("Плёс · Ресторан 000") == 2
         assert "Переименован" not in page.text
         assert page.text.count("Sherpa · со словарём") == 2
         assert "Ресторан 204" in page.text
