@@ -39,7 +39,7 @@ def routes(prefix: str) -> APIRouter:
                 review["reference"],
                 [
                     {
-                        "name": "GigaAM" if engine == "gigaam" else "Parakeet",
+                        "name": "GigaAM",
                         "variant_label": VARIANT_LABELS[variant],
                         "dictionary": None,
                         "text": review["transcript"]
@@ -53,6 +53,9 @@ def routes(prefix: str) -> APIRouter:
                     if review["reference"] or variant == "onnx"
                 ],
             )
+            review["pair"] = [
+                candidate for candidate in review["pair"] if candidate.get("name") == "GigaAM"
+            ]
         return render(
             request,
             "voice_admin.html",

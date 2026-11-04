@@ -24,7 +24,7 @@ def test_voice_provider_rejects_analysis_without_a_cloud_client(tmp_path):
     assert not hasattr(provider, "analysis")
 
 
-@pytest.mark.parametrize("engine", ["gigaam", "parakeet"])
+@pytest.mark.parametrize("engine", ["gigaam"])
 def test_asr_same_protocol_and_empty_speech_is_not_invented(tmp_path, monkeypatch, engine):
     import numpy as np
 

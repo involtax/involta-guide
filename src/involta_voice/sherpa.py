@@ -12,7 +12,7 @@ from typing import Any
 from .asr import VAD, decode
 from .config import Settings
 from .provider import ProviderFailure
-from .variants import dictionary_names
+from .variants import SHERPA_PROFILES, dictionary_names
 
 # Includes the NeMo TDT beam-search/length-reward fix, upstream PR #4084.
 RUNTIME_REVISION = "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb"
@@ -26,21 +26,16 @@ MODELS: dict[str, dict[str, Any]] = {
         "feature_dim": 64,
         "license": "MIT",
     },
-    "parakeet": {
-        "repository": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
-        "revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78",
-        "files": ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
-        "decoder": "decoder.int8.onnx",
-        "joiner": "joiner.int8.onnx",
-        "feature_dim": 128,
-        "license": "CC-BY-4.0",
-    },
 }
 
 
-def options(settings: Settings, engine: str, variant: str, names: list[str]) -> dict[str, Any]:
-    if variant not in ("sherpa_plain", "sherpa_hotwords"):
+def options(
+    settings: Settings, engine: str, variant: str, names: list[str], *, location_name: str = ""
+) -> dict[str, Any]:
+    if variant not in SHERPA_PROFILES:
         raise ValueError("Неизвестный вариант Sherpa")
+    score, paths, source = SHERPA_PROFILES[variant]
+    dictionary = [location_name] if source == "city" else names if source == "catalogue" else []
     return {
         "engine": "sherpa-onnx",
         "model": engine,
@@ -53,10 +48,10 @@ def options(settings: Settings, engine: str, variant: str, names: list[str]) -> 
         "feature_dim": MODELS[engine]["feature_dim"],
         "model_type": "nemo_transducer",
         "decoding_method": "modified_beam_search",
-        "max_active_paths": 4,
-        "hotwords_score": 1.5,
-        "length_reward": 0.5 if engine == "parakeet" else 0.0,
-        "dictionary": dictionary_names(names) if variant == "sherpa_hotwords" else [],
+        "max_active_paths": paths,
+        "hotwords_score": score,
+        "length_reward": 0.0,
+        "dictionary": dictionary_names(dictionary),
         "dictionary_encoding": "tokens-longest-match-v1",
         "vad_revision": VAD["revision"],
         "max_speech_duration_s": 20,

@@ -156,15 +156,21 @@ try:
                 response = internal.post("/internal/v1/admin/recognitions", json=[ref])
                 response.raise_for_status()
                 recognitions = response.json()[ref]
-                if len(recognitions) == 6 and all(r["state"] == "completed" for r in recognitions):
+                if len(recognitions) == 7 and all(r["state"] == "completed" for r in recognitions):
                     break
                 time.sleep(1)
             else:
-                raise AssertionError("The worker did not complete all six recognition variants")
+                raise AssertionError(
+                    "The worker did not complete all seven GigaAM recognition variants"
+                )
             assert {r["variant"] for r in recognitions} == {
                 "onnx",
                 "sherpa_plain",
                 "sherpa_hotwords",
+                "sherpa_hotwords_weak",
+                "sherpa_hotwords_strong",
+                "sherpa_hotwords_wide",
+                "sherpa_hotwords_city",
             }
             assert all("dictionary" in r for r in recognitions)
         stopping = time.monotonic()
