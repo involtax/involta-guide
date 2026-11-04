@@ -713,6 +713,13 @@
             "type": "array",
             "maxItems": 200,
             "title": "Restaurants"
+          },
+          "recognition_dictionary": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recognition Dictionary"
           }
         },
         "additionalProperties": false,

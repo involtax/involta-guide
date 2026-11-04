@@ -226,6 +226,18 @@ def routes(prefix: str) -> APIRouter:
             if not isinstance(audio, UploadFile):
                 raise HTTPException(400, "Нужна аудиозапись")
             selected = ctx.queries.location(location["id"])
+            # The ASR dictionary includes the whole city catalogue, not just its public top.
+            with ctx.engine.connect() as conn:
+                names = list(
+                    conn.execute(
+                        sql_text(
+                            "SELECT name FROM restaurants WHERE location_id=:id ORDER BY name,id"
+                        ),
+                        {"id": location["id"]},
+                    ).scalars()
+                )
+            from involta_voice.variants import dictionary_names
+
             visitor = owner(request)
             metadata = SubmissionMetadata(
                 location=LocationContext(
@@ -234,6 +246,7 @@ def routes(prefix: str) -> APIRouter:
                     name=location["name"],
                     revision=location["revision"],
                     content_epoch=epoch,
+                    recognition_dictionary=dictionary_names(names),
                     restaurants=[
                         RestaurantContext(
                             id=r["id"],

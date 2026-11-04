@@ -42,7 +42,10 @@ def test_review_numbers_survive_sorting_slug_changes_and_concurrent_creation(dat
         page = client.get("/guide" + path)
         assert page.status_code == 200, page.text
         assert page.text.count('class="review-transcripts"') == 8
-        assert "<dt>GigaAM</dt>" in page.text and "<dt>Parakeet</dt>" in page.text
+        assert (
+            "<dt>GigaAM<small>onnx-asr</small></dt>" in page.text
+            and "<dt>Parakeet<small>onnx-asr</small></dt>" in page.text
+        )
         assert "admin.css" in page.text and "?tab=" not in page.text
         assert client.get("/guide" + path, headers={"HX-Request": "true"}).status_code == 200
         for route in ("/admin/reviews", "/admin/reviews?page=2", path):
@@ -114,7 +117,10 @@ def test_saved_model_comparison_survives_settings_failure_and_shows_outages(data
         remote.failed = True
         unavailable = client.get(path)
         assert unavailable.status_code == 200
-        assert "<dt>GigaAM</dt>" in unavailable.text and "<dt>Parakeet</dt>" in unavailable.text
+        assert (
+            "<dt>GigaAM<small>onnx-asr</small></dt>" in unavailable.text
+            and "<dt>Parakeet<small>onnx-asr</small></dt>" in unavailable.text
+        )
         assert "Voice временно недоступен" in unavailable.text
     assert all(method == "POST" and path == "/admin/recognitions" for method, path in calls)
     assert queries.rows("jobs") == []

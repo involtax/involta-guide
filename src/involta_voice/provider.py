@@ -31,11 +31,24 @@ class VoiceProvider:
         from .asr import LocalAsr
 
         self.asr = LocalAsr(settings)
+        self.sherpa: Any = None
+        self.settings = settings
 
     def call(self, kind: str, request: dict[str, Any], audio: bytes, mime: str) -> dict[str, Any]:
         if kind == "transcription":
+            if request.get("engine") == "sherpa-onnx":
+                from .sherpa import LocalSherpa
+
+                self.asr.close()
+                if self.sherpa is None:
+                    self.sherpa = LocalSherpa(self.settings)
+                return self.sherpa.call(request, audio)
+            if self.sherpa is not None:
+                self.sherpa.close()
             return self.asr.call(request, audio)
         raise ProviderFailure("Анализ отзывов пока отключён")
 
     def close(self) -> None:
-        pass
+        self.asr.close()
+        if self.sherpa is not None:
+            self.sherpa.close()

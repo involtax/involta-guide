@@ -146,6 +146,27 @@ try:
         assert status.get("transcript"), status
         assert status["transcript"] in c.get("/guide/ivanovo").text
         assert c.get(status["log_url"]).status_code == 200
+        with httpx.Client(
+            base_url="http://127.0.0.1:13100",
+            headers={"authorization": "Bearer " + secret},
+            trust_env=False,
+            timeout=10,
+        ) as internal:
+            for _ in range(40):
+                response = internal.post("/internal/v1/admin/recognitions", json=[ref])
+                response.raise_for_status()
+                recognitions = response.json()[ref]
+                if len(recognitions) == 6 and all(r["state"] == "completed" for r in recognitions):
+                    break
+                time.sleep(1)
+            else:
+                raise AssertionError("The worker did not complete all six recognition variants")
+            assert {r["variant"] for r in recognitions} == {
+                "onnx",
+                "sherpa_plain",
+                "sherpa_hotwords",
+            }
+            assert all("dictionary" in r for r in recognitions)
         stopping = time.monotonic()
         run(compose + ["stop", "voice"])
         elapsed = time.monotonic() - stopping

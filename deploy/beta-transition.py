@@ -379,7 +379,7 @@ e.dispose()
 
         for key in ("locations", "owned_restaurants", "stars"):
             assert current[key] == self.inventory[key], f"Inventory changed: {key}"
-        assert self.voice_sql("SELECT max(version) FROM voice_schema_versions").strip() == "7"
+        assert self.voice_sql("SELECT max(version) FROM voice_schema_versions").strip() == "8"
         assert self.voice_sql("SELECT count(*) FROM purge_files").strip() == "0"
         self.log(inventory=current)
 

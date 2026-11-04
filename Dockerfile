@@ -10,17 +10,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 FROM base AS builder
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
     pip install --no-cache-dir uv==0.12.23
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca GIT_SSL_CAINFO=/run/secrets/proxy_ca CMAKE_TLS_CAINFO=/run/secrets/proxy_ca; fi; \
     uv sync --frozen --extra voice-local --no-dev --no-install-project
 COPY src ./src
 RUN chmod -R a+rX /app/src
 RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca GIT_SSL_CAINFO=/run/secrets/proxy_ca CMAKE_TLS_CAINFO=/run/secrets/proxy_ca; fi; \
     uv sync --frozen --extra voice-local --no-dev --no-editable
 
 FROM base AS runtime
@@ -32,6 +35,7 @@ RUN apt-get update \
     && useradd --uid 10001 --gid 10001 --create-home --no-log-init \
        --shell /usr/sbin/nologin guide
 COPY --from=builder /app/.venv /app/.venv
+RUN /app/.venv/bin/python -c "import sherpa_onnx, importlib.metadata, json; provenance=json.loads(importlib.metadata.distribution('sherpa-onnx').read_text('direct_url.json')); assert provenance['vcs_info']['commit_id']=='3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb', provenance"
 COPY data ./data
 COPY migrations ./migrations
 COPY alembic.ini ./

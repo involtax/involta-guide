@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 from uuid import uuid4
 
@@ -8,22 +10,20 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
 from involta_guide.infrastructure.voice.shared_database import consolidate, digest
-from involta_voice.db import database, migrate_connection
-from involta_voice.provider import FakeProvider
+from involta_voice.db import database, migrate, migrate_connection
 from involta_voice.service import VoiceService
-from involta_voice.worker import Worker
 
 from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 
 
-@pytest.fixture
-def legacy_source(voice_database):
+@pytest.fixture(params=[5, 6, 7, 8])
+def legacy_source(voice_database, request):
     settings, _ = voice_database
     settings = settings.model_copy(update={"database_schema": "public"})
     engine = database(settings)
     with engine.begin() as conn:
-        migrate_connection(conn, version=5)
+        migrate_connection(conn, version=request.param)
     try:
         yield settings, engine
     finally:
@@ -45,6 +45,56 @@ def shared_target(voice_database):
         conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema)))
 
 
+def seed_legacy_recording(settings, engine):
+    """Populate each real historical schema without running new code against old columns."""
+    data = metadata()
+    reference = str(uuid4())
+    audio = recording()
+    filename = reference + ".wav"
+    service = VoiceService(engine, settings)
+    service.storage.root.mkdir(parents=True, exist_ok=True)
+    service.storage.path(filename).write_bytes(audio)
+    transcript = "Saved original GigaAM text"
+    snapshot = {"location": data.location.model_dump(mode="json"), "transcription_model": "gigaam"}
+    with engine.begin() as conn:
+        conn.execute(
+            text("""INSERT INTO submissions(reference,location_id,visitor,idempotency_key,payload_hash,metadata,
+          audio,mime,duration,size,sha256,repeat_signals,transcript)
+          VALUES(:id,:location,:visitor,:key,'legacy-hash',CAST(:metadata AS jsonb),:audio,'audio/wav',6,:size,:sha,'{}',:transcript)"""),
+            {
+                "id": reference,
+                "location": str(data.location.id),
+                "visitor": data.visitor,
+                "key": str(data.idempotency_key),
+                "metadata": data.model_dump_json(),
+                "audio": filename,
+                "size": len(audio),
+                "sha": hashlib.sha256(audio).hexdigest(),
+                "transcript": transcript,
+            },
+        )
+        conn.execute(
+            text(
+                "INSERT INTO runs(submission,number,snapshot) VALUES(:id,1,CAST(:snapshot AS jsonb))"
+            ),
+            {"id": reference, "snapshot": json.dumps(snapshot)},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO stages(submission,run,kind,state) VALUES(:id,1,'transcription','completed')"
+            ),
+            {"id": reference},
+        )
+        conn.execute(
+            text("""INSERT INTO asr_candidates(submission,run,engine,revision,settings,transcript,elapsed_seconds,duration,details)
+          VALUES(:id,1,'gigaam','legacy-revision','{}',:transcript,1,6,'{}')"""),
+            {"id": reference, "transcript": transcript},
+        )
+        service.emit(conn, reference, 1, "recording_received")
+        service.emit(conn, reference, 1, "gigaam_ready")
+    return reference, transcript
+
+
 def source_url(settings):
     return (
         make_url(settings.database_url.get_secret_value())
@@ -62,20 +112,21 @@ def test_transfer_preserves_audio_events_sequences_and_old_client_access(
     legacy_source, shared_target
 ):
     settings, engine = legacy_source
-    service = VoiceService(engine, settings)
-    reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
-    worker = Worker(engine, settings, FakeProvider())
-    assert worker.once() and not worker.once()
+    reference, original_text = seed_legacy_recording(settings, engine)
     assert consolidate(shared_target, source_url(settings)) == "imported"
     assert consolidate(shared_target, source_url(settings)) == "verified"
     target = database(shared_target)
     try:
+        with target.begin() as conn:
+            assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 2
+            assert conn.execute(text("SELECT nextval('outbox_sequence_seq')")).scalar_one() == 3
+        # Migration 6 may advance the sequence while skipping existing events.
+        # Verify transfer before migration; gaps are normal PostgreSQL behavior.
+        migrate(target)
         moved = VoiceService(target, shared_target)
-        assert moved.status(reference)["transcript"] == service.status(reference)["transcript"]
+        assert moved.status(reference)["transcript"] == original_text
         with target.connect() as conn:
             assert conn.execute(text("SELECT count(*) FROM outbox")).scalar_one() == 2
-            sequence = conn.execute(text("SELECT nextval('outbox_sequence_seq')")).scalar_one()
-            assert sequence == 3
         # An old image reads VOICE_DATABASE_URL and has no schema configuration.
         with psycopg.connect(source_url(shared_target)) as old_client:
             assert old_client.execute("SELECT count(*) FROM submissions").fetchone()[0] == 1
@@ -89,7 +140,7 @@ def test_failed_import_rolls_back_schema_and_never_changes_source(
     legacy_source, shared_target, monkeypatch
 ):
     settings, engine = legacy_source
-    VoiceService(engine, settings).submit(metadata(), recording(), "audio/wav")
+    seed_legacy_recording(settings, engine)
     with psycopg.connect(source_url(settings)) as source:
         before = digest(source, settings.database_schema, "submissions")
     monkeypatch.setattr(

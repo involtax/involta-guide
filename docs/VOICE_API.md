@@ -46,7 +46,7 @@ GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Recei
 primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
 analysis_ready, processing_failed принимаются только как история доставки.
 
-POST `/admin/recognitions` — приватный batch до 30 UUID: по две строки результатов,
+POST `/admin/recognitions` — приватный batch до 30 UUID: до шести строк результатов,
 без оценок и эталона. GET `/admin/submissions/{reference}` и `/asr` содержат
 подробности для лога. Ручные new-run/revalidate, ASR-run/evaluation и изменение
 настроек анализа удалены. GigaAM фиксирован как primary. Публичный SubmissionStatus
@@ -112,3 +112,47 @@ UUID через запятую: ответ publication_statuses сообщает
 События и DTO: [voice-dtos.schema.json](voice-dtos.schema.json). Guide migration
 review_publication добавляет ограничение IN(0,1,2). Voice migration 7 создаёт новые
 события для уже сохранённых терминальных ошибок GigaAM, не вызывая ASR снова.
+
+## Шесть вариантов распознавания (бета)
+
+Для **новых** отзывов профиль беты автоматически создаёт шесть независимых stages:
+
+| kind | Модель | variant |
+| --- | --- | --- |
+| transcription | GigaAM | onnx |
+| comparison | Parakeet | onnx |
+| sherpa_gigaam_plain | GigaAM | sherpa_plain |
+| sherpa_gigaam_hotwords | GigaAM | sherpa_hotwords |
+| sherpa_parakeet_plain | Parakeet | sherpa_plain |
+| sherpa_parakeet_hotwords | Parakeet | sherpa_hotwords |
+
+Контракт v2 дополнен `LocationContext.recognition_dictionary: string[]` (default []).
+Guide формирует его из **всех** строк `restaurants` выбранного города, включая
+не входящие в публичную подборку; без лимита 200 и без названий соседних городов.
+Пробельные последовательности нормализуются, точные дубликаты удаляются. Это
+подсказки, а не ограничение допустимой речи. Список фиксируется вместе с исходным
+контекстом в `runs.snapshot`; каждый Sherpa request сохраняет фактический dictionary.
+Позднее редактирование каталога на уже принятый отзыв не влияет.
+Полный список подсказок выдаётся только в приватных метаданных/результатах;
+публичный status не раскрывает его.
+
+Voice schema 8 добавляет `asr_candidates.variant`; ключ результата теперь
+`(submission, run, engine, variant)`. Имеющиеся записи получают variant=onnx,
+их поля, аудио, outbox/ACK и результаты сохраняются. Миграция не запускает ASR
+исторических отзывов и не создаёт для них дополнительные stages.
+
+Приватный batch `/admin/recognitions` по-прежнему ограничен 30 references и тремя
+SQL-запросами; каждый элемент содержит engine/name/variant/variant_label,
+text/state/error и dictionary (null — данные не получены, [] — словаря нет).
+Новые отзывы имеют шесть строк; исторические — только ранее созданные варианты.
+Чтение ничего не распознаёт. Ошибка одного сравнения не мешает остальным.
+
+События публикации неизменны: **только исходный GigaAM / onnx** может дать
+`gigaam_ready` или `gigaam_failed`. Ни один результат Sherpa не служит fallback,
+не меняет публичный текст или publication_status. Работает прежняя защита
+от поздней доставки после удаления и reset.
+
+Sherpa-варианты используют одинаковые modified_beam_search, max_active_paths=4,
+предобработку и Silero VAD; различается только dictionary (и имя варианта).
+Сила подсказок 1.5; length_reward=0.5 для Parakeet и 0 для GigaAM. Все параметры
+и ревизии входят в сохранённый request и raw-результат.

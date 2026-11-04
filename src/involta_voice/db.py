@@ -40,7 +40,7 @@ def migrate(engine: Engine) -> None:
         migrate_connection(conn)
 
 
-def migrate_connection(conn: Connection, version: int = 7) -> None:
+def migrate_connection(conn: Connection, version: int = 8) -> None:
     # The connection's search_path selects the Voice-owned schema. No fallback
     # to public: an absent Voice table must never resolve to a Guide table.
     schema = conn.execute(text("SHOW search_path")).scalar_one()
@@ -68,6 +68,10 @@ def migrate_connection(conn: Connection, version: int = 7) -> None:
     if version >= 7 and not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=7"):
         conn.exec_driver_sql(
             (Path(__file__).parent / "migrations/007_publication_failures.sql").read_text()
+        )
+    if version >= 8 and not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=8"):
+        conn.exec_driver_sql(
+            (Path(__file__).parent / "migrations/008_recognition_variants.sql").read_text()
         )
 
 

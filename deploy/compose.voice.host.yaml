@@ -62,7 +62,8 @@
         "VOICE_DATA_DIR": "/app/var/voice",
         "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
         "HF_HOME": "/tmp/huggingface",
-        "HF_HUB_OFFLINE": "1"
+        "HF_HUB_OFFLINE": "1",
+        "VOICE_ASR_BETA_ENABLED": "true"
       },
       "volumes": [
         "voice-audio:/app/var/voice",
@@ -126,7 +127,8 @@
         "VOICE_DATA_DIR": "/app/var/voice",
         "VOICE_ASR_MODELS_DIR": "/app/var/asr-models",
         "HF_HOME": "/tmp/huggingface",
-        "HF_HUB_DISABLE_XET": "1"
+        "HF_HUB_DISABLE_XET": "1",
+        "VOICE_ASR_BETA_ENABLED": "true"
       },
       "volumes": [
         "asr-models:/app/var/asr-models"
@@ -162,7 +164,8 @@
         "OPENAI_API_KEY": "${OPENAI_API_KEY:-}",
         "VOICE_SERVICE_SECRET": "${VOICE_SERVICE_SECRET:?}",
         "VOICE_DATA_DIR": "/app/var/voice",
-        "VOICE_URL": "http://127.0.0.1:13100"
+        "VOICE_URL": "http://127.0.0.1:13100",
+        "VOICE_ASR_BETA_ENABLED": "true"
       },
       "volumes": [
         "voice-audio:/app/var/voice"

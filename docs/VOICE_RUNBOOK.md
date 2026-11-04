@@ -11,10 +11,12 @@ rollback описаны в [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Ста�
 
 Voice использует ту же PostgreSQL БД, что Guide, со схемой `voice` и отдельным
 аудиотомом. Контейнер `voice` запускает API и доставку результатов в Guide;
-`voice-worker` — ASR/анализ. Internal API не публикуется через Nginx.
+`voice-worker` — шесть локальных вариантов ASR для новых отзывов. Internal API не публикуется через Nginx.
 [Устройство, остановка и перенос существующей БД](VOICE_RUNTIME.md).
 
-Для локального запуска нужны Python 3.13, uv, PostgreSQL 17 и ffprobe:
+Для локальной сборки нужны Python 3.13 с development headers, uv, C++ compiler,
+git, PostgreSQL 17 и ffprobe. CMake ставится в изолированную build-среду uv.
+Готовому production-образу компилятор не нужен:
 
 ```bash
 uv sync --frozen --extra voice-local
@@ -28,7 +30,8 @@ uv run voice-worker
 
 В изолированной проверочной установке `VOICE_FAKE_PROVIDER=true` исключает реальные
 платные вызовы. В production false; ASR GigaAM/Parakeet локальный, pinned weights
-и требования ресурсов — [ASR_BETA.md](ASR_BETA.md). OpenAI нужен для анализа текста.
+и сравнение шести вариантов — [VOICE_SHERPA_COMPARISON.md](VOICE_SHERPA_COMPARISON.md).
+Распознавание и сравнение OpenAI не вызывают.
 `VOICE_ENABLED` в Guide включает приём для всех ролей. Чтение сохранённых отзывов и
 модерация не зависят от возможности принять новую запись.
 

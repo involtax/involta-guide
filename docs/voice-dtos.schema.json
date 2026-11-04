@@ -42,6 +42,13 @@
           "maxItems": 200,
           "title": "Restaurants",
           "type": "array"
+        },
+        "recognition_dictionary": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recognition Dictionary",
+          "type": "array"
         }
       },
       "required": [
