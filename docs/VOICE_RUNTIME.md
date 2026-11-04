@@ -71,10 +71,10 @@ Release посылает stop всем процессам одновременн
    предыдущего образа; новые процессы читают только `DATABASE_URL`.
 5. Останавливает и удаляет старые контейнеры `voice-db`, `voice-api`, `voice-consumer`.
    Их PostgreSQL volume остаётся резервной копией; аудио-том используется дальше.
-6. До обновления Voice 5/6 → 7 сохраняет проверенный pg_dump только схемы `voice`
+6. До обновления исходной Voice-схемы (<8) сохраняет проверенный pg_dump только схемы `voice`
    в приватный `pre-voice-stream.{deployment_id}.dump`. Перенос копирует исходную версию
    схемы; обновление версии выполняется отдельно, после backup.
-7. Применяет Voice v7, запускает `voice` и `voice-worker`, проверяет API/доставку,
+7. Применяет Voice v8, запускает `voice` и `voice-worker`, проверяет API/доставку,
    затем web/worker и HTTPS. Guide мигрируется одной цепочкой
    filling_v3 → filling_top3 → review_stream → review_publication.
 
