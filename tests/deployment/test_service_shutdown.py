@@ -78,7 +78,9 @@ def test_previous_image_url_uses_shared_schema_without_exposing_credentials(tmp_
 def test_bootstrap_quoted_database_url_and_recovery(tmp_path, quote):
     from urllib.parse import parse_qs, urlsplit
 
-    spec = importlib.util.spec_from_file_location("shared_env", ROOT / "deploy/shared-database-env.py")
+    spec = importlib.util.spec_from_file_location(
+        "shared_env", ROOT / "deploy/shared-database-env.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     release = tmp_path / "release"
@@ -94,3 +96,41 @@ def test_bootstrap_quoted_database_url_and_recovery(tmp_path, quote):
     assert parsed.scheme == "postgresql" and parsed.path == "/guide"
     assert parse_qs(parsed.query)["options"] == [" -c search_path=voice"]
     assert (release / "voice-env-before-shared-db").read_text() == original
+
+
+@pytest.mark.parametrize("check", [True, False])
+def test_env_preflight_preserves_original_and_literal_url(tmp_path, check):
+    spec = importlib.util.spec_from_file_location(
+        "shared_env", ROOT / "deploy/shared-database-env.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    release = tmp_path / "release"
+    release.mkdir()
+    url = "postgresql://guide:test$literal%23%27@localhost/guide?sslmode=require"
+    (tmp_path / ".env.production").write_text(f"DATABASE_URL='{url}'\n")
+    original = "VOICE_DATABASE_URL='postgresql://old:test@localhost/voice'\n"
+    (tmp_path / ".env.voice").write_text(original)
+    module.update(tmp_path, release, check=check)
+    if check:
+        assert (tmp_path / ".env.voice").read_text() == original
+        assert not (release / "voice-env-before-shared-db").exists()
+    else:
+        result = module.read_values((tmp_path / ".env.voice").read_text())["VOICE_DATABASE_URL"]
+        assert "test$literal%23%27" in result and "sslmode=require" in result
+    assert not list(tmp_path.glob(".voice-env-*"))
+
+
+def test_invalid_env_does_not_replace_rollback_configuration(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "shared_env", ROOT / "deploy/shared-database-env.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    (tmp_path / ".env.production").write_text("DATABASE_URL='broken-test-secret'\n")
+    original = "VOICE_DATABASE_URL='postgresql://old:test@localhost/voice'\n"
+    (tmp_path / ".env.voice").write_text(original)
+    with pytest.raises(ValueError) as failure:
+        module.update(tmp_path, tmp_path / "release")
+    assert "broken-test-secret" not in str(failure.value)
+    assert (tmp_path / ".env.voice").read_text() == original

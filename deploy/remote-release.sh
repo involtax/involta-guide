@@ -250,6 +250,10 @@ if [[ "$mode" == rollback && -n "$previous_sha" && -f "$DEPLOY_ROOT/releases/$pr
   docker run --rm --entrypoint python "$target_image" -c 'import involta_voice; import involta_guide.web.routes.voice' || { echo 'Cannot roll back Voice references to an incompatible image' >&2; exit 2; }
 fi
 docker volume inspect "$AUDIO_VOLUME" >/dev/null
+# Validate the proposed environment while the previous release still serves traffic.
+if [[ "$VOICE_STACK" == 1 ]]; then
+  python3 "$script_dir/shared-database-env.py" "$DEPLOY_ROOT" "$release_dir" --check
+fi
 # The current-state cutover has a private pre-change dump; image rollback restores it first.
 changed=0
 failed() {

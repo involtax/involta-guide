@@ -99,3 +99,23 @@ DSN остаётся прежним. Схема Guide при необходим�
 SIGTERM и недосланные HTTP-тела. `test_service_shutdown.py`: параллельная остановка
 через барьер процессов и приватное обновление DSN. `voice_stack_smoke.py`: одноразовый
 Compose-стек с синтетическим аудио и fake provider, без платных вызовов.
+
+### Quoted database URL and failed-cutover recovery
+
+The bootstrap writes single-quoted dotenv values. The shared-database bridge
+must decode those quotes before adding PostgreSQL `search_path`; otherwise
+Compose cannot parse the resulting `.env.voice`, including during rollback.
+`shared-database-env.py --check` validates the candidate with the actual Compose
+parser before any writers stop. The actual update validates again, uses a private
+temporary file, and atomically replaces the env only on success. Credentials and
+Compose's resolved configuration never appear in logs.
+
+If an uncommitted cutover has already damaged `.env.voice`, the SSH transport
+supports explicit `recover` with `RECOVERY_DEPLOYMENT_ID` set to the failed run's
+original `run-attempt`. `TARGET_SHA` and `IMAGE_REF` identify that failed release.
+Recovery holds the deployment locks, requires all writers stopped, requires the
+original private env and Guide dump, repairs the compatibility URL using the
+original env, restores matching database snapshots and starts the recorded prior
+release. The successfully consolidated Voice database remains the source of truth;
+the old separate database is not selected again. Local and public health checks
+must pass. This is an operator recovery action, never an automatic read-only report.
