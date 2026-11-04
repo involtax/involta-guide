@@ -10,7 +10,8 @@ Gateway Guide под BASE_PATH `/voice/api/v1`:
 - POST `/submissions?location={slug}&content_epoch={epoch}` принимает тот же blob/key
   одной отправкой; серверная идемпотентность сохраняется. Actor, visitor и IP клиента не назначают права/владельца.
 - GET `/reviews?location={slug}` — одна общая лента (последние 10 записей), без cookies/входа.
-  Поля: reference, number, transcript, created_at, state, log_url; ответ содержит content_epoch.
+  Поля: reference, number, transcript, created_at, state, publication_status, log_url;
+  ответ содержит content_epoch и publication_statuses для запрошенных pending.
   Персональные metadata не выдаются. Старые gateway GET /submissions/{reference} и /mine удалены.
 - GET/POST `/debug/{request_id}` — приватные диагностические события, флаг VOICE_DEBUG_ENABLED.
 
@@ -39,7 +40,8 @@ upload/callback возвращает `stale_epoch` 409. Повтор purge то�
 
 Outbox event v2: sequence/event_id/reference/run/kind, metadata v2, transcript,
 analysis (историческое поле), audio SHA/MIME/duration, created_at и repeat_signals.
-Новые виды: `recording_received` (transcript=null) и `gigaam_ready` (текст GigaAM).
+Новые виды: `recording_received` (transcript=null), `gigaam_ready` (текст GigaAM)
+и `gigaam_failed` (терминальная ошибка primary).
 GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Receipt и
 primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
 analysis_ready, processing_failed принимаются только как история доставки.
@@ -76,11 +78,37 @@ validation; historical >=1-second OutboxEvent records remain readable.
 
 The centered microphone/stop UI, silence detection, demo and pinned browser assets
 are described in [VOICE_WIDGET_UX_IMPLEMENTATION.md](VOICE_WIDGET_UX_IMPLEMENTATION.md).
-The widget retains each recording's original content_epoch across all retries.
+The widget retains each recording's original content_epoch until its single upload finishes.
 
 ## Время в пользовательском списке и результате
 
-`GET /voice/api/v1/reviews?location={slug}` сохраняет исходный `created_at` Voice. Если Voice недоступен, локальный ответ Guide
-содержит сохранённый `reviews.created_at`; время загрузки страницы не подставляется.
+`GET /voice/api/v1/reviews?location={slug}` читает Guide и сохраняет исходный
+`created_at` Voice в `reviews.created_at`. Для чтения не нужен доступ к Voice;
+время загрузки страницы не подставляется.
 Виджет показывает дату/время в часовом поясе браузера через `<time datetime="…">`
 вместо редакторского статуса. Поля состояния API сохраняются для обработки/опроса.
+
+## Статус публикации и ошибка GigaAM
+
+Guide хранит reviews.publication_status: 0 — ошибка, 1 — опубликован,
+2 — резерв модерации. Поступление аудио и успешный GigaAM автоматически дают 1;
+терминальная ошибка/unknown/пустой результат GigaAM дают 0. Приложение не ставит 2.
+Ошибка Parakeet не меняет публикацию. Удаление даёт 0 и оставляет status=deleted
+как защиту от позднего события.
+
+Voice отправляет OutboxEvent v2 kind=gigaam_failed, error:string|null, с прежними
+reference/run/metadata/epoch и данными аудио. Ошибка пишется в той же транзакции,
+что завершает primary stage; queued-повтор не публикует ошибку. Consumer сохраняет
+ошибку и publication_status=0, не удаляя отзыв, файл или лог. Готовый текст GigaAM
+не затирается запоздавшим сообщением об ошибке; receipt не возвращает failed в received.
+
+GET /voice/api/v1/reviews?location={slug} содержит только publication_status=1.
+Неудачные отзывы не занимают места в последних 10. Дополнительный pending — до 30
+UUID через запятую: ответ publication_statuses сообщает текущие статусы этих записей
+только в указанном городе. Это позволяет убрать временную строку сразу после ошибки,
+даже если исходное подтверждение приёма ещё не появилось в общей ленте. Запрос read-only;
+причина ошибки и raw-ответ в публичную ленту не попадают.
+
+События и DTO: [voice-dtos.schema.json](voice-dtos.schema.json). Guide migration
+review_publication добавляет ограничение IN(0,1,2). Voice migration 7 создаёт новые
+события для уже сохранённых терминальных ошибок GigaAM, не вызывая ASR снова.

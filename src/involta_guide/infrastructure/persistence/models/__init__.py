@@ -83,6 +83,7 @@ class ReviewRow(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(Text)
     moderation: Mapped[str] = mapped_column(Text)
+    publication_status: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     fraud: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(Text)

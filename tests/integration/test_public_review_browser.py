@@ -45,6 +45,7 @@ def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(databas
             expect(page.locator("#guide-voice .reviews")).to_have_count(0)
             expect(page.locator("#guide-voice .primary")).to_be_visible()
             expect(page.get_by_role("heading", name="Отзывы", exact=True)).to_have_count(1)
+            expect(page.locator('a[href*="/logs"]')).to_have_count(0)
             page.locator("#guide-voice").scroll_into_view_if_needed()
             page.screenshot(path=str(screenshots / f"public-reviews-{width}.png"), full_page=True)
             login(client)

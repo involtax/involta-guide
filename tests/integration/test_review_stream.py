@@ -88,6 +88,8 @@ def test_public_latest_ten_are_automatic_primary_text_only(database):
         assert page.status_code == 200
         assert "GigaAM отзыв 11" in page.text and "GigaAM отзыв 1</p>" not in page.text
         assert "Parakeet" not in page.text
+        assert 'class="review-log"' not in page.text
+        assert "Открыть логи наполнения" not in page.text
         path = (
             "/guide/logs/reviews/" + city["slug"] + "/" + str(queries.get("reviews", ref)["number"])
         )

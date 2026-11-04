@@ -123,7 +123,7 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
         pass
     with engine.begin() as conn:
         # A database at released version 5 with a Parakeet fallback and human judgments.
-        conn.execute(text("DELETE FROM voice_schema_versions WHERE version=6"))
+        conn.execute(text("DELETE FROM voice_schema_versions WHERE version>=6"))
         conn.execute(
             text("CREATE TABLE asr_evaluations(reference_text text,preferred_engine text)")
         )
@@ -131,7 +131,11 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
         conn.execute(text("CREATE TABLE asr_evaluation_events(before_data jsonb,after_data jsonb)"))
         conn.execute(text("INSERT INTO asr_evaluation_events VALUES('{}','{}')"))
         conn.execute(text("UPDATE submissions SET transcript='Historical fallback'"))
-        conn.execute(text("DELETE FROM outbox WHERE kind IN ('recording_received','gigaam_ready')"))
+        conn.execute(
+            text(
+                "DELETE FROM outbox WHERE kind IN ('recording_received','gigaam_ready','gigaam_failed')"
+            )
+        )
         conn.execute(
             text(
                 "INSERT INTO delivery_ack VALUES('guide',123) ON CONFLICT(consumer) DO UPDATE SET sequence=123"
@@ -164,7 +168,9 @@ def test_populated_migration_preserves_sources_and_replays_only_proven_primary(
         )
         assert all(e["sequence"] > 123 for e in events)
         assert [e["payload"]["kind"] for e in events] == (
-            ["recording_received", "gigaam_ready"] if with_primary else ["recording_received"]
+            ["recording_received", "gigaam_ready"]
+            if with_primary
+            else ["recording_received", "gigaam_failed"]
         )
         assert all(e["payload"]["transcript"] != "Только Parakeet" for e in events)
     assert service.storage.path(audio).exists()

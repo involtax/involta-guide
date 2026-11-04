@@ -1,4 +1,3 @@
-import json
 import os
 import time
 from datetime import UTC, datetime
@@ -50,6 +49,10 @@ def widget_page(browser):
         timezone_id="Europe/Moscow",
     )
     context.add_init_script(FAKE_RECORDER)
+    # Observe the existing audit POST; the product has no diagnostic DOM or debug globals.
+    context.add_init_script("""window.__uploadReports=[];const send=window.fetch.bind(window);
+      window.fetch=(input,options={})=>{if(String(input).includes('/debug/')&&options.method==='POST')
+        window.__uploadReports.push(JSON.parse(options.body));return send(input,options)};""")
     page = context.new_page()
     uploads = []
     errors = []
@@ -97,6 +100,9 @@ def widget_page(browser):
     expect(widget.get_by_role("button", name="Повторить отправку")).to_have_count(0)
     expect(widget.get_by_role("link", name="Скачать аудио")).to_have_count(0)
     expect(widget.locator(".current")).to_have_count(0)
+    expect(widget.locator("details, pre, .hint, .cancel")).to_have_count(0)
+    expect(widget.get_by_role("button", name="Отменить")).to_have_count(0)
+    expect(widget.get_by_role("link")).to_have_count(0)
     assert not errors
     context.close()
 
@@ -122,7 +128,7 @@ def state(widget, value):
 
 
 def report(widget):
-    return json.loads(widget.locator("details pre").first.text_content())
+    return widget.evaluate("()=>window.__uploadReports.at(-1)||{}")
 
 
 def touch(cdp, kind, x=0, y=0):
@@ -167,8 +173,6 @@ def test_native_upward_drag_after_holding_continues_one_recording(widget_page, h
     )
     assert page.evaluate("__recorders.length===1 && !__recorders[0].stops")
     assert not uploads
-    gesture = next(e for e in report(widget)["timeline"] if e["name"] == "gesture_end")
-    assert gesture["reason"] == "released" and gesture["lift_px"] == 140
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
     page.keyboard.press("Escape")
 
@@ -309,13 +313,13 @@ def test_minimum_uses_stop_time_and_only_valid_audio_is_sent_automatically(widge
     state(widget, "idle")
     assert len(uploads) == (0 if duration < 5000 else 1)
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
-    events = report(widget)["timeline"]
-    assert next(e["duration_ms"] for e in events if e["name"] == "stop_requested") == duration
     if duration < 5000:
         expect(widget.get_by_role("status")).to_contain_text("Слишком коротко")
         assert "draft" not in report(widget)
         assert page.evaluate("__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
     else:
+        events = report(widget)["timeline"]
+        assert next(e["duration_ms"] for e in events if e["name"] == "stop_requested") == duration
         assert next(e["duration_ms"] for e in events if e["name"] == "blob_ready") == duration
         assert report(widget)["recording"]["durationMs"] == duration
 
@@ -327,7 +331,7 @@ def test_cancel_permission_late_stream_and_second_embed_are_safe(widget_page):
     state(widget, "starting")
     expect(page.locator("#b").get_by_role("button", name="Записать отзыв")).to_be_disabled()
     wait_expression(page, "!!window.__latePermission")
-    widget.get_by_role("button", name="Отменить").dispatch_event("click")
+    page.keyboard.press("Escape")
     state(widget, "idle")
     page.evaluate("window.__latePermission();window.__delayPermission=false")
     wait_expression(page, "__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
@@ -495,7 +499,7 @@ def test_failed_upload_is_not_retained_or_retried_and_next_press_records_new_aud
     state(widget, "error")
     expect(widget.get_by_role("button", name="Записать отзыв", exact=True)).to_be_enabled()
     if failure == "html":
-        expect(widget.locator("details pre").last).to_contain_text("full nginx timeout")
+        assert "full nginx timeout" in report(widget)["events"][-1]["response_body"]
     page.clock.run_for(30000)
     assert len(requests) == 1
     page.reload()
@@ -528,10 +532,7 @@ def test_permission_wait_is_not_audio_duration(widget_page):
     page.clock.run_for(1)
     state(widget, "idle")
     assert not uploads
-    assert (
-        next(e["duration_ms"] for e in report(widget)["timeline"] if e["name"] == "stop_requested")
-        == 4999
-    )
+    expect(widget.get_by_role("status")).to_contain_text("Слишком коротко")
 
 
 def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
@@ -542,7 +543,7 @@ def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
     page.evaluate("__recorders[0].stop()")
     page.clock.run_for(1)
     state(widget, "error")
-    assert report(widget)["recording"]["durationMs"] == 5100
+    assert page.evaluate("__recorders[0].stops") == 1
     assert not uploads
 
 
@@ -595,7 +596,7 @@ def test_auto_upload_disables_control_and_coalesces_duplicate_stop_events(widget
         page.clock.run_for(1)
     state(widget, "uploading")
     expect(widget.get_by_role("button", name="Отправляем отзыв", exact=True)).to_be_disabled()
-    assert report(widget)["recording"]["durationMs"] == 5100
+    assert len(pending[0].request.post_data_buffer) > 100
     press(page, widget)
     widget.locator(".primary").dispatch_event("click", {"detail": 0})
     assert len(pending) == 1
@@ -849,3 +850,84 @@ def test_two_pending_reviews_are_updated_without_duplicates(widget_page):
     page.clock.run_for(2000)
     expect(widget.locator(".reviews .transcript").nth(0)).to_have_text("Второй текст готов")
     expect(widget.locator(".reviews p")).to_have_count(2)
+
+
+def test_permission_wait_has_no_caption_and_denial_is_black_with_a_lock(widget_page):
+    page, widget, uploads = widget_page
+    page.evaluate("window.__delayPermission=true")
+    press(page, widget)
+    state(widget, "starting")
+    expect(widget.locator(".control-status")).to_be_hidden()
+    expect(widget.get_by_text("Разреши доступ к микрофону", exact=True)).to_have_count(0)
+    page.keyboard.press("Escape")
+    page.evaluate("window.__latePermission();window.__delayPermission=false")
+    wait_expression(page, "__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
+    page.evaluate(
+        "()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('blocked','NotAllowedError')}}"
+    )
+    press(page, widget)
+    state(widget, "error")
+    error = widget.get_by_role("alert")
+    expect(error).to_contain_text("Нет доступа к микрофону")
+    assert error.evaluate("e=>getComputedStyle(e).color") == "rgb(21, 21, 21)"
+    assert "🔒" in error.evaluate("e=>getComputedStyle(e,'::before').content")
+    expect(widget.locator("details, .cancel, .hint")).to_have_count(0)
+    assert not uploads
+
+
+def test_failed_publication_disappears_without_a_public_error_message(widget_page):
+    page, widget, _ = widget_page
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5100)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "idle")
+    expect(widget.locator(".reviews p")).to_have_count(1)
+
+    def unpublished(route):
+        from urllib.parse import parse_qs
+
+        assert parse_qs(urlsplit(route.request.url).query)["pending"] == ["saved"]
+        route.fulfill(json={"rows": [], "publication_statuses": {"saved": 0}, "content_epoch": 1})
+
+    page.route("**/reviews?*", unpublished)
+    page.clock.run_for(2000)
+    expect(widget.locator(".reviews p")).to_have_count(0)
+    expect(widget.get_by_text("Не удалось расшифровать", exact=False)).to_have_count(0)
+    expect(widget.locator(".history")).to_be_hidden()
+
+
+def test_nonpublished_rows_never_become_public_text(widget_page):
+    page, widget, _ = widget_page
+    page.route(
+        "**/reviews?*",
+        lambda route: route.fulfill(
+            json={
+                "rows": [
+                    {
+                        "reference": "failed",
+                        "publication_status": 0,
+                        "state": "processing_failed",
+                        "transcript": "",
+                    },
+                    {
+                        "reference": "moderation",
+                        "publication_status": 2,
+                        "state": "result_ready",
+                        "transcript": "Не опубликован",
+                    },
+                    {
+                        "reference": "public",
+                        "publication_status": 1,
+                        "state": "result_ready",
+                        "transcript": "Опубликованный текст",
+                    },
+                ],
+                "content_epoch": 1,
+            }
+        ),
+    )
+    page.reload()
+    expect(widget.locator(".reviews p")).to_have_count(1)
+    expect(widget.locator(".reviews .transcript")).to_have_text("Опубликованный текст")

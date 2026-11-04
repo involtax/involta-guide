@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -12,7 +11,7 @@ def test_native_recording_sends_once_and_transcription_stays_in_reviews():
     html = """<!doctype html><meta charset="utf-8"><div id="a"></div><div id="b"></div>
       <script defer src="/widget.v1.js" data-target="a" data-api-base="/voice/api/v1" data-location="ivanovo"></script>
       <script defer src="/widget.v1.js" data-target="b" data-api-base="/voice/api/v1" data-location="ivanovo"></script>"""
-    keys, rows = [], []
+    keys, rows, reports = [], [], []
     reads = 0
 
     def handle(route):
@@ -54,6 +53,8 @@ def test_native_recording_sends_once_and_transcription_stays_in_reviews():
         elif path.startswith("/logs/"):
             route.fulfill(content_type="text/html; charset=utf-8", body="<h1>Журнал отправки</h1>")
         elif "/debug/" in path:
+            if request.method == "POST":
+                reports.append(request.post_data_json)
             route.fulfill(json={"events": [], "saved": True})
         else:
             route.fulfill(status=404)
@@ -90,12 +91,9 @@ def test_native_recording_sends_once_and_transcription_stays_in_reviews():
         expect(first.locator(".stage .timer")).to_have_text("00:05", timeout=15000)
         first.get_by_role("button", name="Остановить запись").click()
         expect(first.get_by_role("alert")).to_contain_text("HTTP 504")
-        expect(first.locator("pre").last).to_contain_text("full nginx timeout response")
-        report = json.loads(first.locator("pre").first.inner_text())
-        with context.expect_page() as journal:
-            first.get_by_role("link", name="Открыть журнал отправки ↗").click()
-        expect(journal.value).to_have_url(origin + "/logs/ivanovo/uploads/" + report["request_id"])
-        journal.value.close()
+        assert "full nginx timeout response" in reports[-1]["events"][-1]["response_body"]
+        expect(first.locator("details, pre")).to_have_count(0)
+        expect(first.get_by_role("link")).to_have_count(0)
         page.reload()
         expect(mic).to_be_visible()
         expect(first.locator(".status")).to_be_empty()

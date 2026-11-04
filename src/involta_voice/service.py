@@ -261,7 +261,14 @@ class VoiceService:
         return {"page": page, "rows": [self.status(str(reference), visitor) for reference in items]}
 
     def emit(
-        self, conn: Connection, reference: str, number: int, kind: str, result: Any = None
+        self,
+        conn: Connection,
+        reference: str,
+        number: int,
+        kind: str,
+        result: Any = None,
+        *,
+        error: str | None = None,
     ) -> None:
         # Lock BEFORE allocating the sequence: cursor order must also be commit order.
         execute(conn, "SELECT pg_advisory_xact_lock(47032003)")
@@ -287,6 +294,7 @@ class VoiceService:
             "metadata": event_metadata,
             "transcript": submission["transcript"] if kind == "gigaam_ready" else None,
             "analysis": result,
+            "error": error,
             "sha256": submission["sha256"],
             "mime": submission["mime"],
             "duration": submission["duration"],

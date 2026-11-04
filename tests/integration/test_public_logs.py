@@ -82,7 +82,7 @@ def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(databas
         for key in (admin_job["id"], private_id, str(uuid4())):
             assert client.get("/guide/logs/" + key).status_code == 404
             assert client.get("/guide/logs/" + key + ".json").status_code == 404
-        assert "Открыть логи наполнения" in client.get("/guide/ivanovo").text
+        assert "Открыть логи наполнения" not in client.get("/guide/ivanovo").text
         assert "Disallow: /guide/logs" in client.get("/guide/robots.txt").text
     disabled = settings.model_copy(update={"public_fill_logs_enabled": False})
     with TestClient(create_app(disabled)) as client:

@@ -346,7 +346,7 @@ def routes(prefix: str) -> APIRouter:
             await form.close()
 
     @router.get(base + "/reviews")
-    def public_reviews(request: Request, location: str) -> Response:
+    def public_reviews(request: Request, location: str, pending: str = "") -> Response:
         from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 
         ctx = context(request)
@@ -354,20 +354,14 @@ def routes(prefix: str) -> APIRouter:
         if not public:
             raise HTTPException(404, "Локация не найдена")
         city = public["location"]
-        rows = VoiceReadModel(ctx.engine).public_texts(city["id"])
-        pending = [r["reference"] for r in rows if r["state"] == "accepted"]
-        if pending:
-            try:
-                reports = voice_client(request).json("POST", "/admin/recognitions", json=pending)
-                for item in rows:
-                    primary = next(
-                        (r for r in reports.get(item["reference"], []) if r["name"] == "GigaAM"),
-                        None,
-                    )
-                    if primary and primary["state"] in ("failed", "unknown"):
-                        item["state"] = "processing_failed"
-            except VoiceUnavailable:
-                pass  # Durable Guide receipts and texts remain readable offline.
+        read = VoiceReadModel(ctx.engine)
+        rows = read.public_texts(city["id"])
+        try:
+            references = [str(UUID(value)) for value in pending.split(",")[:30] if value]
+        except ValueError:
+            raise HTTPException(422, "Некорректный идентификатор отзыва") from None
+        states = read.publication_states(city["id"], references)
+        rows = [item for item in rows if states.get(item["reference"], 1) == 1]
         for item in rows:
             item["log_url"] = ctx.settings.path(
                 "/logs/reviews/" + city["slug"] + "/" + str(item["number"])
@@ -375,7 +369,13 @@ def routes(prefix: str) -> APIRouter:
         from fastapi.encoders import jsonable_encoder
 
         return JSONResponse(
-            jsonable_encoder({"rows": rows, "content_epoch": city["content_epoch"]}),
+            jsonable_encoder(
+                {
+                    "rows": rows,
+                    "content_epoch": city["content_epoch"],
+                    "publication_statuses": states,
+                }
+            ),
             headers={"Cache-Control": "no-store"},
         )
 

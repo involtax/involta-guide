@@ -5,7 +5,7 @@ from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from .config import Settings
 from .db import database, encoded, execute, row
@@ -27,12 +27,30 @@ class Worker:
         with self.engine.begin() as conn:
             execute(conn, "SELECT pg_advisory_xact_lock(47032004)")
             # A saved response can be replayed. An interrupted external POST without one is unknown.
-            execute(
-                conn,
-                """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') AND attempts<3 THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'failed' ELSE 'unknown' END,
+            expired = (
+                conn.execute(
+                    text(
+                        """UPDATE stages SET state=CASE WHEN raw_response IS NOT NULL THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') AND attempts<3 THEN 'queued' WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'failed' ELSE 'unknown' END,
                 error=CASE WHEN raw_response IS NOT NULL THEN NULL WHEN request->>'engine' IN ('faster-whisper','onnx-asr') THEN 'Локальный исполнитель прерван; ограниченный повтор' ELSE 'Исполнитель прерван; исход OpenAI неизвестен' END,
-                lease_token=NULL,lease_until=NULL WHERE kind IN ('transcription','comparison') AND state='running' AND lease_until<now()""",
+                lease_token=NULL,lease_until=NULL WHERE kind IN ('transcription','comparison') AND state='running' AND lease_until<now()
+                RETURNING submission,run,kind,state,error"""
+                    )
+                )
+                .mappings()
+                .all()
             )
+            for interrupted in expired:
+                if interrupted["kind"] == "transcription" and interrupted["state"] in (
+                    "failed",
+                    "unknown",
+                ):
+                    self.service.emit(
+                        conn,
+                        str(interrupted["submission"]),
+                        interrupted["run"],
+                        "gigaam_failed",
+                        error=self.clean(interrupted["error"]),
+                    )
             running = row(conn, "SELECT count(*) n FROM stages WHERE state='running'")
             if running and running["n"] >= self.settings.concurrency:
                 return None
@@ -306,7 +324,7 @@ class Worker:
 
     def fail(self, stage: dict[str, Any], error: str, state: str = "failed") -> None:
         with self.engine.begin() as conn:
-            row(
+            changed = row(
                 conn,
                 """UPDATE stages SET state=:state,error=:error,finished_at=now(),lease_token=NULL,
                 lease_until=NULL,available_at=now()+interval '30 seconds',
@@ -319,6 +337,14 @@ class Worker:
                 kind=stage["kind"],
                 token=stage["lease_token"],
             )
+            if changed and stage["kind"] == "transcription" and state in ("failed", "unknown"):
+                self.service.emit(
+                    conn,
+                    str(stage["submission"]),
+                    stage["run"],
+                    "gigaam_failed",
+                    error=self.clean(error),
+                )
 
 
 def main() -> None:

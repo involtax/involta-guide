@@ -94,7 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health/ready")
     def ready() -> dict[str, str]:
         with engine.connect() as conn:
-            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=6") or row(
+            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=7") or row(
                 conn, "SELECT 1 FROM purge_files WHERE content_epoch=1 LIMIT 1"
             ):
                 raise HTTPException(

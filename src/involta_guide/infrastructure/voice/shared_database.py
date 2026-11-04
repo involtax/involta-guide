@@ -60,8 +60,10 @@ def consolidate(settings: Settings, source_url: str | None) -> str:
                 version = source.execute(
                     "SELECT max(version) FROM voice_schema_versions"
                 ).fetchone()
-                if not version or version[0] not in (5, 6):
-                    raise RuntimeError("Expected Voice schema version 5 or 6 before consolidation")
+                if not version or version[0] not in (5, 6, 7):
+                    raise RuntimeError(
+                        "Expected Voice schema version 5, 6 or 7 before consolidation"
+                    )
                 source_schema = origin[3]
                 source_tables = {
                     r[0]

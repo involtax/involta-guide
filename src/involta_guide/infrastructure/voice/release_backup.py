@@ -1,4 +1,4 @@
-"""Private snapshot of the Voice schema before the incompatible v6 cutover.
+"""Private snapshot of the Voice schema before its coordinated migrations.
 
 All writers must be stopped. The Guide schema is never included or restored here.
 """
@@ -28,7 +28,7 @@ def main() -> None:
                 version = conn.execute(
                     text("SELECT max(version) FROM voice_schema_versions")
                 ).scalar_one()
-            print("yes" if version < 6 else "no")
+            print("yes" if version < 7 else "no")
         finally:
             engine.dispose()
         return

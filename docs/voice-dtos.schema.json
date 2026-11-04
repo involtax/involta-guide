@@ -111,6 +111,7 @@
           "enum": [
             "recording_received",
             "gigaam_ready",
+            "gigaam_failed",
             "transcript_ready",
             "analysis_ready",
             "processing_failed"
@@ -189,6 +190,18 @@
           },
           "title": "Repeat Signals",
           "type": "object"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
         }
       },
       "required": [
