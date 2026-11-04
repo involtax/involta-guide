@@ -19,6 +19,7 @@
   const status=document.querySelector('#search-status');
   const clear=document.querySelector('.search-clear');
   const footer=document.querySelector('.search-menu-footer');
+  const panel=document.querySelector('.search-suggestions');
   const unavailable=new URLSearchParams(location.search).get('state')==='error';
   const normalize=text=>text.toLowerCase().replaceAll('ё','е').trim();
   const safeHighlight=(element,text,query)=>{
@@ -33,14 +34,11 @@
     selector:'#destination',wrapper:false,threshold:2,debounce:180,submit:true,
     data:{src:async query=>unavailable?[]:records.filter(row=>normalize(row.name+' '+row.context+' '+(row.alias||'')).includes(normalize(query))),keys:['name'],cache:false},
     searchEngine:()=> ' ',
-    resultsList:{class:'destination-results',maxResults:6,noResults:true,element:(list,data)=>{
+    resultsList:{class:'destination-results',destination:'.search-menu-footer',position:'beforebegin',maxResults:6,noResults:true,element:(list,data)=>{
       if(!data.results.length){
         const empty=document.createElement('li');empty.className='search-empty';empty.role='presentation';
         empty.textContent=unavailable?'Подсказки временно недоступны.':'Не нашли такую локацию. Попробуйте другое название.';list.append(empty);
       }
-      requestAnimationFrame(()=>{
-        form.style.setProperty('--menu-height',list.getBoundingClientRect().height+'px');
-      });
       status.textContent=data.results.length?`Подсказок: ${data.results.length}`:'Ничего не найдено';
     }},
     resultItem:{class:'destination-result',element:(li,data)=>{
@@ -67,8 +65,8 @@
         else if(event.key==='ArrowUp'){event.preventDefault();widget.previous();}
         else if(event.key==='Enter'&&widget.cursor>=0){event.preventDefault();widget.select(widget.cursor);}
       },
-      open:()=>{footer.hidden=false;},
-      close:()=>{footer.hidden=true;}
+      open:()=>{panel.hidden=false;footer.hidden=false;},
+      close:()=>{panel.hidden=true;footer.hidden=true;}
     }}
   });
   input.setAttribute('aria-autocomplete','list');
