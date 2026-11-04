@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Б: пять оттенков и пять размеров шрифта — Инвольта гид</title>
+<link rel="stylesheet" href="gallery.css">
+<style>
+.refinement-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px; }
+.refinement-group { min-width:0; }
+.refinement-group > h2 { font-size:26px;font-weight:400;letter-spacing:-.7px;margin:0 0 8px; }
+.refinement-note { font-size:12px;color:#747474;margin:0 0 22px; }
+.refinement-list { display:grid;gap:14px; }
+.refinement-list iframe { height:144px;pointer-events:none; }
+.refinement-list .variant-description { margin:4px 0 0; }
+.refinement-list code { color:#858585;font-size:12px;margin-left:12px; }
+@media(max-width:800px) { .refinement-grid { grid-template-columns:minmax(0,1fr);gap:32px; } }
+</style>
+<script defer src="refinements.js"></script>
+<script defer src="refinement-gallery.js"></script>
+</head>
+<body>
+<header>
+<p class="eyebrow">ИНВОЛЬТА ГИД · МАКЕТЫ НА ТЕСТОВЫХ ДАННЫХ</p>
+<h1>Берём Б. <em>Настраиваем акцент.</em></h1>
+<p>Более крупная надпись и плотнее кнопка. Цвет и размер сравниваем отдельно.</p>
+</header>
+<main class="refinement-grid">
+<section class="refinement-group" id="tone-comparison"><h2>Пять оттенков</h2><p class="refinement-note">Макеты · Во всех надпись 20 px. Меняется только синий.</p><div class="refinement-list" data-kind="tone"></div></section>
+<section class="refinement-group" id="font-comparison"><h2>Пять размеров «Найти»</h2><p class="refinement-note">Макеты · Во всех текущий синий №02. Меняется только размер шрифта.</p><div class="refinement-list" data-kind="font"></div></section>
+</main>
+<footer>Во всех примерах кнопка внутри строки с равными зазорами: 10 px на компьютере, 9 px на телефоне. Полная капсула и тени «Фарфора» сохранены.</footer>
+</body>
+</html>

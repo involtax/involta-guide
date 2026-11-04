@@ -1,0 +1,17 @@
+/* Candidate refinements: keep the accepted B shell, increase button fill. */
+html[data-refinement] { --cta-bg:#2563eb;--cta-hover:#1d4ed8;--cta-label-size:20px; }
+html[data-cta-tone="01"] { --cta-bg:#1477cf;--cta-hover:#1069b9; }
+html[data-cta-tone="03"] { --cta-bg:#4865d5;--cta-hover:#3b57c7; }
+html[data-cta-tone="04"] { --cta-bg:#1d4fb5;--cta-hover:#17449f; }
+html[data-cta-tone="05"] { --cta-bg:#087da8;--cta-hover:#086b91; }
+html[data-cta-font="16"] { --cta-label-size:16px; }
+html[data-cta-font="18"] { --cta-label-size:18px; }
+html[data-cta-font="22"] { --cta-label-size:22px; }
+html[data-cta-font="24"] { --cta-label-size:24px; }
+html[data-refinement] .search-submit {
+  min-width:116px;width:116px;height:58px;margin:10px;padding:0 16px;
+  font-size:var(--cta-label-size);font-weight:500;line-height:1.2;white-space:nowrap;
+}
+@media(max-width:650px) {
+  html[data-refinement] .search-submit { min-width:100px;width:100px;height:50px;margin:9px;padding:0 14px;font-size:var(--cta-label-size); }
+}

@@ -7,14 +7,21 @@
   const variant=buttonVariant?porcelain:(window.SEARCH_VARIANTS.find(item=>item.id===params.get('variant'))||porcelain);
   const gallery=params.get('gallery')==='1';
   const comparison=params.get('comparison')==='1';
-  const reference=params.get('geometry')==='reference';
+  const reference=params.get('geometry')==='reference'||(!params.has('geometry')&&!params.has('variant')&&!params.has('button'));
+  const tone=window.SEARCH_REFINEMENTS.tones.find(item=>item.id===params.get('tone'));
+  const font=window.SEARCH_REFINEMENTS.fonts.find(item=>item.px===Number(params.get('font')));
   document.documentElement.dataset.searchVariant=variant.id;
   if(buttonVariant)document.documentElement.dataset.buttonVariant=buttonVariant.id;
   if(reference)document.documentElement.dataset.searchGeometry='reference';
+  if(tone||font){
+    document.documentElement.dataset.refinement='compact';
+    document.documentElement.dataset.ctaTone=tone?tone.id:'02';
+    document.documentElement.dataset.ctaFont=font?String(font.px):'20';
+  }
   if(gallery)document.documentElement.dataset.preview='component';
   if(comparison)document.documentElement.dataset.preview='geometry';
   document.title=buttonVariant?'Кнопка '+buttonVariant.id+' · '+buttonVariant.name+' — Макет':variant.id+' · '+variant.name+' — Макет поиска';
-  document.querySelector('.prototype-label').textContent=reference?'Макет · по референсу':buttonVariant?'Макет · Фарфор · '+buttonVariant.id:'Макет '+variant.id+' · '+variant.name;
+  document.querySelector('.prototype-label').textContent=tone||font?'Макет · '+(tone?tone.name:'Синий')+' · '+(font?font.px:20)+' px':reference?'Макет · Б':buttonVariant?'Макет · Фарфор · '+buttonVariant.id:'Макет '+variant.id+' · '+variant.name;
   if(buttonVariant&&!buttonVariant.arrow)document.querySelector('.search-submit > span:last-child').hidden=true;
   const records = [
     {name:'Великий Новгород',context:'Город · Новгородская область',alias:'Новгород',slug:'velikiy-novgorod'},
