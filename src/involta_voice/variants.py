@@ -1,20 +1,19 @@
-"""The seven GigaAM beta profiles; only the original GigaAM publishes text."""
+"""Five Sherpa profiles; the frozen recommended profile publishes text."""
 
 # score, search width, dictionary source. Frozen in each run at intake.
 SHERPA_PROFILES = {
-    "sherpa_plain": (1.5, 4, "none"),
-    "sherpa_hotwords_weak": (0.75, 4, "catalogue"),
-    "sherpa_hotwords": (1.5, 4, "catalogue"),
-    "sherpa_hotwords_strong": (3.0, 4, "catalogue"),
-    "sherpa_hotwords_wide": (1.5, 8, "catalogue"),
-    "sherpa_hotwords_city": (1.5, 4, "city"),
+    "sherpa_plain": (5.0, 8, "none"),
+    "sherpa_hotwords_weak": (4.5, 8, "catalogue"),
+    "sherpa_hotwords": (5.0, 8, "catalogue"),
+    "sherpa_hotwords_strong": (5.5, 8, "catalogue"),
+    "sherpa_hotwords_wide": (5.0, 16, "catalogue"),
 }
 SHERPA_STAGES = {
     "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)
     for variant in SHERPA_PROFILES
 }
 STAGES = ("transcription", *SHERPA_STAGES)
-RESULTS = (("gigaam", "onnx"), *SHERPA_STAGES.values())
+RESULTS = tuple(SHERPA_STAGES.values())
 VARIANT_LABELS = {
     "onnx": "Базовый · onnx-asr",
     "sherpa_plain": "Sherpa · без словаря",
@@ -40,3 +39,14 @@ def result_identity(kind: str, primary: str = "gigaam") -> tuple[str, str]:
 
 def dictionary_names(names: list[str]) -> list[str]:
     return sorted({" ".join(name.split()) for name in names if name.strip()})
+
+
+def primary_variant(snapshot: dict[str, object]) -> str:
+    return str(snapshot.get("primary_variant", "onnx"))
+
+
+def primary_kind(snapshot: dict[str, object]) -> str:
+    variant = primary_variant(snapshot)
+    if variant == "onnx":
+        return "transcription"
+    return next(kind for kind, (_, value) in SHERPA_STAGES.items() if value == variant)

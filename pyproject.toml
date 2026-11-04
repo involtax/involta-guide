@@ -11,7 +11,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 voice-local = [
- "onnx-asr[cpu,hub]>=0.9,<1", "av>=14,<16",
+ "onnx-asr[cpu,hub]>=0.9,<1", "av>=14,<16", "sentencepiece==0.2.2",
  "sherpa-onnx @ git+https://github.com/k2-fsa/sherpa-onnx.git@3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb",
 ]
 

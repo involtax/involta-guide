@@ -12,6 +12,7 @@ from typing import Any
 from .asr import VAD, decode
 from .config import Settings
 from .provider import ProviderFailure
+from .sherpa_tokenizer import ENCODING, TOKENIZER_SHA256, VOCAB_FILE, VOCAB_SHA256, vocabulary
 from .variants import SHERPA_PROFILES, dictionary_names
 
 # Includes the NeMo TDT beam-search/length-reward fix, upstream PR #4084.
@@ -35,7 +36,13 @@ def options(
     if variant not in SHERPA_PROFILES:
         raise ValueError("Неизвестный вариант Sherpa")
     score, paths, source = SHERPA_PROFILES[variant]
-    dictionary = [location_name] if source == "city" else names if source == "catalogue" else []
+    dictionary = (
+        [location_name]
+        if source == "city"
+        else [location_name, *names]
+        if source == "catalogue"
+        else []
+    )
     return {
         "engine": "sherpa-onnx",
         "model": engine,
@@ -51,8 +58,10 @@ def options(
         "max_active_paths": paths,
         "hotwords_score": score,
         "length_reward": 0.0,
-        "dictionary": dictionary_names(dictionary),
-        "dictionary_encoding": "tokens-longest-match-v1",
+        "dictionary": dictionary_names([v for name in dictionary for v in (name, name.lower())]),
+        "dictionary_encoding": ENCODING,
+        "tokenizer_sha256": TOKENIZER_SHA256,
+        "bpe_vocab_sha256": VOCAB_SHA256,
         "vad_revision": VAD["revision"],
         "max_speech_duration_s": 20,
         "min_silence_duration_ms": 500,
@@ -78,14 +87,10 @@ def prepare(settings: Settings) -> None:
         )
         if not all((target / name).is_file() for name in definition["files"]):
             raise RuntimeError("Неполная загрузка модели Sherpa")
-        # Upstream Sherpa's Parakeet hotwords example derives the BPE vocabulary
-        # from tokens.txt in this way. This is an encoding for hints, not a new ASR vocabulary.
-        pieces = [
-            line.rsplit(" ", 1)[0] for line in (target / "tokens.txt").read_text().splitlines()
-        ]
-        (target / "bpe.vocab").write_text(
-            "".join(piece + "\t0\n" for piece in pieces if not piece.startswith("<"))
-        )
+        # Versioned filename preserves the exact vocabulary of old queued requests.
+        prepared = target / (VOCAB_FILE + ".tmp")
+        prepared.write_bytes(vocabulary(target / "tokens.txt"))
+        prepared.replace(target / VOCAB_FILE)
         (target / "READY.json").write_text(
             json.dumps({"repository": definition["repository"], "revision": definition["revision"]})
         )
@@ -119,6 +124,27 @@ class LocalSherpa:
         vad = self.settings.asr_models_dir / "vad" / request["vad_revision"]
         if not (root / "READY.json").is_file() or not (vad / "READY.json").is_file():
             raise ProviderFailure("Модели Sherpa не подготовлены: выполните voice prepare-model")
+        encoding = request.get("dictionary_encoding", "tokens-longest-match-v1")
+        if encoding == ENCODING:
+            if (
+                request.get("tokenizer_sha256") != TOKENIZER_SHA256
+                or request.get("bpe_vocab_sha256") != VOCAB_SHA256
+            ):
+                raise ProviderFailure("Неизвестная ревизия токенизатора GigaAM")
+            bpe_vocab = root / VOCAB_FILE
+            if (
+                not bpe_vocab.is_file()
+                or hashlib.sha256(bpe_vocab.read_bytes()).hexdigest() != VOCAB_SHA256
+            ):
+                raise ProviderFailure(
+                    "Родной словарь GigaAM не подготовлен: выполните voice prepare-model"
+                )
+        elif encoding == "tokens-longest-match-v1":
+            bpe_vocab = root / "bpe.vocab"
+            if not bpe_vocab.is_file():
+                raise ProviderFailure("Исходный словарь исторического задания недоступен")
+        else:
+            raise ProviderFailure("Неизвестное кодирование словаря GigaAM")
         signature = json.dumps(request, sort_keys=True, ensure_ascii=False)
         if self._signature == signature and self._model is not None:
             return
@@ -158,7 +184,7 @@ class LocalSherpa:
                 decoding_method=request["decoding_method"],
                 max_active_paths=request["max_active_paths"],
                 modeling_unit="bpe",
-                bpe_vocab=str(root / "bpe.vocab"),
+                bpe_vocab=str(bpe_vocab),
                 hotwords_file=phrases.name if names else "",
                 hotwords_score=request["hotwords_score"],
                 provider="cpu",

@@ -7,7 +7,7 @@ from sqlalchemy import Engine, text
 from .asr import MODELS
 from .db import encoded, execute, row
 from .errors import VoiceError
-from .variants import RESULTS, VARIANT_LABELS, result_identity
+from .variants import RESULTS, VARIANT_LABELS, primary_variant, result_identity
 
 
 def save_candidate(
@@ -47,7 +47,9 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
     with engine.connect() as conn:
         submissions = (
             conn.execute(
-                text("SELECT reference FROM submissions WHERE reference=ANY(CAST(:ids AS uuid[]))"),
+                text(
+                    "SELECT s.reference,s.transcript,r.snapshot FROM submissions s JOIN runs r ON r.submission=s.reference AND r.number=s.active_run WHERE s.reference=ANY(CAST(:ids AS uuid[]))"
+                ),
                 {"ids": references},
             )
             .mappings()
@@ -77,7 +79,8 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
     for submission in submissions:
         ref = str(submission["reference"])
         pair = []
-        for name, variant in RESULTS:
+        # Read old controls only when their original job/result actually exists.
+        for name, variant in (("gigaam", "onnx"), *RESULTS):
             candidate = next(
                 (
                     c
@@ -106,7 +109,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                 None,
             )
             # Existing reviews retain their saved profiles; no comparison is scheduled by reads.
-            if variant != "onnx" and candidate is None and stage is None:
+            if candidate is None and stage is None:
                 continue
             request = (
                 candidate["settings"] if candidate else (stage["request"] or {}) if stage else {}
@@ -120,7 +123,16 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     "dictionary": request.get("dictionary", []) if stage or candidate else None,
                     "max_active_paths": request.get("max_active_paths"),
                     "hotwords_score": request.get("hotwords_score"),
-                    "text": candidate["transcript"] if candidate else None,
+                    "primary": variant == primary_variant(submission["snapshot"]),
+                    "raw_text": candidate["transcript"] if candidate else None,
+                    "text": (
+                        submission["transcript"]
+                        if variant == primary_variant(submission["snapshot"])
+                        and submission["snapshot"].get("restore_dictionary_case")
+                        else candidate["transcript"]
+                    )
+                    if candidate
+                    else None,
                     "state": "completed"
                     if candidate
                     else stage["state"]

@@ -30,7 +30,7 @@ MODELS: dict[str, dict[str, Any]] = {
         ],
     },
 }
-VAD = {
+VAD: dict[str, Any] = {
     "repository": "istupakov/silero-vad-onnx",
     "revision": "b3e3ee3cce4c11ceb63b1a0b229d916069c1ddf6",
     "files": ["config.json", "silero_vad.onnx", "README.md", "LICENSE.txt"],
@@ -61,7 +61,7 @@ def model_path(settings: Settings, request: dict[str, Any] | None = None) -> Pat
 def prepare(settings: Settings) -> Path:
     from huggingface_hub import snapshot_download
 
-    engines = list(MODELS) if settings.asr_beta_enabled else [settings.transcription_model]
+    engines: list[str] = [] if settings.asr_beta_enabled else [settings.transcription_model]
     for name, definition in [(e, MODELS[e]) for e in engines] + [("vad", VAD)]:
         target = settings.asr_models_dir / name / definition["revision"]
         target.mkdir(parents=True, exist_ok=True)

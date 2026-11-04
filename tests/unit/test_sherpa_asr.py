@@ -10,6 +10,7 @@ from involta_voice.asr import VAD
 from involta_voice.config import Settings
 from involta_voice.provider import ProviderFailure
 from involta_voice.sherpa import LocalSherpa, model_path, options
+from involta_voice.sherpa_tokenizer import VOCAB_FILE, tokenizer, vocabulary
 from involta_voice.variants import SHERPA_PROFILES
 
 
@@ -31,11 +32,18 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
     assert {k: v for k, v in plain.items() if k not in ("variant", "dictionary")} == {
         k: v for k, v in biased.items() if k not in ("variant", "dictionary")
     }
-    assert biased["dictionary"] == ["Алхимист", "Огонёк", "Сыроварня"]
+    assert biased["dictionary"] == [
+        "Алхимист",
+        "Огонёк",
+        "Сыроварня",
+        "алхимист",
+        "огонёк",
+        "сыроварня",
+    ]
     assert plain["dictionary"] == []
     assert plain["decoding_method"] == "modified_beam_search"
     names.append("Не должно попасть в запрос")
-    assert len(biased["dictionary"]) == 3
+    assert len(biased["dictionary"]) == 6
 
 
 def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
@@ -56,6 +64,13 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     for path in (model_path(config, engine), config.asr_models_dir / "vad" / VAD["revision"]):
         path.mkdir(parents=True)
         (path / "READY.json").write_text("{}")
+    root = model_path(config, engine)
+    sp = tokenizer()
+    (root / "tokens.txt").write_text(
+        "".join(f"{sp.id_to_piece(i)} {i}\n" for i in range(sp.vocab_size()))
+        + f"<blk> {sp.vocab_size()}\n"
+    )
+    (root / VOCAB_FILE).write_bytes(vocabulary(root / "tokens.txt"))
     waveform = np.zeros(16000, dtype=np.float32)
     monkeypatch.setattr(sherpa, "decode", lambda audio: waveform)
     captured = {}

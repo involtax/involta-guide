@@ -44,7 +44,7 @@ def test_primary_failure_unpublishes_but_retains_audio_and_logs(database, voice_
 
     class PrimaryFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
-            if request["model"] == "gigaam":
+            if request.get("variant", "onnx") == "sherpa_hotwords":
                 if failure == "empty":
                     return {"status_code": 200, "body": json.dumps({"text": "  "})}
                 raise ProviderFailure("GigaAM test failure", unknown=failure == "unknown")
@@ -101,7 +101,7 @@ def test_comparison_failure_does_not_unpublish_primary_text(database, voice_data
 
     class ComparisonFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
-            if request.get("variant", "onnx") != "onnx":
+            if request.get("variant", "onnx") != "sherpa_hotwords":
                 raise ProviderFailure("Comparison test failure")
             return super().call(kind, request, audio, mime)
 
