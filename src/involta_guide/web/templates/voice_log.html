@@ -1,0 +1,9 @@
+{%extends 'admin_shell.html'%}
+{%block admin_content%}
+<header class="admin-section-heading"><h2>{{v.location.name}} / отзыв № {{v.review.number}}</h2><a href="{{settings.path('/admin/reviews/'+v.location.slug+'/'+v.review.number|string)}}">К отзыву ←</a></header>
+{%if voice_unavailable%}<p role="alert">{{voice_unavailable}}</p>{%endif%}
+<section class="panel"><h3>Запись и доставка</h3><pre>{{v.review|tojson(indent=2)}}</pre><h3>Voice consumer</h3><pre>{{consumer_health|tojson(indent=2)}}</pre></section>
+{%if remote%}<section class="panel"><h3>Этапы обработки и исходные ответы</h3><pre>{{remote|tojson(indent=2)}}</pre></section>{%endif%}
+{%if comparison%}<section class="panel"><h3>Результаты моделей</h3><pre>{{comparison|tojson(indent=2)}}</pre></section>{%endif%}
+<section class="panel"><h3>События доставки в Guide</h3>{%for event in v.events%}<details><summary>{{event.sequence}} · {{event.kind}} · {{event.state}}</summary><pre>{{event|tojson(indent=2)}}</pre>{%if event.state=='failed'%}<form method="post" action="{{settings.path('/admin/reviews/inbox/'+event.event_id|string+'/retry')}}">{{csrf()}}<button>Повторить доставку</button></form>{%endif%}</details>{%else%}<p>Событий нет.</p>{%endfor%}</section>
+{%endblock%}

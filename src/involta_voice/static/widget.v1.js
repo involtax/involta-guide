@@ -1610,16 +1610,11 @@
           showReview(currentText, data);
           if (data.state.includes("failed") || data.state.includes("unknown")) {
             status.textContent = data.transcript
-              ? "Текст отзыва сохранён. Дополнительный анализ не завершён."
+              ? "Текст отзыва сохранён."
               : "Запись сохранена. Расшифровка не завершена; подробности в диагностике.";
             return;
           }
-          if (
-            ["approved", "published", "rejected", "fraud"].includes(
-              data.editorial_state || data.moderation,
-            )
-          )
-            return;
+          if (data.transcript) return;
           delay = Math.min(delay * 1.5, 60000);
           schedule();
         } catch {
@@ -1653,15 +1648,9 @@
           }
           for (const item of data.rows || []) {
             const paragraph = document.createElement("p");
-            const state = item.editorial_state || item.moderation;
             showReview(paragraph, item);
             history.append(paragraph);
-            ongoing ||= ![
-              "approved",
-              "published",
-              "rejected",
-              "fraud",
-            ].includes(state);
+            ongoing ||= !item.transcript && !item.state?.includes("failed") && !item.state?.includes("unknown");
           }
         } catch {
           ongoing = true;

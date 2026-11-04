@@ -136,7 +136,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "filling_v3"
+                    == "review_stream"
                 )
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)

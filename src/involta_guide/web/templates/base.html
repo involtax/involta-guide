@@ -24,7 +24,9 @@
 <a href="{{ settings.path('/') }}" class="brand">инвольта<span>гид</span>
 <sup>Россия</sup>
 </a>
-<a href="{{ settings.path('/') }}" class="header-note">Места, ради которых стоит зайти.</a>
+{% if admin_ui|default(false) %}
+{% if admin_authenticated|default(false) %}<form method="post" action="{{ settings.path('/admin/logout') }}" class="admin-logout" hx-boost="false"><input type="hidden" name="_csrf" value="{{csrf_token}}"><button>Выйти</button></form>{% endif %}
+{% else %}<a href="{{ settings.path('/') }}" class="header-note">Места, ради которых стоит зайти.</a>{% endif %}
 </header>
 {% block body %}
 {% endblock %}

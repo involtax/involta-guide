@@ -1,3 +1,5 @@
+> Уточнение от 04.11.2026: ручная модерация/правки/привязки и оценка ASR отменены. Текущий контракт, GigaAM-only лента и переход БД: [ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
+
 # Beta core: переход и эксплуатация
 
 Нормативное ТЗ: [BETA_CORE_SIMPLIFICATION_SPEC.md](BETA_CORE_SIMPLIFICATION_SPEC.md).

@@ -108,13 +108,25 @@ stop_guide_writers() {
   local sha=$1 image=$2
   compose "$sha" "$image" stop --timeout 240 worker web
   if [[ -f "$DEPLOY_ROOT/releases/$sha/compose.voice.yaml" ]]; then
-    compose "$sha" "$image" stop --timeout 240 voice-consumer
+    compose "$sha" "$image" stop --timeout 240 voice-consumer voice-api voice-worker
   fi
+}
+voice_pg() {
+  local tool=$1 port=5432
+  shift
+  [[ "$NETWORK_MODE" != host ]] || port=55439
+  compose "$target_sha" "$target_image" exec -T voice-db "$tool" \
+    -h 127.0.0.1 -p "$port" -U voice -d voice "$@"
 }
 restore_cutover_database() {
   local backup="$DEPLOY_ROOT/releases/$target_sha/pre-cutover.$deployment_id.dump"
-  [[ -f "$backup" ]] || return 0
+  local voice_backup="$DEPLOY_ROOT/releases/$target_sha/pre-voice-stream.$deployment_id.dump"
+  [[ -f "$backup" || -f "$voice_backup" ]] || return 0
   stop_guide_writers "$target_sha" "$target_image" || return 1
+  if [[ -f "$voice_backup" ]]; then
+    voice_pg pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction < "$voice_backup" || return 1
+  fi
+  [[ -f "$backup" ]] || return 0
   compose "$target_sha" "$target_image" run --rm --no-deps -T web \
     python -m involta_guide.infrastructure.persistence.release_backup restore < "$backup" || return 1
 }
@@ -254,6 +266,19 @@ fi
 compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
 if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" up -d --no-build voice-db
+  wait_health "$target_sha" "$target_image" voice-db
+  voice_schema_exists=$(voice_pg psql -Atc "SELECT to_regclass('voice_schema_versions') IS NOT NULL")
+  voice_schema_version=0
+  if [[ "$voice_schema_exists" == t ]]; then
+    voice_schema_version=$(voice_pg psql -Atc 'SELECT max(version) FROM voice_schema_versions')
+  fi
+  if [[ "$voice_schema_exists" == t && "$voice_schema_version" -lt 6 ]]; then
+    voice_backup="$release_dir/pre-voice-stream.$deployment_id.dump"
+    voice_pg pg_dump --format=custom --no-owner --no-privileges > "$voice_backup.tmp"
+    [[ -s "$voice_backup.tmp" ]] || { echo 'Empty Voice backup; migration refused' >&2; false; }
+    voice_pg pg_restore --list < "$voice_backup.tmp" > /dev/null
+    mv -f -- "$voice_backup.tmp" "$voice_backup"
+  fi
   compose "$target_sha" "$target_image" run --rm voice-migrate
   compose "$target_sha" "$target_image" run --rm voice-prepare-model
   compose "$target_sha" "$target_image" up -d --no-build voice-api voice-worker voice-consumer

@@ -1,4 +1,4 @@
-"""Protected first Voice rollout and corpus evaluation. Credentials stay on the server."""
+"""Protected first Voice rollout and recognition diagnostics. Credentials stay on the server."""
 
 import fcntl
 import hashlib
@@ -95,7 +95,7 @@ def healthy(command, service):
 
 def main():
     action, target_sha = sys.argv[1:]
-    assert action in ("prepare", "activate", "backfill", "report")
+    assert action in ("prepare", "activate", "report")
     assert re.fullmatch(r"[0-9a-f]{40}", target_sha)
     os.umask(0o077)
     with (
@@ -278,24 +278,6 @@ def main():
                     {"enabled": True, "revision": sha, "asr_beta": True, "fake_provider": False}
                 )
             )
-        elif action == "backfill":
-            for service, cli in (("voice-api", "voice"),):
-                args = [cli, "asr-backfill"]
-                for execute in (False, True):
-                    result = json.loads(
-                        run(
-                            [
-                                *command,
-                                "exec",
-                                "-T",
-                                service,
-                                *args,
-                                *(["--execute"] if execute else []),
-                            ],
-                            timeout=900,
-                        )
-                    )
-                    print(json.dumps({"service": service, "inventory": result}, ensure_ascii=False))
         else:
             result = json.loads(
                 run([*command, "exec", "-T", "voice-api", "voice", "asr-report"], timeout=600)

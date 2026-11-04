@@ -1,9 +1,8 @@
 # Voice API, контракт 2
 
-Voice — отдельный backend с собственной БД/файлами. Guide — каталог и модерация.
+Voice — отдельный backend с собственной БД/файлами. Guide — каталог и публичная лента последних 10 GigaAM-отзывов.
 [OpenAPI](voice-openapi.json) · [DTO JSON Schema](voice-dtos.schema.json).
-Внутренние пути `/internal/v1` требуют Bearer service secret; настройки и ASR-оценки
-также передают административную сессию. Публичного доступа к Voice DB/API нет.
+Внутренние пути `/internal/v1` требуют Bearer service secret; административные результаты доступны только через защищённый gateway. Публичного доступа к Voice DB/API нет.
 
 Gateway Guide под BASE_PATH `/voice/api/v1`:
 
@@ -37,15 +36,22 @@ upload/callback возвращает `stale_epoch` 409. Повтор purge то�
 новые записи этого цикла. Во время неполной очистки новые intake закрыты.
 
 Outbox event v2: sequence/event_id/reference/run/kind, metadata v2, transcript,
-analysis, audio SHA/MIME/duration, created_at и repeat_signals. Виды: transcript_ready,
-analysis_ready, processing_failed. GET `/events?after=N`; POST `/events/ack` после
-сохранения входа в Guide inbox. Ошибка одного применения не блокирует независимые
-reference; зависимые события одного reference ждут. Повтор ACK/event безопасен.
+analysis (историческое поле), audio SHA/MIME/duration, created_at и repeat_signals.
+Новые виды: `recording_received` (transcript=null) и `gigaam_ready` (текст GigaAM).
+GET `/events?after=N`; POST `/events/ack` после durable inbox commit. Receipt и
+primary применяются в любом порядке; повторы безопасны. Старые transcript_ready,
+analysis_ready, processing_failed принимаются только как история доставки.
 
-Сохранены normal new-run/revalidate, локальные GigaAM/Parakeet, ASR-кандидаты и
-ручные оценки из PR18. Архивных API, guide-transcription, Alex-команд и второго
-Guide-исполнителя нет. ЧПУ карточки Guide `/admin/reviews/{slug}/{number}`, действия
-`/actions`, аудио `/audio`; сравнение двух моделей показывается в этой же карточке.
+POST `/admin/recognitions` — приватный batch до 30 UUID: по две строки результатов,
+без оценок и эталона. GET `/admin/submissions/{reference}` и `/asr` содержат
+подробности для лога. Ручные new-run/revalidate, ASR-run/evaluation и изменение
+настроек анализа удалены. GigaAM фиксирован как primary. Публичный SubmissionStatus
+и личная история посетителя не содержат Parakeet, модерации и редакторского состояния.
+
+Админка: `/admin/reviews/{slug}` — лента города. ЧПУ `/admin/reviews/{slug}/{number}`
+открывает страницу с якорем. `/audio` доступно только администратору.
+Приватный лог `/logs/reviews/{slug}/{number}`. Подробности и переход двух БД:
+[ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
 
 Виджет сохраняет blob/key/**исходный epoch** в IndexedDB. После reset старый blob/key
 не получает свежую метку: очередь очищается при следующем контакте, пользователь

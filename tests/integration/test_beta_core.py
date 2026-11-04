@@ -241,7 +241,7 @@ def test_poison_event_is_durable_and_does_not_block_other_reviews(database, voic
     import copy
 
     events = copy.deepcopy(original)
-    bad = next(e for e in events if e["reference"] == refs[0] and e["kind"] == "transcript_ready")
+    bad = next(e for e in events if e["reference"] == refs[0] and e["kind"] == "gigaam_ready")
     bad["transcript"] = ""
 
     class Client:
@@ -257,7 +257,9 @@ def test_poison_event_is_durable_and_does_not_block_other_reviews(database, voic
     consumer = Consumer(engine, client)
     consumer.once()
     assert client.acknowledged == max(e["sequence"] for e in events)
-    assert [r["id"] for r in queries.rows("reviews")] == [refs[1]]
+    assert {r["id"] for r in queries.rows("reviews")} == set(refs)
+    assert queries.get("reviews", refs[0])["transcript"] is None
+    assert queries.get("reviews", refs[1])["transcript"]
     with engine.connect() as conn:
         failed = (
             conn.execute(text("SELECT payload,error FROM voice_inbox WHERE state='failed'"))
@@ -267,7 +269,7 @@ def test_poison_event_is_durable_and_does_not_block_other_reviews(database, voic
         assert failed["payload"] == bad and failed["error"]
         assert (
             conn.execute(text("SELECT count(*) FROM voice_inbox WHERE state='pending'")).scalar()
-            == 1
+            == 0
         )
     # Correcting a saved poison input is an operator action; retry reuses the inbox identity.
     repaired = next(e for e in original if e["event_id"] == bad["event_id"])

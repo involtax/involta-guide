@@ -3,6 +3,8 @@ import time
 from pydantic import SecretStr
 from sqlalchemy import text
 
+from involta_voice.asr import options
+from involta_voice.db import encoded
 from involta_voice.provider import FakeProvider
 from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
@@ -11,9 +13,7 @@ from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 
 
-def test_transcription_survives_missing_analysis_key_without_audio_network(
-    voice_database, monkeypatch
-):
+def test_transcription_needs_no_analysis_key_or_audio_network(voice_database, monkeypatch):
     settings, engine = voice_database
     settings = settings.model_copy(update={"fake_provider": False, "openai_api_key": SecretStr("")})
     from involta_voice.asr import LocalAsr
@@ -36,9 +36,9 @@ def test_transcription_survives_missing_analysis_key_without_audio_network(
         with engine.connect() as conn:
             call = conn.execute(text("SELECT * FROM provider_calls")).mappings().one()
             assert call["reserved_usd"] is None and call["cost_usd"] is None
-        assert worker.once()  # optional analysis has no API key; text is still committed.
+        assert not worker.once()  # No analysis stage is scheduled.
         assert service.status(ref)["transcript"] == "Локальная расшифровка."
-        assert service.status(ref)["state"] == "analysis_failed"
+        assert service.status(ref)["state"] == "result_ready"
     finally:
         worker.provider.close()
 
@@ -67,8 +67,9 @@ def test_interrupted_local_inference_retries_without_cloud_unknown(voice_databas
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE stages SET request='{\"engine\":\"onnx-asr\"}'::jsonb,lease_until=now()-interval '1 second'"
-            )
+                "UPDATE stages SET request=CAST(:request AS jsonb),lease_until=now()-interval '1 second'"
+            ),
+            {"request": encoded(options(settings))},
         )
     assert worker.once()
     assert service.status(ref)["transcript"]

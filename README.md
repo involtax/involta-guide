@@ -3,6 +3,7 @@
 # Инвольта гид
 
 Принципы разработки и инструкции для агентов: [AGENTS.md](AGENTS.md).
+Текущая лента отзывов, GigaAM-only публикация и переход БД: [docs/ADMIN_REVIEWS.md](docs/ADMIN_REVIEWS.md).
 
 Ресторанный справочник России: города, районы, курорты и направления.
 **Python 3.13+, FastAPI, Jinja2, HTMX, PostgreSQL 17.** Без Node.js и frontend-сборки.

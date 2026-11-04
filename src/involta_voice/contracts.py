@@ -135,7 +135,6 @@ class SubmissionStatus(DTO):
     transcript: str | None
     created_at: str
     error: str | None = None
-    moderation: Literal["pending"] = "pending"
     repeat_signals: dict[str, int] = Field(default_factory=dict)
 
 
@@ -143,11 +142,17 @@ class OutboxEvent(DTO):
     schema_version: Literal[2]
     event_id: UUID
     sequence: int = Field(ge=1)
-    kind: Literal["transcript_ready", "analysis_ready", "processing_failed"]
+    kind: Literal[
+        "recording_received",
+        "gigaam_ready",
+        "transcript_ready",
+        "analysis_ready",
+        "processing_failed",
+    ]
     reference: UUID
     run: int = Field(ge=1)
     metadata: SubmissionMetadata
-    transcript: str = Field(min_length=1, max_length=30000)
+    transcript: str | None = Field(default=None, min_length=1, max_length=30000)
     analysis: dict[str, Any] | None = None
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     mime: Literal["audio/webm", "audio/ogg", "audio/mp4", "audio/wav"]

@@ -31,7 +31,7 @@ def owner(request: Request) -> str:
     return visitor
 
 
-def editorial_status(request: Request, reference: str, visitor: str) -> dict[str, Any] | None:
+def saved_status(request: Request, reference: str, visitor: str) -> dict[str, Any] | None:
     ctx = context(request)
     try:
         review = ctx.queries.get("reviews", reference)
@@ -39,26 +39,14 @@ def editorial_status(request: Request, reference: str, visitor: str) -> dict[str
         return None
     if review["visitor"] != visitor:
         raise HTTPException(404, "Запись не найдена")
-    try:
-        text = ctx.queries.get("review_texts", reference)
-    except NotFound:
-        text = None
     location = ctx.queries.get("locations", review["location_id"])
-    state = "fraud" if review["fraud"] else review["moderation"]
-    if review["changes"] and review["moderation"] == "approved" and not review["fraud"]:
-        state = "published"
-    if text and text["public"] and review["moderation"] == "approved" and not review["fraud"]:
-        state = "published"
+    ready = review["status"] == "transcribed"
     return {
         "reference": reference,
         "location": {"id": str(location["id"]), "slug": location["slug"], "name": location["name"]},
-        "transcript": text["original_text"] if text else review["transcript"],
-        "moderation": review["moderation"],
-        "editorial_state": state,
+        "transcript": review["transcript"] if ready else None,
         "created_at": str(review["created_at"]),
-        "state": "result_ready"
-        if review["transcript"]
-        else ("processing_failed" if review["status"] == "failed" else "accepted"),
+        "state": "result_ready" if ready else "accepted",
     }
 
 
@@ -388,8 +376,8 @@ def routes(prefix: str) -> APIRouter:
                 "GET", "/submissions", params={"visitor": visitor, "page": max(1, page)}
             )
             for item in data["rows"]:
-                imported = editorial_status(request, item["reference"], visitor)
-                if imported:
+                imported = saved_status(request, item["reference"], visitor)
+                if imported and imported["transcript"]:
                     item.update(
                         {k: v for k, v in imported.items() if k not in {"state", "created_at"}}
                     )
@@ -397,7 +385,7 @@ def routes(prefix: str) -> APIRouter:
         except VoiceUnavailable:
             rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
             data = {
-                "rows": [editorial_status(request, r["id"], visitor) for r in rows],
+                "rows": [saved_status(request, r["id"], visitor) for r in rows],
                 "page": page,
                 "service_available": False,
             }
@@ -405,7 +393,7 @@ def routes(prefix: str) -> APIRouter:
         rows = context(request).queries.rows("reviews", {"visitor": visitor}, limit=30)
         for item in rows:
             if item["id"] not in known:
-                own = editorial_status(request, item["id"], visitor)
+                own = saved_status(request, item["id"], visitor)
                 if own:
                     data["rows"].append(own)
         if location:
@@ -420,7 +408,7 @@ def routes(prefix: str) -> APIRouter:
     @router.get(base + "/submissions/{reference}")
     def status(request: Request, reference: UUID) -> Response:
         visitor = owner(request)
-        imported = editorial_status(request, str(reference), visitor)
+        imported = saved_status(request, str(reference), visitor)
         try:
             remote = voice_client(request).request(
                 "GET", "/submissions/" + str(reference), params={"visitor": visitor}
@@ -436,7 +424,7 @@ def routes(prefix: str) -> APIRouter:
             if imported is None:
                 raise HTTPException(503, "Статус временно недоступен") from None
             data = imported
-        if imported:
+        if imported and imported["transcript"]:
             data.update({k: v for k, v in imported.items() if k not in {"state", "created_at"}})
             data.setdefault("created_at", imported["created_at"])
         return JSONResponse(data, headers={"Cache-Control": "private,no-store"})

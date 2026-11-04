@@ -1,9 +1,43 @@
+import re
 from typing import Any
 
 from sqlalchemy import Engine, text
 
 from involta_guide.domain.entities import NotFound
 from involta_voice.db import row
+
+
+def browser_label(agent: str) -> str:
+    browser = next(
+        (
+            label + " " + match.group(1)
+            for token, label in (
+                ("Edg", "Edge"),
+                ("OPR", "Opera"),
+                ("Chrome", "Chrome"),
+                ("Firefox", "Firefox"),
+                ("Version", "Safari"),
+            )
+            if (match := re.search(token + r"/(\d+)", agent))
+        ),
+        "",
+    )
+    platform = next(
+        (
+            label
+            for token, label in (
+                ("Android", "Android"),
+                ("iPhone", "iPhone"),
+                ("iPad", "iPad"),
+                ("Windows", "Windows"),
+                ("Macintosh", "macOS"),
+                ("Linux", "Linux"),
+            )
+            if token in agent
+        ),
+        "",
+    )
+    return " · ".join(p for p in (browser, platform) if p) or agent[:80] or "Браузер не указан"
 
 
 class VoiceReadModel:
@@ -28,73 +62,75 @@ class VoiceReadModel:
             return [
                 dict(r)
                 for r in conn.execute(
-                    text("""SELECT t.editorial_text,r.created_at,s.name restaurant_name
-                FROM review_texts t JOIN reviews r ON r.id=t.review_id LEFT JOIN restaurants s ON s.id=t.restaurant_id
-                WHERE r.location_id=:location AND t.public AND r.moderation='approved' AND r.fraud=0
-                ORDER BY r.created_at DESC,r.id LIMIT 100"""),
+                    text("""SELECT transcript,created_at FROM reviews
+                WHERE location_id=:location AND status='transcribed' AND length(trim(transcript))>0
+                ORDER BY created_at DESC,number DESC LIMIT 10"""),
                     {"location": location_id},
                 ).mappings()
             ]
 
-    def listing(
-        self,
-        query: str = "",
-        moderation: str = "",
-        kind: str = "",
-        repeat: bool = False,
-        page: int = 1,
-        stage: str = "",
-    ) -> dict[str, Any]:
-        # This is an administrator-only queue; trusted audio needs comparison too.
-        clauses = ["TRUE"]
-        params: dict[str, Any] = {
-            "q": "%" + query.replace("%", "\\%").replace("_", "\\_") + "%",
-            "moderation": moderation,
-            "kind": kind,
-        }
-        if query:
-            clauses.append("(l.name ILIKE :q OR l.slug ILIKE :q)")
-        if moderation in ("pending", "approved", "rejected"):
-            clauses.append("r.moderation=:moderation")
-        if kind in ("edit", "restaurant"):
-            clauses.append(
-                "EXISTS(SELECT 1 FROM proposals p WHERE p.review_id=r.id AND p.kind=:kind)"
-            )
-        if repeat:
-            clauses.append("coalesce((v.metadata->'repeat_signals'->>'same_audio')::integer,0)>0")
-        if stage == "waiting-text":
-            clauses.append("t.review_id IS NULL")
-        elif stage == "text-ready":
-            clauses.append("t.review_id IS NOT NULL")
-        elif stage == "analysis-ready":
-            clauses.append(
-                "r.result IS NOT NULL AND (v.reference IS NULL OR EXISTS(SELECT 1 FROM voice_results a WHERE a.review_id=r.id AND a.run=v.active_run))"
-            )
-        elif stage == "failed":
-            clauses.append("(r.error IS NOT NULL OR r.status='failed')")
-        joins = (
-            "FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN voice_links v ON v.review_id=r.id LEFT JOIN review_texts t ON t.review_id=r.id WHERE "
-            + " AND ".join(clauses)
-        )
+    def cities(self, query: str = "") -> list[dict[str, Any]]:
         with self.engine.connect() as conn:
-            count = row(conn, "SELECT count(*) n " + joins, **params)
-            total = count["n"] if count else 0
-            page = max(1, min(page, max(1, (total + 29) // 30)))
-            params.update(offset=(page - 1) * 30)
-            items = [
+            return [
                 dict(r)
                 for r in conn.execute(
-                    text(
-                        "SELECT r.*,l.name location_name,l.slug location_slug,v.active_run,t.editorial_text "
-                        + joins
-                        + " ORDER BY r.created_at DESC,r.id LIMIT 30 OFFSET :offset"
-                    ),
-                    params,
+                    text("""SELECT l.id,l.slug,l.name,count(*) total,max(r.created_at) latest
+                FROM locations l JOIN reviews r ON r.location_id=l.id
+                WHERE l.name ILIKE :q OR l.slug ILIKE :q
+                GROUP BY l.id ORDER BY latest DESC,l.name,l.id"""),
+                    {
+                        "q": "%"
+                        + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                        + "%"
+                    },
                 ).mappings()
             ]
+
+    def listing(self, slug: str | None = None, query: str = "", page: int = 1) -> dict[str, Any]:
+        cities = self.cities(query)
+        with self.engine.connect() as conn:
+            city = (
+                row(conn, "SELECT id,slug,name FROM locations WHERE slug=:slug", slug=slug)
+                if slug
+                else (cities[0] if cities else None)
+            )
+            if slug and not city:
+                raise NotFound("Локация не найдена")
+            counted = (
+                row(conn, "SELECT count(*) n FROM reviews WHERE location_id=:id", id=city["id"])
+                if city
+                else None
+            )
+            total = counted["n"] if counted else 0
+            pages = max(1, (total + 19) // 20)
+            page = max(1, min(page, pages))
+            items = (
+                [
+                    dict(r)
+                    for r in conn.execute(
+                        text("""SELECT r.*,v.reference FROM reviews r
+                LEFT JOIN voice_links v ON v.review_id=r.id WHERE r.location_id=:id
+                ORDER BY r.created_at DESC,r.number DESC LIMIT 20 OFFSET :offset"""),
+                        {"id": city["id"], "offset": (page - 1) * 20},
+                    ).mappings()
+                ]
+                if city
+                else []
+            )
         for item in items:
-            item["path"] = "/admin/reviews/" + item["location_slug"] + "/" + str(item["number"])
-        return {"rows": items, "page": page, "pages": max(1, (total + 29) // 30), "total": total}
+            assert city is not None
+            item["path"] = "/admin/reviews/" + city["slug"] + "/" + str(item["number"])
+            item["log_path"] = "/logs/reviews/" + city["slug"] + "/" + str(item["number"])
+            item["browser"] = browser_label(item["user_agent"])
+            item["reference"] = str(item["reference"]) if item["reference"] else None
+        return {
+            "cities": cities,
+            "city": city,
+            "rows": items,
+            "page": page,
+            "pages": pages,
+            "total": total,
+        }
 
     def path(self, review_id: str) -> str:
         with self.engine.connect() as conn:
@@ -103,7 +139,7 @@ class VoiceReadModel:
                 "SELECT r.number,l.slug FROM reviews r JOIN locations l ON l.id=r.location_id WHERE r.id=:id",
                 id=review_id,
             )
-        if item is None:
+        if not item:
             raise NotFound("Отзыв не найден")
         return "/admin/reviews/" + item["slug"] + "/" + str(item["number"])
 
@@ -111,14 +147,13 @@ class VoiceReadModel:
         with self.engine.connect() as conn:
             item = row(
                 conn,
-                """SELECT r.id AS review_id,l.slug FROM reviews r JOIN locations l ON l.id=r.location_id
-                WHERE r.number=:n AND l.slug=:slug""",
-                n=number,
+                "SELECT r.id FROM reviews r JOIN locations l ON l.id=r.location_id WHERE l.slug=:slug AND r.number=:n",
                 slug=slug,
+                n=number,
             )
         if not item:
             raise NotFound("Отзыв не найден")
-        return str(item["review_id"]), item["slug"]
+        return str(item["id"]), slug
 
     def detail(self, review_id: str) -> dict[str, Any]:
         with self.engine.connect() as conn:
@@ -126,88 +161,12 @@ class VoiceReadModel:
             if not review:
                 raise NotFound("Отзыв не найден")
             location = row(conn, "SELECT * FROM locations WHERE id=:id", id=review["location_id"])
-            assert location is not None
             link = row(conn, "SELECT * FROM voice_links WHERE review_id=:id", id=review_id)
-            text_review = row(conn, "SELECT * FROM review_texts WHERE review_id=:id", id=review_id)
-            asr_reference = str(link["reference"]) if link else None
-            proposals = [
-                dict(p)
-                for p in conn.execute(
-                    text("""SELECT p.*,v.run,v.revision FROM proposals p
-                LEFT JOIN voice_proposals v ON v.proposal_id=p.id WHERE p.review_id=:id
-                ORDER BY p.created_at,p.id"""),
+            events = [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT * FROM voice_inbox WHERE review_id=:id ORDER BY sequence"),
                     {"id": review_id},
                 ).mappings()
             ]
-            decisions = [
-                dict(p)
-                for p in conn.execute(
-                    text(
-                        "SELECT * FROM review_decisions WHERE review_id=:id ORDER BY created_at,id"
-                    ),
-                    {"id": review_id},
-                ).mappings()
-            ]
-            runs = [
-                dict(p)
-                for p in conn.execute(
-                    text("SELECT * FROM voice_results WHERE review_id=:id ORDER BY run DESC"),
-                    {"id": review_id},
-                ).mappings()
-            ]
-            restaurants = [
-                dict(p)
-                for p in conn.execute(
-                    text(
-                        "SELECT id,name,phone,description,opening_hours,maps_url,cuisine FROM restaurants WHERE location_id=:id ORDER BY name,id"
-                    ),
-                    {"id": review["location_id"]},
-                ).mappings()
-            ]
-            analysis = next(
-                (r["analysis"] for r in runs if link and r["run"] == link["active_run"]),
-                review["result"] or {},
-            )
-            if link and analysis:
-                import copy
-
-                analysis = copy.deepcopy(analysis)
-                for binding in conn.execute(
-                    text(
-                        "SELECT number,restaurant_id FROM review_fragment_bindings WHERE review_id=:id AND run=:run"
-                    ),
-                    {"id": review_id, "run": link["active_run"]},
-                ).mappings():
-                    analysis["entries"][binding["number"]]["restaurantId"] = (
-                        str(binding["restaurant_id"]) if binding["restaurant_id"] else None
-                    )
-        for p in proposals:
-            target = str(p["restaurant_id"]) if p["restaurant_id"] else None
-            p["before"] = next((r for r in restaurants if str(r["id"]) == target), {})
-            before = p["before"]
-            p["changes"] = p["payload"].get("changes", p["payload"])
-            p["final"] = {
-                "name": before.get("name", p["payload"].get("name", "")),
-                "cuisine": before.get("cuisine", ""),
-                "description": before.get("description", ""),
-                "phone": before.get("phone", ""),
-                "mapsUrl": before.get("maps_url", ""),
-                "openingHours": before.get("opening_hours"),
-                **p["changes"],
-            }
-            p["revision"] = p["revision"] or 1
-            p["run"] = p["run"] or 0
-        return {
-            "asr_reference": asr_reference,
-            "review": review,
-            "text": text_review,
-            "location": location,
-            "link": link,
-            "proposals": proposals,
-            "decisions": decisions,
-            "runs": runs,
-            "restaurants": restaurants,
-            "analysis": analysis,
-            "changes": review["changes"],
-            "path": "/admin/reviews/" + location["slug"] + "/" + str(review["number"]),
-        }
+        return {"review": review, "location": location, "link": link, "events": events}

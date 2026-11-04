@@ -11,8 +11,8 @@ from involta_guide.main import create_app
 
 from .editor_fixture import FixtureEditor
 from .test_editorial import CONTENT
-from .test_voice_editorial import imported
 from .test_web import login
+from .voice_fixture import imported
 
 
 def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, monkeypatch):
@@ -45,55 +45,16 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         },
     )
     Consumer(database[1], VoiceClient(settings)).import_event(event)
-    pending_ref = str(uuid4())
-    pending = {
-        "reference": pending_ref,
-        "location": {"name": city["name"]},
-        "state": "transcript_ready",
-        "transcript": "Текст ещё не доставлен в Guide",
-        "error": "",
-        "stages": [{"run": 1}],
-    }
-    comparison = {
-        "runs": [
-            {
-                "run": 1,
-                "source_engine": "gigaam",
-                "digest": "fixture",
-                "evaluation": None,
-                "candidates": [
-                    {
-                        "name": name,
-                        "engine": engine,
-                        "state": "done",
-                        "revision": "fixture-v1",
-                        "text": "Распознанный текст " + name,
-                        "error": "",
-                        "seconds": 1.2,
-                        "rtf": 0.6,
-                        "wer": None,
-                        "cer": None,
-                    }
-                    for name, engine in [("GigaAM", "gigaam"), ("Parakeet", "parakeet")]
-                ],
-            }
-        ]
-    }
 
     class FakeVoice:
         def json(self, method, path, **kwargs):
-            if path == "/admin/settings":
-                return {
-                    "models": {"transcription": ["gigaam"], "analysis": ["gpt-5"]},
-                    "transcription_model": "gigaam",
-                    "analysis_model": "gpt-5",
-                    "prompt": "Промпт анализа",
-                }
-            if path == "/admin/submissions":
-                return {"rows": [pending]}
-            if path.endswith("/asr"):
-                return comparison
-            return pending
+            pair = [
+                {"name": name, "text": "Распознанный текст " + name, "state": "completed"}
+                for name in ("GigaAM", "Parakeet")
+            ]
+            if path == "/admin/recognitions":
+                return {reference: pair for reference in kwargs["json"]}
+            return {"pair": pair, "stages": []}
 
     from involta_guide.web.routes import voice_admin
 
@@ -126,8 +87,7 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
         "filling": "/admin/settings/filling",
         "voice": "/admin/reviews",
         "voice-review": "/admin/reviews/ivanovo/1",
-        "voice-run": "/admin/reviews/ivanovo/1/runs/1",
-        "voice-pending": "/admin/reviews/submission/" + pending_ref,
+        "voice-log": "/logs/reviews/ivanovo/1",
         "ratings": "/admin/ratings",
         "contacts": "/admin/contacts",
         "sessions": "/admin/sessions",
@@ -185,23 +145,21 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                 response = client.get("/guide" + path)
                 assert response.status_code == 200, (name, response.text[:200])
                 page.goto("http://testserver/guide" + path, wait_until="networkidle")
-                if name == "voice":
-                    page.locator(".admin-settings > summary").click()
-                if name == "voice-review":
-                    page.get_by_text("Редактировать расписание", exact=True).click()
                 assert page.locator(".admin-workspace").count() == 1, name
                 assert page.locator(".admin-tabs").count() == 1, name
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), (
                     name,
                     width,
                 )
-                box = page.locator(".admin-header").bounding_box()
+                box = page.locator(".admin-tabs").bounding_box()
                 if name == "overview":
                     baseline = box
                 assert (
                     abs(box["x"] - baseline["x"]) < 1 and abs(box["width"] - baseline["width"]) < 1
                 ), (name, width)
-                assert page.locator("h1").inner_text() == "Рабочий стол.", name
+                assert page.get_by_role("heading", name="Рабочий стол.").count() == 0, name
+                assert page.locator(".header .admin-logout").count() == 1, name
+                assert page.locator(".header-note").count() == 0, name
                 if width != 768:
                     page.screenshot(path=str(shots / f"{name}-{width}.png"), full_page=True)
                     if name in ("city", "voice-review"):
@@ -211,14 +169,25 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                             path=str(shots / f"city-reset-{width}.png")
                         )
                 if name == "voice-review":
+                    assert page.locator(".review-city.selected").count() == 1
                     assert (
-                        page.get_by_role("heading", name="Применённые изменения страницы").count()
-                        == 1
+                        page.locator(".review-transcripts > div").count()
+                        == 2 * page.locator(".review-card").count()
                     )
-                    assert page.locator(".admin-list-item.selected").count() == 1
-                    assert page.locator(".asr-comparison .admin-compare > article").count() == 2
+                    assert page.locator(".review-top audio").count() == 1
                     assert (
-                        page.locator(".asr-comparison .admin-compare article article").count() == 0
+                        page.locator(
+                            ".review-feed textarea, .review-feed select, .review-feed details"
+                        ).count()
+                        == 0
+                    )
+                    audio = page.locator(".review-top audio").first.bounding_box()
+                    label = page.locator(
+                        ".review-top:has(audio) .review-label"
+                    ).first.bounding_box()
+                    assert (
+                        audio["y"] < label["y"] + label["height"]
+                        and audio["y"] + audio["height"] > label["y"]
                     )
                     assert (
                         page.get_by_role("navigation", name="Администрирование")

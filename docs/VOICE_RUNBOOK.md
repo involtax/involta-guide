@@ -1,3 +1,5 @@
+> Уточнение от 04.11.2026: ручная модерация/правки/привязки и оценка ASR отменены. Текущий контракт, GigaAM-only лента и переход БД: [ADMIN_REVIEWS.md](ADMIN_REVIEWS.md).
+
 # Voice: эксплуатация beta core
 
 Несовместимый переход Guide review_urls / Voice 3 → beta_core / Voice 4 и граница

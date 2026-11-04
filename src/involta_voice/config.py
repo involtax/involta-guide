@@ -17,11 +17,9 @@ class Settings(BaseSettings):
     asr_models_dir: Path = Path("var/asr-models")
     asr_cpu_threads: int = Field(default=2, ge=1, le=64)
     asr_beta_enabled: bool = True
-    analysis_model: str = "gpt-4.1"
     max_audio_bytes: int = 10 * 1024 * 1024
     min_free_bytes: int = 64 * 1024 * 1024
     queue_limit: int = Field(default=1000, ge=1)
-    daily_calls: int = Field(default=100, ge=1)
     concurrency: int = Field(default=2, ge=1, le=10)
     lease_seconds: int = Field(default=180, ge=120)
     heartbeat_file: Path = Path("/tmp/involta-voice-worker")

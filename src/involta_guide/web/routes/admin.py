@@ -46,6 +46,7 @@ def render(request: Request, name: str, data: dict[str, Any]) -> Response:
             "fragment": request.headers.get("HX-Request") == "true"
             and request.headers.get("HX-History-Restore-Request") != "true",
             "admin_ui": True,
+            "admin_authenticated": ctx.security.principal(token) is not None,
             "review_path": lambda key: ctx.settings.path(VoiceReadModel(ctx.engine).path(str(key))),
             "csrf_token": ctx.security.csrf(token),
             "kinds": KINDS,

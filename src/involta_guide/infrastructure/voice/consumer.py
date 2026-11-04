@@ -1,6 +1,6 @@
 import time
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import ValidationError
 from sqlalchemy import Engine
@@ -8,7 +8,7 @@ from sqlalchemy import text as sql_text
 
 from involta_guide.config import Settings
 from involta_guide.infrastructure.persistence.unit_of_work import create_database
-from involta_voice.contracts import OutboxEvent, SubmissionMetadata, validate_analysis
+from involta_voice.contracts import OutboxEvent, SubmissionMetadata
 from involta_voice.db import encoded, execute, row
 
 from .client import VoiceClient
@@ -178,30 +178,12 @@ class Consumer:
 
     def _apply(self, event: dict[str, Any]) -> int:
         event = OutboxEvent.model_validate(event).model_dump(mode="json")
-        if event.get("schema_version") != 2 or event.get("kind") not in (
-            "transcript_ready",
-            "analysis_ready",
-            "processing_failed",
-        ):
-            raise ValueError("Unsupported Voice event schema")
         metadata = SubmissionMetadata.model_validate(event["metadata"])
         reference, event_id = str(UUID(event["reference"])), str(UUID(event["event_id"]))
         number = int(event["run"])
-        sequence = int(event["sequence"])
         transcript = event["transcript"]
-        if (
-            number < 1
-            or sequence < 1
-            or not isinstance(transcript, str)
-            or not transcript.strip()
-            or len(transcript) > 30000
-        ):
-            raise ValueError("Invalid transcript event")
-        analysis = (
-            validate_analysis(event["analysis"], transcript, metadata.location)
-            if event["kind"] == "analysis_ready"
-            else None
-        )
+        if event["kind"] == "gigaam_ready" and (not transcript or not transcript.strip()):
+            raise ValueError("Invalid GigaAM transcript")
         with self.engine.begin() as conn:
             location = row(
                 conn,
@@ -224,26 +206,15 @@ class Consumer:
                 or metadata.location.content_epoch != location["content_epoch"]
             ):
                 raise ValueError("Локация не принимает отзыв в этом цикле")
-            earlier = row(
-                conn,
-                "SELECT 1 FROM voice_inbox WHERE review_id=:id AND sequence<:seq AND state<>'imported'",
-                id=reference,
-                seq=sequence,
-            )
-            if earlier:
-                return 0
-            if analysis:
-                ids = {str(e.restaurantId) for e in analysis.entries if e.restaurantId}
-                ids.update(str(e.restaurantId) for e in analysis.suggestions if e.restaurantId)
-                ids.update(str(c) for e in analysis.entries for c in e.candidates)
-                for identity in ids:
-                    if not row(
-                        conn,
-                        "SELECT 1 FROM restaurants WHERE id=:id AND location_id=:loc",
-                        id=identity,
-                        loc=str(metadata.location.id),
-                    ):
-                        raise ValueError("Чужой ресторан в обработке")
+            # Old analysis/fallback events remain in the inbox as diagnostic history.
+            # Only the explicit primary-result contract can publish a review.
+            if event["kind"] not in ("recording_received", "gigaam_ready"):
+                execute(
+                    conn,
+                    "UPDATE voice_inbox SET state='imported',error=NULL WHERE event_id=:id",
+                    id=event_id,
+                )
+                return 1
             link = row(
                 conn, "SELECT * FROM voice_links WHERE reference=:id FOR UPDATE", id=reference
             )
@@ -256,8 +227,8 @@ class Consumer:
                 execute(
                     conn,
                     """INSERT INTO reviews(id,location_id,content_epoch,visitor,audio,mime,hash,ip,user_agent,
-                    transcript,status,duration_seconds,result) VALUES(:id,:location,:epoch,:visitor,:audio,
-                    :mime,:sha,:ip,:agent,:transcript,'processed',:duration,'{"entries":[],"suggestions":[]}'::jsonb)""",
+                    transcript,status,duration_seconds,created_at,result) VALUES(:id,:location,:epoch,:visitor,:audio,
+                    :mime,:sha,:ip,:agent,NULL,'received',:duration,CAST(:created AS timestamptz),'{"entries":[],"suggestions":[]}'::jsonb)""",
                     id=reference,
                     location=str(metadata.location.id),
                     epoch=metadata.location.content_epoch,
@@ -267,14 +238,8 @@ class Consumer:
                     sha=event["sha256"],
                     ip=metadata.ip,
                     agent=metadata.user_agent,
-                    transcript=transcript,
+                    created=event["created_at"],
                     duration=event["duration"],
-                )
-                execute(
-                    conn,
-                    "INSERT INTO review_texts(review_id,original_text,editorial_text) VALUES(:id,:text,:text)",
-                    id=reference,
-                    text=transcript,
                 )
                 execute(
                     conn,
@@ -292,89 +257,22 @@ class Consumer:
                     ),
                 )
                 link = {"review_id": reference, "active_run": number}
-            original = row(
-                conn, "SELECT original_text FROM review_texts WHERE review_id=:id", id=reference
-            )
-            if not original or original["original_text"] != transcript:
-                raise ValueError("Original transcript cannot be replaced by a later event")
-            if analysis is not None:
+            if event["kind"] == "gigaam_ready":
                 execute(
                     conn,
-                    "INSERT INTO voice_results(review_id,run,analysis) VALUES(:id,:run,CAST(:result AS jsonb)) ON CONFLICT DO NOTHING",
-                    id=reference,
-                    run=number,
-                    result=analysis.model_dump_json(),
-                )
-                for index, fragment in enumerate(analysis.entries):
-                    execute(
-                        conn,
-                        "INSERT INTO voice_fragments(review_id,run,number,restaurant_id,fragment) VALUES(:id,:run,:n,:restaurant,CAST(:value AS jsonb)) ON CONFLICT DO NOTHING",
-                        id=reference,
-                        run=number,
-                        n=index,
-                        restaurant=str(fragment.restaurantId) if fragment.restaurantId else None,
-                        value=fragment.model_dump_json(),
-                    )
-                for index, suggestion in enumerate(analysis.suggestions):
-                    if row(
-                        conn,
-                        "SELECT 1 FROM voice_proposals WHERE review_id=:id AND run=:run AND number=:n",
-                        id=reference,
-                        run=number,
-                        n=index,
-                    ):
-                        continue
-                    proposal = str(uuid4())
-                    payload = {**suggestion.changes, **suggestion.model_dump(mode="json")}
-                    execute(
-                        conn,
-                        "INSERT INTO proposals(id,location_id,review_id,kind,restaurant_id,payload) VALUES(:p,:location,:id,:kind,:restaurant,CAST(:payload AS jsonb))",
-                        p=proposal,
-                        location=str(metadata.location.id),
-                        id=reference,
-                        kind=suggestion.kind,
-                        restaurant=str(suggestion.restaurantId)
-                        if suggestion.restaurantId
-                        else None,
-                        payload=encoded(payload),
-                    )
-                    execute(
-                        conn,
-                        "INSERT INTO voice_proposals(proposal_id,review_id,run,number) VALUES(:p,:id,:run,:n)",
-                        p=proposal,
-                        id=reference,
-                        run=number,
-                        n=index,
-                    )
-                # New runs are candidates. Already accepted decisions/attributes are never overwritten.
-                if link["active_run"] == number:
-                    execute(conn, "UPDATE reviews SET error=NULL WHERE id=:id", id=reference)
-                    execute(
-                        conn,
-                        "UPDATE reviews SET result=CAST(:result AS jsonb) WHERE id=:id AND moderation='pending'",
-                        result=analysis.model_dump_json(),
-                        id=reference,
-                    )
-                    ids = {
-                        str(e.restaurantId) for e in analysis.entries if e.restaurantId is not None
-                    }
-                    if len(ids) == 1 and all(e.restaurantId is not None for e in analysis.entries):
-                        execute(
-                            conn,
-                            "UPDATE review_texts SET restaurant_id=:restaurant WHERE review_id=:id AND restaurant_id IS NULL AND revision=1",
-                            restaurant=next(iter(ids)),
-                            id=reference,
-                        )
-                execute(
-                    conn,
-                    "UPDATE review_texts SET revision=revision+1 WHERE review_id=:id AND EXISTS (SELECT 1 FROM reviews WHERE id=:id AND moderation='pending')",
+                    "UPDATE reviews SET transcript=:text,status='transcribed',error=NULL WHERE id=:id",
+                    text=transcript,
                     id=reference,
                 )
-            elif event["kind"] == "processing_failed" and link["active_run"] == number:
+            elif not row(
+                conn,
+                "SELECT 1 FROM voice_inbox WHERE review_id=:id AND kind='gigaam_ready' AND state='imported'",
+                id=reference,
+            ):
+                # The receipt can arrive after the primary event; never erase a ready result.
                 execute(
                     conn,
-                    "UPDATE reviews SET error=:error WHERE id=:id",
-                    error=str(event["analysis"].get("error", "Ошибка анализа"))[:2000],
+                    "UPDATE reviews SET status='received' WHERE id=:id AND status<>'transcribed'",
                     id=reference,
                 )
             execute(
