@@ -150,6 +150,12 @@ def test_admin_button_current_catalogue_old_event_and_soft_delete_guards(databas
     app.state.voice_client = remote
     read = VoiceReadModel(engine)
     path = "/guide/admin/reviews/" + city["slug"] + "/" + str(before["number"]) + "/reprocess"
+    # Filled locations have a UUID revision; raw read-model rows retain that type.
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE locations SET revision=:revision WHERE id=:id"),
+            {"revision": uuid4(), "id": city["id"]},
+        )
     with engine.begin() as conn:
         conn.execute(
             text(

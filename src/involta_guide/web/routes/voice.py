@@ -37,7 +37,7 @@ def current_location_context(request: Request, location: dict[str, Any]) -> Loca
         id=location["id"],
         slug=location["slug"],
         name=location["name"],
-        revision=location["revision"],
+        revision=str(location["revision"]) if location["revision"] is not None else None,
         content_epoch=location["content_epoch"],
         recognition_dictionary=dictionary_names([location["name"], *names]),
         restaurants=[

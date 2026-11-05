@@ -17,3 +17,32 @@ document.addEventListener('htmx:beforeSend', event => {
     button.removeAttribute('aria-busy');
   }, {once: true});
 });
+
+// HTMX does not swap 4xx/5xx responses. Keep the form and show a safe text notice.
+function adminRequestError(event, fallback) {
+  const form = event.detail?.elt?.closest('form');
+  const workspace = form?.closest('.admin-workspace');
+  if (!workspace) return;
+  let message = fallback;
+  try {
+    const body = JSON.parse(event.detail.xhr.responseText);
+    const detail = body.error || body.detail;
+    if (typeof detail === 'string') message = detail;
+  } catch { /* Proxy errors can be HTML; never inject them into the page. */ }
+  let notice = workspace.querySelector('#admin-request-error');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.id = 'admin-request-error';
+    notice.className = 'notice admin-error';
+    notice.setAttribute('role', 'alert');
+    workspace.prepend(notice);
+  }
+  notice.textContent = message.slice(0, 500);
+  notice.scrollIntoView({block: 'nearest'});
+}
+document.addEventListener('htmx:responseError', event => {
+  adminRequestError(event, `Не удалось выполнить действие (HTTP ${event.detail.xhr.status}). Обновите страницу и попробуйте снова.`);
+});
+for (const name of ['htmx:sendError', 'htmx:timeout']) {
+  document.addEventListener(name, event => adminRequestError(event, 'Не удалось связаться с сервером. Попробуйте снова.'));
+}
