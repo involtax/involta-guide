@@ -547,39 +547,30 @@ def test_browser_initiated_recorder_stop_uses_same_duration_check(widget_page):
     assert not uploads
 
 
-@pytest.mark.parametrize("reset_at", ["identity", "upload"])
-def test_reset_rejects_recording_without_relabelling_its_epoch(widget_page, reset_at):
+def test_reset_rejects_recording_without_relabelling_its_epoch(widget_page):
     page, widget, uploads = widget_page
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
     attempted_epochs = []
-    if reset_at == "identity":
-        page.route(
-            "**/identity?*",
-            lambda route: route.fulfill(
-                content_type="application/json", body='{"ready":true,"content_epoch":2}'
-            ),
+    from urllib.parse import parse_qs
+
+    def reject_stale(route):
+        attempted_epochs.append(parse_qs(urlsplit(route.request.url).query)["content_epoch"])
+        route.fulfill(
+            status=409,
+            content_type="application/json",
+            body='{"detail":{"code":"stale_epoch","message":"Локация сброшена"}}',
         )
-    else:
-        from urllib.parse import parse_qs
 
-        def reject_stale(route):
-            attempted_epochs.append(parse_qs(urlsplit(route.request.url).query)["content_epoch"])
-            route.fulfill(
-                status=409,
-                content_type="application/json",
-                body='{"detail":{"code":"stale_epoch","message":"Локация сброшена"}}',
-            )
-
-        page.route("**/submissions?*", reject_stale)
+    page.route("**/submissions?*", reject_stale)
     press(page, widget)
     page.clock.run_for(1)
     state(widget, "idle")
     expect(widget.get_by_role("alert")).to_contain_text("Локация сброшена")
     expect(widget.get_by_text(REQUEST, exact=True)).to_be_visible()
     assert not uploads
-    assert attempted_epochs == ([] if reset_at == "identity" else [["1"]])
+    assert attempted_epochs == [["1"]]
     assert "local_copy_saved" not in str(report(widget))
 
 
@@ -606,24 +597,26 @@ def test_auto_upload_disables_control_and_coalesces_duplicate_stop_events(widget
     expect(widget.get_by_role("button", name="Записать отзыв", exact=True)).to_be_enabled()
 
 
-def test_unmount_during_upload_identity_discards_audio_without_a_late_post(widget_page):
+def test_unmount_during_upload_ignores_late_result_without_resending_audio(widget_page):
     page, widget, uploads = widget_page
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
     pending = []
-    page.route("**/identity?*", lambda route: pending.append(route))
-    with page.expect_request("**/identity?*"):
+    page.route("**/submissions?*", lambda route: pending.append(route))
+    with page.expect_request("**/submissions?*"):
         press(page, widget)
         page.clock.run_for(1)
     state(widget, "uploading")
     page.evaluate("InvoltaVoice.unmount('a')")
-    pending[0].fulfill(json={"ready": True, "content_epoch": 1})
-    page.unroute("**/identity?*")
+    pending[0].fulfill(status=202, json={"reference": "late-result", "state": "accepted"})
+    page.unroute("**/submissions?*")
     page.evaluate("InvoltaVoice.mount('a',{location:'ivanovo'})")
     state(widget, "idle")
     page.clock.run_for(10)
     assert not uploads
+    assert len(pending) == 1
+    expect(widget.locator('[data-reference="late-result"]')).to_have_count(0)
     press(page, widget)
     state(widget, "recording")
     page.clock.run_for(5100)
@@ -631,6 +624,30 @@ def test_unmount_during_upload_identity_discards_audio_without_a_late_post(widge
     page.clock.run_for(1)
     state(widget, "idle")
     assert len(uploads) == 1 and page.evaluate("__recorders.length") == 2
+
+
+def test_audio_upload_does_not_depend_on_another_identity_request(widget_page):
+    page, widget, uploads = widget_page
+    identities = []
+
+    def identity_once(route):
+        identities.append(route.request)
+        if len(identities) > 1:
+            route.abort("timedout")
+        else:
+            route.fulfill(json={"ready": True, "content_epoch": 1})
+
+    page.route("**/identity?*", identity_once)
+    press(page, widget)
+    state(widget, "recording")
+    page.clock.run_for(5400)
+    press(page, widget)
+    page.clock.run_for(1)
+    state(widget, "idle")
+    assert len(identities) == 1
+    assert len(uploads) == 1
+    assert len(uploads[0].post_data_buffer) > 100
+    expect(widget.locator(".error")).to_have_text("")
 
 
 def test_transcription_updates_its_list_entry_while_another_recording_continues(widget_page):
