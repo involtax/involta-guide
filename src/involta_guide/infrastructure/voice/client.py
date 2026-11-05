@@ -21,7 +21,8 @@ class VoiceClient:
             raise VoiceUnavailable("Голосовой сервис не настроен")
         try:
             actor = kwargs.pop("actor_session", None)
-            headers = {"Authorization": "Bearer " + secret}
+            headers = httpx.Headers(kwargs.pop("headers", {}))
+            headers["Authorization"] = "Bearer " + secret
             if actor is not None:
                 headers["X-Guide-Session"] = str(actor)
             with httpx.Client(

@@ -49,3 +49,36 @@ def database(tmp_path, monkeypatch, request):
         engine.dispose()
         with psycopg.connect(url, autocommit=True) as admin:
             admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+
+
+@pytest.fixture
+def streaming_webm(tmp_path):
+    import subprocess
+
+    data = subprocess.run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000",
+            "-t",
+            "6.2",
+            "-c:a",
+            "libopus",
+            "-live",
+            "1",
+            "-fflags",
+            "+bitexact",
+            "-f",
+            "webm",
+            "pipe:1",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+    path = tmp_path / "stream.webm"
+    path.write_bytes(data)
+    return path

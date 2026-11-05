@@ -130,7 +130,6 @@ checked
 {%endif%}
 </section>
 {%if not c.is_hub and settings.beta_reset_enabled%}<section class="panel"><h3>Очистить локацию и наполнить заново</h3><p>Будут удалены все данные этого города: рестораны, вступление, отзывы, аудио и логи. География и настройки сохранятся. После завершения очистки начнётся одно новое наполнение.</p>{%if c.reset_pending%}<p role="status">Сброс выполняется. Новые записи и изменения временно закрыты.</p>{%if c.reset_error%}<p role="alert">{{c.reset_error}}</p>{%endif%}{%endif%}<form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/reset-and-fill')}}" class="stack">{{csrf()}}<input type="hidden" name="request_key" value="{{reset_request_key}}"><input type="hidden" name="content_epoch" value="{{c.content_epoch}}"><label>Для подтверждения введите {{c.name}}<input name="confirmation" required autocomplete="off"></label><button>{{'Продолжить сброс' if c.reset_pending else 'Очистить локацию и наполнить заново'}}</button></form></section>{%endif%}
-<p><a href="{{settings.path('/logs/'+c.slug)}}" hx-boost="false">Логи наполнения города ↗</a></p>
 {%endif%}
 {%endif%}
 {%if selected is none%}<section class="restaurant-empty"><h2>Выберите город</h2><p>Слева доступны все локации, включая пустые.</p></section>{%endif%}

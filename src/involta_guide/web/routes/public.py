@@ -12,7 +12,7 @@ from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.infrastructure.voice.upload_logs import UploadLogs
-from involta_guide.web.http import admin_token, check_origin, context
+from involta_guide.web.http import admin_token, check_origin, context, require_diagnostics
 from involta_guide.web.routes.admin import render
 
 
@@ -144,11 +144,7 @@ def routes(prefix: str) -> APIRouter:
     }
 
     def check_log_access(request: Request) -> None:
-        ctx = context(request)
-        if not ctx.settings.public_fill_logs_enabled and not ctx.security.principal(
-            admin_token(request)
-        ):
-            raise HTTPException(404, "Публичные логи отключены")
+        require_diagnostics(request)
 
     def log_store(request: Request) -> AIAudit:
         check_log_access(request)

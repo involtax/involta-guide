@@ -35,7 +35,7 @@ def test_public_admin_htmx_and_csrf(database):
         assert page.status_code == 200 and "noindex" in page.text
         assert client.get("/guide/unknown-404").status_code == 404
         assert client.get("/guide/gazprom-laura", follow_redirects=False).status_code == 308
-        assert client.get("/guide/admin/reviews/ivanovo/1/audio").status_code == 401
+        assert client.get("/guide/admin/reviews/ivanovo/1/audio").status_code == 404
         csrf = login(client)
         fragment = client.get("/guide/admin/locations", headers={"HX-Request": "true"})
         assert (

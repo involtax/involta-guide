@@ -15,12 +15,14 @@ from involta_voice.worker import Worker
 from .test_jobs import setup
 from .test_sherpa_comparison import GigaResults
 from .test_voice_guide import client_for
-from .test_voice_service import metadata, recording
+from .test_voice_service import metadata
 from .test_voice_service import voice_database as voice_database
 from .test_web import login
 
 
-def test_single_profile_and_exact_dictionary_in_existing_admin_shell(database, voice_database):
+def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
+    database, voice_database, streaming_webm
+):
     settings, engine, _, _, city, _, _ = setup(database)
     vs, ve = voice_database
     vs = vs.model_copy(update={"asr_beta_enabled": True})
@@ -36,7 +38,7 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(database, v
             )
         }
     )
-    VoiceService(ve, vs).submit(meta, recording(), "audio/wav")
+    VoiceService(ve, vs).submit(meta, streaming_webm.read_bytes(), "audio/webm")
 
     class Demo(GigaResults):
         def call(self, kind, request, audio, mime):
@@ -62,18 +64,24 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(database, v
     with TestClient(app) as client, sync_playwright() as p:
         login(client)
         browser = p.chromium.launch(
-            executable_path=os.getenv("CHROMIUM_PATH") or "/usr/bin/chromium", args=["--no-sandbox"]
+            executable_path=os.getenv("CHROMIUM_PATH") or "/usr/bin/chromium",
+            args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
         )
         for width in (390, 1440):
             page = browser.new_page(viewport={"width": width, "height": 1100})
 
             def respond(route):
                 parsed = urlsplit(route.request.url)
-                response = client.get(parsed.path + ("?" + parsed.query if parsed.query else ""))
+                response = client.get(
+                    parsed.path + ("?" + parsed.query if parsed.query else ""),
+                    headers={
+                        k: v for k, v in route.request.headers.items() if k in ("range", "if-range")
+                    },
+                )
                 route.fulfill(
                     status=response.status_code,
                     body=response.content,
-                    content_type=response.headers.get("content-type", "text/plain"),
+                    headers=dict(response.headers),
                 )
 
             page.route("**/*", respond)
@@ -96,6 +104,28 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(database, v
             ).to_have_count(1)
             expect(page.get_by_role("button", name="Удалить отзыв", exact=False)).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert page.locator('a[href*="/logs"]').count() == 0
+            audio = page.locator("audio")
+            expect(audio).to_have_attribute(
+                "controlslist", "nodownload noplaybackrate noremoteplayback"
+            )
+            page.wait_for_function(
+                "(a)=>Number.isFinite(a.duration)&&a.duration>6", arg=audio.element_handle()
+            )
+            width_before = audio.evaluate("a=>a.getBoundingClientRect().width")
+            audio.evaluate("a=>a.play()")
+            page.wait_for_timeout(400)
+            assert audio.evaluate("a=>a.currentTime") > 0.1
+            audio.evaluate("a=>{a.currentTime=3}")
+            page.wait_for_function(
+                "(a)=>a.currentTime>=3&&a.currentTime<4", arg=audio.element_handle()
+            )
+            assert audio.evaluate("a=>a.getBoundingClientRect().width") == width_before
+            page.locator(".review-card").screenshot(
+                path=str(folder / f"player-playing-{width}.png")
+            )
+            audio.evaluate("a=>a.pause()")
+
             page.screenshot(path=str(folder / f"admin-{width}.png"), full_page=True)
             page.locator(".review-card").screenshot(path=str(folder / f"card-{width}.png"))
             page.close()

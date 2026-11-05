@@ -47,6 +47,13 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
     Consumer(database[1], VoiceClient(settings)).import_event(event)
 
     class FakeVoice:
+        def request(self, method, path, **kwargs):
+            import httpx
+
+            from .test_voice_service import recording
+
+            return httpx.Response(200, content=recording(), headers={"content-type": "audio/wav"})
+
         def json(self, method, path, **kwargs):
             pair = [
                 {"name": name, "text": "Распознанный текст " + name, "state": "completed"}

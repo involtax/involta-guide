@@ -53,7 +53,8 @@ def test_shared_public_feed_delete_and_late_event_cannot_resurrect(database):
             )
         assert visitor.get(feed).json()["rows"] == []
         assert queries.get("reviews", reference)["status"] == "deleted"
-        assert visitor.get(log).status_code == 200
+        assert visitor.get(log).status_code == 404
+        assert admin.get(log).status_code == 200
     with engine.connect() as conn:
         assert (
             conn.execute(

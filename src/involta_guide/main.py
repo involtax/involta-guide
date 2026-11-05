@@ -148,7 +148,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(admin.routes(settings.base_path))
     app.include_router(admin_content.routes(settings.base_path))
+    # Specific review diagnostics must precede generic /logs/{slug} routes.
+    app.include_router(voice_admin.routes(settings.base_path))
     app.include_router(public.routes(settings.base_path))
     app.include_router(voice.routes(settings.base_path))
-    app.include_router(voice_admin.routes(settings.base_path))
     return app

@@ -141,3 +141,13 @@ Docker build и существующий Guide cutover/rollback smoke выпол
 [desktop](design/voice-sherpa-comparison/admin-1440.png),
 [телефон](design/voice-sherpa-comparison/admin-390.png).
 Порядок подготовки и публикации: [VOICE_SHERPA_COMPARISON.md](VOICE_SHERPA_COMPARISON.md).
+
+## Плеер и агентская диагностика
+
+В админке убраны ссылки на логи, включая общую навигацию. Диагностика остаётся
+по документированным адресам и JSON-индексу для агента. Нативный audio использует
+controlslist=nodownload/noplaybackrate/noremoteplayback, без меню. Для WebM
+playback=true отдаёт временно remux-ированный контейнер с конечной длительностью
+и поддержкой Range/If-Range, без перекодирования и изменений оригинала.
+Оригинал выдаётся без playback=true, с исходным SHA256. Исследование ASR использует
+только оригиналы, а не проигрываемое представление. [VOICE_CORPUS.md](VOICE_CORPUS.md).

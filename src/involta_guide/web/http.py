@@ -33,6 +33,14 @@ def admin_token(request: Request) -> str:
     return request.cookies.get("guide_admin", "")
 
 
+def require_diagnostics(request: Request) -> bool:
+    ctx = context(request)
+    admin = ctx.security.principal(admin_token(request)) is not None
+    if not ctx.settings.public_fill_logs_enabled and not admin:
+        raise HTTPException(404, "Публичная диагностика отключена")
+    return admin
+
+
 def require_admin(request: Request) -> dict[str, Any]:
     principal = context(request).security.principal(admin_token(request))
     if principal is None:
