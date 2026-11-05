@@ -1,5 +1,3 @@
-import re
-
 from fastapi.testclient import TestClient
 from sqlalchemy import event, text
 
@@ -96,62 +94,32 @@ def test_catalogue_request_has_compact_fields_validators_and_no_visitors_or_jobs
             assert 'id="location-catalogue"' not in home.text
             assert len(selects) == 3
             assert client.get("/guide/api/locations/suggest?q=и").status_code == 404
-            assert client.get("/guide/", params={"q": "x" * 101}).status_code == 422
+            assert (
+                client.get("/guide/", params={"q": "x" * 101}, follow_redirects=False).status_code
+                == 308
+            )
     finally:
         event.remove(search_engine, "before_cursor_execute", capture)
     with engine.connect() as connection:
         assert connection.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
 
 
-def test_native_search_ranks_only_names_with_short_prefix_and_three_letter_substring(database):
-    settings, engine = database
-    add_location(engine, "Йцук", "name-exact")
-    add_location(engine, "Йцукоград", "name-prefix", ready=True)
-    add_location(engine, "Старый Йцукоград", "name-later-word", ready=True)
-    add_location(engine, "Айцукоград", "name-inside-word", ready=True)
-    add_location(engine, "Региональный", "name-region", region="Йцук", ready=True)
-    add_location(engine, "Алиасный", "name-alias", aliases=["Йцук"], ready=True)
-    add_location(
-        engine,
-        "Иной родитель",
-        "name-parent",
-        parent=add_location(engine, "Йцук родитель", "name-parent-title"),
-    )
-    add_location(engine, "Другой", "йцук-slug")
-    with TestClient(create_app(settings)) as client:
-        for query in ("й", "ЙЦ", "йцу"):
-            page = client.get("/guide/", params={"q": query})
-            urls = re.findall(r'<a class="city-link" href="([^"]+)"', page.text)
-            assert "/guide/name-exact" in urls and "/guide/name-prefix" in urls
-            if len(query) < 3:
-                assert (
-                    "/guide/name-later-word" not in urls and "/guide/name-inside-word" not in urls
-                )
-            else:
-                assert "/guide/name-later-word" in urls and "/guide/name-inside-word" in urls
-            for excluded in ("region", "alias", "parent"):
-                assert f"/guide/name-{excluded}" not in urls
-            assert "/guide/йцук-slug" not in urls
-        exact = client.get("/guide/", params={"q": "йцук"})
-        assert (
-            re.findall(r'<a class="city-link" href="([^"]+)"', exact.text)[0] == "/guide/name-exact"
-        )
-
-
-def test_real_catalogue_name_search_normalization_keyboard_typo_and_empty(database):
+def test_public_home_has_no_search_form_results_or_parameter_pages(database):
     settings, _ = database
     with TestClient(create_app(settings)) as client:
-        for query, expected in [
-            ("ПлЕс", "Плёс"),
-            ("новгород нижний", "Нижний Новгород"),
-            ("cjxb", "Сочи"),
-            ("Сочии", "Сочи"),
-        ]:
-            page = client.get("/guide/", params={"q": query})
-            assert re.findall(r"<strong>(.*?)</strong>", page.text)[0] == expected
-        for query in ("sochi", "жцфыщбъь", "%_"):
-            page = client.get("/guide/", params={"q": query})
-            assert 'class="city-link"' not in page.text
+        home = client.get("/guide/")
+        assert 'name="q"' not in home.text
+        assert "search-choose" in home.text and "Выбери" in home.text
+        assert "Результаты поиска" not in home.text and 'class="cities"' not in home.text
+        assert "page_query" not in home.text and "?q=" not in home.text
+        for parameters in (
+            {"q": "Иваново"},
+            {"page": "2"},
+            {"q": "x" * 101},
+            {"anything": "value"},
+        ):
+            response = client.get("/guide/", params=parameters, follow_redirects=False)
+            assert response.status_code == 308 and response.headers["location"] == "/guide/"
 
 
 def test_catalogue_returns_untrusted_names_as_json_and_preserves_non_city_type(database):

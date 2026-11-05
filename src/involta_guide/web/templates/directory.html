@@ -15,43 +15,8 @@
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-{%with search_action=settings.path('/'), search_label='Поиск локации', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
+{%with search_label='Выбор локации', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
 </section>
-{%if searching%}
-<section class="cities">
-<div class="section-heading">
-<h2>Результаты поиска</h2>
-<span class="muted">{{result.total}} найдено</span>
-</div>
-<div class="city-grid">
-{%for c in result.rows%}
-<a class="city-link" href="{{settings.path('/'+c.slug)}}">
-<span>
-<strong>{{c.name}}</strong>
-<small>{{kinds[c.kind]}} · {{c.parent_name or c.region}}
-{%if c.child_count%}
- · внутри {{c.child_count}}
-{%endif%}
-</small>
-</span>
-<span>→</span>
-</a>
-{%endfor%}
-</div>
-{%if not result.total%}
-<p>Пока не нашли такую локацию. Попробуйте другое название.</p>
-{%endif%}
-{%if result.pages>1%}<nav class="pagination" aria-label="Страницы справочника">
-{%if result.page>1%}
-<a href="?{{page_query(result.page-1)}}">← Назад</a>
-{%endif%}
-<span>{{result.page}} / {{result.pages}}</span>
-{%if result.page<result.pages%}
-<a href="?{{page_query(result.page+1)}}">Дальше →</a>
-{%endif%}
-</nav>{%endif%}
-</section>
-{%else%}
 <section class="home-reviews" aria-labelledby="home-reviews-title">
 <div class="section-heading"><h2 id="home-reviews-title">Жизнь кипит</h2></div>
 <div class="home-reviews-list">
@@ -67,7 +32,6 @@
 {%else%}<p class="home-reviews-empty">Пока нет отзывов.</p>{%endfor%}
 </div>
 </section>
-{%endif%}
 </main>
 {%endblock%}
 {% block scripts %}
