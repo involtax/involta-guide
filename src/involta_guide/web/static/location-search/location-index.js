@@ -1,5 +1,5 @@
 // The server supplies public rows in baseline order. Only names enter this index.
-// Matching/ranking is mirrored by domain/location_search.py for the native GET form.
+// Matching/ranking is mirrored by domain/location_search.py for the admin POST form.
 window.GuideLocationIndex = catalogue => {
   const normalize = value => (Array.from(value).slice(0, 100).join('').normalize('NFKC')
     .toLowerCase().replaceAll('ё', 'е').match(/[\p{L}\p{N}]+/gu) || []).join(' ');

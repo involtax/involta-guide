@@ -11,7 +11,7 @@ from .test_editorial import CONTENT
 from .test_jobs import setup
 
 
-def test_home_reviews_replace_city_grid_and_search_covers_all_types(database):
+def test_home_reviews_replace_city_grid_and_choices_cover_all_types(database):
     settings, _, uow, queries, city, _, _ = setup(database)
     editor = EditorialService(uow)
     other = next(row for row in queries.directory(kind="resort")["rows"] if row["listed"])
@@ -25,9 +25,8 @@ def test_home_reviews_replace_city_grid_and_search_covers_all_types(database):
         assert "Жизнь кипит" in home.text and 'class="city-grid"' not in home.text
         assert f'href="/guide/{other["slug"]}"' not in home.text
         assert '<select name="kind"' not in home.text
-        search = client.get("/guide/", params={"q": other["name"], "kind": "city"})
-        assert f'href="/guide/{other["slug"]}"' in search.text
-        assert '<select name="kind"' not in search.text
+        catalogue = client.get("/guide/api/locations/catalogue").json()
+        assert any(item["location"] == other["slug"] for item in catalogue)
 
 
 def test_city_page_omits_removed_metadata_and_review_controls(database):

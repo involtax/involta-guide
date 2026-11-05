@@ -77,6 +77,7 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
     assert len(queued) == 1 and all(r["state"] == "queued" for r in queued)
     assert [r["dictionary"] for r in queued if r["variant"] == "sherpa_hotwords_strong"] == [
         [
+            "Алекс Концов",
             "Алхимист",
             "Иванова",
             "Иванове",
@@ -85,6 +86,7 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
             "Иванову",
             "Огонёк",
             "Сыроварня",
+            "алекс концов",
             "алхимист",
             "иванова",
             "иванове",
@@ -107,6 +109,7 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
     assert all(r["dictionary"] == [] for r in rows if r["variant"] == "sherpa_plain")
     assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows] == [(2.5, 16)]
     assert rows[0]["dictionary"] == [
+        "Алекс Концов",
         "Алхимист",
         "Иванова",
         "Иванове",
@@ -115,6 +118,7 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
         "Иванову",
         "Огонёк",
         "Сыроварня",
+        "алекс концов",
         "алхимист",
         "иванова",
         "иванове",
@@ -347,12 +351,14 @@ def test_recommended_profile_publishes_canonical_spelling_but_keeps_raw_results(
             assert request["variant"] == "sherpa_hotwords_strong"
             assert request["hotwords_score"] == 2.5 and request["max_active_paths"] == 16
             assert request["dictionary"] == [
+                "Алекс Концов",
                 "Грандъ Сова",
                 "Плёс",
                 "Плёса",
                 "Плёсе",
                 "Плёсом",
                 "Плёсу",
+                "алекс концов",
                 "грандъ сова",
                 "плёс",
                 "плёса",

@@ -1199,9 +1199,7 @@
         });
         clearBlob();
         try {
-          const currentEpoch = await identity();
-          if (disposed) return;
-          if (!intentEpoch || currentEpoch !== intentEpoch) {
+          if (!intentEpoch) {
             stale();
             return;
           }

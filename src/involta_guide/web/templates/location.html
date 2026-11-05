@@ -62,9 +62,6 @@
 <span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
 </h1>
 <p class="lead">{{content.intro or ('Выберите район или курорт ниже.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
-{%if location.coverage_note%}
-<p class="coverage">{{location.coverage_note}}</p>
-{%endif%}
 </section>
 {%if children%}
 <section class="location-children">

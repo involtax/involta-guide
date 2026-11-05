@@ -334,7 +334,11 @@ class Worker:
                 location = snapshot["location"]
                 transcript = restore_names(
                     transcript,
-                    [location["name"], *location.get("recognition_dictionary", [])],
+                    [
+                        location["name"],
+                        *location.get("recognition_dictionary", []),
+                        *snapshot.get("common_recognition_names", []),
+                    ],
                     forms=snapshot.get("name_forms"),
                 )
             if snapshot.get("review_text_format") == REVIEW_TEXT_FORMAT:

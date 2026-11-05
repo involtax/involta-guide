@@ -5,11 +5,10 @@ from urllib.parse import urlencode
 from uuid import UUID
 from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
-from involta_guide.domain.location_search import search_locations
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
@@ -24,8 +23,6 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix)
     def slash(request: Request) -> Response:
         target = context(request).settings.path("/")
-        if request.url.query:
-            target += "?" + request.url.query
         return RedirectResponse(
             target,
             status_code=302,
@@ -33,39 +30,17 @@ def routes(prefix: str) -> APIRouter:
         )
 
     @router.get(prefix + "/")
-    def directory(
-        request: Request, q: str = Query("", max_length=100), page: str = "1"
-    ) -> Response:
+    def directory(request: Request) -> Response:
         ctx = context(request)
-        try:
-            page_number = int(page)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail="Invalid page number") from exc
-        searching = bool(q.strip())
-        if searching:
-            matches = search_locations(ctx.queries.public_location_catalogue(), q)
-            pages = max(1, (len(matches) + 59) // 60)
-            current = max(1, min(pages, page_number))
-            result = {
-                "rows": matches[(current - 1) * 60 : current * 60],
-                "total": len(matches),
-                "page": current,
-                "pages": pages,
-            }
-        else:
-            result = None
+        if request.url.query:
+            return RedirectResponse(ctx.settings.path("/"), status_code=308)
         request.state.audience_page = True
         return request.app.state.templates.TemplateResponse(
             request=request,
             name="directory.html",
             context={
                 "settings": ctx.settings,
-                "q": q,
-                "searching": searching,
-                "result": result,
-                "home_reviews": VoiceReadModel(ctx.engine).latest_public_texts()
-                if not searching
-                else [],
+                "home_reviews": VoiceReadModel(ctx.engine).latest_public_texts(),
                 "review_timezone": timezone(timedelta(hours=3)),
                 "months": (
                     "янв",
@@ -83,7 +58,6 @@ def routes(prefix: str) -> APIRouter:
                 ),
                 "kinds": KINDS,
                 "indexable": True,
-                "page_query": lambda n: urlencode({"q": q, "page": n}),
             },
         )
 

@@ -1,13 +1,17 @@
-<form class="destination-search" action="{{search_action}}" method="{{search_method|default('get')}}" role="search" data-location-search data-catalogue-url="{{settings.path('/api/locations/catalogue')}}" {%if search_add|default(false)%}data-location-add{%endif%}>
-{%if search_add|default(false)%}{{csrf()}}<input type="hidden" name="nearby_id" value="">{%endif%}
-<label for="destination" {%if search_label_hidden|default(false)%}class="sr-only"{%endif%}>{{search_label|default("Куда отправимся?")}}</label>
+{%if search_add|default(false)%}
+<form class="destination-search" action="{{search_action}}" method="post" data-location-search data-location-add>
+{{csrf()}}<input type="hidden" name="nearby_id" value="">
+{%else%}
+<div class="destination-search" data-location-search data-catalogue-url="{{settings.path('/api/locations/catalogue')}}" data-location-base="{{settings.path('/')}}" role="group" aria-label="Локации">
+{%endif%}
+<label for="destination" {%if search_label_hidden|default(false)%}class="sr-only"{%endif%}>{{search_label|default("Выбор локации")}}</label>
 <div class="search-control">
 <div class="search-surface">
 <div class="search-input-row">
 <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-<input id="destination" type="search" name="q" value="{{search_query|default(q)}}" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-describedby="search-status">
+<input id="destination" type="text" data-location-input {%if search_add|default(false)%}name="q"{%endif%} value="{{search_query|default('')}}" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-describedby="search-status">
 <button type="button" class="search-clear" aria-label="Очистить поиск" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-<button type="submit" class="search-submit">Найти</button>
+<button type="button" class="search-choose" aria-expanded="false">Выбери <span aria-hidden="true">↓</span></button>
 </div>
 <div class="search-suggestions" hidden inert aria-hidden="true">
 <div class="search-panel-content">
@@ -18,4 +22,4 @@
 </div>
 {%if search_add|default(false)%}<script type="application/json" id="location-catalogue">{{location_catalogue|tojson}}</script>{%endif%}
 <p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
-</form>
+{%if search_add|default(false)%}</form>{%else%}</div>{%endif%}

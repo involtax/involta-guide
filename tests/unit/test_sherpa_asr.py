@@ -9,7 +9,7 @@ import pytest
 from involta_voice.asr import VAD
 from involta_voice.config import Settings
 from involta_voice.provider import ProviderFailure
-from involta_voice.sherpa import LocalSherpa, model_path, options
+from involta_voice.sherpa import VAD_TAIL_CONTEXT, LocalSherpa, model_path, options
 from involta_voice.sherpa_tokenizer import VOCAB_FILE, tokenizer, vocabulary
 from involta_voice.variants import SHERPA_PROFILES
 
@@ -32,16 +32,18 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
     with pytest.raises(ValueError):
         options(config, engine, "sherpa_plain", names)
     assert biased["dictionary"] == [
+        "Алекс Концов",
         "Алхимист",
         "Огонёк",
         "Сыроварня",
+        "алекс концов",
         "алхимист",
         "огонёк",
         "сыроварня",
     ]
     assert biased["decoding_method"] == "modified_beam_search"
     names.append("Не должно попасть в запрос")
-    assert len(biased["dictionary"]) == 6
+    assert len(biased["dictionary"]) == 8
 
 
 def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
@@ -53,14 +55,17 @@ def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
 
 
 @pytest.mark.parametrize("variant", list(SHERPA_PROFILES))
+@pytest.mark.parametrize("tail_policy", [None, VAD_TAIL_CONTEXT])
 def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
-    tmp_path, monkeypatch, variant
+    tmp_path, monkeypatch, variant, tail_policy
 ):
     from involta_voice import sherpa
 
     config = settings(tmp_path)
     engine = "gigaam"
     request = options(config, engine, variant, ["Алхимист", "Бар / Кухня"], location_name="Плёс")
+    if tail_policy is None:
+        request.pop("vad_tail_context")
     for path in (model_path(config, engine), config.asr_models_dir / "vad" / VAD["revision"]):
         path.mkdir(parents=True)
         (path / "READY.json").write_text("{}")
@@ -81,9 +86,10 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
         def segment_batch(self, audio, lengths, sample_rate, **kwargs):
             assert sample_rate == 16000 and kwargs["max_speech_duration_s"] == 20
             assert kwargs["min_silence_duration_ms"] == 500
-            yield iter([] if self.silent else [(0, 8000), (8000, 16000)])
+            yield iter([] if self.silent else [(0, 8000), (12000, 16000)])
 
     vad = Vad()
+    accepted_lengths = []
 
     class Stream:
         result = SimpleNamespace(text="Ресторан Алхимист.")
@@ -93,7 +99,8 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
             assert float(value) == 0
 
         def accept_waveform(self, sample_rate, audio):
-            assert sample_rate == 16000 and len(audio) == 8000
+            assert sample_rate == 16000
+            accepted_lengths.append(len(audio))
 
     class Model:
         def create_stream(self):
@@ -137,10 +144,17 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     assert result["settings"] == request
     assert result["pcm_sha256"] == hashlib.sha256(waveform.tobytes()).hexdigest()
     assert result["audio_sha256"] == hashlib.sha256(b"private fixture").hexdigest()
-    assert result["segments"] == [
-        {"start": 0, "end": 0.5, "text": "Ресторан Алхимист."},
-        {"start": 0.5, "end": 1, "text": "Ресторан Алхимист."},
-    ]
+    assert result["vad_segments"] == [{"start": 0, "end": 0.5}, {"start": 0.75, "end": 1}]
+    assert result["vad_tail_context_applied"] == (tail_policy is not None)
+    assert result["segments"] == (
+        [{"start": 0, "end": 1, "text": "Ресторан Алхимист."}]
+        if tail_policy
+        else [
+            {"start": 0, "end": 0.5, "text": "Ресторан Алхимист."},
+            {"start": 0.75, "end": 1, "text": "Ресторан Алхимист."},
+        ]
+    )
+    assert accepted_lengths == ([16000] if tail_policy else [8000, 4000])
     from pathlib import Path
 
     if captured["hotwords_file"]:
@@ -163,3 +177,42 @@ def test_native_vocabulary_missing_or_corrupt_fails_before_runtime_import(tmp_pa
         (root / VOCAB_FILE).write_bytes(contents)
     with pytest.raises(ProviderFailure, match="Родной словарь GigaAM не подготовлен"):
         LocalSherpa(config).warmup(options(config, "gigaam", "sherpa_hotwords_strong", ["Плёс"]))
+
+
+@pytest.mark.parametrize(
+    ("segments", "limit", "expected"),
+    [
+        ([], 20, []),
+        ([(0, 3000)], 20, [(0, 3000)]),
+        ([(32, 48608), (91680, 96736)], 20, [(32, 96736)]),
+        ([(0, 16000), (16000, 22400)], 20, [(0, 16000), (16000, 22400)]),
+        ([(0, 16000), (16000, 22399)], 20, [(0, 22399)]),
+        ([(0, 16000), (64000, 67000)], 20, [(0, 67000)]),
+        ([(0, 16000), (64001, 67000)], 20, [(0, 16000), (64001, 67000)]),
+        ([(0, 316000), (316001, 320000)], 20, [(0, 320000)]),
+        ([(0, 316000), (316002, 320001)], 20, [(0, 316000), (316002, 320001)]),
+        ([(0, 16000), (16000, 19000)], 1, [(0, 16000), (16000, 19000)]),
+        ([(0, 16000), (15000, 18000)], 20, [(0, 16000), (15000, 18000)]),
+        (
+            [(0, 16000), (32000, 35000), (48000, 64000)],
+            20,
+            [(0, 16000), (32000, 35000), (48000, 64000)],
+        ),
+        ([(0, 8000), (10000, 16000), (20000, 23000)], 20, [(0, 8000), (10000, 23000)]),
+    ],
+)
+def test_short_tail_context_preserves_audio_and_respects_boundaries(segments, limit, expected):
+    from involta_voice.sherpa import join_short_tail
+
+    original = list(segments)
+    actual = join_short_tail(segments, 16000, limit)
+    assert actual == expected
+    assert segments == original
+    assert join_short_tail(actual, 16000, limit) == actual
+
+
+def test_unknown_tail_policy_fails_before_loading_models(tmp_path):
+    request = options(settings(tmp_path), "gigaam", "sherpa_hotwords_strong", [])
+    request["vad_tail_context"] = "unknown-v9"
+    with pytest.raises(ProviderFailure, match="Неизвестная версия"):
+        LocalSherpa(settings(tmp_path)).call(request, b"not-an-audio")

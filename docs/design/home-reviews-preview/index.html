@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Макет главной с отзывами — Инвольта гид</title>
+<title>Макет выбора локации — Инвольта гид</title>
 <meta name="description" content="Короткие подборки ресторанов России">
 <meta name="robots" content="noindex, follow">
-<link rel="canonical" href="https://demo.invalid/guide/">
+<link rel="canonical" href="https://involta.ru/guide/">
 
 
 <meta property="og:title" content="Инвольта гид">
 <meta property="og:description" content="Города. Места, где вкусно.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://demo.invalid/guide/">
+<meta property="og:url" content="https://involta.ru/guide/">
 
 
 <style>
@@ -1038,6 +1038,14 @@ pre.audit-json {
 .public-reviews time { color: #777; font-size: .8rem; }
 .public-reviews .transcript { white-space: pre-wrap; }
 
+.nearby-locations { border-top:1px solid var(--line);padding:28px 0 40px;margin-top:30px; }
+.nearby-locations h2 { margin-bottom:22px; }
+.nearby-locations h2 em { font-weight:400; }
+
+.nearby-locations .city-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.nearby-locations .city-link strong { font-size:24px;font-weight:500; }
+@media(max-width:650px) { .nearby-locations .city-grid { grid-template-columns:minmax(0,1fr); } }
+
 </style>
 
 <style>
@@ -1062,10 +1070,10 @@ pre.audit-json {
 .search-clear[hidden] { opacity:0;visibility:hidden;pointer-events:none; }
 .search-clear::before { content:'';position:absolute;inset:-2px -8px; }
 .search-clear svg { width:18px;height:18px; }
-.search-control .search-submit { flex:0 0 132px;height:54px;padding:0;border:0;border-radius:27px;background:#2861eb;color:#fff;font-size:22px;line-height:1.5;transition:flex-basis var(--search-duration) var(--search-ease),height var(--search-duration) var(--search-ease),border-radius var(--search-duration) var(--search-ease),background 150ms; }
-.search-control .search-submit:hover { background:#1d53d5;opacity:1; }
-.search-control .search-submit:active { background:#1847bc; }
-.is-open .search-submit { flex-basis:122px;height:50px;border-radius:25px; }
+.search-control .search-choose { display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;flex:0 0 132px;height:54px;padding:0;border:0;border-radius:27px;background:#2861eb;color:#fff;font-size:22px;line-height:1.5;transition:flex-basis var(--search-duration) var(--search-ease),height var(--search-duration) var(--search-ease),border-radius var(--search-duration) var(--search-ease),background 150ms; }
+.search-control .search-choose:hover { background:#1d53d5;opacity:1; }
+.search-control .search-choose:active { background:#1847bc; }
+.is-open .search-choose { flex-basis:122px;height:50px;border-radius:25px; }
 .search-suggestions { opacity:0;transform:translateY(-6px);transition:opacity 180ms ease,transform var(--search-duration) var(--search-ease); }
 .is-open .search-suggestions { opacity:1;transform:translateY(0); }
 .search-panel-content { padding:0 8px 4px; }
@@ -1081,25 +1089,17 @@ pre.audit-json {
 .result-arrow { color:#858585;font-size:18px; }
 .destination-result mark { padding:0;background:transparent;color:inherit;font-weight:700; }
 .search-message { padding:25px 18px 28px;font-size:15px;color:#797979; }
-.search-intro { color:var(--muted);font-size:14px;line-height:1.7;margin:20px 0 0; }
-.search-hero:has(.search-suggestions:not([hidden])) .search-intro { visibility:hidden; }
-.search-hero + .cities { border-top:1px solid var(--line);padding-top:28px; }
-.search-hero + .cities .section-heading { margin-bottom:12px; }
-.search-hero + .cities .city-link { padding-top:18px;padding-bottom:18px; }
 @media (max-width:650px) {
   .search-hero { padding-top:38px;padding-bottom:30px; }
   .search-hero h1 { font-size:clamp(46px,12.5vw,72px);margin-bottom:28px; }
   .search-hero .eyebrow { font-size:9px;letter-spacing:1.6px; }
   .destination-search label { font-size:18px;margin-bottom:12px; }
-  .search-intro { font-size:12px;line-height:1.7;margin-top:16px; }
-  .desktop-break { display:none; }
-  .search-hero + .cities { padding-top:24px; }
 }
 @media (max-width:600px) {
   .search-input-row { gap:10px;padding-left:20px; }
   .search-control input { font-size:16px; }
   .search-symbol { width:18px;height:18px;flex-basis:18px; }
-  .search-control .search-submit,.is-open .search-submit { flex-basis:82px; }
+  .search-control .search-choose,.is-open .search-choose { flex-basis:114px; }
   .search-clear,.search-clear[hidden] { flex-basis:22px;width:22px;margin-left:-4px; }
   .search-clear::before { inset:-2px -11px; }
   .result-name { display:block;font-size:16px; }
@@ -1109,27 +1109,33 @@ pre.audit-json {
   .destination-search *,.destination-search *::before,.destination-search *::after { transition-duration:1ms!important; }
 }
 
+.search-choose > span { font-size:18px;line-height:1; }
+@media(max-width:360px){.search-symbol{display:none}}
+
 </style>
-
-
-
-<style>.demo-note{max-width:1232px;margin:16px auto 0;padding:0 48px;font:12px/1.6 Arial,sans-serif;color:#747474}@media(max-width:650px){.demo-note{padding:0 25px}}</style>
-<style>.search-hero > .eyebrow{text-transform:none}.demo-note{display:none}</style>
 <style>
 .home-reviews{max-width:860px;border-top:1px solid var(--line);padding-top:28px;margin-bottom:70px}
 .home-reviews .section-heading{margin-bottom:8px;gap:16px}
-.home-reviews .mock-label{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0}
 .home-review{display:block;padding:25px 0 27px;border-bottom:1px solid var(--line)}
 .home-review-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:16px}
-.home-review-city{justify-self:start;min-width:0;font:italic 19px/1.4 Georgia,'Times New Roman',serif;letter-spacing:-.015em;color:var(--black);text-decoration:underline;text-decoration-color:#d8d8d1;text-decoration-thickness:1px;text-underline-offset:5px}
+.home-review-city{justify-self:start;min-width:0;overflow-wrap:anywhere;font:italic 19px/1.4 Georgia,'Times New Roman',serif;letter-spacing:-.015em;color:var(--black);text-decoration:underline;text-decoration-color:#d8d8d1;text-decoration-thickness:1px;text-underline-offset:5px}
 .home-review-city-arrow{display:inline-block;margin-left:8px;font:14px/1 Arial,sans-serif;color:#8a8a84;transition:transform 140ms ease}
 .home-review time{justify-self:end;text-align:right;font-size:12px;line-height:1.7;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-.home-review p{font-size:17px;line-height:1.65;margin:12px 0 0;max-width:760px;color:var(--black)}
+.home-review p{font-size:17px;line-height:1.65;margin:12px 0 0;max-width:760px;color:var(--black);white-space:pre-wrap;overflow-wrap:anywhere}
 .home-review:hover{opacity:1}.home-review:hover .home-review-city{text-decoration-color:#888}.home-review:hover .home-review-city-arrow{transform:translateX(3px)}
-@media(max-width:650px){.home-reviews{padding-top:24px;margin-bottom:48px}.home-review{padding:23px 0 25px}.home-review-meta{gap:12px}.home-review-city{font-size:17px}.home-review-city-arrow{font-size:12px;margin-left:6px}.home-review time{font-size:11px}.home-review p{font-size:16px;margin-top:11px}.home-reviews .mock-label{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.home-review-city-arrow{transition:none}}
+
+.home-page .search-hero > .eyebrow { text-transform:none; }
+.home-review:last-child { border-bottom:0; }
+.home-page + footer { border-top:0; }
+.home-reviews-empty { padding:18px 0;color:var(--muted); }
+@media(max-width:650px){.home-reviews{padding-top:24px;margin-bottom:48px}.home-review{padding:23px 0 25px}.home-review-meta{gap:12px}.home-review-city{font-size:17px}.home-review-city-arrow{font-size:12px;margin-left:6px}.home-review time{font-size:11px}.home-review p{font-size:16px;margin-top:11px}}
+
 </style>
-<style>.home-review:last-child{border-bottom:0}main + footer{border-top:0}</style>
+
+
+
+<style>.home-reviews .section-heading{gap:16px}.mock-label{font:11px/1.5 Arial,sans-serif;color:var(--muted)}.demo-note{max-width:860px;margin:16px auto;padding:0 25px;font:12px/1.6 Arial,sans-serif;color:#747474}.demo-note:empty{display:none}@media(max-width:650px){.mock-label{font-size:10px}}</style>
 </head>
 <body>
 <header class="header">
@@ -1139,20 +1145,23 @@ pre.audit-json {
 
 </header>
 
-<main>
+<main class="home-page">
 <section class="hero search-hero">
 <p class="eyebrow">Еда. Люди. Качество.</p>
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-<form class="destination-search" action="/guide/" method="get" role="search" data-location-search data-catalogue-url="/guide/api/locations/catalogue">
+
+<div class="destination-search" data-location-search data-catalogue-url="/guide/api/locations/catalogue" data-location-base="/guide/" role="group" aria-label="Локации">
+
+<label for="destination" class="sr-only">Выбор локации</label>
 <div class="search-control">
 <div class="search-surface">
 <div class="search-input-row">
 <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-<input id="destination" aria-label="Поиск локации" type="search" name="q" value="" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-describedby="search-status">
+<input id="destination" type="text" data-location-input  value="" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-describedby="search-status">
 <button type="button" class="search-clear" aria-label="Очистить поиск" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-<button type="submit" class="search-submit">Найти</button>
+<button type="button" class="search-choose" aria-expanded="false">Выбери <span aria-hidden="true">↓</span></button>
 </div>
 <div class="search-suggestions" hidden inert aria-hidden="true">
 <div class="search-panel-content">
@@ -1161,42 +1170,105 @@ pre.audit-json {
 </div>
 </div>
 </div>
+
 <p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
-</form>
+</div>
 </section>
 <section class="home-reviews" aria-labelledby="home-reviews-title">
 <div class="section-heading"><h2 id="home-reviews-title">Жизнь кипит</h2><span class="mock-label">Макет · тестовые отзывы</span></div>
-<div class="home-reviews-list"><a class="home-review" href="https://involta.ru/guide/ivanovo">
-<div class="home-review-meta"><span class="home-review-city">Иваново<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="06.11.2026 14:32" datetime="2026-11-06T14:32:00+03:00">6 ноя · 14:32</time></div>
+<div class="home-reviews-list">
+
+
+<a class="home-review" href="https://involta.ru/guide/ivanovo">
+<div class="home-review-meta">
+<span class="home-review-city">Иваново<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="06.11.2026 14:32" datetime="2026-11-06T14:32:00+03:00">6 ноя · 14:32</time>
+</div>
 <p>Паста очень хорошая, соус не тяжёлый. Принесли быстро, хотя почти все столы были заняты. Вернусь попробовать остальное.</p>
-</a><a class="home-review" href="https://involta.ru/guide/veliky-novgorod">
-<div class="home-review-meta"><span class="home-review-city">Великий Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="06.11.2026 12:18" datetime="2026-11-06T12:18:00+03:00">6 ноя · 12:18</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/veliky-novgorod">
+<div class="home-review-meta">
+<span class="home-review-city">Великий Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="06.11.2026 12:18" datetime="2026-11-06T12:18:00+03:00">6 ноя · 12:18</time>
+</div>
 <p>Зашли на обед после прогулки. Уха понравилась больше всего — насыщенная, много рыбы. Хлеб тоже отличный.</p>
-</a><a class="home-review" href="https://involta.ru/guide/ples">
-<div class="home-review-meta"><span class="home-review-city">Плёс<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="06.11.2026 11:05" datetime="2026-11-06T11:05:00+03:00">6 ноя · 11:05</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/ples">
+<div class="home-review-meta">
+<span class="home-review-city">Плёс<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="06.11.2026 11:05" datetime="2026-11-06T11:05:00+03:00">6 ноя · 11:05</time>
+</div>
 <p>Взяли рыбу и пирог. Рыба нежная, а пирог лучше заказывать один на двоих: порция большая. Хорошее место, чтобы никуда не спешить.</p>
-</a><a class="home-review" href="https://involta.ru/guide/sochi">
-<div class="home-review-meta"><span class="home-review-city">Сочи<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="06.11.2026 09:42" datetime="2026-11-06T09:42:00+03:00">6 ноя · 09:42</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/sochi">
+<div class="home-review-meta">
+<span class="home-review-city">Сочи<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="06.11.2026 09:42" datetime="2026-11-06T09:42:00+03:00">6 ноя · 09:42</time>
+</div>
 <p>Хинкали сочные, тесто тонкое. Салат простой, но помидоры вкусные. Вечером шумновато, для спокойного разговора лучше приходить раньше.</p>
-</a><a class="home-review" href="https://involta.ru/guide/nizhny-novgorod">
-<div class="home-review-meta"><span class="home-review-city">Нижний Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 21:37" datetime="2026-11-05T21:37:00+03:00">5 ноя · 21:37</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/nizhny-novgorod">
+<div class="home-review-meta">
+<span class="home-review-city">Нижний Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 21:37" datetime="2026-11-05T21:37:00+03:00">5 ноя · 21:37</time>
+</div>
 <p>Понравились завтрак и кофе. За соседними столами было свободно, но заказ ждали минут двадцать. По еде всё хорошо.</p>
-</a><a class="home-review" href="https://involta.ru/guide/novosibirsk">
-<div class="home-review-meta"><span class="home-review-city">Новосибирск<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 19:21" datetime="2026-11-05T19:21:00+03:00">5 ноя · 19:21</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/novosibirsk">
+<div class="home-review-meta">
+<span class="home-review-city">Новосибирск<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 19:21" datetime="2026-11-05T19:21:00+03:00">5 ноя · 19:21</time>
+</div>
 <p>Мясо приготовили ровно так, как просили. Овощи с дымком, никаких лишних соусов. За этим и стоит приходить.</p>
-</a><a class="home-review" href="https://involta.ru/guide/novorossiysk">
-<div class="home-review-meta"><span class="home-review-city">Новороссийск<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 18:08" datetime="2026-11-05T18:08:00+03:00">5 ноя · 18:08</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/novorossiysk">
+<div class="home-review-meta">
+<span class="home-review-city">Новороссийск<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 18:08" datetime="2026-11-05T18:08:00+03:00">5 ноя · 18:08</time>
+</div>
 <p>Свежая рыба, хорошая прожарка. Официант помог выбрать без долгого перечисления всего меню. Остались довольны.</p>
-</a><a class="home-review" href="https://involta.ru/guide/ivanovo">
-<div class="home-review-meta"><span class="home-review-city">Иваново<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 16:50" datetime="2026-11-05T16:50:00+03:00">5 ноя · 16:50</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/ivanovo">
+<div class="home-review-meta">
+<span class="home-review-city">Иваново<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 16:50" datetime="2026-11-05T16:50:00+03:00">5 ноя · 16:50</time>
+</div>
 <p>Очень удачный десерт с ягодами. Не приторно, чувствуется вкус самих ягод. Кофе обычный, а ради десерта зайду ещё.</p>
-</a><a class="home-review" href="https://involta.ru/guide/veliky-novgorod">
-<div class="home-review-meta"><span class="home-review-city">Великий Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 14:16" datetime="2026-11-05T14:16:00+03:00">5 ноя · 14:16</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/veliky-novgorod">
+<div class="home-review-meta">
+<span class="home-review-city">Великий Новгород<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 14:16" datetime="2026-11-05T14:16:00+03:00">5 ноя · 14:16</time>
+</div>
 <p>Брали суп и горячее. Всё принесли горячим, порции честные. Внутри спокойно, можно нормально поговорить.</p>
-</a><a class="home-review" href="https://involta.ru/guide/novy-urengoy">
-<div class="home-review-meta"><span class="home-review-city">Новый Уренгой<span class="home-review-city-arrow" aria-hidden="true">→</span></span><time title="05.11.2026 12:43" datetime="2026-11-05T12:43:00+03:00">5 ноя · 12:43</time></div>
+</a>
+
+
+<a class="home-review" href="https://involta.ru/guide/novy-urengoy">
+<div class="home-review-meta">
+<span class="home-review-city">Новый Уренгой<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="05.11.2026 12:43" datetime="2026-11-05T12:43:00+03:00">5 ноя · 12:43</time>
+</div>
 <p>Хороший обед: понятное меню, вкусный бульон и мягкое мясо. Обслужили внимательно, даже когда стало многолюдно.</p>
-</a></div>
+</a>
+
+</div>
 </section>
 </main>
 
@@ -1420,7 +1492,7 @@ var t,e;t=this,e=function(){"use strict";function t(t,e){(null==e||e>t.length)&&
 </script>
 <script>
 // The server supplies public rows in baseline order. Only names enter this index.
-// Matching/ranking is mirrored by domain/location_search.py for the native GET form.
+// Matching/ranking is mirrored by domain/location_search.py for the admin POST form.
 window.GuideLocationIndex = catalogue => {
   const normalize = value => (Array.from(value).slice(0, 100).join('').normalize('NFKC')
     .toLowerCase().replaceAll('ё', 'е').match(/[\p{L}\p{N}]+/gu) || []).join(' ');
@@ -1469,181 +1541,223 @@ window.GuideLocationIndex = catalogue => {
 
 </script>
 <script>
-const demoCatalogue=[{"name": "Великий Новгород", "context": "Новгородская область", "location": "velikiy-novgorod"}, {"name": "Нижний Новгород", "context": "Нижегородская область", "location": "nizhniy-novgorod"}, {"name": "Новосибирск", "context": "Новосибирская область", "location": "novosibirsk"}, {"name": "Новороссийск", "context": "Краснодарский край", "location": "novorossiysk"}, {"name": "Новомосковск", "context": "Тульская область", "location": "novomoskovsk"}, {"name": "Новый Уренгой", "context": "Ямало-Ненецкий автономный округ", "location": "novyy-urengoy"}, {"name": "Плёс", "context": "Ивановская область", "location": "plyos"}, {"name": "Переславль-Залесский", "context": "Ярославская область", "location": "pereslavl-zalesskiy"}, {"name": "Сочи", "context": "Краснодарский край", "location": "sochi"}, {"name": "Иваново", "context": "Ивановская область", "location": "ivanovo"}];
+const demoCatalogue=[{"name": "Великий Новгород", "context": "Новгородская область", "location": "veliky-novgorod"}, {"name": "Нижний Новгород", "context": "Нижегородская область", "location": "nizhny-novgorod"}, {"name": "Новосибирск", "context": "Новосибирская область", "location": "novosibirsk"}, {"name": "Новороссийск", "context": "Краснодарский край", "location": "novorossiysk"}, {"name": "Новомосковск", "context": "Тульская область", "location": "novomoskovsk"}, {"name": "Новый Уренгой", "context": "Ямало-Ненецкий АО", "location": "novy-urengoy"}, {"name": "Плёс", "context": "Ивановская область", "location": "ples"}, {"name": "Переславль-Залесский", "context": "Ярославская область", "location": "pereslavl-zalessky"}, {"name": "Сочи", "context": "Краснодарский край", "location": "sochi"}, {"name": "Иваново", "context": "Ивановская область", "location": "ivanovo"}];
 
 window.fetch=async()=>new Response(JSON.stringify(demoCatalogue),{headers:{'Content-Type':'application/json'}});
-const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');demoNote.textContent='Макет главной · тестовые города. Попробуйте поиск: «и», «пл» или «очи».';
-document.querySelector('.header').after(demoNote);
-document.querySelector('form[data-location-search]').addEventListener('submit',event=>{event.preventDefault();demoNote.textContent='Демо: поиск «'+event.target.querySelector('input[name=q]').value+'». Переход отключён.';requestAnimationFrame(()=>event.target.querySelector('input[name=q]').dispatchEvent(new Event('input',{bubbles:true})));});
+const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');
+document.querySelector('.search-hero').append(demoNote);
 document.addEventListener('click',event=>{const link=event.target.closest('a');if(link&&!link.closest('.home-review')){event.preventDefault();demoNote.textContent='Демо: переход «'+link.textContent.trim()+'».';}});
 
 </script>
 <script>
-(async () => {
-  const form = document.querySelector('[data-location-search]');
-  if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
-  let catalogue;
-  try {
-    const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
-    if (!response.ok) return;
-    catalogue = await response.json();
-    if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
-      typeof item.name !== 'string' || typeof item.context !== 'string' ||
-      typeof item.location !== 'string' || !item.location)) return;
-  }
-  catch { return; }
-  const search = GuideLocationIndex(catalogue);
-  const input = form.querySelector('input[name="q"]');
-  const clear = form.querySelector('.search-clear');
-  const panel = form.querySelector('.search-suggestions');
-  const content = form.querySelector('.search-panel-content');
-  const control = form.querySelector('.search-control');
-  const surface = form.querySelector('.search-surface');
-  const inputRow = form.querySelector('.search-input-row');
-  const status = form.querySelector('[role="status"]');
-  let rows = [];
-  let composing = false;
-  let expanded = false, closeTimer;
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+(() => {
+  function mount(picker) {
+    if (picker.dataset.searchMounted || !window.autoComplete || !window.GuideLocationIndex) return;
+    picker.dataset.searchMounted = 'true';
+    const lifecycle = new AbortController();
+    const input = picker.querySelector('[data-location-input]');
+    const choose = picker.querySelector('.search-choose');
+    const clear = picker.querySelector('.search-clear');
+    const panel = picker.querySelector('.search-suggestions');
+    const content = picker.querySelector('.search-panel-content');
+    const control = picker.querySelector('.search-control');
+    const surface = picker.querySelector('.search-surface');
+    const inputRow = picker.querySelector('.search-input-row');
+    const status = picker.querySelector('[role="status"]');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    let catalogue = [], search, rows = [], loading = false, loadError = false;
+    let composing = false, allowEmpty = false, expanded = false, closeTimer;
 
-  const folded = value => value.toLowerCase().replaceAll('ё', 'е');
-  function title(element, value) {
-    const words = folded(input.value).match(/[\p{L}\p{N}]+/gu) || [];
-    const normalized = folded(value);
-    let offset = 0;
-    while (offset < value.length) {
-      const hits = words.map(word => ({at: normalized.indexOf(word, offset), size: word.length}))
-        .filter(hit => hit.at >= 0).sort((a, b) => a.at - b.at || b.size - a.size);
-      if (!hits.length) { element.append(document.createTextNode(value.slice(offset))); break; }
-      const hit = hits[0];
-      element.append(document.createTextNode(value.slice(offset, hit.at)));
-      const mark = document.createElement('mark');
-      mark.textContent = value.slice(hit.at, hit.at + hit.size);
-      element.append(mark);
-      offset = hit.at + hit.size;
+    const folded = value => value.toLowerCase().replaceAll('ё', 'е');
+    function title(element, value) {
+      const words = folded(input.value).match(/[\p{L}\p{N}]+/gu) || [];
+      const normalized = folded(value);
+      let offset = 0;
+      while (offset < value.length) {
+        const hits = words.map(word => ({at: normalized.indexOf(word, offset), size: word.length}))
+          .filter(hit => hit.at >= 0).sort((a, b) => a.at - b.at || b.size - a.size);
+        if (!hits.length) { element.append(document.createTextNode(value.slice(offset))); break; }
+        const hit = hits[0];
+        element.append(document.createTextNode(value.slice(offset, hit.at)));
+        const mark = document.createElement('mark');
+        mark.textContent = value.slice(hit.at, hit.at + hit.size);
+        element.append(mark);
+        offset = hit.at + hit.size;
+      }
     }
-  }
 
-  const widget = new autoComplete({
-    selector: () => input, wrapper: false, threshold: 0, submit: true,
-    data: {src: async () => rows, keys: ['name'], cache: false},
-    // The in-memory index ranks names; the library only renders safe DOM nodes.
-    searchEngine: () => ' ',
-    resultsList: {
-      class: 'destination-results', destination: () => content, position: 'beforeend',
-      maxResults: 6, noResults: true,
-      element: (list, data) => {
-        if (!data.results.length) {
-          const item = document.createElement('li');
-          item.className = 'search-message'; item.role = 'presentation';
-          item.textContent = 'Не нашли такую локацию. Попробуйте другое название.';
-          list.append(item);
-        }
-        status.textContent = data.results.length ? `Подсказок: ${data.results.length}` : 'Ничего не найдено';
-        requestAnimationFrame(fitResults);
-      }
-    },
-    resultItem: {
-      class: 'destination-result', element: (item, data) => {
-        item.replaceChildren();
-        const text = document.createElement('span');
-        const name = document.createElement('span'); name.className = 'result-name';
-        title(name, data.value.name);
-        const context = document.createElement('span'); context.className = 'result-context';
-        context.textContent = data.value.context;
-        text.append(name, context);
-        const arrow = document.createElement('span'); arrow.className = 'result-arrow';
-        arrow.textContent = '→'; arrow.ariaHidden = 'true';
-        item.append(text, arrow);
-      }
-    },
-    events: {input: {
-      input: () => begin(),
-      focus: () => { if (!composing && !expanded) begin(); },
-      // Keep the query, but fold the panel when focus leaves the input.
-      blur: () => widget.close(),
-      keydown: event => {
-        if (composing || event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Escape') { event.preventDefault(); return; }
-        if (!widget.isOpen || !widget.feedback?.results.length) return;
-        if (event.key === 'ArrowDown') { event.preventDefault(); widget.next(); }
-        else if (event.key === 'ArrowUp') { event.preventDefault(); widget.previous(); }
-        else if (event.key === 'Enter' && widget.cursor >= 0) { event.preventDefault(); widget.select(widget.cursor); }
-      },
-      selection: event => {
-        const selected = event.detail.selection?.value;
-        if (!selected) return;
-        // The catalogue stores a slug; the Guide prefix belongs to the form.
-        const target = new URL(encodeURIComponent(selected.location), form.action);
-        if (target.origin === location.origin && target.pathname.startsWith(new URL(form.action).pathname)) {
-          input.value = selected.name; demoNote.textContent = 'Демо: выбрано «' + selected.name + '».'; requestAnimationFrame(() => input.dispatchEvent(new Event('input', {bubbles:true})));
+    const widget = new autoComplete({
+      selector: () => input, wrapper: false, threshold: 0, submit: true,
+      data: {src: async () => rows, keys: ['name'], cache: false},
+      searchEngine: () => ' ',
+      resultsList: {
+        class: 'destination-results', destination: () => content, position: 'beforeend',
+        maxResults: 6, noResults: true,
+        element: (list, data) => {
+          if (!data.results.length) {
+            const item = document.createElement('li');
+            item.className = 'search-message'; item.role = 'presentation';
+            item.textContent = loadError
+              ? 'Не удалось загрузить локации. Нажмите «Выбери», чтобы повторить.'
+              : 'Не нашли такую локацию. Попробуйте другое название.';
+            list.append(item);
+          }
+          status.textContent = loadError ? 'Список локаций недоступен'
+            : data.results.length ? `Подсказок: ${data.results.length}` : 'Ничего не найдено';
+          requestAnimationFrame(fitResults);
         }
       },
-      open: () => {
-        if (!input.value.trim() || document.activeElement !== input) { widget.close(); return; }
-        panel.hidden = false;
-        panel.inert = false;
-        panel.setAttribute('aria-hidden', 'false');
-        clearTimeout(closeTimer);
-        // Establish the closed panel style before starting its opacity/transform transition.
-        panel.getBoundingClientRect();
-        expanded = true;
-        control.classList.add('is-open');
-        requestAnimationFrame(fitResults);
+      resultItem: {
+        class: 'destination-result', element: (item, data) => {
+          item.replaceChildren();
+          const text = document.createElement('span');
+          const name = document.createElement('span'); name.className = 'result-name';
+          title(name, data.value.name);
+          const context = document.createElement('span'); context.className = 'result-context';
+          context.textContent = data.value.context;
+          text.append(name, context);
+          const arrow = document.createElement('span'); arrow.className = 'result-arrow';
+          arrow.textContent = '→'; arrow.ariaHidden = 'true';
+          item.append(text, arrow);
+        }
       },
-      close: () => {
-        expanded = false;
-        panel.inert = true;
-        panel.setAttribute('aria-hidden', 'true');
-        control.classList.remove('is-open');
-        // The library hides its list immediately; keep it painted while it fades out.
-        widget.list.hidden = false;
-        resizeSurface();
-        clearTimeout(closeTimer);
-        closeTimer = setTimeout(() => {
-          if (!expanded) { panel.hidden = true; widget.list.hidden = true; }
-        }, reducedMotion.matches ? 0 : 420);
-      }
-    }}
-  });
-  input.setAttribute('aria-autocomplete', 'list');
-  clear.hidden = !input.value;
-
-  function begin() {
+      events: {input: {
+        input: () => begin(),
+        focus: () => { if (!composing && !expanded) begin(); },
+        blur: () => { allowEmpty = false; widget.close(); },
+        keydown: event => {
+          if (composing || event.isComposing || event.keyCode === 229) return;
+          if (event.key === 'Escape') { event.preventDefault(); return; }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            if (widget.isOpen && widget.feedback?.results.length && widget.cursor >= 0) widget.select(widget.cursor);
+            else if (loadError) { allowEmpty = true; loadCatalogue(); }
+            else begin(true);
+            return;
+          }
+          if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !widget.isOpen) {
+            event.preventDefault(); begin(true); return;
+          }
+          if (!widget.isOpen || !widget.feedback?.results.length) return;
+          if (event.key === 'ArrowDown') { event.preventDefault(); widget.next(); }
+          else if (event.key === 'ArrowUp') { event.preventDefault(); widget.previous(); }
+        },
+        selection: event => {
+          const selected = event.detail.selection?.value;
+          if (!selected) return;
+          if (picker.hasAttribute('data-location-add')) {
+            if (!Number.isSafeInteger(selected.id) || selected.id < 1) return;
+            picker.querySelector('[name=nearby_id]').value = selected.id;
+            picker.requestSubmit();
+            return;
+          }
+          const base = new URL(picker.dataset.locationBase, location.href);
+          const target = new URL(encodeURIComponent(selected.location), base);
+          if (target.origin === location.origin && target.pathname.startsWith(base.pathname)) { input.value = selected.name; demoNote.textContent = 'Демо: выбрано «' + selected.name + '».'; widget.close(); }
+        },
+        open: () => {
+          if ((!search && !loadError) || (!input.value.trim() && !allowEmpty) || document.activeElement !== input) {
+            widget.close(); return;
+          }
+          panel.hidden = false; panel.inert = false;
+          panel.setAttribute('aria-hidden', 'false'); choose.setAttribute('aria-expanded', 'true');
+          clearTimeout(closeTimer);
+          panel.getBoundingClientRect();
+          expanded = true; control.classList.add('is-open');
+          requestAnimationFrame(fitResults);
+        },
+        close: () => {
+          expanded = false; panel.inert = true;
+          panel.setAttribute('aria-hidden', 'true'); choose.setAttribute('aria-expanded', 'false');
+          control.classList.remove('is-open');
+          // Keep the library's list painted until the morph finishes.
+          widget.list.hidden = false;
+          resizeSurface(); clearTimeout(closeTimer);
+          closeTimer = setTimeout(() => {
+            if (!expanded) { panel.hidden = true; widget.list.hidden = true; }
+          }, reducedMotion.matches ? 0 : 420);
+        }
+      }}
+    });
+    input.setAttribute('aria-autocomplete', 'list');
+    choose.setAttribute('aria-controls', widget.list.id);
     clear.hidden = !input.value;
-    if (!input.value.trim()) { widget.close(); status.textContent = ''; return; }
-    if (composing) return;
-    rows = search(input.value).slice(0, 6);
-    widget.start(input.value);
-  }
-  function fitResults() {
-    if (!expanded) return;
-    const viewport = window.visualViewport;
-    const bottom = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight);
-    if (document.activeElement === input && innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
-      control.scrollIntoView({block: 'start', behavior: 'instant'});
+
+    function begin(showEmpty = false) {
+      clear.hidden = !input.value;
+      allowEmpty = showEmpty;
+      if (!input.value.trim() && !showEmpty) { widget.close(); status.textContent = ''; return; }
+      if (composing || (!search && !loadError)) return;
+      rows = search ? (input.value.trim() ? search(input.value) : catalogue).slice(0, 6) : [];
+      widget.start(input.value);
     }
-    const list = form.querySelector('.destination-results');
-    const room = bottom - list.getBoundingClientRect().top - 24;
-    form.style.setProperty('--search-results-height', Math.max(72, Math.min(456, room)) + 'px');
+    async function loadCatalogue() {
+      if (loading || search) return;
+      loading = true; loadError = false;
+      widget.close();
+      try {
+        if (picker.hasAttribute('data-location-add')) {
+          catalogue = JSON.parse(picker.querySelector('#location-catalogue').textContent);
+        } else {
+          const response = await fetch(picker.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
+          if (!response.ok) throw new Error('Catalogue unavailable');
+          catalogue = await response.json();
+          if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
+            typeof item.name !== 'string' || typeof item.context !== 'string' ||
+            typeof item.location !== 'string' || !item.location)) throw new Error('Invalid catalogue');
+        }
+        if (!lifecycle.signal.aborted) search = GuideLocationIndex(catalogue);
+      } catch { loadError = true; }
+      finally {
+        loading = false;
+        if (!lifecycle.signal.aborted && document.activeElement === input && (input.value.trim() || allowEmpty)) begin(allowEmpty);
+      }
+    }
+    function fitResults() {
+      if (!expanded) return;
+      const viewport = window.visualViewport;
+      const bottom = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight);
+      if (document.activeElement === input && innerWidth <= 650 && bottom - panel.getBoundingClientRect().top < 180) {
+        control.scrollIntoView({block: 'start', behavior: 'instant'});
+      }
+      const room = bottom - widget.list.getBoundingClientRect().top - 24;
+      picker.style.setProperty('--search-results-height', Math.max(72, Math.min(456, room)) + 'px');
+      resizeSurface();
+    }
+    function resizeSurface() {
+      surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
+    }
+    choose.addEventListener('mousedown', event => event.preventDefault());
+    choose.addEventListener('click', () => {
+      const wasOpen = expanded;
+      input.focus();
+      if (!search) { allowEmpty = true; loadCatalogue(); }
+      else if (wasOpen) widget.close();
+      else begin(true);
+    });
+    input.addEventListener('compositionstart', () => { composing = true; });
+    input.addEventListener('compositionend', () => { composing = false; begin(); });
+    clear.addEventListener('click', () => { input.value = ''; allowEmpty = false; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
+    window.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+    window.visualViewport?.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+    const observer = new ResizeObserver(resizeSurface);
+    observer.observe(content);
+    document.addEventListener('htmx:beforeCleanupElement', event => {
+      if (event.detail.elt === picker || event.detail.elt.contains(picker)) {
+        lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
+      }
+    }, {signal: lifecycle.signal});
     resizeSurface();
+    loadCatalogue();
   }
-  function resizeSurface() {
-    surface.style.height = inputRow.offsetHeight + 2 + (expanded ? panel.offsetHeight : 0) + 'px';
+  function mountAll(root) {
+    if (root.matches?.('[data-location-search]')) mount(root);
+    root.querySelectorAll('[data-location-search]').forEach(mount);
   }
-  input.addEventListener('compositionstart', () => { composing = true; });
-  input.addEventListener('compositionend', () => { composing = false; begin(); });
-  clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
-  window.addEventListener('resize', fitResults);
-  window.visualViewport?.addEventListener('resize', fitResults);
-  new ResizeObserver(resizeSurface).observe(content);
-  resizeSurface();
-  if (input.value.trim()) begin();
+  mountAll(document);
+  document.addEventListener('htmx:load', event => mountAll(event.detail.elt));
 })();
 
-</script>
-<script>
-const demoInput=document.querySelector("input[name=q]");demoInput.value="";demoInput.dispatchEvent(new Event("input",{bubbles:true}));
 </script>
 </body>
 </html>

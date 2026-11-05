@@ -143,7 +143,9 @@ def deploy(root, env, sha, run="1-1", mode="deploy"):
         text=True,
         capture_output=True,
         env=env,
-        timeout=15,
+        # Fake Docker/curl still spawn real Python processes throughout rollback.
+        # Leave room for loaded CI runners; assertions below verify the final state.
+        timeout=60,
     )
 
 

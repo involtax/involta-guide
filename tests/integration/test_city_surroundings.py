@@ -20,6 +20,7 @@ from .test_background_generation import configured, envelope, task
 from .test_editorial import CONTENT
 from .test_filling_top3 import shortlist
 from .test_jobs import setup
+from .test_web import login
 
 SPEC = spec_from_file_location(
     "city_surroundings",
@@ -103,11 +104,17 @@ def test_countryside_competes_in_the_city_list_with_its_real_locality(
     try:
         initial_location_count = len(queries.rows("locations"))
         assert location["id"] == location_id
+        with TestClient(create_app(settings)) as client:
+            empty = client.get("/guide/" + location["slug"])
+            assert empty.status_code == 200
+            assert 'class="coverage"' not in empty.text
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
         prompt = requests[0]["input"][1]["content"]
-        assert CONTRACT.COVERAGE_NOTES[location_id] in prompt
-        assert name in prompt
+        assert location["coverage_note"] == ""
+        assert name not in prompt
+        assert "Семигор" not in prompt and "Кажма" not in prompt
+        assert "vinoterria.com" not in prompt and "zaonezhie.com" not in prompt
         assert "Только " + city not in prompt
         winners = queries.location(location_id)["content"]["restaurants"]
         assert [r["name"] for r in winners] == [name, "Кандидат 00", "Кандидат 02"]
@@ -127,6 +134,7 @@ def test_countryside_competes_in_the_city_list_with_its_real_locality(
             html = client.get("/guide/" + location["slug"]).text
             assert description in html
             assert countryside["mapsUrl"] in html
+            assert 'class="coverage"' not in html
     finally:
         provider.close()
 
@@ -143,7 +151,7 @@ def test_default_scope_includes_surroundings_and_explicit_scope_is_preserved(
         prompts.append(json.loads(request.content)["input"][1]["content"])
         return httpx.Response(200, json=envelope())
 
-    _, engine, _, location, service, queue, provider, _ = configured(database, handler)
+    settings, engine, queries, location, service, queue, provider, _ = configured(database, handler)
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -154,6 +162,15 @@ def test_default_scope_includes_surroundings_and_explicit_scope_is_preserved(
         context = json.loads(prompts[0].split("ОБЯЗАТЕЛЬНЫЙ ГЕОГРАФИЧЕСКИЙ КОНТЕКСТ\n")[1])
         if custom_scope:
             assert context["scope"] == custom_scope
+            with TestClient(create_app(settings)) as client:
+                public = client.get("/guide/" + location["slug"])
+                assert public.status_code == 200
+                assert custom_scope not in public.text
+                assert queries.get("locations", location["id"])["coverage_note"] == custom_scope
+                login(client)
+                admin = client.get("/guide/admin/locations/" + location["slug"])
+                assert admin.status_code == 200
+                assert custom_scope in admin.text
         else:
             assert context["scope"].startswith("Иваново, ")
             assert "гастрономические окрестности" in context["scope"]
@@ -203,12 +220,8 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
     before_catalogue = queries.rows("restaurants")
     before_reviews = queries.rows("reviews")
     assert before_catalogue and before_reviews
-    command.upgrade(config, "head")
+    command.upgrade(config, "city_surroundings")
     assert queries.setting("prompt") == CONTRACT.PROMPT
-    assert (
-        CONTRACT.PROMPT
-        == (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
-    )
     for before in before_locations:
         after = queries.get("locations", before["id"])
         if before["id"] in CONTRACT.COVERAGE_NOTES:
@@ -228,7 +241,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
                 text("UPDATE jobs SET prompt='Ручное задание' WHERE id=:id"), {"id": pending["id"]}
             )
     # An already applied migration never overwrites subsequent admin edits.
-    command.upgrade(config, "head")
+    command.upgrade(config, "city_surroundings")
     command.downgrade(config, "location_ids")
     assert queries.setting("prompt") == ("Ручная правка" if manual_edits else original_prompt)
     assert queries.get("locations", 34)["coverage_note"] == (
