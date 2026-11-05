@@ -16,6 +16,6 @@
 </div>
 </div>
 </div>
-<script type="application/json" id="location-catalogue">{{location_catalogue|tojson}}</script>
+{%if search_add|default(false)%}<script type="application/json" id="location-catalogue">{{location_catalogue|tojson}}</script>{%endif%}
 <p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
 </form>

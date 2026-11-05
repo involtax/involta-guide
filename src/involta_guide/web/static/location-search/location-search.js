@@ -5,12 +5,16 @@
   const lifecycle = new AbortController();
   let catalogue;
   try {
-    const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
-    if (!response.ok) return;
-    catalogue = await response.json();
-    if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
-      typeof item.name !== 'string' || typeof item.context !== 'string' ||
-      typeof item.location !== 'string' || !item.location)) return;
+    if (form.hasAttribute('data-location-add')) {
+      catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent);
+    } else {
+      const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
+      if (!response.ok) return;
+      catalogue = await response.json();
+      if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
+        typeof item.name !== 'string' || typeof item.context !== 'string' ||
+        typeof item.location !== 'string' || !item.location)) return;
+    }
   }
   catch { return; }
   const search = GuideLocationIndex(catalogue);

@@ -44,10 +44,10 @@ def test_upgrade_preserves_content_links_and_logs_without_old_redirects(database
     with factory() as work:
         work.repo.add("jobs", {"id": str(uuid4()), "kind": "generate", "location_id": city["id"]})
         locations_before = work.repo.rows("locations", limit=100000)
-        relations_before = work.repo.rows("location_relations", limit=100000)
+        relations_before = {r["id"]: r["nearby_location_ids"] for r in locations_before}
         assert work.repo.rows("request_logs")[0]["path"] == "/logs/plyos/1"
 
-    command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "head")
+    command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "readable_slugs")
     assert seed(PostgresUow(engine), settings.root_dir) == 0
     assert seed(PostgresUow(engine), settings.root_dir) == 0
     after = queries.location(city["id"])
@@ -58,7 +58,7 @@ def test_upgrade_preserves_content_links_and_logs_without_old_redirects(database
         assert {row["id"]: row["parent_id"] for row in locations_after} == {
             row["id"]: row["parent_id"] for row in locations_before
         }
-        assert work.repo.rows("location_relations", limit=100000) == relations_before
+        assert {r["id"]: r["nearby_location_ids"] for r in locations_after} == relations_before
         assert work.repo.rows("request_logs")[0]["path"] == "/logs/ples/1"
         assert not any(row["slug"] == "plyos" for row in work.repo.rows("location_slug_redirects"))
         assert len(work.repo.rows("audit", {"action": "location_slug"}, limit=1000)) == 283
@@ -86,7 +86,7 @@ def test_occupied_target_aborts_entire_upgrade(database, alias):
         else:
             connection.execute(text("UPDATE locations SET slug='ples' WHERE slug='ivanovo'"))
     with pytest.raises(RuntimeError, match="URL ples уже занят"):
-        command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "head")
+        command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "readable_slugs")
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
@@ -113,7 +113,7 @@ def test_manual_url_survives_upgrade_and_catalogue_import(database):
     previous_catalogue(database)
     with engine.begin() as connection:
         connection.execute(text("UPDATE locations SET slug='my-ples' WHERE slug='plyos'"))
-    command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "head")
+    command.upgrade(Config(str(settings.root_dir / "alembic.ini")), "readable_slugs")
     assert seed(PostgresUow(engine), settings.root_dir) == 0
     with PostgresUow(engine) as work:
         assert work.repo.by_slug("my-ples")[0]["name"] == "Плёс"

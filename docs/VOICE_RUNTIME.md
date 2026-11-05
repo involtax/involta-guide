@@ -76,8 +76,7 @@ Release посылает stop всем процессам одновременн
    схемы; обновление версии выполняется отдельно, после backup.
 7. После обеих копий применяет Guide `location_ids` и `guide seed`, затем Voice v10, запускает `voice` и `voice-worker`, проверяет API/доставку,
    затем web/worker и HTTPS. Guide мигрируется одной цепочкой
-   filling_v3 → filling_top3 → review_stream → review_publication → audience_stats → readable_slugs.
-   filling_v3 → filling_top3 → review_stream → review_publication → audience_stats → location_ids.
+   filling_v3 → filling_top3 → review_stream → review_publication → audience_stats → readable_slugs → restaurant_discovery → location_ids.
 
 Rollback использует **Compose snapshot предыдущего релиза вместе с его образом**.
 При неудачном обновлении сначала восстанавливаются исходная версия Voice и Guide из снимков
@@ -161,9 +160,6 @@ bpe.gigaam-native-v2.vocab с исходными оценками частей, 
 дополнительных распознаваний. Фактическую память/скорость измерять на выбранном VPS.
 
 Порядок выпуска: собрать/проверить образ → штатный полный release, который
-останавливает writers, сохраняет Voice schema dump для версий <9, применяет
-`voice migrate` (9), выполняет `voice prepare-model`, запускает все компоненты
-из одного SHA. Guide Alembic — readable_slugs (подробнее [TRANSLITERATION.md](TRANSLITERATION.md)). Production Compose
 останавливает writers, сохраняет Voice schema dump для версий <10, применяет
 `voice migrate` (10), выполняет `voice prepare-model`, запускает все компоненты
 из одного SHA. Guide Alembic — location_ids (подробнее [AUDIENCE.md](AUDIENCE.md)). Production Compose

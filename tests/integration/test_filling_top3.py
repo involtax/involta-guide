@@ -138,6 +138,8 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
     config = Config(str(settings.root_dir / "alembic.ini"))
     # Exercise the historical prompt chain without reversing the later,
     # intentionally irreversible numeric-identity migration in this fixture.
+    command.stamp(config, "restaurant_discovery")
+    command.downgrade(config, "readable_slugs")
     command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     custom = "Авторский промпт до ограниченного исследования. " * 2
@@ -169,7 +171,7 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
             ),
             {"job": submitted["id"], "usage": usage, "body": json.dumps(recorded)},
         )
-    command.upgrade(config, "audience_stats")
+    command.upgrade(config, "restaurant_discovery")
     with engine.connect() as connection:
         actual = connection.execute(
             text("SELECT value FROM settings WHERE key='prompt'")
@@ -178,6 +180,8 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
     assert queries.get("jobs", pending["id"])["prompt"] == actual
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
     assert task(engine, submitted)["request_json"] == recorded
+    command.stamp(config, "restaurant_discovery")
+    command.downgrade(config, "readable_slugs")
     command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     with engine.connect() as connection:
@@ -187,10 +191,10 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         )
     assert queries.get("jobs", pending["id"])["prompt"] == custom
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
-    command.upgrade(config, "audience_stats")
+    command.upgrade(config, "restaurant_discovery")
     with engine.begin() as connection:
         connection.execute(text("UPDATE settings SET value='Ручная правка' WHERE key='prompt'"))
-    command.upgrade(config, "audience_stats")
+    command.upgrade(config, "restaurant_discovery")
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT value FROM settings WHERE key='prompt'")).scalar_one()

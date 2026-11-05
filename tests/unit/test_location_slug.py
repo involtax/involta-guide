@@ -43,10 +43,10 @@ def test_catalogue_has_unique_urls_and_all_references_survive_rename():
     plan = json.loads((root / "migrations/data/readable_slugs.json").read_text())
     slugs = {row["slug"] for row in catalog["locations"]}
     assert len(slugs) == len(catalog["locations"]) == 1448
+    ids = {row["id"] for row in catalog["locations"]}
     for row in catalog["locations"]:
         assert row["parent_slug"] is None or row["parent_slug"] in slugs
-    for row in catalog["related"]:
-        assert row["location_slug"] in slugs and row["related_slug"] in slugs
+        assert set(row["nearby_location_ids"]) <= ids
     for row in catalog["redirects"]:
         assert row["location_slug"] in slugs and row["slug"] not in slugs
     for row in plan["locations"]:

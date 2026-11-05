@@ -12,8 +12,8 @@ from starlette.datastructures import FormData
 
 from involta_guide.application.commands.schemas import LocationInput
 from involta_guide.domain.entities import Conflict, RuleViolation
-from involta_guide.domain.location_slug import location_slug
 from involta_guide.domain.location_search import search_locations
+from involta_guide.domain.location_slug import location_slug
 from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.location_catalog import export_catalog
 from involta_guide.web.http import check_csrf, context, form_data, require_admin
