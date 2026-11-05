@@ -135,8 +135,7 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
             )
             width_before = audio.evaluate("a=>a.getBoundingClientRect().width")
             audio.evaluate("a=>a.play()")
-            page.wait_for_timeout(400)
-            assert audio.evaluate("a=>a.currentTime") > 0.1
+            page.wait_for_function("a=>a.currentTime>0.1", arg=audio.element_handle())
             audio.evaluate("a=>{a.currentTime=3}")
             page.wait_for_function(
                 "(a)=>a.currentTime>=3&&a.currentTime<4", arg=audio.element_handle()
