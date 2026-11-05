@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from hashlib import sha256
 from textwrap import shorten
 from urllib.parse import urlencode
@@ -52,9 +53,7 @@ def routes(prefix: str) -> APIRouter:
                 "pages": pages,
             }
         else:
-            result = ctx.queries.directory(
-                kind="city", page=page_number, status="active", filled_only=True, public_only=True
-            )
+            result = None
         request.state.audience_page = True
         return request.app.state.templates.TemplateResponse(
             request=request,
@@ -62,7 +61,26 @@ def routes(prefix: str) -> APIRouter:
             context={
                 "settings": ctx.settings,
                 "q": q,
+                "searching": searching,
                 "result": result,
+                "home_reviews": VoiceReadModel(ctx.engine).latest_public_texts()
+                if not searching
+                else [],
+                "review_timezone": timezone(timedelta(hours=3)),
+                "months": (
+                    "янв",
+                    "фев",
+                    "мар",
+                    "апр",
+                    "мая",
+                    "июн",
+                    "июл",
+                    "авг",
+                    "сен",
+                    "окт",
+                    "ноя",
+                    "дек",
+                ),
                 "kinds": KINDS,
                 "indexable": True,
                 "page_query": lambda n: urlencode({"q": q, "page": n}),

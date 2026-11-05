@@ -33,7 +33,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(origin + "/guide/")
-            field = page.get_by_role("combobox", name="Куда отправимся?")
+            field = page.get_by_role("combobox", name="Поиск локации")
             button = page.get_by_role("button", name="Найти", exact=True)
             assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
             assert button.evaluate("el=>getComputedStyle(el).backgroundColor") == "rgb(40, 97, 235)"
@@ -58,7 +58,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
             button.click()
             page.wait_for_url(lambda u: parse_qs(urlsplit(u).query).get("q") == ["пле"])
             expect(page.locator(".city-link")).to_have_count(1)
-            field = page.get_by_role("combobox", name="Куда отправимся?")
+            field = page.get_by_role("combobox", name="Поиск локации")
             field.fill("плес")
             expect(page.get_by_role("option")).to_have_count(1)
             if width == 390:
@@ -72,7 +72,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
         context = browser.new_context(java_script_enabled=False)
         page = context.new_page()
         page.goto(origin + "/guide/")
-        page.get_by_label("Куда отправимся?").fill("новгород нижний")
+        page.get_by_label("Поиск локации").fill("новгород нижний")
         page.get_by_role("button", name="Найти", exact=True).click()
         expect(page.locator(".city-link")).to_have_count(1)
         expect(page.locator(".city-link")).to_contain_text("Нижний Новгород")
@@ -96,7 +96,7 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         )
         page = browser.new_page()
         page.goto(origin + "/guide/", wait_until="networkidle")
-        field = page.get_by_role("combobox", name="Куда отправимся?")
+        field = page.get_by_role("combobox", name="Поиск локации")
         expect(field).to_be_visible()
         page.evaluate("""() => {
             window.searchMessages = [];
@@ -195,10 +195,10 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1100})
         page.goto(origin + "/guide/")
-        field = page.get_by_role("combobox", name="Куда отправимся?")
+        field = page.get_by_role("combobox", name="Поиск локации")
         shell = page.locator(".search-surface")
         panel = page.locator(".search-suggestions")
-        city_top = page.locator(".cities").bounding_box()["y"]
+        city_top = page.locator(".home-reviews").bounding_box()["y"]
         assert shell.evaluate("el=>el.offsetHeight") == 80
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         field.fill("н")
@@ -209,7 +209,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         expanded_height = shell.evaluate("el=>el.getBoundingClientRect().height")
         assert expanded_height > 80
-        assert page.locator(".cities").bounding_box()["y"] == city_top
+        assert page.locator(".home-reviews").bounding_box()["y"] == city_top
         field.press("Escape")
         expect(panel).to_be_visible()
         page.get_by_role("button", name="Найти", exact=True).focus()
@@ -247,7 +247,7 @@ def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_
             held = []
             page.route("**/api/locations/catalogue", lambda route: held.append(route))
             page.goto(origin + "/guide/")
-            field = page.get_by_label("Куда отправимся?")
+            field = page.get_by_label("Поиск локации")
             field.fill("иван")
             field.fill(final_query)
             page.locator("h1").click()
@@ -273,7 +273,7 @@ def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_
         page = browser.new_page()
         page.route("**/api/locations/catalogue", lambda route: route.fulfill(status=503))
         page.goto(origin + "/guide/", wait_until="networkidle")
-        page.get_by_label("Куда отправимся?").fill("плес")
+        page.get_by_label("Поиск локации").fill("плес")
         page.get_by_role("button", name="Найти", exact=True).click()
         expect(page.locator(".city-link")).to_have_count(1)
         expect(page.locator(".city-link")).to_contain_text("Плёс")

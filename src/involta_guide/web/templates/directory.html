@@ -6,21 +6,22 @@
 {% endblock %}
 {% block page_styles %}
 <link rel="stylesheet" href="{{settings.path('/assets/location-search/location-search.css')}}">
+<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">
 {% endblock %}
 {% block body %}
-<main>
+<main class="home-page">
 <section class="hero search-hero">
-<p class="eyebrow">ЕДА. МЕСТА. ЛИЧНЫЙ ОПЫТ.</p>
+<p class="eyebrow">Еда. Люди. Качество.</p>
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-{%with search_action=settings.path('/')%}{%include 'location_search.html'%}{%endwith%}
-<p class="search-intro">Короткие подборки ресторанов в городах, районах и на курортах.<br class="desktop-break"> Выбираем внимательно. Прислушиваемся к вам.</p>
+{%with search_action=settings.path('/'), search_label='Поиск локации', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
 </section>
+{%if searching%}
 <section class="cities">
 <div class="section-heading">
-<h2>{{'Результаты поиска' if q else 'Города с подборками'}}</h2>
-<span class="muted">{{result.total}} {{'найдено' if q else 'городов'}}</span>
+<h2>Результаты поиска</h2>
+<span class="muted">{{result.total}} найдено</span>
 </div>
 <div class="city-grid">
 {%for c in result.rows%}
@@ -50,6 +51,23 @@
 {%endif%}
 </nav>{%endif%}
 </section>
+{%else%}
+<section class="home-reviews" aria-labelledby="home-reviews-title">
+<div class="section-heading"><h2 id="home-reviews-title">Жизнь кипит</h2></div>
+<div class="home-reviews-list">
+{%for review in home_reviews%}
+{%set posted=review.created_at.astimezone(review_timezone)%}
+<a class="home-review" href="{{settings.path('/'+review.location_slug)}}">
+<div class="home-review-meta">
+<span class="home-review-city">{{review.location_name}}<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+<time title="{{posted.strftime('%d.%m.%Y %H:%M')}}" datetime="{{posted.isoformat()}}">{{posted.day}} {{months[posted.month-1]}} · {{posted.strftime('%H:%M')}}</time>
+</div>
+<p>{{review.transcript or 'Расшифровка…'}}</p>
+</a>
+{%else%}<p class="home-reviews-empty">Пока нет отзывов.</p>{%endfor%}
+</div>
+</section>
+{%endif%}
 </main>
 {%endblock%}
 {% block scripts %}

@@ -29,7 +29,7 @@ def test_public_admin_htmx_and_csrf(database):
         redirect = client.get("/guide?q=test", follow_redirects=False)
         assert redirect.status_code == 302 and redirect.headers["location"] == "/guide/?q=test"
         home = client.get("/guide/")
-        assert home.status_code == 200 and "Куда отправимся?" in home.text
+        assert home.status_code == 200 and "Поиск локации" in home.text
         assert "htmx" not in home.text and "react" not in home.text and "/_next/" not in home.text
         page = client.get("/guide/ivanovo")
         assert page.status_code == 200 and "noindex" in page.text

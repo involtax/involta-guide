@@ -38,8 +38,6 @@
 .result-arrow { color:#858585;font-size:18px; }
 .destination-result mark { padding:0;background:transparent;color:inherit;font-weight:700; }
 .search-message { padding:25px 18px 28px;font-size:15px;color:#797979; }
-.search-intro { color:var(--muted);font-size:14px;line-height:1.7;margin:20px 0 0; }
-.search-hero:has(.search-suggestions:not([hidden])) .search-intro { visibility:hidden; }
 .search-hero + .cities { border-top:1px solid var(--line);padding-top:28px; }
 .search-hero + .cities .section-heading { margin-bottom:12px; }
 .search-hero + .cities .city-link { padding-top:18px;padding-bottom:18px; }
@@ -48,8 +46,6 @@
   .search-hero h1 { font-size:clamp(46px,12.5vw,72px);margin-bottom:28px; }
   .search-hero .eyebrow { font-size:9px;letter-spacing:1.6px; }
   .destination-search label { font-size:18px;margin-bottom:12px; }
-  .search-intro { font-size:12px;line-height:1.7;margin-top:16px; }
-  .desktop-break { display:none; }
   .search-hero + .cities { padding-top:24px; }
 }
 @media (max-width:600px) {
