@@ -5,6 +5,7 @@
 # Keep the historical variant ID; each run records its actual numeric weight.
 PRIMARY_VARIANT = "sherpa_hotwords_strong"
 SHERPA_PROFILES = {PRIMARY_VARIANT: (2.5, 16, "catalogue")}
+COMMON_RECOGNITION_NAMES = ("Алекс Концов",)
 # Identities remain readable/executable for accepted jobs and saved history.
 SHERPA_STAGES = {
     "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)

@@ -9,7 +9,7 @@ from pathlib import Path
 from involta_voice.config import Settings
 from involta_voice.sherpa import LocalSherpa, options
 from involta_voice.text import REVIEW_TEXT_FORMAT, catalogue_forms, clean_review_text, restore_names
-from involta_voice.variants import PRIMARY_VARIANT
+from involta_voice.variants import COMMON_RECOGNITION_NAMES, PRIMARY_VARIANT
 
 
 def catalogue(log: dict) -> tuple[str, list[str]]:
@@ -65,6 +65,7 @@ def main() -> None:
             city, names = latest[item["slug"]] if args.catalogue == "latest" else catalogue(log)
             names = list(dict.fromkeys([*names, *args.extra_restaurants]))
             forms = catalogue_forms(names, city=city)
+            forms.update({n.lower().replace("ё", "е"): n for n in COMMON_RECOGNITION_NAMES})
             for score in args.scores:
                 request = options(
                     settings,
@@ -78,7 +79,9 @@ def main() -> None:
                     request["dictionary"] = []
                 body = json.loads(provider.call(request, audio)["body"])
                 provider.close()
-                restored = restore_names(body["text"], names, forms=forms)
+                restored = restore_names(
+                    body["text"], [*names, *COMMON_RECOGNITION_NAMES], forms=forms
+                )
                 row = {
                     "review": item["number"],
                     "slug": item["slug"],
