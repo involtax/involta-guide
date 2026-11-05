@@ -159,6 +159,12 @@ class VoiceService:
         frozen["name_forms"] = catalogue_forms(
             [location["name"], *location.get("recognition_dictionary", [])], city=location["name"]
         )
+        from .variants import COMMON_RECOGNITION_NAMES
+
+        frozen["common_recognition_names"] = list(COMMON_RECOGNITION_NAMES)
+        frozen["name_forms"].update(
+            {name.lower().replace("ё", "е"): name for name in COMMON_RECOGNITION_NAMES}
+        )
         frozen["name_normalization"] = "catalogue-inflections-v1"
         frozen["review_text_format"] = REVIEW_TEXT_FORMAT
         if frozen["asr_beta"]:

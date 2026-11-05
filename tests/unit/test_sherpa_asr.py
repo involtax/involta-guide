@@ -32,16 +32,18 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
     with pytest.raises(ValueError):
         options(config, engine, "sherpa_plain", names)
     assert biased["dictionary"] == [
+        "Алекс Концов",
         "Алхимист",
         "Огонёк",
         "Сыроварня",
+        "алекс концов",
         "алхимист",
         "огонёк",
         "сыроварня",
     ]
     assert biased["decoding_method"] == "modified_beam_search"
     names.append("Не должно попасть в запрос")
-    assert len(biased["dictionary"]) == 6
+    assert len(biased["dictionary"]) == 8
 
 
 def test_missing_models_are_reported_before_import_or_any_download(tmp_path):

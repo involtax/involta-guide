@@ -13,7 +13,7 @@ from .asr import VAD, decode
 from .config import Settings
 from .provider import ProviderFailure
 from .sherpa_tokenizer import ENCODING, TOKENIZER_SHA256, VOCAB_FILE, VOCAB_SHA256, vocabulary
-from .variants import SHERPA_PROFILES, dictionary_names
+from .variants import COMMON_RECOGNITION_NAMES, SHERPA_PROFILES, dictionary_names
 
 # Includes the NeMo TDT beam-search/length-reward fix, upstream PR #4084.
 RUNTIME_REVISION = "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb"
@@ -36,7 +36,7 @@ def options(
     if variant not in SHERPA_PROFILES:
         raise ValueError("Неизвестный вариант Sherpa")
     score, paths, source = SHERPA_PROFILES[variant]
-    dictionary = [location_name, *names] if source == "catalogue" else []
+    dictionary = [location_name, *names, *COMMON_RECOGNITION_NAMES] if source == "catalogue" else []
     if location_name and source == "catalogue":
         from .text import name_forms
 
