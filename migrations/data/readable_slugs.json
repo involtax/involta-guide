@@ -1,0 +1,1712 @@
+{
+  "locations": [
+    {
+      "name": "Ачхой-Мартан",
+      "region": "Чечня",
+      "old": "achkhoy-martan",
+      "new": "achhoy-martan"
+    },
+    {
+      "name": "Ахтубинск",
+      "region": "Астраханская область",
+      "old": "akhtubinsk",
+      "new": "ahtubinsk"
+    },
+    {
+      "name": "Ахты",
+      "region": "Республика Дагестан",
+      "old": "akhty",
+      "new": "ahty"
+    },
+    {
+      "name": "Александровск-Сахалинский",
+      "region": "Сахалинская область",
+      "old": "aleksandrovsk-sakhalinskiy",
+      "new": "aleksandrovsk-sahalinsky"
+    },
+    {
+      "name": "Архангельск",
+      "region": "Архангельская область",
+      "old": "arkhangelsk",
+      "new": "arhangelsk"
+    },
+    {
+      "name": "Архипо-Осиповка",
+      "region": "Краснодарский край",
+      "old": "arkhipo-osipovka",
+      "new": "arhipo-osipovka"
+    },
+    {
+      "name": "Архыз",
+      "region": "Карачаево-Черкесская Республика",
+      "old": "arkhyz",
+      "new": "arhyz"
+    },
+    {
+      "name": "Артём",
+      "region": "Приморский край",
+      "old": "artyom",
+      "new": "artem"
+    },
+    {
+      "name": "Артёмовск",
+      "region": "Красноярский край",
+      "old": "artyomovsk",
+      "new": "artemovsk"
+    },
+    {
+      "name": "Артёмовский",
+      "region": "Свердловская область",
+      "old": "artyomovskiy",
+      "new": "artemovsky"
+    },
+    {
+      "name": "Астрахань",
+      "region": "Астраханская область",
+      "old": "astrakhan",
+      "new": "astrahan"
+    },
+    {
+      "name": "Бахчисарай",
+      "region": "Крым",
+      "old": "bakhchisaray",
+      "new": "bahchisaray"
+    },
+    {
+      "name": "Балахна",
+      "region": "Нижегородская область",
+      "old": "balakhna",
+      "new": "balahna"
+    },
+    {
+      "name": "Балашиха",
+      "region": "Московская область",
+      "old": "balashikha",
+      "new": "balashiha"
+    },
+    {
+      "name": "Белая Холуница",
+      "region": "Кировская область",
+      "old": "belaya-kholunitsa",
+      "new": "belaya-holunitsa"
+    },
+    {
+      "name": "Белинский",
+      "region": "Пензенская область",
+      "old": "belinskiy",
+      "new": "belinsky"
+    },
+    {
+      "name": "Белокуриха",
+      "region": "Алтайский край",
+      "old": "belokurikha",
+      "new": "belokuriha"
+    },
+    {
+      "name": "Белоозёрский",
+      "region": "Московская область",
+      "old": "beloozyorskiy",
+      "new": "beloozersky"
+    },
+    {
+      "name": "Белоярский",
+      "region": "Ханты-Мансийский АО",
+      "old": "beloyarskiy",
+      "new": "beloyarsky"
+    },
+    {
+      "name": "Белёв",
+      "region": "Тульская область",
+      "old": "belyov",
+      "new": "belev"
+    },
+    {
+      "name": "Белый",
+      "region": "Тверская область",
+      "old": "belyy",
+      "new": "bely"
+    },
+    {
+      "name": "Берёзовский",
+      "region": "Кемеровская область",
+      "old": "beryozovskiy",
+      "new": "berezovsky"
+    },
+    {
+      "name": "Берёзовский",
+      "region": "Свердловская область",
+      "old": "beryozovskiy-sverdlovskaya-oblast",
+      "new": "berezovsky-sverdlovskaya-oblast"
+    },
+    {
+      "name": "Благодарный",
+      "region": "Ставропольский край",
+      "old": "blagodarnyy",
+      "new": "blagodarny"
+    },
+    {
+      "name": "Благовещенск",
+      "region": "Амурская область",
+      "old": "blagoveshchensk",
+      "new": "blagoveschensk"
+    },
+    {
+      "name": "Благовещенск",
+      "region": "Башкортостан",
+      "old": "blagoveshchensk-bashkortostan",
+      "new": "blagoveschensk-bashkortostan"
+    },
+    {
+      "name": "Болхов",
+      "region": "Орловская область",
+      "old": "bolkhov",
+      "new": "bolhov"
+    },
+    {
+      "name": "Болохово",
+      "region": "Тульская область",
+      "old": "bolokhovo",
+      "new": "bolohovo"
+    },
+    {
+      "name": "Будённовск",
+      "region": "Ставропольский край",
+      "old": "budyonnovsk",
+      "new": "budennovsk"
+    },
+    {
+      "name": "Чайковский",
+      "region": "Пермский край",
+      "old": "chaykovskiy",
+      "new": "chaykovsky"
+    },
+    {
+      "name": "Чехов",
+      "region": "Московская область",
+      "old": "chekhov",
+      "new": "chehov"
+    },
+    {
+      "name": "Черемхово",
+      "region": "Иркутская область",
+      "old": "cheremkhovo",
+      "new": "cheremhovo"
+    },
+    {
+      "name": "Черняховск",
+      "region": "Калининградская область",
+      "old": "chernyakhovsk",
+      "new": "chernyahovsk"
+    },
+    {
+      "name": "Чох",
+      "region": "Республика Дагестан",
+      "old": "chokh",
+      "new": "choh"
+    },
+    {
+      "name": "Чухлома",
+      "region": "Костромская область",
+      "old": "chukhloma",
+      "new": "chuhloma"
+    },
+    {
+      "name": "Чёрмоз",
+      "region": "Пермский край",
+      "old": "chyormoz",
+      "new": "chermoz"
+    },
+    {
+      "name": "Даховская",
+      "region": "Республика Адыгея",
+      "old": "dakhovskaya",
+      "new": "dahovskaya"
+    },
+    {
+      "name": "Долгопрудный",
+      "region": "Московская область",
+      "old": "dolgoprudnyy",
+      "new": "dolgoprudny"
+    },
+    {
+      "name": "Духовщина",
+      "region": "Смоленская область",
+      "old": "dukhovshchina",
+      "new": "duhovschina"
+    },
+    {
+      "name": "Дзержинский",
+      "region": "Московская область",
+      "old": "dzerzhinskiy",
+      "new": "dzerzhinsky"
+    },
+    {
+      "name": "Фокино",
+      "region": "Приморский край",
+      "old": "fokino-primorskiy-kray",
+      "new": "fokino-primorsky-kray"
+    },
+    {
+      "name": "Горный Алтай",
+      "region": "Республика Алтай",
+      "old": "gornyy-altay",
+      "new": "gorny-altay"
+    },
+    {
+      "name": "Городище",
+      "region": "Пензенская область",
+      "old": "gorodishche",
+      "new": "gorodische"
+    },
+    {
+      "name": "Гороховец",
+      "region": "Владимирская область",
+      "old": "gorokhovets",
+      "new": "gorohovets"
+    },
+    {
+      "name": "Горячий Ключ",
+      "region": "Краснодарский край",
+      "old": "goryachiy-klyuch",
+      "new": "goryachy-klyuch"
+    },
+    {
+      "name": "Грозный",
+      "region": "Чечня",
+      "old": "groznyy",
+      "new": "grozny"
+    },
+    {
+      "name": "Губаха",
+      "region": "Пермский край",
+      "old": "gubakha",
+      "new": "gubaha"
+    },
+    {
+      "name": "Губкинский",
+      "region": "Ямало-Ненецкий АО",
+      "old": "gubkinskiy",
+      "new": "gubkinsky"
+    },
+    {
+      "name": "Гусь-Хрустальный",
+      "region": "Владимирская область",
+      "old": "gus-khrustalnyy",
+      "new": "gus-hrustalny"
+    },
+    {
+      "name": "Гусиноозёрск",
+      "region": "Бурятия",
+      "old": "gusinoozyorsk",
+      "new": "gusinoozersk"
+    },
+    {
+      "name": "Иланский",
+      "region": "Красноярский край",
+      "old": "ilanskiy",
+      "new": "ilansky"
+    },
+    {
+      "name": "Имеретинский курорт",
+      "region": "Федеральная территория Сириус",
+      "old": "imeretinskiy-kurort",
+      "new": "imeretinsky-kurort"
+    },
+    {
+      "name": "Изобильный",
+      "region": "Ставропольский край",
+      "old": "izobilnyy",
+      "new": "izobilny"
+    },
+    {
+      "name": "Каменномостский",
+      "region": "Республика Адыгея",
+      "old": "kamennomostskiy",
+      "new": "kamennomostsky"
+    },
+    {
+      "name": "Каменск-Шахтинский",
+      "region": "Ростовская область",
+      "old": "kamensk-shakhtinskiy",
+      "new": "kamensk-shahtinsky"
+    },
+    {
+      "name": "Каменск-Уральский",
+      "region": "Свердловская область",
+      "old": "kamensk-uralskiy",
+      "new": "kamensk-uralsky"
+    },
+    {
+      "name": "Карадах",
+      "region": "Республика Дагестан",
+      "old": "karadakh",
+      "new": "karadah"
+    },
+    {
+      "name": "Кедровый",
+      "region": "Томская область",
+      "old": "kedrovyy",
+      "new": "kedrovy"
+    },
+    {
+      "name": "Хабаровск",
+      "region": "Хабаровский край",
+      "old": "khabarovsk",
+      "new": "habarovsk"
+    },
+    {
+      "name": "Хадыженск",
+      "region": "Краснодарский край",
+      "old": "khadyzhensk",
+      "new": "hadyzhensk"
+    },
+    {
+      "name": "Хамышки",
+      "region": "Республика Адыгея",
+      "old": "khamyshki",
+      "new": "hamyshki"
+    },
+    {
+      "name": "Ханты-Мансийск",
+      "region": "Ханты-Мансийский АО",
+      "old": "khanty-mansiysk",
+      "new": "hanty-mansiysk"
+    },
+    {
+      "name": "Харабали",
+      "region": "Астраханская область",
+      "old": "kharabali",
+      "new": "harabali"
+    },
+    {
+      "name": "Харовск",
+      "region": "Вологодская область",
+      "old": "kharovsk",
+      "new": "harovsk"
+    },
+    {
+      "name": "Хасавюрт",
+      "region": "Дагестан",
+      "old": "khasavyurt",
+      "new": "hasavyurt"
+    },
+    {
+      "name": "Хилок",
+      "region": "Забайкальский край",
+      "old": "khilok",
+      "new": "hilok"
+    },
+    {
+      "name": "Химки",
+      "region": "Московская область",
+      "old": "khimki",
+      "new": "himki"
+    },
+    {
+      "name": "Холм",
+      "region": "Новгородская область",
+      "old": "kholm",
+      "new": "holm"
+    },
+    {
+      "name": "Холмск",
+      "region": "Сахалинская область",
+      "old": "kholmsk",
+      "new": "holmsk"
+    },
+    {
+      "name": "Холуй",
+      "region": "Ивановская область",
+      "old": "kholuy",
+      "new": "holuy"
+    },
+    {
+      "name": "Хоста",
+      "region": "Краснодарский край",
+      "old": "khosta",
+      "new": "hosta"
+    },
+    {
+      "name": "Хотьково",
+      "region": "Московская область",
+      "old": "khotkovo",
+      "new": "hotkovo"
+    },
+    {
+      "name": "Хунзах",
+      "region": "Республика Дагестан",
+      "old": "khunzakh",
+      "new": "hunzah"
+    },
+    {
+      "name": "Хужир",
+      "region": "Иркутская область",
+      "old": "khuzhir",
+      "new": "huzhir"
+    },
+    {
+      "name": "Хвалынск",
+      "region": "Саратовская область",
+      "old": "khvalynsk",
+      "new": "hvalynsk"
+    },
+    {
+      "name": "Киселёвск",
+      "region": "Кемеровская область",
+      "old": "kiselyovsk",
+      "new": "kiselevsk"
+    },
+    {
+      "name": "Кохма",
+      "region": "Ивановская область",
+      "old": "kokhma",
+      "new": "kohma"
+    },
+    {
+      "name": "Королёв",
+      "region": "Московская область",
+      "old": "korolyov",
+      "new": "korolev"
+    },
+    {
+      "name": "Костерёво",
+      "region": "Владимирская область",
+      "old": "kosteryovo",
+      "new": "kosterevo"
+    },
+    {
+      "name": "Красный Холм",
+      "region": "Тверская область",
+      "old": "krasnyy-kholm",
+      "new": "krasny-holm"
+    },
+    {
+      "name": "Красный Кут",
+      "region": "Саратовская область",
+      "old": "krasnyy-kut",
+      "new": "krasny-kut"
+    },
+    {
+      "name": "Красный Сулин",
+      "region": "Ростовская область",
+      "old": "krasnyy-sulin",
+      "new": "krasny-sulin"
+    },
+    {
+      "name": "Кремёнки",
+      "region": "Калужская область",
+      "old": "kremyonki",
+      "new": "kremenki"
+    },
+    {
+      "name": "Кяхта",
+      "region": "Бурятия",
+      "old": "kyakhta",
+      "new": "kyahta"
+    },
+    {
+      "name": "Лахденпохья",
+      "region": "Карелия",
+      "old": "lakhdenpokhya",
+      "new": "lahdenpohya"
+    },
+    {
+      "name": "Ленинск-Кузнецкий",
+      "region": "Кемеровская область",
+      "old": "leninsk-kuznetskiy",
+      "new": "leninsk-kuznetsky"
+    },
+    {
+      "name": "Лихославль",
+      "region": "Тверская область",
+      "old": "likhoslavl",
+      "new": "lihoslavl"
+    },
+    {
+      "name": "Ликино-Дулёво",
+      "region": "Московская область",
+      "old": "likino-dulyovo",
+      "new": "likino-dulevo"
+    },
+    {
+      "name": "Лосино-Петровский",
+      "region": "Московская область",
+      "old": "losino-petrovskiy",
+      "new": "losino-petrovsky"
+    },
+    {
+      "name": "Лух",
+      "region": "Ивановская область",
+      "old": "lukh",
+      "new": "luh"
+    },
+    {
+      "name": "Луховицы",
+      "region": "Московская область",
+      "old": "lukhovitsy",
+      "new": "luhovitsy"
+    },
+    {
+      "name": "Махачкала",
+      "region": "Дагестан",
+      "old": "makhachkala",
+      "new": "mahachkala"
+    },
+    {
+      "name": "Максимиха",
+      "region": "Республика Бурятия",
+      "old": "maksimikha",
+      "new": "maksimiha"
+    },
+    {
+      "name": "Малоархангельск",
+      "region": "Орловская область",
+      "old": "maloarkhangelsk",
+      "new": "maloarhangelsk"
+    },
+    {
+      "name": "Мариинский Посад",
+      "region": "Чувашия",
+      "old": "mariinskiy-posad",
+      "new": "mariinsky-posad"
+    },
+    {
+      "name": "Майский",
+      "region": "Кабардино-Балкария",
+      "old": "mayskiy",
+      "new": "maysky"
+    },
+    {
+      "name": "Мещовск",
+      "region": "Калужская область",
+      "old": "meshchovsk",
+      "new": "meschovsk"
+    },
+    {
+      "name": "Михайлов",
+      "region": "Рязанская область",
+      "old": "mikhaylov",
+      "new": "mihaylov"
+    },
+    {
+      "name": "Михайловка",
+      "region": "Волгоградская область",
+      "old": "mikhaylovka",
+      "new": "mihaylovka"
+    },
+    {
+      "name": "Михайловск",
+      "region": "Свердловская область",
+      "old": "mikhaylovsk",
+      "new": "mihaylovsk"
+    },
+    {
+      "name": "Михайловск",
+      "region": "Ставропольский край",
+      "old": "mikhaylovsk-stavropolskiy-kray",
+      "new": "mihaylovsk-stavropolsky-kray"
+    },
+    {
+      "name": "Михайловское",
+      "region": "Псковская область",
+      "old": "mikhaylovskoe",
+      "new": "mihaylovskoe"
+    },
+    {
+      "name": "Мирный",
+      "region": "Архангельская область",
+      "old": "mirnyy",
+      "new": "mirny"
+    },
+    {
+      "name": "Мирный",
+      "region": "Якутия",
+      "old": "mirnyy-yakutiya",
+      "new": "mirny-yakutiya"
+    },
+    {
+      "name": "Мисхор",
+      "region": "Республика Крым",
+      "old": "miskhor",
+      "new": "mishor"
+    },
+    {
+      "name": "Московский",
+      "region": "Москва",
+      "old": "moskovskiy",
+      "new": "moskovsky"
+    },
+    {
+      "name": "Академический",
+      "region": "Москва",
+      "old": "moskva-akademicheskiy",
+      "new": "moskva-akademichesky"
+    },
+    {
+      "name": "Алексеевский",
+      "region": "Москва",
+      "old": "moskva-alekseevskiy",
+      "new": "moskva-alekseevsky"
+    },
+    {
+      "name": "Алтуфьевский",
+      "region": "Москва",
+      "old": "moskva-altufevskiy",
+      "new": "moskva-altufevsky"
+    },
+    {
+      "name": "Бабушкинский",
+      "region": "Москва",
+      "old": "moskva-babushkinskiy",
+      "new": "moskva-babushkinsky"
+    },
+    {
+      "name": "Басманный",
+      "region": "Москва",
+      "old": "moskva-basmannyy",
+      "new": "moskva-basmanny"
+    },
+    {
+      "name": "Бескудниковский",
+      "region": "Москва",
+      "old": "moskva-beskudnikovskiy",
+      "new": "moskva-beskudnikovsky"
+    },
+    {
+      "name": "Бирюлёво Восточное",
+      "region": "Москва",
+      "old": "moskva-biryulyovo-vostochnoe",
+      "new": "moskva-biryulevo-vostochnoe"
+    },
+    {
+      "name": "Бирюлёво Западное",
+      "region": "Москва",
+      "old": "moskva-biryulyovo-zapadnoe",
+      "new": "moskva-biryulevo-zapadnoe"
+    },
+    {
+      "name": "Бутырский",
+      "region": "Москва",
+      "old": "moskva-butyrskiy",
+      "new": "moskva-butyrsky"
+    },
+    {
+      "name": "Черёмушки",
+      "region": "Москва",
+      "old": "moskva-cheryomushki",
+      "new": "moskva-cheremushki"
+    },
+    {
+      "name": "Даниловский",
+      "region": "Москва",
+      "old": "moskva-danilovskiy",
+      "new": "moskva-danilovsky"
+    },
+    {
+      "name": "Дмитровский",
+      "region": "Москва",
+      "old": "moskva-dmitrovskiy",
+      "new": "moskva-dmitrovsky"
+    },
+    {
+      "name": "Филимонковский",
+      "region": "Москва",
+      "old": "moskva-filimonkovskiy",
+      "new": "moskva-filimonkovsky"
+    },
+    {
+      "name": "Филёвский Парк",
+      "region": "Москва",
+      "old": "moskva-filyovskiy-park",
+      "new": "moskva-filevsky-park"
+    },
+    {
+      "name": "Гагаринский",
+      "region": "Москва",
+      "old": "moskva-gagarinskiy",
+      "new": "moskva-gagarinsky"
+    },
+    {
+      "name": "Головинский",
+      "region": "Москва",
+      "old": "moskva-golovinskiy",
+      "new": "moskva-golovinsky"
+    },
+    {
+      "name": "Хамовники",
+      "region": "Москва",
+      "old": "moskva-khamovniki",
+      "new": "moskva-hamovniki"
+    },
+    {
+      "name": "Хорошёво-Мнёвники",
+      "region": "Москва",
+      "old": "moskva-khoroshyovo-mnyovniki",
+      "new": "moskva-horoshevo-mnevniki"
+    },
+    {
+      "name": "Хорошёвский",
+      "region": "Москва",
+      "old": "moskva-khoroshyovskiy",
+      "new": "moskva-horoshevsky"
+    },
+    {
+      "name": "Ховрино",
+      "region": "Москва",
+      "old": "moskva-khovrino",
+      "new": "moskva-hovrino"
+    },
+    {
+      "name": "Косино-Ухтомский",
+      "region": "Москва",
+      "old": "moskva-kosino-ukhtomskiy",
+      "new": "moskva-kosino-uhtomsky"
+    },
+    {
+      "name": "Краснопахорский",
+      "region": "Москва",
+      "old": "moskva-krasnopakhorskiy",
+      "new": "moskva-krasnopahorsky"
+    },
+    {
+      "name": "Красносельский",
+      "region": "Москва",
+      "old": "moskva-krasnoselskiy",
+      "new": "moskva-krasnoselsky"
+    },
+    {
+      "name": "Красный Октябрь",
+      "region": "Москва",
+      "old": "moskva-krasnyy-oktyabr",
+      "new": "moskva-krasny-oktyabr"
+    },
+    {
+      "name": "Левобережный",
+      "region": "Москва",
+      "old": "moskva-levoberezhnyy",
+      "new": "moskva-levoberezhny"
+    },
+    {
+      "name": "Ломоносовский",
+      "region": "Москва",
+      "old": "moskva-lomonosovskiy",
+      "new": "moskva-lomonosovsky"
+    },
+    {
+      "name": "Лосиноостровский",
+      "region": "Москва",
+      "old": "moskva-losinoostrovskiy",
+      "new": "moskva-losinoostrovsky"
+    },
+    {
+      "name": "Марьина Роща",
+      "region": "Москва",
+      "old": "moskva-marina-roshcha",
+      "new": "moskva-marina-roscha"
+    },
+    {
+      "name": "Мещанский",
+      "region": "Москва",
+      "old": "moskva-meshchanskiy",
+      "new": "moskva-meschansky"
+    },
+    {
+      "name": "Молжаниновский",
+      "region": "Москва",
+      "old": "moskva-molzhaninovskiy",
+      "new": "moskva-molzhaninovsky"
+    },
+    {
+      "name": "Можайский",
+      "region": "Москва",
+      "old": "moskva-mozhayskiy",
+      "new": "moskva-mozhaysky"
+    },
+    {
+      "name": "Нагатинский Затон",
+      "region": "Москва",
+      "old": "moskva-nagatinskiy-zaton",
+      "new": "moskva-nagatinsky-zaton"
+    },
+    {
+      "name": "Нагорный",
+      "region": "Москва",
+      "old": "moskva-nagornyy",
+      "new": "moskva-nagorny"
+    },
+    {
+      "name": "Нижегородский",
+      "region": "Москва",
+      "old": "moskva-nizhegorodskiy",
+      "new": "moskva-nizhegorodsky"
+    },
+    {
+      "name": "Обручевский",
+      "region": "Москва",
+      "old": "moskva-obruchevskiy",
+      "new": "moskva-obruchevsky"
+    },
+    {
+      "name": "Орехово-Борисово Северное",
+      "region": "Москва",
+      "old": "moskva-orekhovo-borisovo-severnoe",
+      "new": "moskva-orehovo-borisovo-severnoe"
+    },
+    {
+      "name": "Орехово-Борисово Южное",
+      "region": "Москва",
+      "old": "moskva-orekhovo-borisovo-yuzhnoe",
+      "new": "moskva-orehovo-borisovo-yuzhnoe"
+    },
+    {
+      "name": "Останкинский",
+      "region": "Москва",
+      "old": "moskva-ostankinskiy",
+      "new": "moskva-ostankinsky"
+    },
+    {
+      "name": "Пресненский",
+      "region": "Москва",
+      "old": "moskva-presnenskiy",
+      "new": "moskva-presnensky"
+    },
+    {
+      "name": "Рязанский",
+      "region": "Москва",
+      "old": "moskva-ryazanskiy",
+      "new": "moskva-ryazansky"
+    },
+    {
+      "name": "Савёлки",
+      "region": "Москва",
+      "old": "moskva-savyolki",
+      "new": "moskva-savelki"
+    },
+    {
+      "name": "Савёловский",
+      "region": "Москва",
+      "old": "moskva-savyolovskiy",
+      "new": "moskva-savelovsky"
+    },
+    {
+      "name": "Северный",
+      "region": "Москва",
+      "old": "moskva-severnyy",
+      "new": "moskva-severny"
+    },
+    {
+      "name": "Щукино",
+      "region": "Москва",
+      "old": "moskva-shchukino",
+      "new": "moskva-schukino"
+    },
+    {
+      "name": "Таганский",
+      "region": "Москва",
+      "old": "moskva-taganskiy",
+      "new": "moskva-tagansky"
+    },
+    {
+      "name": "Текстильщики",
+      "region": "Москва",
+      "old": "moskva-tekstilshchiki",
+      "new": "moskva-tekstilschiki"
+    },
+    {
+      "name": "Тимирязевский",
+      "region": "Москва",
+      "old": "moskva-timiryazevskiy",
+      "new": "moskva-timiryazevsky"
+    },
+    {
+      "name": "Тропарёво-Никулино",
+      "region": "Москва",
+      "old": "moskva-troparyovo-nikulino",
+      "new": "moskva-troparevo-nikulino"
+    },
+    {
+      "name": "Тёплый Стан",
+      "region": "Москва",
+      "old": "moskva-tyoplyy-stan",
+      "new": "moskva-teply-stan"
+    },
+    {
+      "name": "Восточный",
+      "region": "Москва",
+      "old": "moskva-vostochnyy",
+      "new": "moskva-vostochny"
+    },
+    {
+      "name": "Войковский",
+      "region": "Москва",
+      "old": "moskva-voykovskiy",
+      "new": "moskva-voykovsky"
+    },
+    {
+      "name": "Выхино-Жулебино",
+      "region": "Москва",
+      "old": "moskva-vykhino-zhulebino",
+      "new": "moskva-vyhino-zhulebino"
+    },
+    {
+      "name": "Ярославский",
+      "region": "Москва",
+      "old": "moskva-yaroslavskiy",
+      "new": "moskva-yaroslavsky"
+    },
+    {
+      "name": "Южнопортовый",
+      "region": "Москва",
+      "old": "moskva-yuzhnoportovyy",
+      "new": "moskva-yuzhnoportovy"
+    },
+    {
+      "name": "Мытищи",
+      "region": "Московская область",
+      "old": "mytishchi",
+      "new": "mytischi"
+    },
+    {
+      "name": "Находка",
+      "region": "Приморский край",
+      "old": "nakhodka",
+      "new": "nahodka"
+    },
+    {
+      "name": "Нерехта",
+      "region": "Костромская область",
+      "old": "nerekhta",
+      "new": "nerehta"
+    },
+    {
+      "name": "Нижний Ломов",
+      "region": "Пензенская область",
+      "old": "nizhniy-lomov",
+      "new": "nizhny-lomov"
+    },
+    {
+      "name": "Нижний Новгород",
+      "region": "Нижегородская область",
+      "old": "nizhniy-novgorod",
+      "new": "nizhny-novgorod"
+    },
+    {
+      "name": "Нижний Тагил",
+      "region": "Свердловская область",
+      "old": "nizhniy-tagil",
+      "new": "nizhny-tagil"
+    },
+    {
+      "name": "Новоаннинский",
+      "region": "Волгоградская область",
+      "old": "novoanninskiy",
+      "new": "novoanninsky"
+    },
+    {
+      "name": "Новохопёрск",
+      "region": "Воронежская область",
+      "old": "novokhopyorsk",
+      "new": "novohopersk"
+    },
+    {
+      "name": "Новомихайловский",
+      "region": "Краснодарский край",
+      "old": "novomikhaylovskiy",
+      "new": "novomihaylovsky"
+    },
+    {
+      "name": "Новошахтинск",
+      "region": "Ростовская область",
+      "old": "novoshakhtinsk",
+      "new": "novoshahtinsk"
+    },
+    {
+      "name": "Новый Оскол",
+      "region": "Белгородская область",
+      "old": "novyy-oskol",
+      "new": "novy-oskol"
+    },
+    {
+      "name": "Новый Свет",
+      "region": "Республика Крым",
+      "old": "novyy-svet",
+      "new": "novy-svet"
+    },
+    {
+      "name": "Новый Уренгой",
+      "region": "Ямало-Ненецкий АО",
+      "old": "novyy-urengoy",
+      "new": "novy-urengoy"
+    },
+    {
+      "name": "Очёр",
+      "region": "Пермский край",
+      "old": "ochyor",
+      "new": "ocher"
+    },
+    {
+      "name": "Оха",
+      "region": "Сахалинская область",
+      "old": "okha",
+      "new": "oha"
+    },
+    {
+      "name": "Оханск",
+      "region": "Пермский край",
+      "old": "okhansk",
+      "new": "ohansk"
+    },
+    {
+      "name": "Октябрьский",
+      "region": "Башкортостан",
+      "old": "oktyabrskiy",
+      "new": "oktyabrsky"
+    },
+    {
+      "name": "Олимпийский парк",
+      "region": "Федеральная территория Сириус",
+      "old": "olimpiyskiy-park",
+      "new": "olimpiysky-park"
+    },
+    {
+      "name": "Ольхон",
+      "region": "Иркутская область",
+      "old": "olkhon",
+      "new": "olhon"
+    },
+    {
+      "name": "Олёкминск",
+      "region": "Якутия",
+      "old": "olyokminsk",
+      "new": "olekminsk"
+    },
+    {
+      "name": "Орехово-Зуево",
+      "region": "Московская область",
+      "old": "orekhovo-zuevo",
+      "new": "orehovo-zuevo"
+    },
+    {
+      "name": "Орёл",
+      "region": "Орловская область",
+      "old": "oryol",
+      "new": "orel"
+    },
+    {
+      "name": "Остров Русский",
+      "region": "Приморский край",
+      "old": "ostrov-russkiy",
+      "new": "ostrov-russky"
+    },
+    {
+      "name": "Отрадный",
+      "region": "Самарская область",
+      "old": "otradnyy",
+      "new": "otradny"
+    },
+    {
+      "name": "Озёрск",
+      "region": "Калининградская область",
+      "old": "ozyorsk",
+      "new": "ozersk"
+    },
+    {
+      "name": "Озёрск",
+      "region": "Челябинская область",
+      "old": "ozyorsk-chelyabinskaya-oblast",
+      "new": "ozersk-chelyabinskaya-oblast"
+    },
+    {
+      "name": "Озёры",
+      "region": "Московская область",
+      "old": "ozyory",
+      "new": "ozery"
+    },
+    {
+      "name": "Палех",
+      "region": "Ивановская область",
+      "old": "palekh",
+      "new": "paleh"
+    },
+    {
+      "name": "Павловский Посад",
+      "region": "Московская область",
+      "old": "pavlovskiy-posad",
+      "new": "pavlovsky-posad"
+    },
+    {
+      "name": "Переславль-Залесский",
+      "region": "Ярославская область",
+      "old": "pereslavl-zalesskiy",
+      "new": "pereslavl-zalessky"
+    },
+    {
+      "name": "Петропавловск-Камчатский",
+      "region": "Камчатский край",
+      "old": "petropavlovsk-kamchatskiy",
+      "new": "petropavlovsk-kamchatsky"
+    },
+    {
+      "name": "Петровск-Забайкальский",
+      "region": "Забайкальский край",
+      "old": "petrovsk-zabaykalskiy",
+      "new": "petrovsk-zabaykalsky"
+    },
+    {
+      "name": "Петухово",
+      "region": "Курганская область",
+      "old": "petukhovo",
+      "new": "petuhovo"
+    },
+    {
+      "name": "Пикалёво",
+      "region": "Ленинградская область",
+      "old": "pikalyovo",
+      "new": "pikalevo"
+    },
+    {
+      "name": "Пионерский",
+      "region": "Калининградская область",
+      "old": "pionerskiy",
+      "new": "pionersky"
+    },
+    {
+      "name": "Пляхо",
+      "region": "Краснодарский край",
+      "old": "plyakho",
+      "new": "plyaho"
+    },
+    {
+      "name": "Плёс",
+      "region": "Ивановская область",
+      "old": "plyos",
+      "new": "ples"
+    },
+    {
+      "name": "Похвистнево",
+      "region": "Самарская область",
+      "old": "pokhvistnevo",
+      "new": "pohvistnevo"
+    },
+    {
+      "name": "Полярный",
+      "region": "Мурманская область",
+      "old": "polyarnyy",
+      "new": "polyarny"
+    },
+    {
+      "name": "Порхов",
+      "region": "Псковская область",
+      "old": "porkhov",
+      "new": "porhov"
+    },
+    {
+      "name": "Пошехонье",
+      "region": "Ярославская область",
+      "old": "poshekhone",
+      "new": "poshehone"
+    },
+    {
+      "name": "Приморско-Ахтарск",
+      "region": "Краснодарский край",
+      "old": "primorsko-akhtarsk",
+      "new": "primorsko-ahtarsk"
+    },
+    {
+      "name": "Прохладный",
+      "region": "Кабардино-Балкария",
+      "old": "prokhladnyy",
+      "new": "prohladny"
+    },
+    {
+      "name": "Пугачёв",
+      "region": "Саратовская область",
+      "old": "pugachyov",
+      "new": "pugachev"
+    },
+    {
+      "name": "Пущино",
+      "region": "Московская область",
+      "old": "pushchino",
+      "new": "puschino"
+    },
+    {
+      "name": "Пыть-Ях",
+      "region": "Ханты-Мансийский АО",
+      "old": "pyt-yakh",
+      "new": "pyt-yah"
+    },
+    {
+      "name": "Радужный",
+      "region": "Владимирская область",
+      "old": "raduzhnyy",
+      "new": "raduzhny"
+    },
+    {
+      "name": "Радужный",
+      "region": "Ханты-Мансийский АО",
+      "old": "raduzhnyy-khanty-mansiyskiy-ao",
+      "new": "raduzhny-hanty-mansiysky-ao"
+    },
+    {
+      "name": "Райчихинск",
+      "region": "Амурская область",
+      "old": "raychikhinsk",
+      "new": "raychihinsk"
+    },
+    {
+      "name": "Роза Хутор",
+      "region": "Краснодарский край",
+      "old": "roza-khutor",
+      "new": "roza-hutor"
+    },
+    {
+      "name": "Ртищево",
+      "region": "Саратовская область",
+      "old": "rtishchevo",
+      "new": "rtischevo"
+    },
+    {
+      "name": "Сахюрта",
+      "region": "Иркутская область",
+      "old": "sakhyurta",
+      "new": "sahyurta"
+    },
+    {
+      "name": "Салехард",
+      "region": "Ямало-Ненецкий АО",
+      "old": "salekhard",
+      "new": "salehard"
+    },
+    {
+      "name": "Санкт-Петербург",
+      "region": "Санкт-Петербург",
+      "old": "sankt-peterburg",
+      "new": "spb"
+    },
+    {
+      "name": "Семёнов",
+      "region": "Нижегородская область",
+      "old": "semyonov",
+      "new": "semenov"
+    },
+    {
+      "name": "Серпухов",
+      "region": "Московская область",
+      "old": "serpukhov",
+      "new": "serpuhov"
+    },
+    {
+      "name": "Шахты",
+      "region": "Ростовская область",
+      "old": "shakhty",
+      "new": "shahty"
+    },
+    {
+      "name": "Шахунья",
+      "region": "Нижегородская область",
+      "old": "shakhunya",
+      "new": "shahunya"
+    },
+    {
+      "name": "Щербинка",
+      "region": "Москва",
+      "old": "shcherbinka",
+      "new": "scherbinka"
+    },
+    {
+      "name": "Щигры",
+      "region": "Курская область",
+      "old": "shchigry",
+      "new": "schigry"
+    },
+    {
+      "name": "Щучье",
+      "region": "Курганская область",
+      "old": "shchuche",
+      "new": "schuche"
+    },
+    {
+      "name": "Щёкино",
+      "region": "Тульская область",
+      "old": "shchyokino",
+      "new": "schekino"
+    },
+    {
+      "name": "Щёлкино",
+      "region": "Крым",
+      "old": "shchyolkino",
+      "new": "schelkino"
+    },
+    {
+      "name": "Щёлково",
+      "region": "Московская область",
+      "old": "shchyolkovo",
+      "new": "schelkovo"
+    },
+    {
+      "name": "Шелехов",
+      "region": "Иркутская область",
+      "old": "shelekhov",
+      "new": "shelehov"
+    },
+    {
+      "name": "Шиханы",
+      "region": "Саратовская область",
+      "old": "shikhany",
+      "new": "shihany"
+    },
+    {
+      "name": "Шумиха",
+      "region": "Курганская область",
+      "old": "shumikha",
+      "new": "shumiha"
+    },
+    {
+      "name": "Соловецкий",
+      "region": "Архангельская область",
+      "old": "solovetskiy",
+      "new": "solovetsky"
+    },
+    {
+      "name": "Сосенский",
+      "region": "Калужская область",
+      "old": "sosenskiy",
+      "new": "sosensky"
+    },
+    {
+      "name": "Сосновый Бор",
+      "region": "Ленинградская область",
+      "old": "sosnovyy-bor",
+      "new": "sosnovy-bor"
+    },
+    {
+      "name": "Советский",
+      "region": "Ханты-Мансийский АО",
+      "old": "sovetskiy",
+      "new": "sovetsky"
+    },
+    {
+      "name": "Спасск-Дальний",
+      "region": "Приморский край",
+      "old": "spassk-dalniy",
+      "new": "spassk-dalny"
+    },
+    {
+      "name": "Спасск-Рязанский",
+      "region": "Рязанская область",
+      "old": "spassk-ryazanskiy",
+      "new": "spassk-ryazansky"
+    },
+    {
+      "name": "Старый Крым",
+      "region": "Крым",
+      "old": "staryy-krym",
+      "new": "stary-krym"
+    },
+    {
+      "name": "Старый Оскол",
+      "region": "Белгородская область",
+      "old": "staryy-oskol",
+      "new": "stary-oskol"
+    },
+    {
+      "name": "Сухиничи",
+      "region": "Калужская область",
+      "old": "sukhinichi",
+      "new": "suhinichi"
+    },
+    {
+      "name": "Сухой Лог",
+      "region": "Свердловская область",
+      "old": "sukhoy-log",
+      "new": "suhoy-log"
+    },
+    {
+      "name": "Сулакский каньон",
+      "region": "Республика Дагестан",
+      "old": "sulakskiy-kanyon",
+      "new": "sulaksky-kanyon"
+    },
+    {
+      "name": "Светлый",
+      "region": "Калининградская область",
+      "old": "svetlyy",
+      "new": "svetly"
+    },
+    {
+      "name": "Свободный",
+      "region": "Амурская область",
+      "old": "svobodnyy",
+      "new": "svobodny"
+    },
+    {
+      "name": "Сычёвка",
+      "region": "Смоленская область",
+      "old": "sychyovka",
+      "new": "sychevka"
+    },
+    {
+      "name": "Тихорецк",
+      "region": "Краснодарский край",
+      "old": "tikhoretsk",
+      "new": "tihoretsk"
+    },
+    {
+      "name": "Тихвин",
+      "region": "Ленинградская область",
+      "old": "tikhvin",
+      "new": "tihvin"
+    },
+    {
+      "name": "Тимашёвск",
+      "region": "Краснодарский край",
+      "old": "timashyovsk",
+      "new": "timashevsk"
+    },
+    {
+      "name": "Трёхгорный",
+      "region": "Челябинская область",
+      "old": "tryokhgornyy",
+      "new": "trehgorny"
+    },
+    {
+      "name": "Циолковский",
+      "region": "Амурская область",
+      "old": "tsiolkovskiy",
+      "new": "tsiolkovsky"
+    },
+    {
+      "name": "Удачный",
+      "region": "Якутия",
+      "old": "udachnyy",
+      "new": "udachny"
+    },
+    {
+      "name": "Ухта",
+      "region": "Коми",
+      "old": "ukhta",
+      "new": "uhta"
+    },
+    {
+      "name": "Великий Новгород",
+      "region": "Новгородская область",
+      "old": "velikiy-novgorod",
+      "new": "veliky-novgorod"
+    },
+    {
+      "name": "Великий Устюг",
+      "region": "Вологодская область",
+      "old": "velikiy-ustyug",
+      "new": "veliky-ustyug"
+    },
+    {
+      "name": "Венёв",
+      "region": "Тульская область",
+      "old": "venyov",
+      "new": "venev"
+    },
+    {
+      "name": "Верещагино",
+      "region": "Пермский край",
+      "old": "vereshchagino",
+      "new": "vereschagino"
+    },
+    {
+      "name": "Верхнеуральск",
+      "region": "Челябинская область",
+      "old": "verkhneuralsk",
+      "new": "verhneuralsk"
+    },
+    {
+      "name": "Верхний Фиагдон",
+      "region": "Республика Северная Осетия — Алания",
+      "old": "verkhniy-fiagdon",
+      "new": "verhny-fiagdon"
+    },
+    {
+      "name": "Верхний Тагил",
+      "region": "Свердловская область",
+      "old": "verkhniy-tagil",
+      "new": "verhny-tagil"
+    },
+    {
+      "name": "Верхний Уфалей",
+      "region": "Челябинская область",
+      "old": "verkhniy-ufaley",
+      "new": "verhny-ufaley"
+    },
+    {
+      "name": "Верхняя Балкария",
+      "region": "Кабардино-Балкарская Республика",
+      "old": "verkhnyaya-balkariya",
+      "new": "verhnyaya-balkariya"
+    },
+    {
+      "name": "Верхняя Пышма",
+      "region": "Свердловская область",
+      "old": "verkhnyaya-pyshma",
+      "new": "verhnyaya-pyshma"
+    },
+    {
+      "name": "Верхняя Салда",
+      "region": "Свердловская область",
+      "old": "verkhnyaya-salda",
+      "new": "verhnyaya-salda"
+    },
+    {
+      "name": "Верхняя Тура",
+      "region": "Свердловская область",
+      "old": "verkhnyaya-tura",
+      "new": "verhnyaya-tura"
+    },
+    {
+      "name": "Верхотурье",
+      "region": "Свердловская область",
+      "old": "verkhoture",
+      "new": "verhoture"
+    },
+    {
+      "name": "Верхоянск",
+      "region": "Якутия",
+      "old": "verkhoyansk",
+      "new": "verhoyansk"
+    },
+    {
+      "name": "Вихоревка",
+      "region": "Иркутская область",
+      "old": "vikhorevka",
+      "new": "vihorevka"
+    },
+    {
+      "name": "Волхов",
+      "region": "Ленинградская область",
+      "old": "volkhov",
+      "new": "volhov"
+    },
+    {
+      "name": "Волжский",
+      "region": "Волгоградская область",
+      "old": "volzhskiy",
+      "new": "volzhsky"
+    },
+    {
+      "name": "Вяземский",
+      "region": "Хабаровский край",
+      "old": "vyazemskiy",
+      "new": "vyazemsky"
+    },
+    {
+      "name": "Вышний Волочёк",
+      "region": "Тверская область",
+      "old": "vyshniy-volochyok",
+      "new": "vyshny-volochek"
+    },
+    {
+      "name": "Яхрома",
+      "region": "Московская область",
+      "old": "yakhroma",
+      "new": "yahroma"
+    },
+    {
+      "name": "Ясный",
+      "region": "Оренбургская область",
+      "old": "yasnyy",
+      "new": "yasny"
+    },
+    {
+      "name": "Юхнов",
+      "region": "Калужская область",
+      "old": "yukhnov",
+      "new": "yuhnov"
+    },
+    {
+      "name": "Юрьев-Польский",
+      "region": "Владимирская область",
+      "old": "yurev-polskiy",
+      "new": "yurev-polsky"
+    },
+    {
+      "name": "Южно-Сахалинск",
+      "region": "Сахалинская область",
+      "old": "yuzhno-sakhalinsk",
+      "new": "yuzhno-sahalinsk"
+    },
+    {
+      "name": "Южно-Сухокумск",
+      "region": "Дагестан",
+      "old": "yuzhno-sukhokumsk",
+      "new": "yuzhno-suhokumsk"
+    },
+    {
+      "name": "Заозёрный",
+      "region": "Красноярский край",
+      "old": "zaozyornyy",
+      "new": "zaozerny"
+    },
+    {
+      "name": "Заозёрск",
+      "region": "Мурманская область",
+      "old": "zaozyorsk",
+      "new": "zaozersk"
+    },
+    {
+      "name": "Заполярный",
+      "region": "Мурманская область",
+      "old": "zapolyarnyy",
+      "new": "zapolyarny"
+    },
+    {
+      "name": "Заречный",
+      "region": "Пензенская область",
+      "old": "zarechnyy",
+      "new": "zarechny"
+    },
+    {
+      "name": "Заречный",
+      "region": "Свердловская область",
+      "old": "zarechnyy-sverdlovskaya-oblast",
+      "new": "zarechny-sverdlovskaya-oblast"
+    },
+    {
+      "name": "Зелёная Поляна",
+      "region": "Республика Башкортостан",
+      "old": "zelyonaya-polyana",
+      "new": "zelenaya-polyana"
+    },
+    {
+      "name": "Железногорск-Илимский",
+      "region": "Иркутская область",
+      "old": "zheleznogorsk-ilimskiy",
+      "new": "zheleznogorsk-ilimsky"
+    },
+    {
+      "name": "Жемчужный",
+      "region": "Республика Хакасия",
+      "old": "zhemchuzhnyy",
+      "new": "zhemchuzhny"
+    },
+    {
+      "name": "Жигулёвск",
+      "region": "Самарская область",
+      "old": "zhigulyovsk",
+      "new": "zhigulevsk"
+    },
+    {
+      "name": "Жуковский",
+      "region": "Московская область",
+      "old": "zhukovskiy",
+      "new": "zhukovsky"
+    }
+  ],
+  "redirects": [
+    {
+      "old": "moskva-shcherbinka",
+      "new": "moskva-scherbinka"
+    },
+    {
+      "old": "khadzhokh",
+      "new": "hadzhoh"
+    }
+  ]
+}

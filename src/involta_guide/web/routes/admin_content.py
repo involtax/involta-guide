@@ -12,6 +12,7 @@ from starlette.datastructures import FormData
 
 from involta_guide.application.commands.schemas import LocationInput
 from involta_guide.domain.entities import Conflict, RuleViolation
+from involta_guide.domain.location_slug import location_slug
 from involta_guide.web.http import check_csrf, context, form_data, require_admin
 
 from .admin import key, log_redirect, render, uid
@@ -24,7 +25,7 @@ def number_param(request: Request, name: str = "page") -> int:
         raise HTTPException(400, "Некорректный номер страницы") from None
 
 
-def location_values(form: FormData) -> dict[str, Any]:
+def location_values(form: FormData, *, new: bool = False) -> dict[str, Any]:
     fields: dict[str, Any] = {
         name: key(form, name)
         for name in (
@@ -37,6 +38,8 @@ def location_values(form: FormData) -> dict[str, Any]:
             "coverage_note",
         )
     }
+    if new and not fields["slug"]:
+        fields["slug"] = location_slug(fields["name"])
     fields.update(
         parent_id=uid(key(form, "parent_id")) if key(form, "parent_id") else None,
         aliases=[v.strip() for v in key(form, "aliases").split(",") if v.strip()],
@@ -153,7 +156,7 @@ def routes(prefix: str) -> APIRouter:
         ctx = context(request)
         current = ctx.queries.admin_location(slug)["location"] if slug else None
         try:
-            values = location_values(form)
+            values = location_values(form, new=current is None)
             ctx.locations.save(current["id"] if current else None, values)
         except ValueError as exc:
             # Keep submitted values for correction, without persisting a partial update.
