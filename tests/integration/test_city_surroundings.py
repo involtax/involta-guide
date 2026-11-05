@@ -22,7 +22,8 @@ from .test_filling_top3 import shortlist
 from .test_jobs import setup
 
 SPEC = spec_from_file_location(
-    "city_surroundings", Path(__file__).resolve().parents[2] / "migrations/versions/city_surroundings.py"
+    "city_surroundings",
+    Path(__file__).resolve().parents[2] / "migrations/versions/city_surroundings.py",
 )
 assert SPEC and SPEC.loader
 CONTRACT = module_from_spec(SPEC)
