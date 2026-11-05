@@ -80,7 +80,8 @@ def test_legacy_real_response_reprocess_cleans_site_and_shows_partial_coverage(d
             assert "reset-and-fill" not in page.text
         assert requests == []
         assert raw == original and task(engine, job)["response_json"] == cached
-        assert len(queries.rows("restaurants")) == 2
+        assert len(queries.rows("restaurants", {"active": 1})) == 2
+        assert any(r["name"] == "Бояре" for r in queries.rows("restaurants", {"active": 0}))
         public = queries.location(location["id"])["content"]
         assert all("](" not in card["description"] for card in public["restaurants"])
         assert public["qualityReport"]["status"] == "partial"
