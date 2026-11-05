@@ -27,11 +27,10 @@ def settings(tmp_path):
 def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(tmp_path, engine):
     config = settings(tmp_path)
     names = ["Алхимист", "Огонёк", "Алхимист", "  Сыроварня  "]
-    plain = options(config, engine, "sherpa_plain", names)
-    biased = options(config, engine, "sherpa_hotwords", names)
-    assert {k: v for k, v in plain.items() if k not in ("variant", "dictionary")} == {
-        k: v for k, v in biased.items() if k not in ("variant", "dictionary")
-    }
+    biased = options(config, engine, "sherpa_hotwords_strong", names)
+    assert biased["hotwords_score"] == 5.5 and biased["max_active_paths"] == 8
+    with pytest.raises(ValueError):
+        options(config, engine, "sherpa_plain", names)
     assert biased["dictionary"] == [
         "Алхимист",
         "Огонёк",
@@ -40,8 +39,7 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
         "огонёк",
         "сыроварня",
     ]
-    assert plain["dictionary"] == []
-    assert plain["decoding_method"] == "modified_beam_search"
+    assert biased["decoding_method"] == "modified_beam_search"
     names.append("Не должно попасть в запрос")
     assert len(biased["dictionary"]) == 6
 
@@ -49,7 +47,9 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
 def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
     config = settings(tmp_path)
     with pytest.raises(ProviderFailure, match="prepare-model"):
-        LocalSherpa(config).call(options(config, "gigaam", "sherpa_plain", []), b"fixture")
+        LocalSherpa(config).call(
+            options(config, "gigaam", "sherpa_hotwords_strong", []), b"fixture"
+        )
 
 
 @pytest.mark.parametrize("variant", list(SHERPA_PROFILES))
@@ -162,4 +162,4 @@ def test_native_vocabulary_missing_or_corrupt_fails_before_runtime_import(tmp_pa
     if contents is not None:
         (root / VOCAB_FILE).write_bytes(contents)
     with pytest.raises(ProviderFailure, match="Родной словарь GigaAM не подготовлен"):
-        LocalSherpa(config).warmup(options(config, "gigaam", "sherpa_hotwords", ["Плёс"]))
+        LocalSherpa(config).warmup(options(config, "gigaam", "sherpa_hotwords_strong", ["Плёс"]))

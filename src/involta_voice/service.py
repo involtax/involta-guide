@@ -143,9 +143,16 @@ class VoiceService:
         submission = row(conn, "SELECT metadata FROM submissions WHERE reference=:id", id=reference)
         assert submission is not None
         frozen["location"] = submission["metadata"]["location"]
+        from .text import catalogue_forms
+
+        location = frozen["location"]
+        frozen["name_forms"] = catalogue_forms(
+            [location["name"], *location.get("recognition_dictionary", [])], city=location["name"]
+        )
+        frozen["name_normalization"] = "catalogue-inflections-v1"
         if frozen["asr_beta"]:
             from .sherpa import options as sherpa_options
-            from .variants import SHERPA_STAGES
+            from .variants import SHERPA_PROFILES, SHERPA_STAGES
 
             names = frozen["location"].get("recognition_dictionary", [])
             frozen["sherpa_models"] = {
@@ -153,6 +160,7 @@ class VoiceService:
                     self.settings, engine, variant, names, location_name=frozen["location"]["name"]
                 )
                 for kind, (engine, variant) in SHERPA_STAGES.items()
+                if variant in SHERPA_PROFILES
             }
         execute(
             conn,

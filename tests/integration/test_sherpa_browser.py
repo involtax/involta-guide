@@ -20,7 +20,7 @@ from .test_voice_service import voice_database as voice_database
 from .test_web import login
 
 
-def test_five_profiles_and_exact_dictionary_in_existing_admin_shell(database, voice_database):
+def test_single_profile_and_exact_dictionary_in_existing_admin_shell(database, voice_database):
     settings, engine, _, _, city, _, _ = setup(database)
     vs, ve = voice_database
     vs = vs.model_copy(update={"asr_beta_enabled": True})
@@ -44,7 +44,7 @@ def test_five_profiles_and_exact_dictionary_in_existing_admin_shell(database, vo
             proper = request.get("variant", "").startswith("sherpa_hotwords")
             body["body"] = json.dumps(
                 {
-                    "text": "иваново, плюс, иваново. ресторан алхимист."
+                    "text": "в иванове, плюс, из иванова. ресторан алхимист."
                     if proper
                     else "иваново, плюс, иваново.",
                     "is_fake": True,
@@ -53,7 +53,7 @@ def test_five_profiles_and_exact_dictionary_in_existing_admin_shell(database, vo
             return body
 
     worker = Worker(ve, vs, Demo())
-    assert all(worker.once() for _ in range(5))
+    assert all(worker.once() for _ in range(1))
     Consumer(engine, client_for(settings, vs)).once()
     app = create_app(settings)
     app.state.voice_client = client_for(settings, vs)
@@ -78,18 +78,22 @@ def test_five_profiles_and_exact_dictionary_in_existing_admin_shell(database, vo
 
             page.route("**/*", respond)
             page.goto("http://localhost/guide/admin/reviews/ivanovo")
-            expect(page.locator(".review-transcripts > div")).to_have_count(5)
+            expect(page.locator(".review-transcripts > div")).to_have_count(1)
             expect(page.locator(".review-transcripts")).not_to_contain_text("Parakeet")
-            expect(page.locator(".recognition-before")).to_contain_text("иваново, плюс, иваново")
-            expect(page.locator(".recognition-after")).to_contain_text("Иваново, плюс, Иваново")
+            expect(page.locator(".recognition-before")).to_contain_text(
+                "в иванове, плюс, из иванова"
+            )
+            expect(page.locator(".recognition-after")).to_contain_text(
+                "в Иванове, плюс, из Иванова"
+            )
             expect(page.locator(".recognition-after")).to_contain_text("Алхимист")
-            expect(page.get_by_text("Sherpa · текущие подсказки", exact=True)).to_have_count(1)
+            expect(page.get_by_text("Sherpa · сильные подсказки", exact=True)).to_have_count(1)
             expect(
                 page.get_by_text(
                     "Словарь: Алхимист · Иваново · Огонёк · Сыроварня · алхимист · иваново · огонёк · сыроварня",
                     exact=True,
                 )
-            ).to_have_count(4)
+            ).to_have_count(1)
             expect(page.get_by_role("button", name="Удалить отзыв", exact=False)).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             page.screenshot(path=str(folder / f"admin-{width}.png"), full_page=True)

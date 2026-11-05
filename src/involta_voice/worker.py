@@ -328,7 +328,9 @@ class Worker:
             if snapshot.get("restore_dictionary_case"):
                 location = snapshot["location"]
                 transcript = restore_names(
-                    transcript, [location["name"], *location.get("recognition_dictionary", [])]
+                    transcript,
+                    [location["name"], *location.get("recognition_dictionary", [])],
+                    forms=snapshot.get("name_forms"),
                 )
             execute(
                 conn,
