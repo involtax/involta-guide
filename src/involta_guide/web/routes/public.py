@@ -23,6 +23,8 @@ def routes(prefix: str) -> APIRouter:
     @router.get(prefix)
     def slash(request: Request) -> Response:
         target = context(request).settings.path("/")
+        if request.url.query:
+            target += "?" + request.url.query
         return RedirectResponse(
             target,
             status_code=302,

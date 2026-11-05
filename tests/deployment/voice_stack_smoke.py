@@ -112,6 +112,18 @@ try:
             except httpx.HTTPError:
                 pass
             time.sleep(1)
+        # Run the production HTTP contract against the real image, not fake curl.
+        run(
+            [
+                "env",
+                "NO_PROXY=127.0.0.1,localhost",
+                "bash",
+                "deploy/check-release.sh",
+                "http://127.0.0.1:33080/guide/",
+                env["RELEASE_SHA"],
+                "local",
+            ]
+        )
         identity = c.post(
             "/guide/voice/api/v1/identity",
             params={"location": "ivanovo"},
