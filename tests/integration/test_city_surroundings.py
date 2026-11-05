@@ -106,8 +106,10 @@ def test_countryside_competes_in_the_city_list_with_its_real_locality(
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
         prompt = requests[0]["input"][1]["content"]
-        assert CONTRACT.COVERAGE_NOTES[location_id] in prompt
-        assert name in prompt
+        assert location["coverage_note"] == ""
+        assert name not in prompt
+        assert "Семигор" not in prompt and "Кажма" not in prompt
+        assert "vinoterria.com" not in prompt and "zaonezhie.com" not in prompt
         assert "Только " + city not in prompt
         winners = queries.location(location_id)["content"]["restaurants"]
         assert [r["name"] for r in winners] == [name, "Кандидат 00", "Кандидат 02"]
@@ -203,7 +205,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
     before_catalogue = queries.rows("restaurants")
     before_reviews = queries.rows("reviews")
     assert before_catalogue and before_reviews
-    command.upgrade(config, "head")
+    command.upgrade(config, "city_surroundings")
     assert queries.setting("prompt") == CONTRACT.PROMPT
     assert (
         CONTRACT.PROMPT
@@ -228,7 +230,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
                 text("UPDATE jobs SET prompt='Ручное задание' WHERE id=:id"), {"id": pending["id"]}
             )
     # An already applied migration never overwrites subsequent admin edits.
-    command.upgrade(config, "head")
+    command.upgrade(config, "city_surroundings")
     command.downgrade(config, "location_ids")
     assert queries.setting("prompt") == ("Ручная правка" if manual_edits else original_prompt)
     assert queries.get("locations", 34)["coverage_note"] == (
