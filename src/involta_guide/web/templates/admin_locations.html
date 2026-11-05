@@ -44,9 +44,10 @@
 <form method="post" action="{{settings.path('/admin/locations') if new_location else settings.path('/admin/locations/'+original.slug)}}" class="stack">{{csrf()}}<input type="hidden" name="id" value="{{c.id if c else ''}}">
 {%for field,label in [('name','Название локации'),('region','Регион'),('slug','URL'),('in_phrase','Фраза «где поесть»')]%}
 <label>{{label}}<input name="{{field}}" value="{{c[field] if c and c[field] is not none else ''}}"
-{%if field not in ['parent_id']%}
+{%if field != 'slug' or not new_location%}
 required
 {%endif%}
+{%if field == 'slug' and new_location%}placeholder="Автоматически из названия"{%endif%}
 >
 </label>
 {%endfor%}

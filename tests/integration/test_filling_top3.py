@@ -129,6 +129,8 @@ def test_contract_violation_is_saved_without_publication_or_another_post(databas
 def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(database):
     settings, engine, _, queries, city, service, _ = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
+    # Keep current URL data while preparing the previous filling schema.
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     custom = "Авторский промпт до ограниченного исследования. " * 2
     with engine.begin() as connection:
@@ -168,6 +170,7 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
     assert queries.get("jobs", pending["id"])["prompt"] == actual
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
     assert task(engine, submitted)["request_json"] == recorded
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     with engine.connect() as connection:
         assert (

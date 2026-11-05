@@ -66,7 +66,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
             else:
                 field.press("ArrowDown")
                 field.press("Enter")
-            page.wait_for_url(origin + "/guide/plyos")
+            page.wait_for_url(origin + "/guide/ples")
             assert errors == []
             page.close()
         context = browser.new_context(java_script_enabled=False)

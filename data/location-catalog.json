@@ -172,7 +172,7 @@
     {
       "name": "Ачхой-Мартан",
       "region": "Чечня",
-      "slug": "achkhoy-martan",
+      "slug": "achhoy-martan",
       "population": 30739,
       "kind": "city",
       "parent_slug": null,
@@ -309,7 +309,7 @@
     {
       "name": "Ахтубинск",
       "region": "Астраханская область",
-      "slug": "akhtubinsk",
+      "slug": "ahtubinsk",
       "population": 35635,
       "kind": "city",
       "parent_slug": null,
@@ -330,7 +330,7 @@
     {
       "name": "Ахты",
       "region": "Республика Дагестан",
-      "slug": "akhty",
+      "slug": "ahty",
       "population": 1500,
       "kind": "settlement",
       "parent_slug": null,
@@ -386,7 +386,7 @@
       "slug": "aktash",
       "population": 600,
       "kind": "settlement",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": false,
       "in_phrase": "в Акташе",
       "aliases": [],
@@ -541,7 +541,7 @@
     {
       "name": "Александровск-Сахалинский",
       "region": "Сахалинская область",
-      "slug": "aleksandrovsk-sakhalinskiy",
+      "slug": "aleksandrovsk-sahalinsky",
       "population": 8854,
       "kind": "city",
       "parent_slug": null,
@@ -1056,7 +1056,7 @@
     {
       "name": "Архангельск",
       "region": "Архангельская область",
-      "slug": "arkhangelsk",
+      "slug": "arhangelsk",
       "population": 301199,
       "kind": "city",
       "parent_slug": null,
@@ -1077,7 +1077,7 @@
     {
       "name": "Архипо-Осиповка",
       "region": "Краснодарский край",
-      "slug": "arkhipo-osipovka",
+      "slug": "arhipo-osipovka",
       "population": 10000,
       "kind": "settlement",
       "parent_slug": null,
@@ -1109,7 +1109,7 @@
     {
       "name": "Архыз",
       "region": "Карачаево-Черкесская Республика",
-      "slug": "arkhyz",
+      "slug": "arhyz",
       "population": 1800,
       "kind": "settlement",
       "parent_slug": null,
@@ -1257,7 +1257,7 @@
     {
       "name": "Артём",
       "region": "Приморский край",
-      "slug": "artyom",
+      "slug": "artem",
       "population": 109556,
       "kind": "city",
       "parent_slug": null,
@@ -1278,7 +1278,7 @@
     {
       "name": "Артёмовск",
       "region": "Красноярский край",
-      "slug": "artyomovsk",
+      "slug": "artemovsk",
       "population": 1510,
       "kind": "city",
       "parent_slug": null,
@@ -1299,7 +1299,7 @@
     {
       "name": "Артёмовский",
       "region": "Свердловская область",
-      "slug": "artyomovskiy",
+      "slug": "artemovsky",
       "population": 28943,
       "kind": "city",
       "parent_slug": null,
@@ -1404,7 +1404,7 @@
     {
       "name": "Астрахань",
       "region": "Астраханская область",
-      "slug": "astrakhan",
+      "slug": "astrahan",
       "population": 475629,
       "kind": "city",
       "parent_slug": null,
@@ -1604,7 +1604,7 @@
     {
       "name": "Бахчисарай",
       "region": "Крым",
-      "slug": "bakhchisaray",
+      "slug": "bahchisaray",
       "population": 28609,
       "kind": "city",
       "parent_slug": null,
@@ -1667,7 +1667,7 @@
     {
       "name": "Балахна",
       "region": "Нижегородская область",
-      "slug": "balakhna",
+      "slug": "balahna",
       "population": 48569,
       "kind": "city",
       "parent_slug": null,
@@ -1730,7 +1730,7 @@
     {
       "name": "Балашиха",
       "region": "Московская область",
-      "slug": "balashikha",
+      "slug": "balashiha",
       "population": 520962,
       "kind": "city",
       "parent_slug": null,
@@ -2035,7 +2035,7 @@
     {
       "name": "Белая Холуница",
       "region": "Кировская область",
-      "slug": "belaya-kholunitsa",
+      "slug": "belaya-holunitsa",
       "population": 9659,
       "kind": "city",
       "parent_slug": null,
@@ -2098,7 +2098,7 @@
     {
       "name": "Белинский",
       "region": "Пензенская область",
-      "slug": "belinskiy",
+      "slug": "belinsky",
       "population": 8656,
       "kind": "city",
       "parent_slug": null,
@@ -2161,7 +2161,7 @@
     {
       "name": "Белокуриха",
       "region": "Алтайский край",
-      "slug": "belokurikha",
+      "slug": "belokuriha",
       "population": 14735,
       "kind": "city",
       "parent_slug": null,
@@ -2203,7 +2203,7 @@
     {
       "name": "Белоозёрский",
       "region": "Московская область",
-      "slug": "beloozyorskiy",
+      "slug": "beloozersky",
       "population": 13737,
       "kind": "city",
       "parent_slug": null,
@@ -2308,7 +2308,7 @@
     {
       "name": "Белоярский",
       "region": "Ханты-Мансийский АО",
-      "slug": "beloyarskiy",
+      "slug": "beloyarsky",
       "population": 19994,
       "kind": "city",
       "parent_slug": null,
@@ -2350,7 +2350,7 @@
     {
       "name": "Белёв",
       "region": "Тульская область",
-      "slug": "belyov",
+      "slug": "belev",
       "population": 12846,
       "kind": "city",
       "parent_slug": null,
@@ -2371,7 +2371,7 @@
     {
       "name": "Белый",
       "region": "Тверская область",
-      "slug": "belyy",
+      "slug": "bely",
       "population": 3125,
       "kind": "city",
       "parent_slug": null,
@@ -2434,7 +2434,7 @@
     {
       "name": "Берёзовский",
       "region": "Кемеровская область",
-      "slug": "beryozovskiy",
+      "slug": "berezovsky",
       "population": 44932,
       "kind": "city",
       "parent_slug": null,
@@ -2455,7 +2455,7 @@
     {
       "name": "Берёзовский",
       "region": "Свердловская область",
-      "slug": "beryozovskiy-sverdlovskaya-oblast",
+      "slug": "berezovsky-sverdlovskaya-oblast",
       "population": 59698,
       "kind": "city",
       "parent_slug": null,
@@ -2729,7 +2729,7 @@
     {
       "name": "Благодарный",
       "region": "Ставропольский край",
-      "slug": "blagodarnyy",
+      "slug": "blagodarny",
       "population": 30827,
       "kind": "city",
       "parent_slug": null,
@@ -2750,7 +2750,7 @@
     {
       "name": "Благовещенск",
       "region": "Амурская область",
-      "slug": "blagoveshchensk",
+      "slug": "blagoveschensk",
       "population": 241437,
       "kind": "city",
       "parent_slug": null,
@@ -2771,7 +2771,7 @@
     {
       "name": "Благовещенск",
       "region": "Башкортостан",
-      "slug": "blagoveshchensk-bashkortostan",
+      "slug": "blagoveschensk-bashkortostan",
       "population": 35481,
       "kind": "city",
       "parent_slug": null,
@@ -3013,7 +3013,7 @@
     {
       "name": "Болхов",
       "region": "Орловская область",
-      "slug": "bolkhov",
+      "slug": "bolhov",
       "population": 9495,
       "kind": "city",
       "parent_slug": null,
@@ -3055,7 +3055,7 @@
     {
       "name": "Болохово",
       "region": "Тульская область",
-      "slug": "bolokhovo",
+      "slug": "bolohovo",
       "population": 9339,
       "kind": "city",
       "parent_slug": null,
@@ -3371,7 +3371,7 @@
     {
       "name": "Будённовск",
       "region": "Ставропольский край",
-      "slug": "budyonnovsk",
+      "slug": "budennovsk",
       "population": 58103,
       "kind": "city",
       "parent_slug": null,
@@ -3602,7 +3602,7 @@
     {
       "name": "Чайковский",
       "region": "Пермский край",
-      "slug": "chaykovskiy",
+      "slug": "chaykovsky",
       "population": 75837,
       "kind": "city",
       "parent_slug": null,
@@ -3739,7 +3739,7 @@
     {
       "name": "Чехов",
       "region": "Московская область",
-      "slug": "chekhov",
+      "slug": "chehov",
       "population": 89025,
       "kind": "city",
       "parent_slug": null,
@@ -3834,7 +3834,7 @@
     {
       "name": "Черемхово",
       "region": "Иркутская область",
-      "slug": "cheremkhovo",
+      "slug": "cheremhovo",
       "population": 53958,
       "kind": "city",
       "parent_slug": null,
@@ -3981,7 +3981,7 @@
     {
       "name": "Черняховск",
       "region": "Калининградская область",
-      "slug": "chernyakhovsk",
+      "slug": "chernyahovsk",
       "population": 36128,
       "kind": "city",
       "parent_slug": null,
@@ -4005,7 +4005,7 @@
       "slug": "chirkey",
       "population": 1300,
       "kind": "settlement",
-      "parent_slug": "sulakskiy-kanyon",
+      "parent_slug": "sulaksky-kanyon",
       "is_hub": false,
       "in_phrase": "в Чиркее",
       "aliases": [],
@@ -4097,7 +4097,7 @@
     {
       "name": "Чох",
       "region": "Республика Дагестан",
-      "slug": "chokh",
+      "slug": "choh",
       "population": 50,
       "kind": "settlement",
       "parent_slug": null,
@@ -4150,7 +4150,7 @@
     {
       "name": "Чухлома",
       "region": "Костромская область",
-      "slug": "chukhloma",
+      "slug": "chuhloma",
       "population": 4252,
       "kind": "city",
       "parent_slug": null,
@@ -4213,7 +4213,7 @@
     {
       "name": "Чёрмоз",
       "region": "Пермский край",
-      "slug": "chyormoz",
+      "slug": "chermoz",
       "population": 3044,
       "kind": "city",
       "parent_slug": null,
@@ -4287,7 +4287,7 @@
     {
       "name": "Даховская",
       "region": "Республика Адыгея",
-      "slug": "dakhovskaya",
+      "slug": "dahovskaya",
       "population": 250,
       "kind": "settlement",
       "parent_slug": null,
@@ -4814,7 +4814,7 @@
     {
       "name": "Долгопрудный",
       "region": "Московская область",
-      "slug": "dolgoprudnyy",
+      "slug": "dolgoprudny",
       "population": 120907,
       "kind": "city",
       "parent_slug": null,
@@ -4838,7 +4838,7 @@
       "slug": "dolina-katuni",
       "population": null,
       "kind": "tourist_area",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": true,
       "in_phrase": "на Катуни",
       "aliases": [
@@ -5030,7 +5030,7 @@
       "slug": "dubki",
       "population": 750,
       "kind": "settlement",
-      "parent_slug": "sulakskiy-kanyon",
+      "parent_slug": "sulaksky-kanyon",
       "is_hub": false,
       "in_phrase": "в Дубке",
       "aliases": [],
@@ -5122,7 +5122,7 @@
     {
       "name": "Духовщина",
       "region": "Смоленская область",
-      "slug": "dukhovshchina",
+      "slug": "duhovschina",
       "population": 3990,
       "kind": "city",
       "parent_slug": null,
@@ -5206,7 +5206,7 @@
     {
       "name": "Дзержинский",
       "region": "Московская область",
-      "slug": "dzerzhinskiy",
+      "slug": "dzerzhinsky",
       "population": 57918,
       "kind": "city",
       "parent_slug": null,
@@ -5979,7 +5979,7 @@
     {
       "name": "Фокино",
       "region": "Приморский край",
-      "slug": "fokino-primorskiy-kray",
+      "slug": "fokino-primorsky-kray",
       "population": 19711,
       "kind": "city",
       "parent_slug": null,
@@ -6533,7 +6533,7 @@
     {
       "name": "Горный Алтай",
       "region": "Республика Алтай",
-      "slug": "gornyy-altay",
+      "slug": "gorny-altay",
       "population": null,
       "kind": "destination",
       "parent_slug": null,
@@ -6575,7 +6575,7 @@
     {
       "name": "Городище",
       "region": "Пензенская область",
-      "slug": "gorodishche",
+      "slug": "gorodische",
       "population": 7796,
       "kind": "city",
       "parent_slug": null,
@@ -6617,7 +6617,7 @@
     {
       "name": "Гороховец",
       "region": "Владимирская область",
-      "slug": "gorokhovets",
+      "slug": "gorohovets",
       "population": 12666,
       "kind": "city",
       "parent_slug": null,
@@ -6670,7 +6670,7 @@
     {
       "name": "Горячий Ключ",
       "region": "Краснодарский край",
-      "slug": "goryachiy-klyuch",
+      "slug": "goryachy-klyuch",
       "population": 40903,
       "kind": "city",
       "parent_slug": null,
@@ -6733,7 +6733,7 @@
     {
       "name": "Грозный",
       "region": "Чечня",
-      "slug": "groznyy",
+      "slug": "grozny",
       "population": 328533,
       "kind": "city",
       "parent_slug": null,
@@ -6828,7 +6828,7 @@
     {
       "name": "Губаха",
       "region": "Пермский край",
-      "slug": "gubakha",
+      "slug": "gubaha",
       "population": 23397,
       "kind": "city",
       "parent_slug": null,
@@ -6870,7 +6870,7 @@
     {
       "name": "Губкинский",
       "region": "Ямало-Ненецкий АО",
-      "slug": "gubkinskiy",
+      "slug": "gubkinsky",
       "population": 33273,
       "kind": "city",
       "parent_slug": null,
@@ -7060,7 +7060,7 @@
     {
       "name": "Гусь-Хрустальный",
       "region": "Владимирская область",
-      "slug": "gus-khrustalnyy",
+      "slug": "gus-hrustalny",
       "population": 51552,
       "kind": "city",
       "parent_slug": null,
@@ -7102,7 +7102,7 @@
     {
       "name": "Гусиноозёрск",
       "region": "Бурятия",
-      "slug": "gusinoozyorsk",
+      "slug": "gusinoozersk",
       "population": 24451,
       "kind": "city",
       "parent_slug": null,
@@ -7197,7 +7197,7 @@
     {
       "name": "Иланский",
       "region": "Красноярский край",
-      "slug": "ilanskiy",
+      "slug": "ilansky",
       "population": 15945,
       "kind": "city",
       "parent_slug": null,
@@ -7250,7 +7250,7 @@
     {
       "name": "Имеретинский курорт",
       "region": "Федеральная территория Сириус",
-      "slug": "imeretinskiy-kurort",
+      "slug": "imeretinsky-kurort",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": "sirius",
@@ -7745,7 +7745,7 @@
     {
       "name": "Изобильный",
       "region": "Ставропольский край",
-      "slug": "izobilnyy",
+      "slug": "izobilny",
       "population": 38614,
       "kind": "city",
       "parent_slug": null,
@@ -8092,7 +8092,7 @@
     {
       "name": "Каменномостский",
       "region": "Республика Адыгея",
-      "slug": "kamennomostskiy",
+      "slug": "kamennomostsky",
       "population": 800,
       "kind": "settlement",
       "parent_slug": null,
@@ -8126,7 +8126,7 @@
     {
       "name": "Каменск-Шахтинский",
       "region": "Ростовская область",
-      "slug": "kamensk-shakhtinskiy",
+      "slug": "kamensk-shahtinsky",
       "population": 86365,
       "kind": "city",
       "parent_slug": null,
@@ -8147,7 +8147,7 @@
     {
       "name": "Каменск-Уральский",
       "region": "Свердловская область",
-      "slug": "kamensk-uralskiy",
+      "slug": "kamensk-uralsky",
       "population": 164192,
       "kind": "city",
       "parent_slug": null,
@@ -8420,7 +8420,7 @@
     {
       "name": "Карадах",
       "region": "Республика Дагестан",
-      "slug": "karadakh",
+      "slug": "karadah",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": null,
@@ -8757,7 +8757,7 @@
     {
       "name": "Кедровый",
       "region": "Томская область",
-      "slug": "kedrovyy",
+      "slug": "kedrovy",
       "population": 1818,
       "kind": "city",
       "parent_slug": null,
@@ -8873,7 +8873,7 @@
     {
       "name": "Хабаровск",
       "region": "Хабаровский край",
-      "slug": "khabarovsk",
+      "slug": "habarovsk",
       "population": 617441,
       "kind": "city",
       "parent_slug": null,
@@ -8894,7 +8894,7 @@
     {
       "name": "Хадыженск",
       "region": "Краснодарский край",
-      "slug": "khadyzhensk",
+      "slug": "hadyzhensk",
       "population": 22094,
       "kind": "city",
       "parent_slug": null,
@@ -8915,7 +8915,7 @@
     {
       "name": "Хамышки",
       "region": "Республика Адыгея",
-      "slug": "khamyshki",
+      "slug": "hamyshki",
       "population": 550,
       "kind": "settlement",
       "parent_slug": null,
@@ -8947,7 +8947,7 @@
     {
       "name": "Ханты-Мансийск",
       "region": "Ханты-Мансийский АО",
-      "slug": "khanty-mansiysk",
+      "slug": "hanty-mansiysk",
       "population": 107473,
       "kind": "city",
       "parent_slug": null,
@@ -8968,7 +8968,7 @@
     {
       "name": "Харабали",
       "region": "Астраханская область",
-      "slug": "kharabali",
+      "slug": "harabali",
       "population": 18514,
       "kind": "city",
       "parent_slug": null,
@@ -8989,7 +8989,7 @@
     {
       "name": "Харовск",
       "region": "Вологодская область",
-      "slug": "kharovsk",
+      "slug": "harovsk",
       "population": 8389,
       "kind": "city",
       "parent_slug": null,
@@ -9010,7 +9010,7 @@
     {
       "name": "Хасавюрт",
       "region": "Дагестан",
-      "slug": "khasavyurt",
+      "slug": "hasavyurt",
       "population": 155144,
       "kind": "city",
       "parent_slug": null,
@@ -9031,7 +9031,7 @@
     {
       "name": "Хилок",
       "region": "Забайкальский край",
-      "slug": "khilok",
+      "slug": "hilok",
       "population": 9948,
       "kind": "city",
       "parent_slug": null,
@@ -9052,7 +9052,7 @@
     {
       "name": "Химки",
       "region": "Московская область",
-      "slug": "khimki",
+      "slug": "himki",
       "population": 257128,
       "kind": "city",
       "parent_slug": null,
@@ -9073,7 +9073,7 @@
     {
       "name": "Холм",
       "region": "Новгородская область",
-      "slug": "kholm",
+      "slug": "holm",
       "population": 3214,
       "kind": "city",
       "parent_slug": null,
@@ -9094,7 +9094,7 @@
     {
       "name": "Холмск",
       "region": "Сахалинская область",
-      "slug": "kholmsk",
+      "slug": "holmsk",
       "population": 25677,
       "kind": "city",
       "parent_slug": null,
@@ -9115,7 +9115,7 @@
     {
       "name": "Холуй",
       "region": "Ивановская область",
-      "slug": "kholuy",
+      "slug": "holuy",
       "population": 850,
       "kind": "settlement",
       "parent_slug": null,
@@ -9147,7 +9147,7 @@
     {
       "name": "Хоста",
       "region": "Краснодарский край",
-      "slug": "khosta",
+      "slug": "hosta",
       "population": 21000,
       "kind": "settlement",
       "parent_slug": "sochi",
@@ -9179,7 +9179,7 @@
     {
       "name": "Хотьково",
       "region": "Московская область",
-      "slug": "khotkovo",
+      "slug": "hotkovo",
       "population": 20466,
       "kind": "city",
       "parent_slug": null,
@@ -9200,7 +9200,7 @@
     {
       "name": "Хунзах",
       "region": "Республика Дагестан",
-      "slug": "khunzakh",
+      "slug": "hunzah",
       "population": 800,
       "kind": "settlement",
       "parent_slug": null,
@@ -9232,10 +9232,10 @@
     {
       "name": "Хужир",
       "region": "Иркутская область",
-      "slug": "khuzhir",
+      "slug": "huzhir",
       "population": 4500,
       "kind": "settlement",
-      "parent_slug": "olkhon",
+      "parent_slug": "olhon",
       "is_hub": false,
       "in_phrase": "в Хужире",
       "aliases": [],
@@ -9264,7 +9264,7 @@
     {
       "name": "Хвалынск",
       "region": "Саратовская область",
-      "slug": "khvalynsk",
+      "slug": "hvalynsk",
       "population": 12042,
       "kind": "city",
       "parent_slug": null,
@@ -9727,7 +9727,7 @@
     {
       "name": "Киселёвск",
       "region": "Кемеровская область",
-      "slug": "kiselyovsk",
+      "slug": "kiselevsk",
       "population": 83431,
       "kind": "city",
       "parent_slug": null,
@@ -9969,7 +9969,7 @@
     {
       "name": "Кохма",
       "region": "Ивановская область",
-      "slug": "kokhma",
+      "slug": "kohma",
       "population": 30940,
       "kind": "city",
       "parent_slug": null,
@@ -10506,7 +10506,7 @@
     {
       "name": "Королёв",
       "region": "Московская область",
-      "slug": "korolyov",
+      "slug": "korolev",
       "population": 228095,
       "kind": "city",
       "parent_slug": null,
@@ -10572,7 +10572,7 @@
       "slug": "kosh-agach",
       "population": 300,
       "kind": "settlement",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": false,
       "in_phrase": "в Коше-Агаче",
       "aliases": [],
@@ -10601,7 +10601,7 @@
     {
       "name": "Костерёво",
       "region": "Владимирская область",
-      "slug": "kosteryovo",
+      "slug": "kosterevo",
       "population": 7113,
       "kind": "city",
       "parent_slug": null,
@@ -11428,7 +11428,7 @@
     {
       "name": "Красный Холм",
       "region": "Тверская область",
-      "slug": "krasnyy-kholm",
+      "slug": "krasny-holm",
       "population": 4998,
       "kind": "city",
       "parent_slug": null,
@@ -11449,7 +11449,7 @@
     {
       "name": "Красный Кут",
       "region": "Саратовская область",
-      "slug": "krasnyy-kut",
+      "slug": "krasny-kut",
       "population": 14296,
       "kind": "city",
       "parent_slug": null,
@@ -11470,7 +11470,7 @@
     {
       "name": "Красный Сулин",
       "region": "Ростовская область",
-      "slug": "krasnyy-sulin",
+      "slug": "krasny-sulin",
       "population": 35697,
       "kind": "city",
       "parent_slug": null,
@@ -11491,7 +11491,7 @@
     {
       "name": "Кремёнки",
       "region": "Калужская область",
-      "slug": "kremyonki",
+      "slug": "kremenki",
       "population": 11745,
       "kind": "city",
       "parent_slug": null,
@@ -12207,7 +12207,7 @@
     {
       "name": "Кяхта",
       "region": "Бурятия",
-      "slug": "kyakhta",
+      "slug": "kyahta",
       "population": 17877,
       "kind": "city",
       "parent_slug": null,
@@ -12375,7 +12375,7 @@
     {
       "name": "Лахденпохья",
       "region": "Карелия",
-      "slug": "lakhdenpokhya",
+      "slug": "lahdenpohya",
       "population": 5952,
       "kind": "city",
       "parent_slug": null,
@@ -12533,7 +12533,7 @@
     {
       "name": "Ленинск-Кузнецкий",
       "region": "Кемеровская область",
-      "slug": "leninsk-kuznetskiy",
+      "slug": "leninsk-kuznetsky",
       "population": 92244,
       "kind": "city",
       "parent_slug": null,
@@ -12680,7 +12680,7 @@
     {
       "name": "Лихославль",
       "region": "Тверская область",
-      "slug": "likhoslavl",
+      "slug": "lihoslavl",
       "population": 11017,
       "kind": "city",
       "parent_slug": null,
@@ -12701,7 +12701,7 @@
     {
       "name": "Ликино-Дулёво",
       "region": "Московская область",
-      "slug": "likino-dulyovo",
+      "slug": "likino-dulevo",
       "population": 34191,
       "kind": "city",
       "parent_slug": null,
@@ -12965,7 +12965,7 @@
     {
       "name": "Лосино-Петровский",
       "region": "Московская область",
-      "slug": "losino-petrovskiy",
+      "slug": "losino-petrovsky",
       "population": 29000,
       "kind": "city",
       "parent_slug": null,
@@ -13039,7 +13039,7 @@
     {
       "name": "Лух",
       "region": "Ивановская область",
-      "slug": "lukh",
+      "slug": "luh",
       "population": 1700,
       "kind": "settlement",
       "parent_slug": null,
@@ -13071,7 +13071,7 @@
     {
       "name": "Луховицы",
       "region": "Московская область",
-      "slug": "lukhovitsy",
+      "slug": "luhovitsy",
       "population": 29889,
       "kind": "city",
       "parent_slug": null,
@@ -13407,7 +13407,7 @@
     {
       "name": "Махачкала",
       "region": "Дагестан",
-      "slug": "makhachkala",
+      "slug": "mahachkala",
       "population": 623254,
       "kind": "city",
       "parent_slug": null,
@@ -13428,7 +13428,7 @@
     {
       "name": "Максимиха",
       "region": "Республика Бурятия",
-      "slug": "maksimikha",
+      "slug": "maksimiha",
       "population": 2500,
       "kind": "settlement",
       "parent_slug": "baykal",
@@ -13576,7 +13576,7 @@
     {
       "name": "Малоархангельск",
       "region": "Орловская область",
-      "slug": "maloarkhangelsk",
+      "slug": "maloarhangelsk",
       "population": 3609,
       "kind": "city",
       "parent_slug": null,
@@ -13787,7 +13787,7 @@
     {
       "name": "Мариинский Посад",
       "region": "Чувашия",
-      "slug": "mariinskiy-posad",
+      "slug": "mariinsky-posad",
       "population": 7851,
       "kind": "city",
       "parent_slug": null,
@@ -13914,7 +13914,7 @@
     {
       "name": "Майский",
       "region": "Кабардино-Балкария",
-      "slug": "mayskiy",
+      "slug": "maysky",
       "population": 26632,
       "kind": "city",
       "parent_slug": null,
@@ -14135,7 +14135,7 @@
     {
       "name": "Мещовск",
       "region": "Калужская область",
-      "slug": "meshchovsk",
+      "slug": "meschovsk",
       "population": 3810,
       "kind": "city",
       "parent_slug": null,
@@ -14346,7 +14346,7 @@
     {
       "name": "Михайлов",
       "region": "Рязанская область",
-      "slug": "mikhaylov",
+      "slug": "mihaylov",
       "population": 10303,
       "kind": "city",
       "parent_slug": null,
@@ -14367,7 +14367,7 @@
     {
       "name": "Михайловка",
       "region": "Волгоградская область",
-      "slug": "mikhaylovka",
+      "slug": "mihaylovka",
       "population": 56031,
       "kind": "city",
       "parent_slug": null,
@@ -14388,7 +14388,7 @@
     {
       "name": "Михайловск",
       "region": "Свердловская область",
-      "slug": "mikhaylovsk",
+      "slug": "mihaylovsk",
       "population": 9756,
       "kind": "city",
       "parent_slug": null,
@@ -14409,7 +14409,7 @@
     {
       "name": "Михайловск",
       "region": "Ставропольский край",
-      "slug": "mikhaylovsk-stavropolskiy-kray",
+      "slug": "mihaylovsk-stavropolsky-kray",
       "population": 114133,
       "kind": "city",
       "parent_slug": null,
@@ -14430,7 +14430,7 @@
     {
       "name": "Михайловское",
       "region": "Псковская область",
-      "slug": "mikhaylovskoe",
+      "slug": "mihaylovskoe",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": null,
@@ -14567,7 +14567,7 @@
     {
       "name": "Мирный",
       "region": "Архангельская область",
-      "slug": "mirnyy",
+      "slug": "mirny",
       "population": 27262,
       "kind": "city",
       "parent_slug": null,
@@ -14588,7 +14588,7 @@
     {
       "name": "Мирный",
       "region": "Якутия",
-      "slug": "mirnyy-yakutiya",
+      "slug": "mirny-yakutiya",
       "population": 34045,
       "kind": "city",
       "parent_slug": null,
@@ -14609,7 +14609,7 @@
     {
       "name": "Мисхор",
       "region": "Республика Крым",
-      "slug": "miskhor",
+      "slug": "mishor",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": "koreiz",
@@ -14778,7 +14778,7 @@
     {
       "name": "Московский",
       "region": "Москва",
-      "slug": "moskovskiy",
+      "slug": "moskovsky",
       "population": 65417,
       "kind": "city",
       "parent_slug": "moskva",
@@ -14846,7 +14846,7 @@
     {
       "name": "Академический",
       "region": "Москва",
-      "slug": "moskva-akademicheskiy",
+      "slug": "moskva-akademichesky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -14872,7 +14872,7 @@
     {
       "name": "Алексеевский",
       "region": "Москва",
-      "slug": "moskva-alekseevskiy",
+      "slug": "moskva-alekseevsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -14898,7 +14898,7 @@
     {
       "name": "Алтуфьевский",
       "region": "Москва",
-      "slug": "moskva-altufevskiy",
+      "slug": "moskva-altufevsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -14953,7 +14953,7 @@
     {
       "name": "Бабушкинский",
       "region": "Москва",
-      "slug": "moskva-babushkinskiy",
+      "slug": "moskva-babushkinsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -14979,7 +14979,7 @@
     {
       "name": "Басманный",
       "region": "Москва",
-      "slug": "moskva-basmannyy",
+      "slug": "moskva-basmanny",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15085,7 +15085,7 @@
     {
       "name": "Бескудниковский",
       "region": "Москва",
-      "slug": "moskva-beskudnikovskiy",
+      "slug": "moskva-beskudnikovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15137,7 +15137,7 @@
     {
       "name": "Бирюлёво Восточное",
       "region": "Москва",
-      "slug": "moskva-biryulyovo-vostochnoe",
+      "slug": "moskva-biryulevo-vostochnoe",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15163,7 +15163,7 @@
     {
       "name": "Бирюлёво Западное",
       "region": "Москва",
-      "slug": "moskva-biryulyovo-zapadnoe",
+      "slug": "moskva-biryulevo-zapadnoe",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15241,7 +15241,7 @@
     {
       "name": "Бутырский",
       "region": "Москва",
-      "slug": "moskva-butyrskiy",
+      "slug": "moskva-butyrsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15345,7 +15345,7 @@
     {
       "name": "Черёмушки",
       "region": "Москва",
-      "slug": "moskva-cheryomushki",
+      "slug": "moskva-cheremushki",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15424,7 +15424,7 @@
     {
       "name": "Даниловский",
       "region": "Москва",
-      "slug": "moskva-danilovskiy",
+      "slug": "moskva-danilovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15452,7 +15452,7 @@
     {
       "name": "Дмитровский",
       "region": "Москва",
-      "slug": "moskva-dmitrovskiy",
+      "slug": "moskva-dmitrovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15556,7 +15556,7 @@
     {
       "name": "Филимонковский",
       "region": "Москва",
-      "slug": "moskva-filimonkovskiy",
+      "slug": "moskva-filimonkovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15582,7 +15582,7 @@
     {
       "name": "Филёвский Парк",
       "region": "Москва",
-      "slug": "moskva-filyovskiy-park",
+      "slug": "moskva-filevsky-park",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15608,7 +15608,7 @@
     {
       "name": "Гагаринский",
       "region": "Москва",
-      "slug": "moskva-gagarinskiy",
+      "slug": "moskva-gagarinsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15634,7 +15634,7 @@
     {
       "name": "Головинский",
       "region": "Москва",
-      "slug": "moskva-golovinskiy",
+      "slug": "moskva-golovinsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15764,7 +15764,7 @@
     {
       "name": "Хамовники",
       "region": "Москва",
-      "slug": "moskva-khamovniki",
+      "slug": "moskva-hamovniki",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15790,7 +15790,7 @@
     {
       "name": "Хорошёво-Мнёвники",
       "region": "Москва",
-      "slug": "moskva-khoroshyovo-mnyovniki",
+      "slug": "moskva-horoshevo-mnevniki",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15816,7 +15816,7 @@
     {
       "name": "Хорошёвский",
       "region": "Москва",
-      "slug": "moskva-khoroshyovskiy",
+      "slug": "moskva-horoshevsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15842,7 +15842,7 @@
     {
       "name": "Ховрино",
       "region": "Москва",
-      "slug": "moskva-khovrino",
+      "slug": "moskva-hovrino",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -15972,7 +15972,7 @@
     {
       "name": "Косино-Ухтомский",
       "region": "Москва",
-      "slug": "moskva-kosino-ukhtomskiy",
+      "slug": "moskva-kosino-uhtomsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16024,7 +16024,7 @@
     {
       "name": "Краснопахорский",
       "region": "Москва",
-      "slug": "moskva-krasnopakhorskiy",
+      "slug": "moskva-krasnopahorsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16050,7 +16050,7 @@
     {
       "name": "Красносельский",
       "region": "Москва",
-      "slug": "moskva-krasnoselskiy",
+      "slug": "moskva-krasnoselsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16076,7 +16076,7 @@
     {
       "name": "Красный Октябрь",
       "region": "Москва",
-      "slug": "moskva-krasnyy-oktyabr",
+      "slug": "moskva-krasny-oktyabr",
       "population": null,
       "kind": "neighbourhood",
       "parent_slug": "moskva",
@@ -16258,7 +16258,7 @@
     {
       "name": "Левобережный",
       "region": "Москва",
-      "slug": "moskva-levoberezhnyy",
+      "slug": "moskva-levoberezhny",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16310,7 +16310,7 @@
     {
       "name": "Ломоносовский",
       "region": "Москва",
-      "slug": "moskva-lomonosovskiy",
+      "slug": "moskva-lomonosovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16336,7 +16336,7 @@
     {
       "name": "Лосиноостровский",
       "region": "Москва",
-      "slug": "moskva-losinoostrovskiy",
+      "slug": "moskva-losinoostrovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16414,7 +16414,7 @@
     {
       "name": "Марьина Роща",
       "region": "Москва",
-      "slug": "moskva-marina-roshcha",
+      "slug": "moskva-marina-roscha",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16492,7 +16492,7 @@
     {
       "name": "Мещанский",
       "region": "Москва",
-      "slug": "moskva-meshchanskiy",
+      "slug": "moskva-meschansky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16570,7 +16570,7 @@
     {
       "name": "Молжаниновский",
       "region": "Москва",
-      "slug": "moskva-molzhaninovskiy",
+      "slug": "moskva-molzhaninovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16622,7 +16622,7 @@
     {
       "name": "Можайский",
       "region": "Москва",
-      "slug": "moskva-mozhayskiy",
+      "slug": "moskva-mozhaysky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16700,7 +16700,7 @@
     {
       "name": "Нагатинский Затон",
       "region": "Москва",
-      "slug": "moskva-nagatinskiy-zaton",
+      "slug": "moskva-nagatinsky-zaton",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16726,7 +16726,7 @@
     {
       "name": "Нагорный",
       "region": "Москва",
-      "slug": "moskva-nagornyy",
+      "slug": "moskva-nagorny",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16778,7 +16778,7 @@
     {
       "name": "Нижегородский",
       "region": "Москва",
-      "slug": "moskva-nizhegorodskiy",
+      "slug": "moskva-nizhegorodsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16882,7 +16882,7 @@
     {
       "name": "Обручевский",
       "region": "Москва",
-      "slug": "moskva-obruchevskiy",
+      "slug": "moskva-obruchevsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16934,7 +16934,7 @@
     {
       "name": "Орехово-Борисово Северное",
       "region": "Москва",
-      "slug": "moskva-orekhovo-borisovo-severnoe",
+      "slug": "moskva-orehovo-borisovo-severnoe",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16960,7 +16960,7 @@
     {
       "name": "Орехово-Борисово Южное",
       "region": "Москва",
-      "slug": "moskva-orekhovo-borisovo-yuzhnoe",
+      "slug": "moskva-orehovo-borisovo-yuzhnoe",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -16986,7 +16986,7 @@
     {
       "name": "Останкинский",
       "region": "Москва",
-      "slug": "moskva-ostankinskiy",
+      "slug": "moskva-ostankinsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17297,7 +17297,7 @@
     {
       "name": "Пресненский",
       "region": "Москва",
-      "slug": "moskva-presnenskiy",
+      "slug": "moskva-presnensky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17401,7 +17401,7 @@
     {
       "name": "Рязанский",
       "region": "Москва",
-      "slug": "moskva-ryazanskiy",
+      "slug": "moskva-ryazansky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17427,7 +17427,7 @@
     {
       "name": "Савёлки",
       "region": "Москва",
-      "slug": "moskva-savyolki",
+      "slug": "moskva-savelki",
       "population": null,
       "kind": "district",
       "parent_slug": "zelenograd",
@@ -17453,7 +17453,7 @@
     {
       "name": "Савёловский",
       "region": "Москва",
-      "slug": "moskva-savyolovskiy",
+      "slug": "moskva-savelovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17583,7 +17583,7 @@
     {
       "name": "Северный",
       "region": "Москва",
-      "slug": "moskva-severnyy",
+      "slug": "moskva-severny",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17609,7 +17609,7 @@
     {
       "name": "Щукино",
       "region": "Москва",
-      "slug": "moskva-shchukino",
+      "slug": "moskva-schukino",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17893,7 +17893,7 @@
     {
       "name": "Таганский",
       "region": "Москва",
-      "slug": "moskva-taganskiy",
+      "slug": "moskva-tagansky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17919,7 +17919,7 @@
     {
       "name": "Текстильщики",
       "region": "Москва",
-      "slug": "moskva-tekstilshchiki",
+      "slug": "moskva-tekstilschiki",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17945,7 +17945,7 @@
     {
       "name": "Тимирязевский",
       "region": "Москва",
-      "slug": "moskva-timiryazevskiy",
+      "slug": "moskva-timiryazevsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -17971,7 +17971,7 @@
     {
       "name": "Тропарёво-Никулино",
       "region": "Москва",
-      "slug": "moskva-troparyovo-nikulino",
+      "slug": "moskva-troparevo-nikulino",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18101,7 +18101,7 @@
     {
       "name": "Тёплый Стан",
       "region": "Москва",
-      "slug": "moskva-tyoplyy-stan",
+      "slug": "moskva-teply-stan",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18257,7 +18257,7 @@
     {
       "name": "Восточный",
       "region": "Москва",
-      "slug": "moskva-vostochnyy",
+      "slug": "moskva-vostochny",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18283,7 +18283,7 @@
     {
       "name": "Войковский",
       "region": "Москва",
-      "slug": "moskva-voykovskiy",
+      "slug": "moskva-voykovsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18309,7 +18309,7 @@
     {
       "name": "Выхино-Жулебино",
       "region": "Москва",
-      "slug": "moskva-vykhino-zhulebino",
+      "slug": "moskva-vyhino-zhulebino",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18361,7 +18361,7 @@
     {
       "name": "Ярославский",
       "region": "Москва",
-      "slug": "moskva-yaroslavskiy",
+      "slug": "moskva-yaroslavsky",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18491,7 +18491,7 @@
     {
       "name": "Южнопортовый",
       "region": "Москва",
-      "slug": "moskva-yuzhnoportovyy",
+      "slug": "moskva-yuzhnoportovy",
       "population": null,
       "kind": "district",
       "parent_slug": "moskva",
@@ -18708,7 +18708,7 @@
       "slug": "multa",
       "population": 1000,
       "kind": "settlement",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": false,
       "in_phrase": "в Мульте",
       "aliases": [],
@@ -18884,7 +18884,7 @@
     {
       "name": "Мытищи",
       "region": "Московская область",
-      "slug": "mytishchi",
+      "slug": "mytischi",
       "population": 255429,
       "kind": "city",
       "parent_slug": null,
@@ -18947,7 +18947,7 @@
     {
       "name": "Находка",
       "region": "Приморский край",
-      "slug": "nakhodka",
+      "slug": "nahodka",
       "population": 139931,
       "kind": "city",
       "parent_slug": null,
@@ -19325,7 +19325,7 @@
     {
       "name": "Нерехта",
       "region": "Костромская область",
-      "slug": "nerekhta",
+      "slug": "nerehta",
       "population": 19977,
       "kind": "city",
       "parent_slug": null,
@@ -19778,7 +19778,7 @@
     {
       "name": "Нижний Ломов",
       "region": "Пензенская область",
-      "slug": "nizhniy-lomov",
+      "slug": "nizhny-lomov",
       "population": 20421,
       "kind": "city",
       "parent_slug": null,
@@ -19799,7 +19799,7 @@
     {
       "name": "Нижний Новгород",
       "region": "Нижегородская область",
-      "slug": "nizhniy-novgorod",
+      "slug": "nizhny-novgorod",
       "population": 1226076,
       "kind": "city",
       "parent_slug": null,
@@ -19820,7 +19820,7 @@
     {
       "name": "Нижний Тагил",
       "region": "Свердловская область",
-      "slug": "nizhniy-tagil",
+      "slug": "nizhny-tagil",
       "population": 338966,
       "kind": "city",
       "parent_slug": null,
@@ -20030,7 +20030,7 @@
     {
       "name": "Новоаннинский",
       "region": "Волгоградская область",
-      "slug": "novoanninskiy",
+      "slug": "novoanninsky",
       "population": 15351,
       "kind": "city",
       "parent_slug": null,
@@ -20114,7 +20114,7 @@
     {
       "name": "Новохопёрск",
       "region": "Воронежская область",
-      "slug": "novokhopyorsk",
+      "slug": "novohopersk",
       "population": 5948,
       "kind": "city",
       "parent_slug": null,
@@ -20219,7 +20219,7 @@
     {
       "name": "Новомихайловский",
       "region": "Краснодарский край",
-      "slug": "novomikhaylovskiy",
+      "slug": "novomihaylovsky",
       "population": 10500,
       "kind": "settlement",
       "parent_slug": null,
@@ -20335,7 +20335,7 @@
     {
       "name": "Новошахтинск",
       "region": "Ростовская область",
-      "slug": "novoshakhtinsk",
+      "slug": "novoshahtinsk",
       "population": 103480,
       "kind": "city",
       "parent_slug": null,
@@ -20545,7 +20545,7 @@
     {
       "name": "Новый Оскол",
       "region": "Белгородская область",
-      "slug": "novyy-oskol",
+      "slug": "novy-oskol",
       "population": 18359,
       "kind": "city",
       "parent_slug": null,
@@ -20566,7 +20566,7 @@
     {
       "name": "Новый Свет",
       "region": "Республика Крым",
-      "slug": "novyy-svet",
+      "slug": "novy-svet",
       "population": 9000,
       "kind": "settlement",
       "parent_slug": "sudak",
@@ -20598,7 +20598,7 @@
     {
       "name": "Новый Уренгой",
       "region": "Ямало-Ненецкий АО",
-      "slug": "novyy-urengoy",
+      "slug": "novy-urengoy",
       "population": 107251,
       "kind": "city",
       "parent_slug": null,
@@ -20850,7 +20850,7 @@
     {
       "name": "Очёр",
       "region": "Пермский край",
-      "slug": "ochyor",
+      "slug": "ocher",
       "population": 14385,
       "kind": "city",
       "parent_slug": null,
@@ -20892,7 +20892,7 @@
     {
       "name": "Оха",
       "region": "Сахалинская область",
-      "slug": "okha",
+      "slug": "oha",
       "population": 20357,
       "kind": "city",
       "parent_slug": null,
@@ -20913,7 +20913,7 @@
     {
       "name": "Оханск",
       "region": "Пермский край",
-      "slug": "okhansk",
+      "slug": "ohansk",
       "population": 6430,
       "kind": "city",
       "parent_slug": null,
@@ -20955,7 +20955,7 @@
     {
       "name": "Октябрьский",
       "region": "Башкортостан",
-      "slug": "oktyabrskiy",
+      "slug": "oktyabrsky",
       "population": 115557,
       "kind": "city",
       "parent_slug": null,
@@ -21082,7 +21082,7 @@
     {
       "name": "Олимпийский парк",
       "region": "Федеральная территория Сириус",
-      "slug": "olimpiyskiy-park",
+      "slug": "olimpiysky-park",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": "sirius",
@@ -21114,7 +21114,7 @@
     {
       "name": "Ольхон",
       "region": "Иркутская область",
-      "slug": "olkhon",
+      "slug": "olhon",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": "baykal",
@@ -21158,7 +21158,7 @@
     {
       "name": "Олёкминск",
       "region": "Якутия",
-      "slug": "olyokminsk",
+      "slug": "olekminsk",
       "population": 8398,
       "kind": "city",
       "parent_slug": null,
@@ -21295,7 +21295,7 @@
     {
       "name": "Орехово-Зуево",
       "region": "Московская область",
-      "slug": "orekhovo-zuevo",
+      "slug": "orehovo-zuevo",
       "population": 105745,
       "kind": "city",
       "parent_slug": null,
@@ -21379,7 +21379,7 @@
     {
       "name": "Орёл",
       "region": "Орловская область",
-      "slug": "oryol",
+      "slug": "orel",
       "population": 303169,
       "kind": "city",
       "parent_slug": null,
@@ -21537,7 +21537,7 @@
     {
       "name": "Остров Русский",
       "region": "Приморский край",
-      "slug": "ostrov-russkiy",
+      "slug": "ostrov-russky",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": null,
@@ -21643,7 +21643,7 @@
     {
       "name": "Отрадный",
       "region": "Самарская область",
-      "slug": "otradnyy",
+      "slug": "otradny",
       "population": 46984,
       "kind": "city",
       "parent_slug": null,
@@ -21664,7 +21664,7 @@
     {
       "name": "Озёрск",
       "region": "Калининградская область",
-      "slug": "ozyorsk",
+      "slug": "ozersk",
       "population": 4152,
       "kind": "city",
       "parent_slug": null,
@@ -21685,7 +21685,7 @@
     {
       "name": "Озёрск",
       "region": "Челябинская область",
-      "slug": "ozyorsk-chelyabinskaya-oblast",
+      "slug": "ozersk-chelyabinskaya-oblast",
       "population": 76896,
       "kind": "city",
       "parent_slug": null,
@@ -21706,7 +21706,7 @@
     {
       "name": "Озёры",
       "region": "Московская область",
-      "slug": "ozyory",
+      "slug": "ozery",
       "population": 24359,
       "kind": "city",
       "parent_slug": null,
@@ -21727,7 +21727,7 @@
     {
       "name": "Палех",
       "region": "Ивановская область",
-      "slug": "palekh",
+      "slug": "paleh",
       "population": 5000,
       "kind": "settlement",
       "parent_slug": null,
@@ -21928,7 +21928,7 @@
     {
       "name": "Павловский Посад",
       "region": "Московская область",
-      "slug": "pavlovskiy-posad",
+      "slug": "pavlovsky-posad",
       "population": 65098,
       "kind": "city",
       "parent_slug": null,
@@ -22012,7 +22012,7 @@
     {
       "name": "Переславль-Залесский",
       "region": "Ярославская область",
-      "slug": "pereslavl-zalesskiy",
+      "slug": "pereslavl-zalessky",
       "population": 37738,
       "kind": "city",
       "parent_slug": null,
@@ -22180,7 +22180,7 @@
     {
       "name": "Петропавловск-Камчатский",
       "region": "Камчатский край",
-      "slug": "petropavlovsk-kamchatskiy",
+      "slug": "petropavlovsk-kamchatsky",
       "population": 164900,
       "kind": "city",
       "parent_slug": null,
@@ -22243,7 +22243,7 @@
     {
       "name": "Петровск-Забайкальский",
       "region": "Забайкальский край",
-      "slug": "petrovsk-zabaykalskiy",
+      "slug": "petrovsk-zabaykalsky",
       "population": 15015,
       "kind": "city",
       "parent_slug": null,
@@ -22285,7 +22285,7 @@
     {
       "name": "Петухово",
       "region": "Курганская область",
-      "slug": "petukhovo",
+      "slug": "petuhovo",
       "population": 8502,
       "kind": "city",
       "parent_slug": null,
@@ -22348,7 +22348,7 @@
     {
       "name": "Пикалёво",
       "region": "Ленинградская область",
-      "slug": "pikalyovo",
+      "slug": "pikalevo",
       "population": 20388,
       "kind": "city",
       "parent_slug": null,
@@ -22369,7 +22369,7 @@
     {
       "name": "Пионерский",
       "region": "Калининградская область",
-      "slug": "pionerskiy",
+      "slug": "pionersky",
       "population": 12794,
       "kind": "city",
       "parent_slug": null,
@@ -22453,7 +22453,7 @@
     {
       "name": "Пляхо",
       "region": "Краснодарский край",
-      "slug": "plyakho",
+      "slug": "plyaho",
       "population": 1000,
       "kind": "settlement",
       "parent_slug": null,
@@ -22485,7 +22485,7 @@
     {
       "name": "Плёс",
       "region": "Ивановская область",
-      "slug": "plyos",
+      "slug": "ples",
       "population": 1896,
       "kind": "city",
       "parent_slug": null,
@@ -22611,7 +22611,7 @@
     {
       "name": "Похвистнево",
       "region": "Самарская область",
-      "slug": "pokhvistnevo",
+      "slug": "pohvistnevo",
       "population": 27333,
       "kind": "city",
       "parent_slug": null,
@@ -22769,7 +22769,7 @@
     {
       "name": "Полярный",
       "region": "Мурманская область",
-      "slug": "polyarnyy",
+      "slug": "polyarny",
       "population": 12293,
       "kind": "city",
       "parent_slug": null,
@@ -22843,7 +22843,7 @@
     {
       "name": "Порхов",
       "region": "Псковская область",
-      "slug": "porkhov",
+      "slug": "porhov",
       "population": 7309,
       "kind": "city",
       "parent_slug": null,
@@ -22917,7 +22917,7 @@
     {
       "name": "Пошехонье",
       "region": "Ярославская область",
-      "slug": "poshekhone",
+      "slug": "poshehone",
       "population": 5150,
       "kind": "city",
       "parent_slug": null,
@@ -23118,7 +23118,7 @@
     {
       "name": "Приморско-Ахтарск",
       "region": "Краснодарский край",
-      "slug": "primorsko-akhtarsk",
+      "slug": "primorsko-ahtarsk",
       "population": 31087,
       "kind": "city",
       "parent_slug": null,
@@ -23181,7 +23181,7 @@
     {
       "name": "Прохладный",
       "region": "Кабардино-Балкария",
-      "slug": "prokhladnyy",
+      "slug": "prohladny",
       "population": 59938,
       "kind": "city",
       "parent_slug": null,
@@ -23360,7 +23360,7 @@
     {
       "name": "Пугачёв",
       "region": "Саратовская область",
-      "slug": "pugachyov",
+      "slug": "pugachev",
       "population": 40127,
       "kind": "city",
       "parent_slug": null,
@@ -23381,7 +23381,7 @@
     {
       "name": "Пущино",
       "region": "Московская область",
-      "slug": "pushchino",
+      "slug": "puschino",
       "population": 19578,
       "kind": "city",
       "parent_slug": null,
@@ -23518,7 +23518,7 @@
     {
       "name": "Пыть-Ях",
       "region": "Ханты-Мансийский АО",
-      "slug": "pyt-yakh",
+      "slug": "pyt-yah",
       "population": 40180,
       "kind": "city",
       "parent_slug": null,
@@ -23592,7 +23592,7 @@
     {
       "name": "Радужный",
       "region": "Владимирская область",
-      "slug": "raduzhnyy",
+      "slug": "raduzhny",
       "population": 17569,
       "kind": "city",
       "parent_slug": null,
@@ -23613,7 +23613,7 @@
     {
       "name": "Радужный",
       "region": "Ханты-Мансийский АО",
-      "slug": "raduzhnyy-khanty-mansiyskiy-ao",
+      "slug": "raduzhny-hanty-mansiysky-ao",
       "population": 43577,
       "kind": "city",
       "parent_slug": null,
@@ -23676,7 +23676,7 @@
     {
       "name": "Райчихинск",
       "region": "Амурская область",
-      "slug": "raychikhinsk",
+      "slug": "raychihinsk",
       "population": 15797,
       "kind": "city",
       "parent_slug": null,
@@ -23918,7 +23918,7 @@
     {
       "name": "Роза Хутор",
       "region": "Краснодарский край",
-      "slug": "roza-khutor",
+      "slug": "roza-hutor",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": "esto-sadok",
@@ -23950,7 +23950,7 @@
     {
       "name": "Ртищево",
       "region": "Саратовская область",
-      "slug": "rtishchevo",
+      "slug": "rtischevo",
       "population": 37850,
       "kind": "city",
       "parent_slug": null,
@@ -24266,7 +24266,7 @@
     {
       "name": "Сахюрта",
       "region": "Иркутская область",
-      "slug": "sakhyurta",
+      "slug": "sahyurta",
       "population": 2500,
       "kind": "settlement",
       "parent_slug": "maloe-more",
@@ -24361,7 +24361,7 @@
     {
       "name": "Салехард",
       "region": "Ямало-Ненецкий АО",
-      "slug": "salekhard",
+      "slug": "salehard",
       "population": 47910,
       "kind": "city",
       "parent_slug": null,
@@ -24424,7 +24424,7 @@
     {
       "name": "Санкт-Петербург",
       "region": "Санкт-Петербург",
-      "slug": "sankt-peterburg",
+      "slug": "spb",
       "population": 5601911,
       "kind": "city",
       "parent_slug": null,
@@ -24718,7 +24718,7 @@
     {
       "name": "Семёнов",
       "region": "Нижегородская область",
-      "slug": "semyonov",
+      "slug": "semenov",
       "population": 25075,
       "kind": "city",
       "parent_slug": null,
@@ -24865,7 +24865,7 @@
     {
       "name": "Серпухов",
       "region": "Московская область",
-      "slug": "serpukhov",
+      "slug": "serpuhov",
       "population": 133793,
       "kind": "city",
       "parent_slug": null,
@@ -25138,7 +25138,7 @@
     {
       "name": "Шахты",
       "region": "Ростовская область",
-      "slug": "shakhty",
+      "slug": "shahty",
       "population": 226452,
       "kind": "city",
       "parent_slug": null,
@@ -25159,7 +25159,7 @@
     {
       "name": "Шахунья",
       "region": "Нижегородская область",
-      "slug": "shakhunya",
+      "slug": "shahunya",
       "population": 17626,
       "kind": "city",
       "parent_slug": null,
@@ -25317,7 +25317,7 @@
     {
       "name": "Щербинка",
       "region": "Москва",
-      "slug": "shcherbinka",
+      "slug": "scherbinka",
       "population": 56531,
       "kind": "district",
       "parent_slug": "moskva",
@@ -25338,7 +25338,7 @@
     {
       "name": "Щигры",
       "region": "Курская область",
-      "slug": "shchigry",
+      "slug": "schigry",
       "population": 14927,
       "kind": "city",
       "parent_slug": null,
@@ -25359,7 +25359,7 @@
     {
       "name": "Щучье",
       "region": "Курганская область",
-      "slug": "shchuche",
+      "slug": "schuche",
       "population": 8252,
       "kind": "city",
       "parent_slug": null,
@@ -25380,7 +25380,7 @@
     {
       "name": "Щёкино",
       "region": "Тульская область",
-      "slug": "shchyokino",
+      "slug": "schekino",
       "population": 55109,
       "kind": "city",
       "parent_slug": null,
@@ -25401,7 +25401,7 @@
     {
       "name": "Щёлкино",
       "region": "Крым",
-      "slug": "shchyolkino",
+      "slug": "schelkino",
       "population": 10131,
       "kind": "city",
       "parent_slug": null,
@@ -25422,7 +25422,7 @@
     {
       "name": "Щёлково",
       "region": "Московская область",
-      "slug": "shchyolkovo",
+      "slug": "schelkovo",
       "population": 134211,
       "kind": "city",
       "parent_slug": null,
@@ -25464,7 +25464,7 @@
     {
       "name": "Шелехов",
       "region": "Иркутская область",
-      "slug": "shelekhov",
+      "slug": "shelehov",
       "population": 41998,
       "kind": "city",
       "parent_slug": null,
@@ -25538,7 +25538,7 @@
     {
       "name": "Шиханы",
       "region": "Саратовская область",
-      "slug": "shikhany",
+      "slug": "shihany",
       "population": 5155,
       "kind": "city",
       "parent_slug": null,
@@ -25675,7 +25675,7 @@
     {
       "name": "Шумиха",
       "region": "Курганская область",
-      "slug": "shumikha",
+      "slug": "shumiha",
       "population": 16264,
       "kind": "city",
       "parent_slug": null,
@@ -26342,7 +26342,7 @@
     {
       "name": "Соловецкий",
       "region": "Архангельская область",
-      "slug": "solovetskiy",
+      "slug": "solovetsky",
       "population": 750,
       "kind": "settlement",
       "parent_slug": null,
@@ -26479,7 +26479,7 @@
     {
       "name": "Сосенский",
       "region": "Калужская область",
-      "slug": "sosenskiy",
+      "slug": "sosensky",
       "population": 11413,
       "kind": "city",
       "parent_slug": null,
@@ -26563,7 +26563,7 @@
     {
       "name": "Сосновый Бор",
       "region": "Ленинградская область",
-      "slug": "sosnovyy-bor",
+      "slug": "sosnovy-bor",
       "population": 65367,
       "kind": "city",
       "parent_slug": null,
@@ -26668,7 +26668,7 @@
     {
       "name": "Советский",
       "region": "Ханты-Мансийский АО",
-      "slug": "sovetskiy",
+      "slug": "sovetsky",
       "population": 31138,
       "kind": "city",
       "parent_slug": null,
@@ -26752,7 +26752,7 @@
     {
       "name": "Спасск-Дальний",
       "region": "Приморский край",
-      "slug": "spassk-dalniy",
+      "slug": "spassk-dalny",
       "population": 35732,
       "kind": "city",
       "parent_slug": null,
@@ -26773,7 +26773,7 @@
     {
       "name": "Спасск-Рязанский",
       "region": "Рязанская область",
-      "slug": "spassk-ryazanskiy",
+      "slug": "spassk-ryazansky",
       "population": 5796,
       "kind": "city",
       "parent_slug": null,
@@ -27005,7 +27005,7 @@
     {
       "name": "Старый Крым",
       "region": "Крым",
-      "slug": "staryy-krym",
+      "slug": "stary-krym",
       "population": 10470,
       "kind": "city",
       "parent_slug": null,
@@ -27026,7 +27026,7 @@
     {
       "name": "Старый Оскол",
       "region": "Белгородская область",
-      "slug": "staryy-oskol",
+      "slug": "stary-oskol",
       "population": 221676,
       "kind": "city",
       "parent_slug": null,
@@ -27236,7 +27236,7 @@
     {
       "name": "Сухиничи",
       "region": "Калужская область",
-      "slug": "sukhinichi",
+      "slug": "suhinichi",
       "population": 14806,
       "kind": "city",
       "parent_slug": null,
@@ -27257,7 +27257,7 @@
     {
       "name": "Сухой Лог",
       "region": "Свердловская область",
-      "slug": "sukhoy-log",
+      "slug": "suhoy-log",
       "population": 32748,
       "kind": "city",
       "parent_slug": null,
@@ -27310,7 +27310,7 @@
     {
       "name": "Сулакский каньон",
       "region": "Республика Дагестан",
-      "slug": "sulakskiy-kanyon",
+      "slug": "sulaksky-kanyon",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": null,
@@ -27575,7 +27575,7 @@
     {
       "name": "Светлый",
       "region": "Калининградская область",
-      "slug": "svetlyy",
+      "slug": "svetly",
       "population": 21114,
       "kind": "city",
       "parent_slug": null,
@@ -27670,7 +27670,7 @@
     {
       "name": "Свободный",
       "region": "Амурская область",
-      "slug": "svobodnyy",
+      "slug": "svobodny",
       "population": 48517,
       "kind": "city",
       "parent_slug": null,
@@ -27712,7 +27712,7 @@
     {
       "name": "Сычёвка",
       "region": "Смоленская область",
-      "slug": "sychyovka",
+      "slug": "sychevka",
       "population": 7544,
       "kind": "city",
       "parent_slug": null,
@@ -28302,7 +28302,7 @@
     {
       "name": "Тихорецк",
       "region": "Краснодарский край",
-      "slug": "tikhoretsk",
+      "slug": "tihoretsk",
       "population": 55686,
       "kind": "city",
       "parent_slug": null,
@@ -28323,7 +28323,7 @@
     {
       "name": "Тихвин",
       "region": "Ленинградская область",
-      "slug": "tikhvin",
+      "slug": "tihvin",
       "population": 55415,
       "kind": "city",
       "parent_slug": null,
@@ -28344,7 +28344,7 @@
     {
       "name": "Тимашёвск",
       "region": "Краснодарский край",
-      "slug": "timashyovsk",
+      "slug": "timashevsk",
       "population": 51858,
       "kind": "city",
       "parent_slug": null,
@@ -28659,7 +28659,7 @@
     {
       "name": "Трёхгорный",
       "region": "Челябинская область",
-      "slug": "tryokhgornyy",
+      "slug": "trehgorny",
       "population": 32463,
       "kind": "city",
       "parent_slug": null,
@@ -28733,7 +28733,7 @@
     {
       "name": "Циолковский",
       "region": "Амурская область",
-      "slug": "tsiolkovskiy",
+      "slug": "tsiolkovsky",
       "population": 7194,
       "kind": "city",
       "parent_slug": null,
@@ -29126,7 +29126,7 @@
       "slug": "tyungur",
       "population": 2200,
       "kind": "settlement",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": false,
       "in_phrase": "в Тюнгуре",
       "aliases": [],
@@ -29176,7 +29176,7 @@
     {
       "name": "Удачный",
       "region": "Якутия",
-      "slug": "udachnyy",
+      "slug": "udachny",
       "population": 12930,
       "kind": "city",
       "parent_slug": null,
@@ -29281,7 +29281,7 @@
     {
       "name": "Ухта",
       "region": "Коми",
-      "slug": "ukhta",
+      "slug": "uhta",
       "population": 79899,
       "kind": "city",
       "parent_slug": null,
@@ -29305,7 +29305,7 @@
       "slug": "ulagan",
       "population": 500,
       "kind": "settlement",
-      "parent_slug": "gornyy-altay",
+      "parent_slug": "gorny-altay",
       "is_hub": false,
       "in_phrase": "в Улагане",
       "aliases": [],
@@ -30040,7 +30040,7 @@
     {
       "name": "Великий Новгород",
       "region": "Новгородская область",
-      "slug": "velikiy-novgorod",
+      "slug": "veliky-novgorod",
       "population": 224286,
       "kind": "city",
       "parent_slug": null,
@@ -30061,7 +30061,7 @@
     {
       "name": "Великий Устюг",
       "region": "Вологодская область",
-      "slug": "velikiy-ustyug",
+      "slug": "veliky-ustyug",
       "population": 28670,
       "kind": "city",
       "parent_slug": null,
@@ -30124,7 +30124,7 @@
     {
       "name": "Венёв",
       "region": "Тульская область",
-      "slug": "venyov",
+      "slug": "venev",
       "population": 12668,
       "kind": "city",
       "parent_slug": null,
@@ -30145,7 +30145,7 @@
     {
       "name": "Верещагино",
       "region": "Пермский край",
-      "slug": "vereshchagino",
+      "slug": "vereschagino",
       "population": 22239,
       "kind": "city",
       "parent_slug": null,
@@ -30187,7 +30187,7 @@
     {
       "name": "Верхнеуральск",
       "region": "Челябинская область",
-      "slug": "verkhneuralsk",
+      "slug": "verhneuralsk",
       "population": 8929,
       "kind": "city",
       "parent_slug": null,
@@ -30208,7 +30208,7 @@
     {
       "name": "Верхний Фиагдон",
       "region": "Республика Северная Осетия — Алания",
-      "slug": "verkhniy-fiagdon",
+      "slug": "verhny-fiagdon",
       "population": 150,
       "kind": "settlement",
       "parent_slug": null,
@@ -30240,7 +30240,7 @@
     {
       "name": "Верхний Тагил",
       "region": "Свердловская область",
-      "slug": "verkhniy-tagil",
+      "slug": "verhny-tagil",
       "population": 10113,
       "kind": "city",
       "parent_slug": null,
@@ -30261,7 +30261,7 @@
     {
       "name": "Верхний Уфалей",
       "region": "Челябинская область",
-      "slug": "verkhniy-ufaley",
+      "slug": "verhny-ufaley",
       "population": 22981,
       "kind": "city",
       "parent_slug": null,
@@ -30282,7 +30282,7 @@
     {
       "name": "Верхняя Балкария",
       "region": "Кабардино-Балкарская Республика",
-      "slug": "verkhnyaya-balkariya",
+      "slug": "verhnyaya-balkariya",
       "population": 500,
       "kind": "settlement",
       "parent_slug": null,
@@ -30314,7 +30314,7 @@
     {
       "name": "Верхняя Пышма",
       "region": "Свердловская область",
-      "slug": "verkhnyaya-pyshma",
+      "slug": "verhnyaya-pyshma",
       "population": 71335,
       "kind": "city",
       "parent_slug": null,
@@ -30335,7 +30335,7 @@
     {
       "name": "Верхняя Салда",
       "region": "Свердловская область",
-      "slug": "verkhnyaya-salda",
+      "slug": "verhnyaya-salda",
       "population": 41034,
       "kind": "city",
       "parent_slug": null,
@@ -30356,7 +30356,7 @@
     {
       "name": "Верхняя Тура",
       "region": "Свердловская область",
-      "slug": "verkhnyaya-tura",
+      "slug": "verhnyaya-tura",
       "population": 8554,
       "kind": "city",
       "parent_slug": null,
@@ -30377,7 +30377,7 @@
     {
       "name": "Верхотурье",
       "region": "Свердловская область",
-      "slug": "verkhoture",
+      "slug": "verhoture",
       "population": 6706,
       "kind": "city",
       "parent_slug": null,
@@ -30398,7 +30398,7 @@
     {
       "name": "Верхоянск",
       "region": "Якутия",
-      "slug": "verkhoyansk",
+      "slug": "verhoyansk",
       "population": 828,
       "kind": "city",
       "parent_slug": null,
@@ -30535,7 +30535,7 @@
     {
       "name": "Вихоревка",
       "region": "Иркутская область",
-      "slug": "vikhorevka",
+      "slug": "vihorevka",
       "population": 21719,
       "kind": "city",
       "parent_slug": null,
@@ -30809,7 +30809,7 @@
     {
       "name": "Волхов",
       "region": "Ленинградская область",
-      "slug": "volkhov",
+      "slug": "volhov",
       "population": 38511,
       "kind": "city",
       "parent_slug": null,
@@ -30956,7 +30956,7 @@
     {
       "name": "Волжский",
       "region": "Волгоградская область",
-      "slug": "volzhskiy",
+      "slug": "volzhsky",
       "population": 321479,
       "kind": "city",
       "parent_slug": null,
@@ -31209,7 +31209,7 @@
     {
       "name": "Вяземский",
       "region": "Хабаровский край",
-      "slug": "vyazemskiy",
+      "slug": "vyazemsky",
       "population": 12775,
       "kind": "city",
       "parent_slug": null,
@@ -31314,7 +31314,7 @@
     {
       "name": "Вышний Волочёк",
       "region": "Тверская область",
-      "slug": "vyshniy-volochyok",
+      "slug": "vyshny-volochek",
       "population": 45830,
       "kind": "city",
       "parent_slug": null,
@@ -31419,7 +31419,7 @@
     {
       "name": "Яхрома",
       "region": "Московская область",
-      "slug": "yakhroma",
+      "slug": "yahroma",
       "population": 14011,
       "kind": "city",
       "parent_slug": null,
@@ -31629,7 +31629,7 @@
     {
       "name": "Ясный",
       "region": "Оренбургская область",
-      "slug": "yasnyy",
+      "slug": "yasny",
       "population": 15471,
       "kind": "city",
       "parent_slug": null,
@@ -31692,7 +31692,7 @@
     {
       "name": "Юхнов",
       "region": "Калужская область",
-      "slug": "yukhnov",
+      "slug": "yuhnov",
       "population": 6610,
       "kind": "city",
       "parent_slug": null,
@@ -31713,7 +31713,7 @@
     {
       "name": "Юрьев-Польский",
       "region": "Владимирская область",
-      "slug": "yurev-polskiy",
+      "slug": "yurev-polsky",
       "population": 17276,
       "kind": "city",
       "parent_slug": null,
@@ -31818,7 +31818,7 @@
     {
       "name": "Южно-Сахалинск",
       "region": "Сахалинская область",
-      "slug": "yuzhno-sakhalinsk",
+      "slug": "yuzhno-sahalinsk",
       "population": 181587,
       "kind": "city",
       "parent_slug": null,
@@ -31839,7 +31839,7 @@
     {
       "name": "Южно-Сухокумск",
       "region": "Дагестан",
-      "slug": "yuzhno-sukhokumsk",
+      "slug": "yuzhno-suhokumsk",
       "population": 10503,
       "kind": "city",
       "parent_slug": null,
@@ -31944,7 +31944,7 @@
     {
       "name": "Заозёрный",
       "region": "Красноярский край",
-      "slug": "zaozyornyy",
+      "slug": "zaozerny",
       "population": 10573,
       "kind": "city",
       "parent_slug": null,
@@ -31965,7 +31965,7 @@
     {
       "name": "Заозёрск",
       "region": "Мурманская область",
-      "slug": "zaozyorsk",
+      "slug": "zaozersk",
       "population": 7762,
       "kind": "city",
       "parent_slug": null,
@@ -32007,7 +32007,7 @@
     {
       "name": "Заполярный",
       "region": "Мурманская область",
-      "slug": "zapolyarnyy",
+      "slug": "zapolyarny",
       "population": 14791,
       "kind": "city",
       "parent_slug": null,
@@ -32049,7 +32049,7 @@
     {
       "name": "Заречный",
       "region": "Пензенская область",
-      "slug": "zarechnyy",
+      "slug": "zarechny",
       "population": 58510,
       "kind": "city",
       "parent_slug": null,
@@ -32070,7 +32070,7 @@
     {
       "name": "Заречный",
       "region": "Свердловская область",
-      "slug": "zarechnyy-sverdlovskaya-oblast",
+      "slug": "zarechny-sverdlovskaya-oblast",
       "population": 28112,
       "kind": "city",
       "parent_slug": null,
@@ -32322,7 +32322,7 @@
     {
       "name": "Зелёная Поляна",
       "region": "Республика Башкортостан",
-      "slug": "zelyonaya-polyana",
+      "slug": "zelenaya-polyana",
       "population": 3000,
       "kind": "settlement",
       "parent_slug": null,
@@ -32417,7 +32417,7 @@
     {
       "name": "Железногорск-Илимский",
       "region": "Иркутская область",
-      "slug": "zheleznogorsk-ilimskiy",
+      "slug": "zheleznogorsk-ilimsky",
       "population": 21621,
       "kind": "city",
       "parent_slug": null,
@@ -32512,7 +32512,7 @@
     {
       "name": "Жемчужный",
       "region": "Республика Хакасия",
-      "slug": "zhemchuzhnyy",
+      "slug": "zhemchuzhny",
       "population": null,
       "kind": "tourist_area",
       "parent_slug": null,
@@ -32565,7 +32565,7 @@
     {
       "name": "Жигулёвск",
       "region": "Самарская область",
-      "slug": "zhigulyovsk",
+      "slug": "zhigulevsk",
       "population": 50466,
       "kind": "city",
       "parent_slug": null,
@@ -32670,7 +32670,7 @@
     {
       "name": "Жуковский",
       "region": "Московская область",
-      "slug": "zhukovskiy",
+      "slug": "zhukovsky",
       "population": 111222,
       "kind": "city",
       "parent_slug": null,
@@ -32937,12 +32937,12 @@
       "location_slug": "troitsk"
     },
     {
-      "slug": "moskva-shcherbinka",
-      "location_slug": "shcherbinka"
+      "slug": "moskva-scherbinka",
+      "location_slug": "scherbinka"
     },
     {
-      "slug": "khadzhokh",
-      "location_slug": "kamennomostskiy"
+      "slug": "hadzhoh",
+      "location_slug": "kamennomostsky"
     },
     {
       "slug": "gazprom-laura",
@@ -32954,7 +32954,7 @@
     },
     {
       "slug": "sulak",
-      "location_slug": "sulakskiy-kanyon"
+      "location_slug": "sulaksky-kanyon"
     },
     {
       "slug": "katun",
@@ -32964,7 +32964,7 @@
   "related": [
     {
       "location_slug": "moskva-patriarshie",
-      "related_slug": "moskva-presnenskiy"
+      "related_slug": "moskva-presnensky"
     },
     {
       "location_slug": "moskva-kitay-gorod",
@@ -32972,11 +32972,11 @@
     },
     {
       "location_slug": "moskva-chistye-prudy",
-      "related_slug": "moskva-basmannyy"
+      "related_slug": "moskva-basmanny"
     },
     {
       "location_slug": "moskva-city",
-      "related_slug": "moskva-presnenskiy"
+      "related_slug": "moskva-presnensky"
     },
     {
       "location_slug": "moskva-tverskaya",
@@ -32992,19 +32992,19 @@
     },
     {
       "location_slug": "moskva-sretenka",
-      "related_slug": "moskva-meshchanskiy"
+      "related_slug": "moskva-meschansky"
     },
     {
       "location_slug": "moskva-myasnitskaya",
-      "related_slug": "moskva-krasnoselskiy"
+      "related_slug": "moskva-krasnoselsky"
     },
     {
       "location_slug": "moskva-pokrovka",
-      "related_slug": "moskva-basmannyy"
+      "related_slug": "moskva-basmanny"
     },
     {
       "location_slug": "moskva-taganka",
-      "related_slug": "moskva-taganskiy"
+      "related_slug": "moskva-tagansky"
     },
     {
       "location_slug": "moskva-belorusskaya",
@@ -33016,14 +33016,14 @@
     },
     {
       "location_slug": "moskva-park-kultury",
-      "related_slug": "moskva-khamovniki"
+      "related_slug": "moskva-hamovniki"
     },
     {
       "location_slug": "moskva-park-gorkogo",
       "related_slug": "moskva-yakimanka"
     },
     {
-      "location_slug": "moskva-krasnyy-oktyabr",
+      "location_slug": "moskva-krasny-oktyabr",
       "related_slug": "moskva-yakimanka"
     }
   ]

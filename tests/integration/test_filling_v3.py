@@ -48,7 +48,7 @@ def test_real_novgorod_truncation_is_visible_and_never_retried_or_published(data
         assert calls == ["POST"]
         assert "estimated_cost_usd" not in detail["calls"][0]
         with TestClient(create_app(settings)) as client:
-            page = client.get("/guide/logs/velikiy-novgorod/1")
+            page = client.get("/guide/logs/veliky-novgorod/1")
             assert page.status_code == 200
             assert "Диагностика ответа" in page.text
             assert "Нужен новый запрос" in page.text and "3395" in page.text
@@ -72,7 +72,7 @@ def test_real_novgorod_truncation_is_visible_and_never_retried_or_published(data
                 )
 
             page.route("**/*", respond)
-            page.goto("http://testserver/guide/logs/velikiy-novgorod/1", wait_until="networkidle")
+            page.goto("http://testserver/guide/logs/veliky-novgorod/1", wait_until="networkidle")
             assert page.get_by_role("region", name="Диагностика ответа").count() == 1
             shots = Path("var/screenshots")
             shots.mkdir(parents=True, exist_ok=True)
@@ -92,6 +92,8 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
 ):
     settings, engine, uow, queries, city, service, queue = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
+    # URL-only migration has no schema downgrade; this fixture tests the filling schema.
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "canonical_rank")
     old_prompt = "Сохранённый старый промпт до смены контракта. " * 2
     with uow() as tx:
