@@ -1,4 +1,6 @@
+import os
 import re
+import subprocess
 
 from fastapi.testclient import TestClient
 
@@ -27,7 +29,7 @@ def test_public_admin_htmx_and_csrf(database):
     settings, engine = database
     with TestClient(create_app(settings)) as client:
         redirect = client.get("/guide?q=test", follow_redirects=False)
-        assert redirect.status_code == 302 and redirect.headers["location"] == "/guide/"
+        assert redirect.status_code == 302 and redirect.headers["location"] == "/guide/?q=test"
         home = client.get("/guide/")
         assert home.status_code == 200 and "Выбор локации" in home.text
         assert "htmx" not in home.text and "react" not in home.text and "/_next/" not in home.text
@@ -107,3 +109,19 @@ def test_admin_cookie_and_database_expiry_renew_together_and_logout_stays_final(
         assert client.cookies.get("guide_admin") is None
         client.cookies.set("guide_admin", session_token)
         assert "set-cookie" not in client.get("/guide/health/live").headers
+
+
+def test_production_http_checker_against_real_server(database):
+    from .test_voice_upload_transport import serving
+
+    settings, _ = database
+    settings = settings.model_copy(update={"release_sha": "a" * 40})
+    with serving(create_app(settings)) as origin:
+        result = subprocess.run(
+            ["bash", "deploy/check-release.sh", origin + "/guide/", settings.release_sha, "local"],
+            env={**os.environ, "NO_PROXY": "127.0.0.1,localhost"},
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -120,6 +120,11 @@ def test_public_home_has_no_search_form_results_or_parameter_pages(database):
         ):
             response = client.get("/guide/", params=parameters, follow_redirects=False)
             assert response.status_code == 308 and response.headers["location"] == "/guide/"
+            slash = client.get("/guide", params=parameters, follow_redirects=False)
+            assert slash.status_code == 302
+            assert slash.headers["location"] == "/guide/?" + slash.request.url.query.decode()
+            final = client.get(slash.headers["location"], follow_redirects=False)
+            assert final.status_code == 308 and final.headers["location"] == "/guide/"
 
 
 def test_catalogue_returns_untrusted_names_as_json_and_preserves_non_city_type(database):
