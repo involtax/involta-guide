@@ -113,10 +113,10 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                 continue
             current_stage = stage if stage and stage["run"] == submission["active_run"] else None
             request = (
-                (current_stage["request"] or {})
-                if current_stage
-                else candidate["settings"]
+                candidate["settings"]
                 if candidate
+                else (current_stage["request"] or {})
+                if current_stage
                 else {}
             )
             pair.append(
@@ -130,6 +130,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     "hotwords_score": request.get("hotwords_score"),
                     "primary": variant == primary_variant(submission["snapshot"]),
                     "run": submission["active_run"],
+                    "result_run": candidate["run"] if candidate else None,
                     "review_text_format": submission["snapshot"].get("review_text_format")
                     if variant == primary_variant(submission["snapshot"])
                     else None,

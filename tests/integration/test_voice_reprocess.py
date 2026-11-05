@@ -37,6 +37,7 @@ class Words(FakeProvider):
 
 def test_reprocess_reuses_original_freezes_new_context_and_coalesces_requests(voice_database):
     settings, engine = voice_database
+    settings = settings.model_copy(update={"asr_beta_enabled": True})
     service = VoiceService(engine, settings)
     meta = metadata()
     audio = recording()
@@ -57,6 +58,8 @@ def test_reprocess_reuses_original_freezes_new_context_and_coalesces_requests(vo
     assert service.status(ref)["transcript"] == "Старый текст."
     pair = reports(engine, [ref])[ref][0]
     assert pair["state"] == "queued" and pair["text"] == "Старый текст."
+    assert pair["result_run"] == 1 and pair["run"] == 2
+    assert "Горы" not in pair["dictionary"]
     with engine.connect() as conn:
         frozen = conn.execute(
             text("SELECT snapshot FROM runs WHERE submission=:id AND number=2"), {"id": ref}
@@ -71,6 +74,7 @@ def test_reprocess_reuses_original_freezes_new_context_and_coalesces_requests(vo
     assert Worker(engine, settings, fresh).once()
     assert fresh.audio == [audio]
     assert service.status(ref)["transcript"] == "Новый текст. Также ресторан Горы."
+    assert "Горы" in reports(engine, [ref])[ref][0]["dictionary"]
     assert service.reprocess(ref, request)["run"] == 2
     assert not Worker(engine, settings, fresh).once()
     history = report(engine, ref)["candidates"]
