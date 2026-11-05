@@ -149,6 +149,22 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
             page.screenshot(path=str(folder / f"admin-{width}.png"), full_page=True)
             page.locator(".review-card").screenshot(path=str(folder / f"card-{width}.png"))
             button = page.get_by_role("button", name="Перераспознать отзыв", exact=False)
+            # A rejected action must be visible, while leaving the card intact.
+            error_path = "**/admin/reviews/*/*/reprocess"
+            page.route(
+                error_path,
+                lambda route: route.fulfill(
+                    status=400,
+                    content_type="application/json",
+                    body='{"error":"Не удалось выполнить тестовое действие"}',
+                ),
+            )
+            button.click()
+            expect(page.get_by_role("alert")).to_contain_text(
+                "Не удалось выполнить тестовое действие"
+            )
+            expect(button).to_be_enabled()
+            page.unroute(error_path)
             button.click()
             expect(button).to_be_disabled()
             expect(page.get_by_text("Перераспознаётся.", exact=False)).to_be_visible()
