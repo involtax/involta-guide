@@ -164,7 +164,19 @@ class CandidateReview(BaseModel):
         return RestaurantInput.sources_valid(value)
 
 
+class DiscoveredRestaurant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200)
+    sources: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("sources")
+    @classmethod
+    def valid_sources(cls, value: list[str]) -> list[str]:
+        return RestaurantInput.sources_valid(value)
+
+
 class ContentInput(BaseModel):
+    discoveredRestaurants: list[DiscoveredRestaurant] = Field(default_factory=list, max_length=200)
     intro: str = Field(max_length=4000)
     restaurants: list[RestaurantInput] = Field(max_length=50)
     rankingReport: list[RankingCandidate] | None = Field(default=None, max_length=10)
@@ -253,6 +265,7 @@ class RecordedGenerationResult(BaseModel):
 
 
 class GenerationResult(RecordedGenerationResult):
+    discoveredRestaurants: list[DiscoveredRestaurant] = Field(default_factory=list, max_length=200)
     candidates: list[GenerationCandidate] = Field(max_length=10)
 
     @model_validator(mode="after")
