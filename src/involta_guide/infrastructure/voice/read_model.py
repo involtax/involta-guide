@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import Engine, text
 
 from involta_guide.domain.entities import NotFound
+from involta_guide.infrastructure.persistence.repositories.public_catalogue import PUBLIC
 from involta_voice.db import row
 
 
@@ -68,6 +69,20 @@ class VoiceReadModel:
                 FROM reviews WHERE location_id=:location AND publication_status=1 AND status IN ('received','transcribed')
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
                     {"location": location_id},
+                ).mappings()
+            ]
+
+    def latest_public_texts(self) -> list[dict[str, Any]]:
+        with self.engine.connect() as conn:
+            return [
+                dict(item)
+                for item in conn.execute(
+                    text(f"""SELECT r.transcript,r.created_at,r.number,
+                    l.name location_name,l.slug location_slug
+                    FROM reviews r JOIN locations l ON l.id=r.location_id
+                    WHERE r.publication_status=1 AND r.status IN ('received','transcribed')
+                    AND l.active=1 AND {PUBLIC}
+                    ORDER BY r.created_at DESC,r.number DESC LIMIT 10""")
                 ).mappings()
             ]
 

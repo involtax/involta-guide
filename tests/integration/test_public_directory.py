@@ -11,17 +11,18 @@ from .test_editorial import CONTENT
 from .test_jobs import setup
 
 
-def test_home_shows_only_filled_cities_and_search_covers_all_types(database):
+def test_home_reviews_replace_city_grid_and_search_covers_all_types(database):
     settings, _, uow, queries, city, _, _ = setup(database)
     editor = EditorialService(uow)
     other = next(row for row in queries.directory(kind="resort")["rows"] if row["listed"])
     with TestClient(create_app(settings)) as client:
         assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
         editor.save(city["id"], CONTENT, None)
-        assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
+        assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
         editor.save(other["id"], CONTENT, None)
         home = client.get("/guide/")
-        assert f'href="/guide/{city["slug"]}"' in home.text
+        assert f'href="/guide/{city["slug"]}"' not in home.text
+        assert "Жизнь кипит" in home.text and 'class="city-grid"' not in home.text
         assert f'href="/guide/{other["slug"]}"' not in home.text
         assert '<select name="kind"' not in home.text
         search = client.get("/guide/", params={"q": other["name"], "kind": "city"})
