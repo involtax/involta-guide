@@ -38,6 +38,10 @@ def shortlist(count=10):
 @pytest.mark.parametrize("blocked_leader", [False, True])
 def test_ten_candidates_produce_three_catalogue_winners_and_a_full_audit(database, blocked_leader):
     raw = shortlist()
+    raw["discoveredRestaurants"] = [
+        {"name": "Новая кофейня", "sources": []},
+        {"name": "  новая   кофейня ", "sources": []},
+    ]
     # Equal leaders arrive in reverse alphabetical order; the server owns the ranking.
     raw["candidates"][8]["scores"] = deepcopy(raw["candidates"][9]["scores"])
     if blocked_leader:
@@ -69,7 +73,10 @@ def test_ten_candidates_produce_three_catalogue_winners_and_a_full_audit(databas
             else ["Кандидат 08", "Кандидат 09", "Кандидат 07"]
         )
         assert [r["name"] for r in winners] == expected
-        assert len(queries.rows("restaurants")) == 3
+        assert len(queries.rows("restaurants")) == (10 if blocked_leader else 11)
+        extra = next(r for r in queries.rows("restaurants") if r["name"] == "Новая кофейня")
+        assert extra["active"] == 0 and extra["phone"] is None and extra["ranking"] is None
+        assert extra["description"] is None
         report = stored["report"]
         assert len(report["rankingReport"]) == len(report["candidateReview"]) == 10
         assert report["qualityReport"]["verified"] == (9 if blocked_leader else 10)

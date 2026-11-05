@@ -251,8 +251,8 @@ def routes(prefix: str) -> APIRouter:
                         RestaurantContext(
                             id=r["id"],
                             name=r["name"],
-                            phone=r.get("phone", ""),
-                            description=r.get("description", ""),
+                            phone=r.get("phone") or "",
+                            description=r.get("description") or "",
                             openingHours=r.get("openingHours"),
                         )
                         for r in selected["available"]

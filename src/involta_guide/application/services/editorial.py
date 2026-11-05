@@ -149,6 +149,38 @@ def save(
     for previous in repo.rows("restaurants", {"location_id": location_id}, limit=10000):
         if previous["id"] not in seen and previous["active"]:
             repo.change("restaurants", previous["id"], {"active": 0})
+    if job_id:
+        # The catalogue owns every discovered name; only selected cards are public.
+        known = {
+            " ".join(r["name"].casefold().split())
+            for r in repo.rows("restaurants", {"location_id": location_id}, limit=10000)
+        }
+        candidates = payload.get("candidateReview") or []
+        rejected = {
+            " ".join(r["name"].casefold().split())
+            for r in candidates
+            if r.get("exclusionCode") in {"outside_area", "not_restaurant", "duplicate"}
+            or "location" in r.get("verificationIssues", [])
+        }
+        discoveries = []
+        for item in [*candidates, *payload.get("discoveredRestaurants", [])]:
+            name = " ".join(item["name"].split())
+            key = name.casefold()
+            if not key or key in known or key in rejected:
+                continue
+            record = repo.add(
+                "restaurants",
+                {
+                    "id": str(uuid4()),
+                    "location_id": location_id,
+                    "name": name,
+                    "active": 0,
+                    "sources": item.get("sources") or [],
+                },
+            )
+            known.add(key)
+            discoveries.append({"id": record["id"], "name": name, "sources": record["sources"]})
+        payload["catalogueAdditions"] = discoveries
     repo.change("locations", location_id, {"intro": payload["intro"]})
     diff = field_diff(before, current_content(repo, {**location, "intro": payload["intro"]}))
     now = datetime.now(UTC)
