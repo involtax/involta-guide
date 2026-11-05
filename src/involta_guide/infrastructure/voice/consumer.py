@@ -279,6 +279,19 @@ class Consumer:
                             )
                     except SQLAlchemyError as exc:
                         logger.warning("Audience review was not recorded (%s)", type(exc).__name__)
+            if number < link["active_run"]:
+                execute(
+                    conn,
+                    "UPDATE voice_inbox SET state='imported',error=NULL WHERE event_id=:id",
+                    id=event_id,
+                )
+                return 1
+            execute(
+                conn,
+                "UPDATE voice_links SET active_run=:run WHERE reference=:id",
+                run=number,
+                id=reference,
+            )
             if event["kind"] == "gigaam_ready":
                 execute(
                     conn,

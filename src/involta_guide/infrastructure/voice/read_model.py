@@ -207,7 +207,7 @@ class VoiceReadModel:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action='review_deleted' ORDER BY created_at"
+                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_deleted','review_reprocess') ORDER BY created_at"
                     ),
                     {"id": review_id},
                 ).mappings()

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from involta_voice.config import Settings
 from involta_voice.sherpa import LocalSherpa, options
-from involta_voice.text import catalogue_forms, restore_names
+from involta_voice.text import REVIEW_TEXT_FORMAT, catalogue_forms, clean_review_text, restore_names
 from involta_voice.variants import PRIMARY_VARIANT
 
 
@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--search", type=int, default=8)
     parser.add_argument("--catalogue", choices=["saved", "latest"], default="saved")
     parser.add_argument("--extra-words", nargs="*", default=[])
+    parser.add_argument("--extra-restaurants", nargs="*", default=[])
     parser.add_argument("--output", type=Path, default=Path("var/voice-corpus/replay.json"))
     args = parser.parse_args()
     index = json.loads((args.corpus / "index.json").read_text())
@@ -62,6 +63,7 @@ def main() -> None:
                 raise SystemExit("Original audio hash mismatch")
             log = json.loads((args.corpus / item["log_file"]).read_text())
             city, names = latest[item["slug"]] if args.catalogue == "latest" else catalogue(log)
+            names = list(dict.fromkeys([*names, *args.extra_restaurants]))
             forms = catalogue_forms(names, city=city)
             for score in args.scores:
                 request = options(
@@ -76,17 +78,21 @@ def main() -> None:
                     request["dictionary"] = []
                 body = json.loads(provider.call(request, audio)["body"])
                 provider.close()
+                restored = restore_names(body["text"], names, forms=forms)
                 row = {
                     "review": item["number"],
                     "slug": item["slug"],
                     "request": request,
                     "catalogue": args.catalogue,
                     "extra_words": args.extra_words,
+                    "extra_restaurants": args.extra_restaurants,
                     "saved_text": item.get("transcript"),
                     "publication_status": item.get("publication_status"),
                     "mode": "offline-research",
                     "raw_text": body["text"],
-                    "formatted_text": restore_names(body["text"], names, forms=forms),
+                    "names_restored_text": restored,
+                    "formatted_text": clean_review_text(restored, [n for n in names if n != city]),
+                    "format_revision": REVIEW_TEXT_FORMAT,
                     "audio_sha256": body["audio_sha256"],
                     "pcm_sha256": body["pcm_sha256"],
                     "segments": body.get("segments"),

@@ -81,6 +81,11 @@ class SubmissionMetadata(DTO):
     statistics_excluded: bool = True
 
 
+class ReprocessRequest(DTO):
+    location: LocationContext
+    idempotency_key: UUID
+
+
 class ReviewFragment(DTO):
     restaurantId: UUID | None = None
     restaurantName: str = ""

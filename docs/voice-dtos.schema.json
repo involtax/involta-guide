@@ -227,6 +227,25 @@
       "title": "OutboxEvent",
       "type": "object"
     },
+    "ReprocessRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "$ref": "#/$defs/LocationContext"
+        },
+        "idempotency_key": {
+          "format": "uuid",
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "location",
+        "idempotency_key"
+      ],
+      "title": "ReprocessRequest",
+      "type": "object"
+    },
     "RestaurantContext": {
       "additionalProperties": false,
       "properties": {
@@ -327,6 +346,11 @@
           "format": "uuid",
           "title": "Correlation Id",
           "type": "string"
+        },
+        "statistics_excluded": {
+          "default": true,
+          "title": "Statistics Excluded",
+          "type": "boolean"
         }
       },
       "required": [
@@ -432,6 +456,9 @@
     },
     {
       "$ref": "#/$defs/LocationPurged"
+    },
+    {
+      "$ref": "#/$defs/ReprocessRequest"
     }
   ]
 }
