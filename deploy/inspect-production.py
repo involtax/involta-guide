@@ -10,14 +10,14 @@ def run(*args, input=None):
 
 def main():
     docker = ['docker', '--host=unix:///var/run/docker.sock']
-    containers = run(*docker, 'ps', '--filter', 'label=com.involta.guide.owner=production', '--format', '{{.Names}}').stdout.splitlines()
-    result = {}
+    containers = run(*docker, 'ps', '--filter', 'name=involta-guide', '--format', '{{.Names}}').stdout.splitlines()
+    result = {"containers": containers}
     for name in containers:
-        if name.endswith(('-web-1', '-voice-1', '-voice-worker-1')):
+        if any(part in name for part in ('web', 'voice', 'guide')):
             logs = run(*docker, 'logs', '--since', '60m', '--tail', '500', name)
             lines = (logs.stdout + logs.stderr).splitlines()
             result[name] = [line[:700] for line in lines if re.search(r'Traceback|Error:|Exception:|File "|raise |KeyError|ProgrammingError|IntegrityError|POST .*reprocess', line)][-65:]
-    web = next((n for n in containers if n.endswith('-web-1')), None)
+    web = next((n for n in containers if 'web' in n), None)
     if web:
         program = '''
 import json
