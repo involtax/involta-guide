@@ -26,4 +26,4 @@ existing development PostgreSQL during the Python migration. It contains public
 location metadata, parent slugs, editorial relations and redirects, not reviews,
 restaurant content, user/session data or secrets. It preserves the results of the
 original city import, supplied additions and Moscow navigation decisions. Python
-seed reuses existing canonical slugs/identities and never replaces existing fields.
+seed uses permanent numeric IDs and preserves existing content/geography. Each import replaces nearby_location_ids from this Git file; see docs/LOCATION_IDS.md.

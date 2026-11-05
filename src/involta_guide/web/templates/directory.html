@@ -14,26 +14,7 @@
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-<form class="destination-search" action="{{settings.path('/')}}" method="get" role="search" data-location-search>
-<label for="destination">Куда отправимся?</label>
-<div class="search-control">
-<div class="search-surface">
-<div class="search-input-row">
-<svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-<input id="destination" type="search" name="q" value="{{q}}" maxlength="100" placeholder="Город, район, курорт" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-describedby="search-status">
-<button type="button" class="search-clear" aria-label="Очистить поиск" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-<button type="submit" class="search-submit">Найти</button>
-</div>
-<div class="search-suggestions" hidden inert aria-hidden="true">
-<div class="search-panel-content">
-<div class="search-separator" aria-hidden="true"></div>
-</div>
-</div>
-</div>
-</div>
-<script type="application/json" id="location-catalogue">{{location_catalogue|tojson}}</script>
-<p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
-</form>
+{%with search_action=settings.path('/')%}{%include 'location_search.html'%}{%endwith%}
 <p class="search-intro">Короткие подборки ресторанов в городах, районах и на курортах.<br class="desktop-break"> Выбираем внимательно. Прислушиваемся к вам.</p>
 </section>
 <section class="cities">

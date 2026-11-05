@@ -57,7 +57,7 @@ class RestaurantContext(DTO):
 
 
 class LocationContext(DTO):
-    id: UUID
+    id: StrictInt = Field(ge=1)
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=200)
     name: str
     revision: str | None = None

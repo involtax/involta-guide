@@ -10,7 +10,7 @@ from involta_voice.contracts import LocationContext, RestaurantContext, validate
 def test_rating_is_not_invented_from_positive_words_and_fragments_do_not_overlap():
     restaurant = uuid4()
     context = LocationContext(
-        id=uuid4(),
+        id=1,
         slug="ivanovo",
         name="Иваново",
         content_epoch=1,
@@ -54,7 +54,7 @@ def test_rating_is_not_invented_from_positive_words_and_fragments_do_not_overlap
 
 
 def test_explicit_rating_and_unfinished_restaurant_suggestion_are_valid():
-    context = LocationContext(id=uuid4(), slug="ivanovo", name="Иваново", content_epoch=1)
+    context = LocationContext(id=1, slug="ivanovo", name="Иваново", content_epoch=1)
     transcript = "Оценка 8 из 10, кафе новое"
     result = validate_analysis(
         {

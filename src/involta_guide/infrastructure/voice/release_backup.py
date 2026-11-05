@@ -28,7 +28,7 @@ def main() -> None:
                 version = conn.execute(
                     text("SELECT max(version) FROM voice_schema_versions")
                 ).scalar_one()
-            print("yes" if version < 9 else "no")
+            print("yes" if version < 10 else "no")
         finally:
             engine.dispose()
         return

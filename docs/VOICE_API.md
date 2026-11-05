@@ -20,7 +20,7 @@ Gateway Guide под BASE_PATH `/voice/api/v1`:
 и её `.json` не содержат публичных raw-метаданных или текста отзыва; администратор
 видит полный сохранённый отчёт. Правила доступа и этапы: [LOGS.md](LOGS.md).
 
-SubmissionMetadata v2 содержит location (id, slug, name, revision, **content_epoch**,
+SubmissionMetadata v2 содержит location (id — положительное целое из каталога Guide, slug, name, revision, **content_epoch**,
 restaurants), точное `visitor=guide_visitor`, `idempotency_key`, **raw ip**, полный
 **user_agent**, widget_version, language/timezone, correlation_id. Actor/purpose,
 ip_fingerprint и published_revision удалены. Admin recording — обычный отзыв.

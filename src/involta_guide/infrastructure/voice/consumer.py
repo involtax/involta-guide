@@ -103,7 +103,9 @@ class Consumer:
             reference = None
         try:
             context = event["metadata"]["location"]
-            location_id: str | None = str(UUID(context["id"]))
+            location_id: int | None = context["id"]
+            if type(location_id) is not int or location_id < 1:
+                raise ValueError("Invalid location ID")
             epoch = int(context["content_epoch"])
         except (KeyError, ValueError, TypeError, AttributeError):
             location_id, epoch = None, 0
@@ -198,7 +200,7 @@ class Consumer:
             location = row(
                 conn,
                 "SELECT * FROM locations WHERE id=:id FOR UPDATE",
-                id=str(metadata.location.id),
+                id=metadata.location.id,
             )
             if location is None:
                 raise ValueError("Location identity no longer exists in Guide")
@@ -232,7 +234,7 @@ class Consumer:
                 ordinal = row(
                     conn,
                     "UPDATE locations SET next_review_number=next_review_number+1 WHERE id=:id RETURNING next_review_number n",
-                    id=str(metadata.location.id),
+                    id=metadata.location.id,
                 )
                 execute(
                     conn,
@@ -240,7 +242,7 @@ class Consumer:
                     transcript,status,duration_seconds,created_at,result) VALUES(:id,:location,:epoch,:visitor,:audio,
                     :mime,:sha,:ip,:agent,NULL,'received',:duration,CAST(:created AS timestamptz),'{"entries":[],"suggestions":[]}'::jsonb)""",
                     id=reference,
-                    location=str(metadata.location.id),
+                    location=metadata.location.id,
                     epoch=metadata.location.content_epoch,
                     visitor=metadata.visitor,
                     audio="voice:" + reference,
@@ -256,7 +258,7 @@ class Consumer:
                     """INSERT INTO voice_links(review_id,reference,location_id,number,active_run,metadata)
                     VALUES(:id,:id,:location,:number,:run,CAST(:metadata AS jsonb))""",
                     id=reference,
-                    location=str(metadata.location.id),
+                    location=metadata.location.id,
                     number=ordinal["n"] if ordinal else 1,
                     run=number,
                     metadata=encoded(

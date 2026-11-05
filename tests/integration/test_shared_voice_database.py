@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
 from involta_guide.infrastructure.voice.shared_database import consolidate, digest
-from involta_voice.db import database, migrate, migrate_connection
+from involta_voice.db import database, migrate_connection
 from involta_voice.service import VoiceService
 
 from .test_voice_service import metadata, recording
@@ -48,6 +48,8 @@ def shared_target(voice_database):
 def seed_legacy_recording(settings, engine):
     """Populate each real historical schema without running new code against old columns."""
     data = metadata()
+    legacy_metadata = data.model_dump(mode="json")
+    legacy_metadata["location"]["id"] = str(uuid4())
     reference = str(uuid4())
     audio = recording()
     filename = reference + ".wav"
@@ -55,7 +57,7 @@ def seed_legacy_recording(settings, engine):
     service.storage.root.mkdir(parents=True, exist_ok=True)
     service.storage.path(filename).write_bytes(audio)
     transcript = "Saved original GigaAM text"
-    snapshot = {"location": data.location.model_dump(mode="json"), "transcription_model": "gigaam"}
+    snapshot = {"location": legacy_metadata["location"], "transcription_model": "gigaam"}
     with engine.begin() as conn:
         conn.execute(
             text("""INSERT INTO submissions(reference,location_id,visitor,idempotency_key,payload_hash,metadata,
@@ -63,10 +65,10 @@ def seed_legacy_recording(settings, engine):
           VALUES(:id,:location,:visitor,:key,'legacy-hash',CAST(:metadata AS jsonb),:audio,'audio/wav',6,:size,:sha,'{}',:transcript)"""),
             {
                 "id": reference,
-                "location": str(data.location.id),
+                "location": legacy_metadata["location"]["id"],
                 "visitor": data.visitor,
                 "key": str(data.idempotency_key),
-                "metadata": data.model_dump_json(),
+                "metadata": json.dumps(legacy_metadata),
                 "audio": filename,
                 "size": len(audio),
                 "sha": hashlib.sha256(audio).hexdigest(),
@@ -122,7 +124,8 @@ def test_transfer_preserves_audio_events_sequences_and_old_client_access(
             assert conn.execute(text("SELECT nextval('outbox_sequence_seq')")).scalar_one() == 3
         # Migration 6 may advance the sequence while skipping existing events.
         # Verify transfer before migration; gaps are normal PostgreSQL behavior.
-        migrate(target)
+        with target.begin() as connection:
+            migrate_connection(connection, version=9)
         moved = VoiceService(target, shared_target)
         assert moved.status(reference)["transcript"] == original_text
         with target.connect() as conn:

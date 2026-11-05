@@ -1,6 +1,8 @@
 (() => {
-  const form = document.querySelector('[data-location-search]');
-  if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
+  function mount(form) {
+  if (form.dataset.searchMounted || !window.autoComplete || !window.GuideLocationIndex) return;
+  form.dataset.searchMounted = 'true';
+  const lifecycle = new AbortController();
   let catalogue;
   try { catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent); }
   catch { return; }
@@ -85,6 +87,12 @@
       selection: event => {
         const selected = event.detail.selection?.value;
         if (!selected) return;
+        if (form.hasAttribute('data-location-add')) {
+          if (!Number.isSafeInteger(selected.id) || selected.id < 1) return;
+          form.querySelector('[name=nearby_id]').value = selected.id;
+          form.requestSubmit();
+          return;
+        }
         const url = selected.url;
         // Only canonical Guide links from this origin can be selected.
         const target = new URL(url, location.href);
@@ -147,9 +155,22 @@
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
-  window.addEventListener('resize', fitResults);
-  window.visualViewport?.addEventListener('resize', fitResults);
-  new ResizeObserver(resizeSurface).observe(content);
+  window.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  window.visualViewport?.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  const observer = new ResizeObserver(resizeSurface);
+  observer.observe(content);
+  document.addEventListener('htmx:beforeCleanupElement', event => {
+    if (event.detail.elt === form || event.detail.elt.contains(form)) {
+      lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
+    }
+  }, {signal: lifecycle.signal});
   resizeSurface();
   if (input.value.trim()) begin();
+  }
+  function mountAll(root) {
+    if (root.matches?.('[data-location-search]')) mount(root);
+    root.querySelectorAll('[data-location-search]').forEach(mount);
+  }
+  mountAll(document);
+  document.addEventListener('htmx:load', event => mountAll(event.detail.elt));
 })();

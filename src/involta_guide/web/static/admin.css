@@ -148,3 +148,15 @@
 
 .review-transcripts .recognition-before, .review-transcripts .recognition-after { margin: 0; }
 .review-transcripts .recognition-after { margin-top: 5px; }
+
+/* Nearby is a local city attribute; selection uses the shared location search. */
+.location-nearby .destination-search { margin:20px 0 24px; }
+.location-nearby h3 { font-size:23px;margin-bottom:10px; }
+.location-nearby h3 small { display:inline;font:12px Arial,sans-serif;color:var(--muted);margin-left:8px; }
+.nearby-row { display:flex;align-items:center;gap:16px;padding:15px 0;border-top:1px solid var(--line); }
+.nearby-row > span { flex:1;min-width:0; }
+.nearby-row strong,.nearby-row small { display:block; }
+.nearby-row small { color:var(--muted);font-size:12px;margin-top:4px; }
+.nearby-row form { margin:0; }
+.nearby-row button { background:transparent;color:var(--muted);padding:8px;border:0;font-size:12px; }
+.nearby-search-results { margin-top:24px; }

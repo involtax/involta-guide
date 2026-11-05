@@ -13,19 +13,18 @@ class LocationService:
     def __init__(self, uow: UowFactory) -> None:
         self.uow = uow
 
-    def save(self, key: str | None, values: Record) -> str:
+    def save(self, key: int | None, values: Record) -> int:
         with self.uow() as uow:
             repo = uow.repo
-            target = key or str(uuid4())
+            target = key
             data = values.copy()
-            related = data.pop("related_ids", [])
             if data["slug"] in {"new", "export"}:
                 raise RuleViolation("Этот URL зарезервирован для служебного раздела")
             if any(row["id"] != target for row in repo.rows("locations", {"slug": data["slug"]})):
                 raise RuleViolation("Этот URL уже занят другой локацией")
             if key:
                 require(repo, "locations", key, lock=True)
-            if data["parent_id"] == target or target in related:
+            if target is not None and data["parent_id"] == target:
                 raise RuleViolation("Локация не может ссылаться на себя")
             if data["parent_id"]:
                 parent = require(repo, "locations", data["parent_id"])
@@ -33,7 +32,7 @@ class LocationService:
                     raise RuleViolation("Сначала включите родительскую локацию")
                 if target in {row["id"] for row in repo.tree(data["parent_id"], ancestors=True)}:
                     raise RuleViolation("Нельзя создавать цикл")
-            children = [r for r in repo.tree(target)[1:] if r["active"]] if key else []
+            children = [r for r in repo.tree(key)[1:] if r["active"]] if key else []
             if not data["active"] and children:
                 raise RuleViolation("Сначала отключите дочерние локации")
             # is_hub is explicit; the hierarchy remains navigation, never shared ownership.
@@ -43,14 +42,32 @@ class LocationService:
                     raise Conflict("Сброс не завершён")
             data["is_hub"] = bool(data["is_hub"])
             if key:
-                repo.change("locations", target, data)
+                repo.change("locations", key, data)
             else:
-                repo.add("locations", {"id": target, **data})
-            repo.replace_relations(target, related)
+                target = int(repo.add("locations", data)["id"])
+            assert target is not None
             repo.audit("location", target, json.dumps(values, ensure_ascii=False))
-            return target
+            return int(target)
 
-    def save_intro(self, key: str, text: str, expected: str | None, actor: str) -> bool:
+    def nearby(self, key: int, other: int, *, remove: bool = False) -> None:
+        with self.uow() as uow:
+            repo = uow.repo
+            location = require(repo, "locations", key, lock=True)
+            require(repo, "locations", other)
+            if key == other:
+                raise RuleViolation("Локация не может ссылаться на себя")
+            before = location["nearby_location_ids"]
+            after = (
+                [value for value in before if value != other]
+                if remove
+                else list(dict.fromkeys([*before, other]))
+            )
+            if after == before:
+                return
+            repo.change("locations", key, {"nearby_location_ids": after})
+            repo.audit("location_nearby", key, json.dumps({"before": before, "after": after}))
+
+    def save_intro(self, key: int, text: str, expected: str | None, actor: str) -> bool:
         if len(text) > 30000 or "\x00" in text:
             raise RuleViolation("Вступление: до 30000 символов, без нулевого символа")
         with self.uow() as uow:
@@ -105,7 +122,7 @@ class Queries:
         with self.uow() as uow:
             return uow.repo.summary()
 
-    def get(self, table: str, key: str) -> Record:
+    def get(self, table: str, key: str | int) -> Record:
         with self.uow() as uow:
             return require(uow.repo, table, key)
 
@@ -113,7 +130,7 @@ class Queries:
         with self.uow() as uow:
             return uow.repo.rows(table, filters, limit=limit)
 
-    def location(self, key: str) -> Record:
+    def location(self, key: int) -> Record:
         from .editorial import current_content
 
         with self.uow() as uow:
@@ -127,7 +144,7 @@ class Queries:
                 "location": location,
                 "content": {**report, **current_content(repo, location)},
                 "available": repo.available(key),
-                "related_ids": [row["id"] for row in repo.related(key)],
+                "nearby": repo.related(key),
                 "parents": repo.tree(key, ancestors=True),
             }
 
@@ -137,7 +154,9 @@ class Queries:
             if not rows:
                 raise NotFound("Локация не найдена")
             key = rows[0]["id"]
-            events = uow.repo.rows("audit", {"action": "manual_intro", "target": key}, limit=1000)
+            events = uow.repo.rows(
+                "audit", {"action": "manual_intro", "target": str(key)}, limit=1000
+            )
             for event in events:
                 event["data"] = json.loads(event["detail"])
         return {**self.location(key), "intro_events": events}
@@ -154,7 +173,7 @@ class Queries:
         ]
         return result
 
-    def restaurant_browser(self, query: str = "", location_id: str | None = None) -> Record:
+    def restaurant_browser(self, query: str = "", location_id: int | None = None) -> Record:
         from involta_guide.domain.rules import (
             FACTOR_LABELS,
             FACTORS,
@@ -233,15 +252,7 @@ class Queries:
                 child["child_count"] = sum(
                     r["parent_id"] == child["id"] and r["active"] for r in tree
                 )
-            related = [
-                r
-                for r in repo.related(location["id"])
-                if r["active"]
-                and (
-                    r["listed"]
-                    or any(item["initialized_at"] is not None for item in repo.tree(r["id"]))
-                )
-            ]
+            related = repo.related(location["id"])
             return {
                 "location": location,
                 "redirect": redirect,

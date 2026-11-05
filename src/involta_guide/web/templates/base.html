@@ -16,6 +16,10 @@
 {% if admin_ui|default(false) %}
 <script defer src="{{ settings.path('/assets/htmx.min.js') }}">
 </script>
+<link rel="stylesheet" href="{{settings.path('/assets/location-search/location-search.css')}}">
+<script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
+<script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
+<script defer src="{{settings.path('/assets/location-search/location-search.js')}}"></script>
 <script defer src="{{ settings.path('/assets/admin.js') }}">
 </script>
 {% endif %}

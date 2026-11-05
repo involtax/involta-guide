@@ -162,7 +162,7 @@ class Worker:
         from .reset import lock_epoch
 
         try:
-            lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
+            lock_epoch(conn, submission["location_id"], submission["content_epoch"])
         except VoiceError:
             raise ProviderFailure("Content epoch changed", unknown=True) from None
         valid = row(

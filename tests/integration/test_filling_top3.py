@@ -129,6 +129,9 @@ def test_contract_violation_is_saved_without_publication_or_another_post(databas
 def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(database):
     settings, engine, _, queries, city, service, _ = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
+    # Exercise the historical prompt chain without reversing the later,
+    # intentionally irreversible numeric-identity migration in this fixture.
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     custom = "Авторский промпт до ограниченного исследования. " * 2
     with engine.begin() as connection:
@@ -159,7 +162,7 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
             ),
             {"job": submitted["id"], "usage": usage, "body": json.dumps(recorded)},
         )
-    command.upgrade(config, "head")
+    command.upgrade(config, "audience_stats")
     with engine.connect() as connection:
         actual = connection.execute(
             text("SELECT value FROM settings WHERE key='prompt'")
@@ -176,10 +179,10 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         )
     assert queries.get("jobs", pending["id"])["prompt"] == custom
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
-    command.upgrade(config, "head")
+    command.upgrade(config, "audience_stats")
     with engine.begin() as connection:
         connection.execute(text("UPDATE settings SET value='Ручная правка' WHERE key='prompt'"))
-    command.upgrade(config, "head")
+    command.upgrade(config, "audience_stats")
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT value FROM settings WHERE key='prompt'")).scalar_one()
