@@ -296,7 +296,9 @@ def test_shared_search_adds_only_current_city_after_htmx_navigation(database):
     screenshots.mkdir(parents=True, exist_ok=True)
     with TestClient(create_app(settings)) as client, sync_playwright() as p:
         login(client)
-        browser = p.chromium.launch(args=["--no-sandbox"])
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
         page = browser.new_page(viewport={"width": 1440, "height": 1100})
         errors = []
         requests = []

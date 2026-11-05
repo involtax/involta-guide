@@ -21,6 +21,7 @@ from .config import Settings
 from .contracts import (
     LocationPurged,
     LocationReset,
+    ReprocessRequest,
     SubmissionMetadata,
     SubmissionStatus,
 )
@@ -113,6 +114,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     dependencies = [Depends(authorized)]
+
+    @app.post(
+        "/internal/v1/admin/submissions/{reference}/reprocess",
+        dependencies=dependencies,
+        status_code=202,
+    )
+    def reprocess(reference: UUID, body: ReprocessRequest, request: Request) -> Any:
+        actor = request.headers.get("x-guide-session")
+        if actor:
+            actor = str(UUID(actor))
+        return service.reprocess(str(reference), body, actor)
 
     @app.post(
         "/internal/v1/locations/{location_id}/reset",

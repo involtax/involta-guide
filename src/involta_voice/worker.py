@@ -325,6 +325,11 @@ class Worker:
             self.complete(conn, stage)
             if engine != "gigaam" or request.get("variant", "onnx") != primary_variant(snapshot):
                 return
+            active = row(
+                conn, "SELECT active_run FROM submissions WHERE reference=:id", id=reference
+            )
+            if not active or active["active_run"] != number:
+                return
             if snapshot.get("restore_dictionary_case"):
                 location = snapshot["location"]
                 transcript = restore_names(

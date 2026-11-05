@@ -10,7 +10,6 @@ import json
 import os
 import re
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid5
 
 from alembic import op
 from sqlalchemy import text
@@ -46,10 +45,8 @@ def upgrade() -> None:
     }
     catalog = json.loads((Path(__file__).parents[2] / "data/location-catalog.json").read_text())
     by_slug = {item["slug"]: item["id"] for item in catalog["locations"]}
-    by_uuid = {
-        str(uuid5(NAMESPACE_URL, "https://involta.ru/guide/" + slug)): number
-        for slug, number in by_slug.items()
-    }
+    # Frozen pre-cutover identities: catalogue URL edits must not change this map.
+    by_uuid = json.loads((Path(__file__).parents[1] / "data/location_id_uuids.json").read_text())
     conn.exec_driver_sql(
         "CREATE TEMP TABLE location_id_map(old uuid PRIMARY KEY, new integer UNIQUE NOT NULL) ON COMMIT DROP"
     )

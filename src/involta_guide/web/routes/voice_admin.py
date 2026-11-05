@@ -1,6 +1,6 @@
 from typing import Any
 from urllib.parse import urlencode
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
@@ -18,7 +18,7 @@ from involta_guide.web.http import (
     require_diagnostics,
 )
 from involta_guide.web.routes.admin import render
-from involta_guide.web.routes.voice import voice_client
+from involta_guide.web.routes.voice import current_location_context, voice_client
 from involta_voice.variants import PRIMARY_VARIANT, RESULTS, VARIANT_LABELS
 
 
@@ -42,6 +42,7 @@ def routes(prefix: str) -> APIRouter:
             except VoiceUnavailable as exc:
                 unavailable = str(exc)
         for review in listing["rows"]:
+            review["reprocess_key"] = str(uuid4())
             review["pair"] = comparisons.get(
                 review["reference"],
                 [
@@ -68,6 +69,12 @@ def routes(prefix: str) -> APIRouter:
             review["pair"] = [
                 candidate for candidate in review["pair"] if candidate.get("name") == "GigaAM"
             ]
+            review["recognizing"] = any(
+                c.get("primary") and c.get("state") in ("queued", "running") for c in review["pair"]
+            )
+            review["reprocessing"] = review["recognizing"] and any(
+                c.get("primary") and c.get("run", 1) > 1 for c in review["pair"]
+            )
         return render(
             request,
             "voice_admin.html",
@@ -238,6 +245,50 @@ def routes(prefix: str) -> APIRouter:
                     encoded({"actor": principal["id"], "slug": slug, "number": number}),
                 )
         return RedirectResponse(base + "/" + slug, status_code=303)
+
+    @router.post(base + "/{slug}/{number:int}/reprocess")
+    def reprocess(
+        request: Request, slug: str, number: int, form: FormData = Depends(form_data)
+    ) -> Response:
+        principal = require_admin(request)
+        check_csrf(request, form)
+        from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+        from involta_voice.contracts import ReprocessRequest
+        from involta_voice.db import encoded
+
+        ctx = context(request)
+        read = VoiceReadModel(ctx.engine)
+        identity, _ = read.resolve(slug, number)
+        detail = read.detail(identity)
+        if detail["review"]["status"] == "deleted" or not detail["link"]:
+            raise HTTPException(404, "Исходный отзыв недоступен")
+        location = detail["location"]
+        if (
+            location["reset_pending"]
+            or detail["review"]["content_epoch"] != location["content_epoch"]
+        ):
+            raise HTTPException(409, "Контекст отзыва устарел")
+        try:
+            key = UUID(str(form.get("idempotency_key") or ""))
+        except ValueError:
+            raise HTTPException(400, "Некорректный ключ перераспознавания") from None
+        body = ReprocessRequest(
+            location=current_location_context(request, location),
+            idempotency_key=key,
+        )
+        result = voice_client(request).json(
+            "POST",
+            "/admin/submissions/" + str(detail["link"]["reference"]) + "/reprocess",
+            json=body.model_dump(mode="json"),
+            actor_session=principal["id"],
+        )
+        with PostgresUow(ctx.engine) as uow:
+            uow.repo.audit(
+                "review_reprocess",
+                identity,
+                encoded({"actor": principal["id"], "run": result["run"], "state": result["state"]}),
+            )
+        return RedirectResponse(base + "/" + slug + "/" + str(number), status_code=303)
 
     @router.get(prefix + "/logs/reviews/{slug}/{number:int}/audio")
     def audio(request: Request, slug: str, number: int, playback: bool = False) -> Response:

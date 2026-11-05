@@ -48,7 +48,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
         submissions = (
             conn.execute(
                 text(
-                    "SELECT s.reference,s.transcript,r.snapshot FROM submissions s JOIN runs r ON r.submission=s.reference AND r.number=s.active_run WHERE s.reference=ANY(CAST(:ids AS uuid[]))"
+                    "SELECT s.reference,s.transcript,s.active_run,r.snapshot FROM submissions s JOIN runs r ON r.submission=s.reference AND r.number=s.active_run WHERE s.reference=ANY(CAST(:ids AS uuid[]))"
                 ),
                 {"ids": references},
             )
@@ -111,8 +111,13 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
             # Existing reviews retain their saved profiles; no comparison is scheduled by reads.
             if candidate is None and stage is None:
                 continue
+            current_stage = stage if stage and stage["run"] == submission["active_run"] else None
             request = (
-                candidate["settings"] if candidate else (stage["request"] or {}) if stage else {}
+                (current_stage["request"] or {})
+                if current_stage
+                else candidate["settings"]
+                if candidate
+                else {}
             )
             pair.append(
                 {
@@ -124,6 +129,7 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     "max_active_paths": request.get("max_active_paths"),
                     "hotwords_score": request.get("hotwords_score"),
                     "primary": variant == primary_variant(submission["snapshot"]),
+                    "run": submission["active_run"],
                     "review_text_format": submission["snapshot"].get("review_text_format")
                     if variant == primary_variant(submission["snapshot"])
                     else None,
@@ -136,12 +142,12 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     )
                     if candidate
                     else None,
-                    "state": "completed"
+                    "state": current_stage["state"]
+                    if current_stage
+                    else "completed"
                     if candidate
-                    else stage["state"]
-                    if stage
                     else "not_scheduled",
-                    "error": stage["error"] if stage and not candidate else None,
+                    "error": current_stage["error"] if current_stage else None,
                 }
             )
         result[ref] = pair
