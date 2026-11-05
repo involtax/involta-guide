@@ -455,6 +455,69 @@ def test_form_dictionary_is_frozen_and_inflections_are_published_without_changin
     assert not Worker(engine, settings, Raw()).once()
 
 
+@pytest.mark.parametrize("old_run", [False, True])
+def test_review_cleanup_is_frozen_preserves_raw_and_does_not_join_city_names(
+    voice_database, old_run
+):
+    from involta_voice.text import REVIEW_TEXT_FORMAT
+
+    settings, engine = voice_database
+    settings = settings.model_copy(update={"asr_beta_enabled": True})
+    service = VoiceService(engine, settings)
+    meta = metadata()
+    meta.location.recognition_dictionary = ["Иваново", "Алхимист", "Горы"]
+    ref = service.submit(meta, recording(), "audio/wav")["reference"]
+    with engine.begin() as conn:
+        frozen = conn.execute(
+            text("SELECT snapshot FROM runs WHERE submission=:id"), {"id": ref}
+        ).scalar_one()
+        assert frozen["review_text_format"] == REVIEW_TEXT_FORMAT
+        if old_run:
+            conn.execute(
+                text("UPDATE runs SET snapshot=snapshot-'review_text_format' WHERE submission=:id"),
+                {"id": ref},
+            )
+    raw_text = "Э-э, хочу в алхимист. Также ресторан. горы. Также ресторан. Иваново."
+
+    class Raw(FakeProvider):
+        def call(self, *args):
+            return {"status_code": 200, "body": json.dumps({"text": raw_text})}
+
+    worker = Worker(engine, settings, Raw())
+    assert worker.once() and not worker.once()
+    expected = (
+        "Э-э, хочу в Алхимист. Также ресторан. Горы. Также ресторан. Иваново."
+        if old_run
+        else "Хочу в Алхимист. Также ресторан Горы. Также ресторан. Иваново."
+    )
+    assert service.status(ref)["transcript"] == expected
+    report = reports(engine, [ref])[ref][0]
+    assert report["raw_text"] == raw_text
+    assert report["text"] == expected
+    assert report["review_text_format"] == (None if old_run else REVIEW_TEXT_FORMAT)
+
+
+def test_hesitation_only_recording_keeps_raw_but_does_not_publish_empty_text(voice_database):
+    settings, engine = voice_database
+    service = VoiceService(engine, settings)
+    ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
+
+    class Raw(FakeProvider):
+        def call(self, *args):
+            return {"status_code": 200, "body": json.dumps({"text": "Э-э, а-а..."})}
+
+    worker = Worker(engine, settings, Raw())
+    assert worker.once() and not worker.once()
+    status = service.status(ref)
+    assert status["state"] == "transcription_failed"
+    assert status["transcript"] is None
+    with engine.connect() as conn:
+        raw = conn.execute(
+            text("SELECT raw_response FROM stages WHERE submission=:id"), {"id": ref}
+        ).scalar_one()
+        assert json.loads(raw["body"])["text"] == "Э-э, а-а..."
+
+
 def test_accepted_old_primary_retains_five_eight_source_and_exact_normalization(voice_database):
     settings, engine = voice_database
     settings = settings.model_copy(update={"asr_beta_enabled": True})

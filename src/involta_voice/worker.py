@@ -12,7 +12,7 @@ from .db import database, encoded, execute, row
 from .errors import VoiceError
 from .provider import FakeProvider, ProviderFailure, VoiceProvider
 from .service import VoiceService
-from .text import restore_names
+from .text import REVIEW_TEXT_FORMAT, clean_review_text, restore_names
 from .variants import STAGES, primary_kind, primary_variant, result_identity
 
 
@@ -325,6 +325,11 @@ class Worker:
             self.complete(conn, stage)
             if engine != "gigaam" or request.get("variant", "onnx") != primary_variant(snapshot):
                 return
+            active = row(
+                conn, "SELECT active_run FROM submissions WHERE reference=:id", id=reference
+            )
+            if not active or active["active_run"] != number:
+                return
             if snapshot.get("restore_dictionary_case"):
                 location = snapshot["location"]
                 transcript = restore_names(
@@ -332,6 +337,18 @@ class Worker:
                     [location["name"], *location.get("recognition_dictionary", [])],
                     forms=snapshot.get("name_forms"),
                 )
+            if snapshot.get("review_text_format") == REVIEW_TEXT_FORMAT:
+                location = snapshot["location"]
+                transcript = clean_review_text(
+                    transcript,
+                    [
+                        name
+                        for name in location.get("recognition_dictionary", [])
+                        if name != location["name"]
+                    ],
+                )
+                if not any(c.isalnum() for c in transcript):
+                    raise ValueError("После очистки в записи не осталось текста отзыва")
             execute(
                 conn,
                 "UPDATE submissions SET transcript=:text WHERE reference=:id",

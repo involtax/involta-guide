@@ -21,6 +21,38 @@ def voice_client(request: Request) -> VoiceClient:
     )
 
 
+def current_location_context(request: Request, location: dict[str, Any]) -> LocationContext:
+    ctx = context(request)
+    selected = ctx.queries.location(location["id"])
+    with ctx.engine.connect() as conn:
+        names = list(
+            conn.execute(
+                sql_text("SELECT name FROM restaurants WHERE location_id=:id ORDER BY name,id"),
+                {"id": location["id"]},
+            ).scalars()
+        )
+    from involta_voice.variants import dictionary_names
+
+    return LocationContext(
+        id=location["id"],
+        slug=location["slug"],
+        name=location["name"],
+        revision=location["revision"],
+        content_epoch=location["content_epoch"],
+        recognition_dictionary=dictionary_names([location["name"], *names]),
+        restaurants=[
+            RestaurantContext(
+                id=r["id"],
+                name=r["name"],
+                phone=r.get("phone") or "",
+                description=r.get("description") or "",
+                openingHours=r.get("openingHours"),
+            )
+            for r in selected["available"]
+        ][:200],
+    )
+
+
 def owner(request: Request) -> str:
     visitor = request.cookies.get("guide_visitor", "")
     try:
@@ -225,39 +257,9 @@ def routes(prefix: str) -> APIRouter:
             audio = form.get("audio")
             if not isinstance(audio, UploadFile):
                 raise HTTPException(400, "Нужна аудиозапись")
-            selected = ctx.queries.location(location["id"])
-            # The ASR dictionary includes the whole city catalogue, not just its public top.
-            with ctx.engine.connect() as conn:
-                names = list(
-                    conn.execute(
-                        sql_text(
-                            "SELECT name FROM restaurants WHERE location_id=:id ORDER BY name,id"
-                        ),
-                        {"id": location["id"]},
-                    ).scalars()
-                )
-            from involta_voice.variants import dictionary_names
-
             visitor = owner(request)
             metadata = SubmissionMetadata(
-                location=LocationContext(
-                    id=location["id"],
-                    slug=location["slug"],
-                    name=location["name"],
-                    revision=location["revision"],
-                    content_epoch=epoch,
-                    recognition_dictionary=dictionary_names([location["name"], *names]),
-                    restaurants=[
-                        RestaurantContext(
-                            id=r["id"],
-                            name=r["name"],
-                            phone=r.get("phone") or "",
-                            description=r.get("description") or "",
-                            openingHours=r.get("openingHours"),
-                        )
-                        for r in selected["available"]
-                    ][:200],
-                ),
+                location=current_location_context(request, location),
                 visitor=visitor,
                 statistics_excluded=bool(
                     await run_in_threadpool(ctx.security.principal, admin_token(request))

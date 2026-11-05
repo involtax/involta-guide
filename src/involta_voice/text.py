@@ -5,6 +5,56 @@ from functools import cache
 from typing import Any
 
 CASES = ("nomn", "gent", "datv", "accs", "ablt", "loct", "loc2", "gen2")
+REVIEW_TEXT_FORMAT = "hesitations-restaurant-fragments-v1"
+HESITATION = re.compile(
+    r"(?<![\w\-‐‑–—])(?:э(?:[\-‐‑–—]?э)+|а[\-‐‑–—]а(?:[\-‐‑–—]а)*)(?![\w\-‐‑–—])"
+    r"(?:[ \t]*[,;:][ \t]*)?",
+    re.IGNORECASE,
+)
+
+
+def remove_hesitations(text: str) -> str:
+    """Remove elongated э/а only, retaining ordinary words and sentence pauses."""
+    matches = list(HESITATION.finditer(text))
+    if not matches:
+        return text
+    for match in reversed(matches):
+        before, after = text[: match.start()], text[match.end() :]
+        if not before.strip() or re.search(r"[.!?…]\s*$", before):
+            after = re.sub(r"^(\s*[«„“\"(]*)([а-яё])", lambda m: m[1] + m[2].upper(), after)
+        text = before + after
+    text = re.sub(r"[,;:][ \t]*(?=[.!?…])", "", text)
+    text = re.sub(r"([.!?…])[ \t]+[.!?…]+", r"\1", text)
+    text = re.sub(r"[ \t]+([,.!?;:…])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text).strip()
+    if matches[0].start() == 0:
+        text = text.lstrip(",;:.!?… \t")
+        text = re.sub(r"^([а-яё])", lambda m: m[1].upper(), text)
+    return text
+
+
+def join_restaurant_fragments(text: str, restaurant_names: list[str]) -> str:
+    """Join an explicit listing fragment only to an exact known restaurant name."""
+    names = sorted(
+        {" ".join(n.split()) for n in restaurant_names if n.strip()}, key=len, reverse=True
+    )
+    if not names:
+        return text
+    labels = "|".join(r"\s+".join(re.escape(word) for word in name.split()) for name in names)
+    pattern = (
+        r"(?P<boundary>^|[.!?…]\s+)(?P<head>(?:Также|Ещё|Еще)\s+ресторан)\.[ \t]+"
+        r"(?P<name>" + labels + r")(?![\w\-‐‑–—])"
+    )
+    return re.sub(
+        pattern,
+        lambda m: m["boundary"] + m["head"] + " " + m["name"],
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
+def clean_review_text(text: str, restaurant_names: list[str]) -> str:
+    return join_restaurant_fragments(remove_hesitations(text), restaurant_names)
 
 
 @cache
