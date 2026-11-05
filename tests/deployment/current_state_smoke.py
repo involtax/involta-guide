@@ -141,7 +141,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "city_surroundings"
+                    == "unbiased_city_scope"
                 )
                 assert conn.execute("SELECT sum(hits) FROM audience_daily").fetchone()[0] == 3
                 conn.execute("DROP TABLE unrelated_sentinel")
