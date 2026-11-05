@@ -124,6 +124,9 @@ def reports(engine: Engine, references: list[str]) -> dict[str, Any]:
                     "max_active_paths": request.get("max_active_paths"),
                     "hotwords_score": request.get("hotwords_score"),
                     "primary": variant == primary_variant(submission["snapshot"]),
+                    "review_text_format": submission["snapshot"].get("review_text_format")
+                    if variant == primary_variant(submission["snapshot"])
+                    else None,
                     "raw_text": candidate["transcript"] if candidate else None,
                     "text": (
                         submission["transcript"]
