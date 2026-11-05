@@ -1,7 +1,8 @@
 """Destination scope without extra locations or live research calls."""
 
 import json
-from importlib import import_module
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -20,7 +21,12 @@ from .test_editorial import CONTENT
 from .test_filling_top3 import shortlist
 from .test_jobs import setup
 
-CONTRACT = import_module("migrations.versions.city_surroundings")
+SPEC = spec_from_file_location(
+    "city_surroundings", Path(__file__).resolve().parents[2] / "migrations/versions/city_surroundings.py"
+)
+assert SPEC and SPEC.loader
+CONTRACT = module_from_spec(SPEC)
+SPEC.loader.exec_module(CONTRACT)
 
 
 @pytest.mark.parametrize(
