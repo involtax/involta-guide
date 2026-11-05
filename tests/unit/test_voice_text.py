@@ -69,3 +69,7 @@ def test_inflections_never_include_derived_adjectives_or_guessed_brands():
     )
     assert restore_names("иваново", names, forms=forms) == "Иваново"
     assert restore_names("в плесе", names, forms=forms) == "в Плёсе"
+
+
+def test_old_exact_matching_keeps_first_catalogue_spelling():
+    assert restore_names("плёс", ["Плёс", "плёс"]) == "Плёс"

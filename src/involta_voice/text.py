@@ -93,11 +93,13 @@ def catalogue_forms(names: list[str], *, city: str = "") -> dict[str, str]:
 
 def restore_names(text: str, names: list[str], *, forms: dict[str, str] | None = None) -> str:
     # Old runs have no frozen forms and keep their original exact-match behaviour.
-    variants = (
-        forms
-        if forms is not None
-        else {" ".join(n.split()).lower(): " ".join(n.split()) for n in names if n.strip()}
-    )
+    variants = forms
+    if variants is None:
+        variants = {}
+        for name in names:
+            name = " ".join(name.split())
+            if name:
+                variants.setdefault(name.lower(), name)
     if not variants:
         return text
     keys = sorted(variants, key=len, reverse=True)
