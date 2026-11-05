@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
@@ -69,7 +69,13 @@ jobs:
       # Sherpa's CMake cache retains an isolated build interpreter's temporary path.
       # A restored uv source/build cache can point to a Python that no longer exists.
       - run: uv sync --frozen --extra voice-local --no-cache
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Ensure FFmpeg is available
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
       - run: uv run ruff check src tests migrations deploy
       - run: uv run ruff format --check src tests migrations deploy
       - run: uv run mypy
@@ -125,7 +131,7 @@ jobs:
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
