@@ -175,20 +175,57 @@ main {
   margin: 0 auto;
 }
 .about-page {
-  max-width: 780px;
-  padding-top: 64px;
-  padding-bottom: 80px;
+  max-width: 720px;
+  padding: 32px 25px 40px;
 }
-.about-page h1 {
-  font-size: clamp(44px, 7vw, 72px);
-  margin-bottom: 32px;
+.about-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.about-page p {
-  margin-bottom: 24px;
+.about-steps > li {
+  padding: 25px 0 28px;
+  border-top: 1px solid var(--line);
 }
-.about-back {
-  display: inline-block;
-  margin-top: 20px;
+.about-steps > li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.about-steps > li:last-child {
+  padding-bottom: 0;
+}
+.about-steps h2 {
+  margin: 0 0 17px;
+  font-size: clamp(36px, 10.7vw, 48px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+.about-steps h2 em {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+}
+.about-steps p {
+  max-width: 540px;
+  margin: 0;
+  color: var(--black);
+  font-size: 17px;
+  line-height: 1.5;
+}
+@media (min-width: 760px) {
+  .about-page {
+    padding: 48px 40px 56px;
+  }
+  .about-steps > li {
+    padding: 30px 0 34px;
+  }
+  .about-steps h2 {
+    margin-bottom: 20px;
+    font-size: 60px;
+  }
+  .about-steps p {
+    font-size: 19px;
+  }
 }
 .hero {
   padding: 75px 0 60px;
@@ -1092,7 +1129,7 @@ pre.audit-json {
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-<form class="destination-search" action="/guide/" method="get" role="search" data-location-search>
+<form class="destination-search" action="/guide/" method="get" role="search" data-location-search data-catalogue-url="/guide/api/locations/catalogue">
 <label for="destination">Куда отправимся?</label>
 <div class="search-control">
 <div class="search-surface">
@@ -1109,7 +1146,6 @@ pre.audit-json {
 </div>
 </div>
 </div>
-<script type="application/json" id="location-catalogue">[{"context": "Город · Новгородская область", "name": "Великий Новгород", "url": "/guide/velikiy-novgorod"}, {"context": "Город · Нижегородская область", "name": "Нижний Новгород", "url": "/guide/nizhniy-novgorod"}, {"context": "Город · Новосибирская область", "name": "Новосибирск", "url": "/guide/novosibirsk"}, {"context": "Город · Краснодарский край", "name": "Новороссийск", "url": "/guide/novorossiysk"}, {"context": "Город · Тульская область", "name": "Новомосковск", "url": "/guide/novomoskovsk"}, {"context": "Город · Ямало-Ненецкий автономный округ", "name": "Новый Уренгой", "url": "/guide/novyy-urengoy"}, {"context": "Город · Ивановская область", "name": "Плёс", "url": "/guide/plyos"}, {"context": "Город · Ярославская область", "name": "Переславль-Залесский", "url": "/guide/pereslavl-zalesskiy"}, {"context": "Город · Краснодарский край", "name": "Сочи", "url": "/guide/sochi"}, {"context": "Город · Ивановская область", "name": "Иваново", "url": "/guide/ivanovo"}]</script>
 <p id="search-status" role="status" aria-live="polite" class="sr-only"></p>
 </form>
 <p class="search-intro">Короткие подборки ресторанов в городах, районах и на курортах.<br class="desktop-break"> Выбираем внимательно. Прислушиваемся к вам.</p>
@@ -1187,9 +1223,11 @@ pre.audit-json {
 </section>
 </main>
 
+
 <footer>
 <a href="/guide/about">Я тут в первый раз</a>
 </footer>
+
 
 
 
@@ -1454,19 +1492,28 @@ window.GuideLocationIndex = catalogue => {
 
 </script>
 <script>
+const demoCatalogue=[{"name": "Великий Новгород", "context": "Новгородская область", "location": "velikiy-novgorod"}, {"name": "Нижний Новгород", "context": "Нижегородская область", "location": "nizhniy-novgorod"}, {"name": "Новосибирск", "context": "Новосибирская область", "location": "novosibirsk"}, {"name": "Новороссийск", "context": "Краснодарский край", "location": "novorossiysk"}, {"name": "Новомосковск", "context": "Тульская область", "location": "novomoskovsk"}, {"name": "Новый Уренгой", "context": "Ямало-Ненецкий автономный округ", "location": "novyy-urengoy"}, {"name": "Плёс", "context": "Ивановская область", "location": "plyos"}, {"name": "Переславль-Залесский", "context": "Ярославская область", "location": "pereslavl-zalesskiy"}, {"name": "Сочи", "context": "Краснодарский край", "location": "sochi"}, {"name": "Иваново", "context": "Ивановская область", "location": "ivanovo"}];
 
-const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');demoNote.textContent='Демо · тестовые названия. Поиск в памяти, без запросов и задержки. Введите «и», «пл» или «очи».';
+window.fetch=async()=>new Response(JSON.stringify(demoCatalogue),{headers:{'Content-Type':'application/json'}});
+const demoNote=document.createElement('div');demoNote.className='demo-note';demoNote.setAttribute('role','status');demoNote.textContent='Демо · тестовые названия. Одна загрузка каталога эмулирована; поиск в памяти без задержки. Введите «и», «пл» или «очи».';
 document.querySelector('.header').after(demoNote);
 document.querySelector('form[data-location-search]').addEventListener('submit',event=>{event.preventDefault();demoNote.textContent='Демо: поиск «'+event.target.querySelector('input[name=q]').value+'». Переход отключён.';requestAnimationFrame(()=>event.target.querySelector('input[name=q]').dispatchEvent(new Event('input',{bubbles:true})));});
 document.addEventListener('click',event=>{const link=event.target.closest('a');if(link){event.preventDefault();demoNote.textContent='Демо: переход «'+link.textContent.trim()+'».';}});
 
 </script>
 <script>
-(() => {
+(async () => {
   const form = document.querySelector('[data-location-search]');
   if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
   let catalogue;
-  try { catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent); }
+  try {
+    const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
+    if (!response.ok) return;
+    catalogue = await response.json();
+    if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
+      typeof item.name !== 'string' || typeof item.context !== 'string' ||
+      typeof item.location !== 'string' || !item.location)) return;
+  }
   catch { return; }
   const search = GuideLocationIndex(catalogue);
   const input = form.querySelector('input[name="q"]');
@@ -1536,8 +1583,8 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
     events: {input: {
       input: () => begin(),
       focus: () => { if (!composing && !expanded) begin(); },
-      // A populated search stays open when focus moves elsewhere.
-      blur: () => {},
+      // Keep the query, but fold the panel when focus leaves the input.
+      blur: () => widget.close(),
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
         if (event.key === 'Escape') { event.preventDefault(); return; }
@@ -1549,15 +1596,14 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
       selection: event => {
         const selected = event.detail.selection?.value;
         if (!selected) return;
-        const url = selected.url;
-        // Only canonical Guide links from this origin can be selected.
-        const target = new URL(url, location.href);
-        if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
+        // The catalogue stores a slug; the Guide prefix belongs to the form.
+        const target = new URL(encodeURIComponent(selected.location), form.action);
+        if (target.origin === location.origin && target.pathname.startsWith(new URL(form.action).pathname)) {
           input.value = selected.name; demoNote.textContent = 'Демо: выбрано «' + selected.name + '».'; requestAnimationFrame(() => input.dispatchEvent(new Event('input', {bubbles:true})));
         }
       },
       open: () => {
-        if (!input.value.trim()) { widget.close(); return; }
+        if (!input.value.trim() || document.activeElement !== input) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -1620,7 +1666,7 @@ document.addEventListener('click',event=>{const link=event.target.closest('a');i
 
 </script>
 <script>
-const demoInput=document.querySelector("input[name=q]");demoInput.value="нов";demoInput.dispatchEvent(new Event("input",{bubbles:true}));
+const demoInput=document.querySelector("input[name=q]");demoInput.value="нов";demoInput.focus({preventScroll:true});demoInput.dispatchEvent(new Event("input",{bubbles:true}));
 </script>
 </body>
 </html>

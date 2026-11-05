@@ -66,7 +66,7 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
             else:
                 field.press("ArrowDown")
                 field.press("Enter")
-            page.wait_for_url(origin + "/guide/plyos")
+            page.wait_for_url(origin + "/guide/ples")
             assert errors == []
             page.close()
         context = browser.new_context(java_script_enabled=False)
@@ -108,13 +108,16 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         page.context.set_offline(True)
         result = page.evaluate("""async () => {
             const input = document.querySelector('input[name=q]');
-            input.value = 'и'; input.dispatchEvent(new Event('input', {bubbles:true}));
+            input.focus(); input.value = 'и'; input.dispatchEvent(new Event('input', {bubbles:true}));
             await new Promise(requestAnimationFrame);
             return {names:[...document.querySelectorAll('.result-name')].map(node=>node.textContent),
                 busy: input.getAttribute('aria-busy')};
         }""")
         assert "Иваново" in result["names"] and result["busy"] is None
         page.locator("h1").click()
+        expect(page.locator(".search-suggestions")).to_be_hidden()
+        expect(field).to_have_value("и")
+        field.focus()
         expect(page.locator(".search-suggestions")).to_be_visible()
         for query in ("ТолькоРегионУникум777", "ТолькоАлиасУникум777", "uniqueslug777"):
             field.fill(query)
@@ -147,8 +150,9 @@ def test_browser_and_native_matching_agree_on_real_catalogue_and_five_thousand_r
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         page = browser.new_page()
-        page.goto(origin + "/guide/", wait_until="networkidle")
-        catalogue = page.locator("#location-catalogue").evaluate("el=>JSON.parse(el.textContent)")
+        with page.expect_response("**/api/locations/catalogue") as catalogue_response:
+            page.goto(origin + "/guide/", wait_until="networkidle")
+        catalogue = catalogue_response.value.json()
         queries = [
             "и",
             "н",
@@ -165,13 +169,13 @@ def test_browser_and_native_matching_agree_on_real_catalogue_and_five_thousand_r
         ]
         for query in queries:
             actual = page.evaluate(
-                "([rows,q])=>GuideLocationIndex(rows)(q).map(row=>row.url)", [catalogue, query]
+                "([rows,q])=>GuideLocationIndex(rows)(q).map(row=>row.location)", [catalogue, query]
             )
-            expected = [row["url"] for row in search_locations(catalogue, query)]
+            expected = [row["location"] for row in search_locations(catalogue, query)]
             assert actual == expected, query
         benchmark = page.evaluate("""() => {
-            const rows = Array.from({length:5000},(_,i)=>({name:'Город ' + i,context:'Подпись',url:'/guide/city-'+i}));
-            rows.push({name:'Иваново',context:'Город',url:'/guide/ivanovo'});
+            const rows = Array.from({length:5000},(_,i)=>({name:'Город ' + i,context:'Подпись',location:'city-'+i}));
+            rows.push({name:'Иваново',context:'',location:'ivanovo'});
             const started=performance.now(),search=GuideLocationIndex(rows),build=performance.now()-started;
             const times=[];
             for(let i=0;i<100;i++) {const start=performance.now(); search(i%2 ? 'и' : 'город 12');times.push(performance.now()-start);}
@@ -207,11 +211,13 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         assert expanded_height > 80
         assert page.locator(".cities").bounding_box()["y"] == city_top
         field.press("Escape")
-        page.get_by_role("button", name="Найти", exact=True).focus()
-        page.wait_for_timeout(480)
         expect(panel).to_be_visible()
+        page.get_by_role("button", name="Найти", exact=True).focus()
+        expect(panel).to_be_hidden()
         expect(field).to_have_value("нов")
         field.focus()
+        expect(panel).to_be_visible()
+        page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         field.fill("")
         expect(panel).to_have_attribute("inert", "")
         page.wait_for_timeout(80)
@@ -227,4 +233,48 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         expect(panel).to_be_hidden()
         page.wait_for_function("document.querySelector('.search-surface').offsetHeight === 80")
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
+        browser.close()
+
+
+def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_form(database):
+    settings, _ = database
+    with serving(create_app(settings)) as origin, sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        for final_query in ("москва", ""):
+            page = browser.new_page()
+            held = []
+            page.route("**/api/locations/catalogue", lambda route: held.append(route))
+            page.goto(origin + "/guide/")
+            field = page.get_by_label("Куда отправимся?")
+            field.fill("иван")
+            field.fill(final_query)
+            page.locator("h1").click()
+            for _ in range(100):
+                if held:
+                    break
+                page.wait_for_timeout(10)
+            assert len(held) == 1
+            assert "Ищем" not in page.locator(".search-suggestions").text_content()
+            held[0].fulfill(json=[{"name": "Москва", "context": "", "location": "moskva"}])
+            expect(page.get_by_role("combobox")).to_be_visible()
+            expect(page.locator(".search-suggestions")).to_be_hidden()
+            field.focus()
+            if final_query:
+                expect(page.get_by_role("option")).to_have_count(1)
+                expect(page.get_by_role("option")).to_contain_text("Москва")
+                field.fill("мо")
+                expect(page.get_by_role("option")).to_have_count(1)
+            else:
+                expect(page.locator(".search-suggestions")).to_be_hidden()
+            assert len(held) == 1
+            page.close()
+        page = browser.new_page()
+        page.route("**/api/locations/catalogue", lambda route: route.fulfill(status=503))
+        page.goto(origin + "/guide/", wait_until="networkidle")
+        page.get_by_label("Куда отправимся?").fill("плес")
+        page.get_by_role("button", name="Найти", exact=True).click()
+        expect(page.locator(".city-link")).to_have_count(1)
+        expect(page.locator(".city-link")).to_contain_text("Плёс")
         browser.close()

@@ -293,7 +293,6 @@ elif [[ "$needs_backup" == yes ]]; then
 elif [[ "$needs_backup" != no ]]; then
   echo 'Cannot determine schema compatibility; migration refused' >&2; false
 fi
-compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
 if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" run --rm --no-deps -T voice-migrate \
     python -m involta_guide.infrastructure.voice.shared_database
@@ -319,6 +318,11 @@ if [[ "$VOICE_STACK" == 1 ]]; then
   elif [[ "$voice_needs_backup" != no ]]; then
     echo 'Cannot determine Voice schema compatibility' >&2; false
   fi
+fi
+# Both private backups precede the coordinated numeric-location cutover.
+compose "$target_sha" "$target_image" run --rm --no-deps web alembic upgrade head
+compose "$target_sha" "$target_image" run --rm --no-deps web guide seed
+if [[ "$VOICE_STACK" == 1 ]]; then
   compose "$target_sha" "$target_image" run --rm voice-migrate
   compose "$target_sha" "$target_image" run --rm voice-prepare-model
   compose "$target_sha" "$target_image" up -d --no-build voice voice-worker

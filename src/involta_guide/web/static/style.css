@@ -1019,3 +1019,11 @@ pre.audit-json {
 .public-reviews .reviews > p { padding: 1.25rem 0; border-bottom: 1px solid #ddd; }
 .public-reviews time { color: #777; font-size: .8rem; }
 .public-reviews .transcript { white-space: pre-wrap; }
+
+.nearby-locations { border-top:1px solid var(--line);padding:28px 0 40px;margin-top:30px; }
+.nearby-locations h2 { margin-bottom:22px; }
+.nearby-locations h2 em { font-weight:400; }
+
+.nearby-locations .city-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.nearby-locations .city-link strong { font-size:24px;font-weight:500; }
+@media(max-width:650px) { .nearby-locations .city-grid { grid-template-columns:minmax(0,1fr); } }

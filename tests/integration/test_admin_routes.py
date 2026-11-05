@@ -155,7 +155,7 @@ def test_intro_is_atomic_isolated_escaped_and_conflict_preserves_input(database,
         assert queries.rows("restaurants") == restaurants
         assert "<script>alert(1)</script>" not in client.get("/guide/ivanovo").text
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in client.get("/guide/ivanovo").text
-        events = queries.rows("audit", {"action": "manual_intro", "target": city["id"]})
+        events = queries.rows("audit", {"action": "manual_intro", "target": str(city["id"])})
         assert len(events) == 1
         diff = json.loads(events[0]["detail"])
         assert diff["diff"] == [
@@ -320,7 +320,6 @@ def test_location_create_settings_slug_validation_and_relationships(database):
             "active": "on",
             "listed": "on",
             "parent_id": parent["id"],
-            "related_ids": related["id"],
         }
         response = client.post("/guide/admin/locations?slug=ivanovo", data=data, headers=HEADERS)
         assert (
@@ -329,7 +328,12 @@ def test_location_create_settings_slug_validation_and_relationships(database):
         )
         city = queries.admin_location("admin-new-city")["location"]
         assert city["parent_id"] == parent["id"] and city["top_limit"] == 4
-        assert queries.admin_location(city["slug"])["related_ids"] == [related["id"]]
+        client.post(
+            "/guide/admin/locations/" + city["slug"] + "/nearby/add",
+            data={"_csrf": csrf, "nearby_id": related["id"]},
+            headers=HEADERS,
+        )
+        assert queries.get("locations", city["id"])["nearby_location_ids"] == [related["id"]]
         page = client.get("/guide/admin/locations/admin-new-city")
         assert "Родительская локация (UUID)" not in page.text and "Казань · kazan" in page.text
         data["slug"] = "admin-new-city-renamed"
@@ -337,7 +341,8 @@ def test_location_create_settings_slug_validation_and_relationships(database):
         assert response.url.path.endswith("/admin-new-city-renamed")
         assert client.get("/guide/admin/locations/admin-new-city").status_code == 404
         assert any(
-            c["slug"] == data["slug"] for c in client.get("/guide/admin/locations/export").json()
+            c["slug"] == data["slug"]
+            for c in client.get("/guide/admin/locations/export").json()["locations"]
         )
         data["slug"] = "ivanovo"
         response = client.post(

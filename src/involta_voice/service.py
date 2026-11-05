@@ -5,14 +5,14 @@ from uuid import uuid4
 from sqlalchemy import Connection, Engine, text
 
 from .config import Settings
-from .contracts import SubmissionMetadata
+from .contracts import ReprocessRequest, SubmissionMetadata
 from .db import encoded, execute, row, snapshot
 from .errors import VoiceError
 from .storage import AudioStorage
 
 
 def rate_limit(
-    conn: Connection, key: str, limit: int, seconds: int, location: str, epoch: int
+    conn: Connection, key: str, limit: int, seconds: int, location: int, epoch: int
 ) -> None:
     value = row(
         conn,
@@ -22,7 +22,7 @@ def rate_limit(
           THEN 1 ELSE intake_windows.count+1 END,
         started_at=CASE WHEN intake_windows.started_at<now()-make_interval(secs=>:seconds)
           THEN now() ELSE intake_windows.started_at END RETURNING count""",
-        key=location + ":" + str(epoch) + ":" + key,
+        key=str(location) + ":" + str(epoch) + ":" + key,
         location=location,
         epoch=epoch,
         seconds=seconds,
@@ -41,7 +41,7 @@ class VoiceService:
         from .reset import lock_epoch
 
         sha = hashlib.sha256(content).hexdigest()
-        location = str(metadata.location.id)
+        location = metadata.location.id
         epoch = metadata.location.content_epoch
         payload_hash = hashlib.sha256(
             encoded(
@@ -138,18 +138,29 @@ class VoiceService:
         if old["payload_hash"] != payload_hash:
             raise VoiceError("Ключ уже использован для другой записи", "conflict", 409)
 
-    def _new_run(self, conn: Connection, reference: str) -> None:
+    def _new_run(
+        self,
+        conn: Connection,
+        reference: str,
+        number: int = 1,
+        *,
+        location_context: dict[str, Any] | None = None,
+        reprocess_key: str | None = None,
+    ) -> None:
         frozen = snapshot(conn, self.settings)
         submission = row(conn, "SELECT metadata FROM submissions WHERE reference=:id", id=reference)
         assert submission is not None
-        frozen["location"] = submission["metadata"]["location"]
-        from .text import catalogue_forms
+        frozen["location"] = location_context or submission["metadata"]["location"]
+        if reprocess_key:
+            frozen["reprocess_key"] = reprocess_key
+        from .text import REVIEW_TEXT_FORMAT, catalogue_forms
 
         location = frozen["location"]
         frozen["name_forms"] = catalogue_forms(
             [location["name"], *location.get("recognition_dictionary", [])], city=location["name"]
         )
         frozen["name_normalization"] = "catalogue-inflections-v1"
+        frozen["review_text_format"] = REVIEW_TEXT_FORMAT
         if frozen["asr_beta"]:
             from .sherpa import options as sherpa_options
             from .variants import SHERPA_PROFILES, SHERPA_STAGES
@@ -164,24 +175,91 @@ class VoiceService:
             }
         execute(
             conn,
-            "INSERT INTO runs(submission,number,snapshot) VALUES(:id,1,CAST(:snapshot AS jsonb))",
+            "INSERT INTO runs(submission,number,snapshot) VALUES(:id,:number,CAST(:snapshot AS jsonb))",
             id=reference,
+            number=number,
             snapshot=encoded(frozen),
         )
         if not frozen["asr_beta"]:
             execute(
                 conn,
-                "INSERT INTO stages(submission,run,kind) VALUES(:id,1,'transcription')",
+                "INSERT INTO stages(submission,run,kind) VALUES(:id,:number,'transcription')",
                 id=reference,
+                number=number,
             )
         if frozen["asr_beta"]:
             for kind in frozen["sherpa_models"]:
                 execute(
                     conn,
-                    "INSERT INTO stages(submission,run,kind) VALUES(:id,1,:kind)",
+                    "INSERT INTO stages(submission,run,kind) VALUES(:id,:number,:kind)",
                     id=reference,
+                    number=number,
                     kind=kind,
                 )
+
+    def reprocess(
+        self, reference: str, request: ReprocessRequest, actor_session: str | None = None
+    ) -> dict[str, Any]:
+        from .reset import lock_epoch
+
+        location = request.location
+        with self.engine.begin() as conn:
+            lock_epoch(conn, location.id, location.content_epoch)
+            submission = row(
+                conn, "SELECT * FROM submissions WHERE reference=:id FOR UPDATE", id=reference
+            )
+            if not submission:
+                raise VoiceError("Запись не найдена", "not_found", 404)
+            if (
+                submission["location_id"] != location.id
+                or submission["content_epoch"] != location.content_epoch
+            ):
+                raise VoiceError("Контекст записи устарел", "stale_epoch", 409)
+            previous = row(
+                conn,
+                "SELECT number FROM runs WHERE submission=:id AND snapshot->>'reprocess_key'=:key",
+                id=reference,
+                key=str(request.idempotency_key),
+            )
+            if previous:
+                return {"reference": reference, "run": previous["number"], "state": "existing"}
+            if row(
+                conn,
+                "SELECT 1 FROM stages WHERE submission=:id AND state IN ('queued','running')",
+                id=reference,
+            ):
+                return {"reference": reference, "run": submission["active_run"], "state": "busy"}
+            if not self.storage.path(submission["audio"]).is_file():
+                raise VoiceError("Исходное аудио недоступно", "audio_missing", 409)
+            pending = row(conn, "SELECT count(*) n FROM stages WHERE state IN ('queued','running')")
+            if pending and pending["n"] >= self.settings.queue_limit:
+                raise VoiceError("Очередь заполнена", "queue_full", 429)
+            number = submission["active_run"] + 1
+            self._new_run(
+                conn,
+                reference,
+                number,
+                location_context=location.model_dump(mode="json"),
+                reprocess_key=str(request.idempotency_key),
+            )
+            execute(
+                conn,
+                "UPDATE submissions SET active_run=:number WHERE reference=:id",
+                number=number,
+                id=reference,
+            )
+            execute(
+                conn,
+                "INSERT INTO admin_events(id,action,session_id,before_data,after_data,location_id,content_epoch) VALUES(:id,'reprocess',:actor,CAST(:before AS jsonb),CAST(:after AS jsonb),:location,:epoch)",
+                id=str(uuid4()),
+                actor=actor_session,
+                before=encoded({"reference": reference, "run": submission["active_run"]}),
+                after=encoded({"reference": reference, "run": number}),
+                location=location.id,
+                epoch=location.content_epoch,
+            )
+            self.emit(conn, reference, number, "recording_received")
+        return {"reference": reference, "run": number, "state": "queued"}
 
     def status(
         self, reference: str, visitor: str | None = None, *, admin: bool = False

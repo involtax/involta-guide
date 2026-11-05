@@ -57,7 +57,7 @@ class RestaurantContext(DTO):
 
 
 class LocationContext(DTO):
-    id: UUID
+    id: StrictInt = Field(ge=1)
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=200)
     name: str
     revision: str | None = None
@@ -79,6 +79,11 @@ class SubmissionMetadata(DTO):
     correlation_id: UUID
     # Older accepted submissions have no reliable administrative identity.
     statistics_excluded: bool = True
+
+
+class ReprocessRequest(DTO):
+    location: LocationContext
+    idempotency_key: UUID
 
 
 class ReviewFragment(DTO):

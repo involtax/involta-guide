@@ -28,6 +28,7 @@ def database(tmp_path, monkeypatch, request):
         admin.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("DATABASE_SCHEMA", schema)
+    monkeypatch.setenv("VOICE_DATABASE_SCHEMA", "voice_" + schema)
     monkeypatch.setenv("SESSION_SECRET", "test-session-secret-" + "x" * 40)
     settings = Settings(
         database_url=SecretStr(url),

@@ -1,8 +1,21 @@
 (() => {
-  const form = document.querySelector('[data-location-search]');
-  if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
+  async function mount(form) {
+  if (form.dataset.searchMounted || !window.autoComplete || !window.GuideLocationIndex) return;
+  form.dataset.searchMounted = 'true';
+  const lifecycle = new AbortController();
   let catalogue;
-  try { catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent); }
+  try {
+    if (form.hasAttribute('data-location-add')) {
+      catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent);
+    } else {
+      const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
+      if (!response.ok) return;
+      catalogue = await response.json();
+      if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
+        typeof item.name !== 'string' || typeof item.context !== 'string' ||
+        typeof item.location !== 'string' || !item.location)) return;
+    }
+  }
   catch { return; }
   const search = GuideLocationIndex(catalogue);
   const input = form.querySelector('input[name="q"]');
@@ -72,8 +85,8 @@
     events: {input: {
       input: () => begin(),
       focus: () => { if (!composing && !expanded) begin(); },
-      // A populated search stays open when focus moves elsewhere.
-      blur: () => {},
+      // Keep the query, but fold the panel when focus leaves the input.
+      blur: () => widget.close(),
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
         if (event.key === 'Escape') { event.preventDefault(); return; }
@@ -85,15 +98,20 @@
       selection: event => {
         const selected = event.detail.selection?.value;
         if (!selected) return;
-        const url = selected.url;
-        // Only canonical Guide links from this origin can be selected.
-        const target = new URL(url, location.href);
-        if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
+        if (form.hasAttribute('data-location-add')) {
+          if (!Number.isSafeInteger(selected.id) || selected.id < 1) return;
+          form.querySelector('[name=nearby_id]').value = selected.id;
+          form.requestSubmit();
+          return;
+        }
+        // The catalogue stores a slug; the Guide prefix belongs to the form.
+        const target = new URL(encodeURIComponent(selected.location), form.action);
+        if (target.origin === location.origin && target.pathname.startsWith(new URL(form.action).pathname)) {
           location.assign(target.href);
         }
       },
       open: () => {
-        if (!input.value.trim()) { widget.close(); return; }
+        if (!input.value.trim() || document.activeElement !== input) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -147,9 +165,22 @@
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
-  window.addEventListener('resize', fitResults);
-  window.visualViewport?.addEventListener('resize', fitResults);
-  new ResizeObserver(resizeSurface).observe(content);
+  window.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  window.visualViewport?.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  const observer = new ResizeObserver(resizeSurface);
+  observer.observe(content);
+  document.addEventListener('htmx:beforeCleanupElement', event => {
+    if (event.detail.elt === form || event.detail.elt.contains(form)) {
+      lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
+    }
+  }, {signal: lifecycle.signal});
   resizeSurface();
   if (input.value.trim()) begin();
+  }
+  function mountAll(root) {
+    if (root.matches?.('[data-location-search]')) mount(root);
+    root.querySelectorAll('[data-location-search]').forEach(mount);
+  }
+  mountAll(document);
+  document.addEventListener('htmx:load', event => mountAll(event.detail.elt));
 })();

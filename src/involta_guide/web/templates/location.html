@@ -114,21 +114,18 @@
 </details>
 {%endif%}
 </section>
-{%if related%}
-<section class="location-children">
-<h2>Рядом и также интересно</h2>
-<div class="button-row">
-{%for r in related%}
-<a href="{{settings.path('/'+r.slug)}}">{{r.name}} →</a>
-{%endfor%}
-</div>
-</section>
-{%endif%}
 {%if not location.is_hub%}
 <div id="guide-voice"></div>
 <section data-public-reviews class="public-reviews" aria-label="Отзывы" {%if not public_reviews%}hidden{%endif%}>
 <h2>Отзывы</h2><div class="reviews">
 {%for review in public_reviews%}<p data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}"><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}}</time><br><span class="transcript">{{review.transcript or 'Расшифровка…'}}</span></p>{%endfor%}
+</div></section>
+{%endif%}
+{%if related%}
+<section class="nearby-locations" aria-labelledby="nearby-title">
+<h2 id="nearby-title">А еще рядом <em class="serif">есть</em></h2>
+<div class="city-grid">
+{%for place in related%}<a class="city-link" href="{{settings.path('/'+place.slug)}}"><span><strong>{{place.name}}</strong><small>{{place.region}}</small></span><span aria-hidden="true">→</span></a>{%endfor%}
 </div></section>
 {%endif%}
 <script type="application/ld+json">{{structured|tojson}}</script>

@@ -57,7 +57,7 @@ class VoiceReadModel:
             and not status.get("error_type"),
         }
 
-    def public_texts(self, location_id: str) -> list[dict[str, Any]]:
+    def public_texts(self, location_id: int) -> list[dict[str, Any]]:
         with self.engine.connect() as conn:
             return [
                 dict(r)
@@ -71,7 +71,7 @@ class VoiceReadModel:
                 ).mappings()
             ]
 
-    def publication_states(self, location_id: str, references: list[str]) -> dict[str, int]:
+    def publication_states(self, location_id: int, references: list[str]) -> dict[str, int]:
         if not references:
             return {}
         with self.engine.connect() as conn:
@@ -207,7 +207,7 @@ class VoiceReadModel:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action='review_deleted' ORDER BY created_at"
+                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_deleted','review_reprocess') ORDER BY created_at"
                     ),
                     {"id": review_id},
                 ).mappings()

@@ -34,6 +34,8 @@ def test_new_catalog_import_adds_only_new_locations_preserving_manual_changes(da
     (root / "data").mkdir(parents=True)
     new = {
         **catalog["locations"][0],
+        "id": max(item["id"] for item in catalog["locations"]) + 1,
+        "nearby_location_ids": [],
         "name": "Новый туристический мыс",
         "slug": "new-tourist-cape",
         "parent_slug": None,

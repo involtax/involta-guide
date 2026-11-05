@@ -29,8 +29,8 @@ STAGES = {
 REQUESTS = """
 WITH grouped AS (
  SELECT target AS request_id, min(created_at) AS created_at, max(created_at) AS updated_at,
- COALESCE(min(location_id::text) FILTER (WHERE detail::jsonb->>'stage'<>'browser'),
-          min(location_id::text))::uuid AS location_id,
+ COALESCE(min(location_id) FILTER (WHERE detail::jsonb->>'stage'<>'browser'),
+          min(location_id)) AS location_id,
  (array_agg((detail::jsonb->>'status')::int ORDER BY created_at DESC,id DESC)
   FILTER (WHERE detail::jsonb->>'stage' IN ('response','interrupted')))[1] AS server_status,
  max(jsonb_path_query_first(detail::jsonb,

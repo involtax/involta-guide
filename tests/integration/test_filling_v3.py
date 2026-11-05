@@ -48,7 +48,7 @@ def test_real_novgorod_truncation_is_visible_and_never_retried_or_published(data
         assert calls == ["POST"]
         assert "estimated_cost_usd" not in detail["calls"][0]
         with TestClient(create_app(settings)) as client:
-            page = client.get("/guide/logs/velikiy-novgorod/1")
+            page = client.get("/guide/logs/veliky-novgorod/1")
             assert page.status_code == 200
             assert "Диагностика ответа" in page.text
             assert "Нужен новый запрос" in page.text and "3395" in page.text
@@ -72,7 +72,7 @@ def test_real_novgorod_truncation_is_visible_and_never_retried_or_published(data
                 )
 
             page.route("**/*", respond)
-            page.goto("http://testserver/guide/logs/velikiy-novgorod/1", wait_until="networkidle")
+            page.goto("http://testserver/guide/logs/veliky-novgorod/1", wait_until="networkidle")
             assert page.get_by_role("region", name="Диагностика ответа").count() == 1
             shots = Path("var/screenshots")
             shots.mkdir(parents=True, exist_ok=True)
@@ -92,6 +92,11 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
 ):
     settings, engine, uow, queries, city, service, queue = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
+    # Exercise the historical prompt chain without reversing the later,
+    # intentionally irreversible numeric-identity migration in this fixture.
+    command.stamp(config, "restaurant_discovery")
+    command.downgrade(config, "readable_slugs")
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "canonical_rank")
     old_prompt = "Сохранённый старый промпт до смены контракта. " * 2
     with uow() as tx:
@@ -126,7 +131,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     monkeypatch.setattr("sys.argv", ["release_backup", "needed"])
     release_backup.main()
     assert capsys.readouterr().out.strip() == "yes"
-    command.upgrade(config, "head")
+    command.upgrade(config, "restaurant_discovery")
     new_prompt = (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
     assert queries.setting("prompt") == new_prompt
     assert queries.get("jobs", untouched["id"])["prompt"] == new_prompt
@@ -187,7 +192,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
             assert recorded == old_request
         with uow() as tx:
             tx.repo.set_setting("prompt", "Ручной новый стиль после перехода. " * 3)
-        command.upgrade(config, "head")
+        command.upgrade(config, "restaurant_discovery")
         assert queries.setting("prompt").startswith("Ручной новый стиль")
     finally:
         provider.close()

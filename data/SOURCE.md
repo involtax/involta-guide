@@ -27,3 +27,10 @@ location metadata, parent slugs, editorial relations and redirects, not reviews,
 restaurant content, user/session data or secrets. It preserves the results of the
 original city import, supplied additions and Moscow navigation decisions. Python
 seed reuses existing canonical slugs/identities and never replaces existing fields.
+
+URL каталога приведены к [согласованной транслитерации](../docs/TRANSLITERATION.md):
+[полный список замен](../docs/LOCATION_SLUG_CHANGES.md). Для существующей БД есть
+отдельная атомарная миграция; обычный seed сохраняет ручные правки.
+Файлы исходных импортов выше — архив источников, их старые URL не используются
+при запуске. Приложение импортирует только `location-catalog.json`.
+seed uses permanent numeric IDs and preserves existing content/geography. Each import replaces nearby_location_ids from this Git file; see docs/LOCATION_IDS.md.

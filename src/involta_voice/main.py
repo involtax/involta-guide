@@ -21,6 +21,7 @@ from .config import Settings
 from .contracts import (
     LocationPurged,
     LocationReset,
+    ReprocessRequest,
     SubmissionMetadata,
     SubmissionStatus,
 )
@@ -94,7 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health/ready")
     def ready() -> dict[str, str]:
         with engine.connect() as conn:
-            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=9") or row(
+            if not row(conn, "SELECT 1 FROM voice_schema_versions WHERE version=10") or row(
                 conn, "SELECT 1 FROM purge_files WHERE content_epoch=1 LIMIT 1"
             ):
                 raise HTTPException(
@@ -115,14 +116,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     dependencies = [Depends(authorized)]
 
     @app.post(
+        "/internal/v1/admin/submissions/{reference}/reprocess",
+        dependencies=dependencies,
+        status_code=202,
+    )
+    def reprocess(reference: UUID, body: ReprocessRequest, request: Request) -> Any:
+        actor = request.headers.get("x-guide-session")
+        if actor:
+            actor = str(UUID(actor))
+        return service.reprocess(str(reference), body, actor)
+
+    @app.post(
         "/internal/v1/locations/{location_id}/reset",
         dependencies=dependencies,
         response_model=LocationPurged,
     )
-    def reset_location(location_id: UUID, body: LocationReset) -> Any:
+    def reset_location(location_id: int, body: LocationReset) -> Any:
         from .reset import purge
 
-        return purge(service, str(location_id), body.content_epoch)
+        return purge(service, location_id, body.content_epoch)
 
     @app.post(
         "/internal/v1/submissions",

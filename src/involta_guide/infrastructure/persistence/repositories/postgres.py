@@ -2,7 +2,7 @@ import time
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,7 @@ class PostgresRepository:
     def query(self, sql: str, params: Record | None = None) -> list[Record]:
         return [row_dict(row) for row in self.session.execute(text(sql), params or {}).mappings()]
 
-    def get(self, table: str, key: str, *, lock: bool = False) -> Record | None:
+    def get(self, table: str, key: str | int, *, lock: bool = False) -> Record | None:
         target = self.table(table)
         primary = list(target.primary_key.columns)
         statement = select(target).where(primary[0] == key)
@@ -69,7 +69,7 @@ class PostgresRepository:
         )
         return row_dict(row)
 
-    def change(self, table: str, key: str, values: Record) -> None:
+    def change(self, table: str, key: str | int, values: Record) -> None:
         target = self.table(table)
         self.session.execute(
             target.update().where(list(target.primary_key.columns)[0] == key).values(**values)
@@ -87,7 +87,7 @@ class PostgresRepository:
             .on_conflict_do_update(index_elements=["key"], set_={"value": value})
         )
 
-    def audit(self, action: str, target: str, detail: str = "") -> None:
+    def audit(self, action: str, target: str | int, detail: str = "") -> None:
         self.add(
             "audit", {"id": str(uuid4()), "action": action, "target": str(target), "detail": detail}
         )
@@ -115,7 +115,7 @@ class PostgresRepository:
         )
         return (alias[0], True) if alias else None
 
-    def tree(self, location_id: str, *, ancestors: bool = False) -> list[Record]:
+    def tree(self, location_id: int, *, ancestors: bool = False) -> list[Record]:
         if ancestors:
             return self.query(
                 """WITH RECURSIVE chain AS (SELECT l.*,0 depth,ARRAY[l.id] path FROM locations l WHERE id=:id UNION ALL SELECT l.*,c.depth+1,c.path||l.id FROM locations l JOIN chain c ON l.id=c.parent_id WHERE NOT l.id=ANY(c.path) AND c.depth<32) SELECT * FROM chain WHERE depth>0 ORDER BY depth DESC""",
@@ -126,9 +126,9 @@ class PostgresRepository:
             {"id": location_id},
         )
 
-    def related(self, location_id: str) -> list[Record]:
+    def related(self, location_id: int) -> list[Record]:
         return self.query(
-            "SELECT DISTINCT l.* FROM location_relations r JOIN locations l ON l.id=CASE WHEN r.location_id=:id THEN r.related_id ELSE r.location_id END WHERE r.location_id=:id OR r.related_id=:id ORDER BY l.name",
+            "SELECT l.* FROM locations owner CROSS JOIN LATERAL unnest(owner.nearby_location_ids) WITH ORDINALITY AS n(id,position) JOIN locations l ON l.id=n.id WHERE owner.id=:id ORDER BY n.position",
             {"id": location_id},
         )
 
@@ -195,7 +195,7 @@ class PostgresRepository:
     def public_location_catalogue(self) -> list[Record]:
         return public_location_catalogue(self.session)
 
-    def allowed(self, restaurant_id: str, location_id: str) -> bool:
+    def allowed(self, restaurant_id: str, location_id: int) -> bool:
         return bool(
             self.query(
                 "SELECT 1 FROM restaurants WHERE id=:restaurant AND location_id=:location",
@@ -206,17 +206,7 @@ class PostgresRepository:
     def link(self, table: str, values: Record) -> None:
         self.session.execute(insert(self.table(table)).values(**values).on_conflict_do_nothing())
 
-    def replace_relations(self, location_id: str, related: list[str]) -> None:
-        table = self.table("location_relations")
-        self.session.execute(
-            delete(table).where(
-                (table.c.location_id == location_id) | (table.c.related_id == location_id)
-            )
-        )
-        for key in set(related):
-            self.link("location_relations", {"location_id": location_id, "related_id": key})
-
-    def available(self, location_id: str) -> list[Record]:
+    def available(self, location_id: int) -> list[Record]:
         from involta_guide.application.services.editorial import current_content
 
         location = self.get("locations", location_id)
@@ -226,7 +216,7 @@ class PostgresRepository:
             else []
         )
 
-    def known(self, location_id: str) -> list[Record]:
+    def known(self, location_id: int) -> list[Record]:
         return self.query(
             "SELECT id,name,location_id FROM restaurants WHERE location_id=:id AND active=1",
             {"id": location_id},
@@ -253,7 +243,7 @@ class PostgresRepository:
             },
         )
 
-    def city_restaurants(self, location_id: str) -> list[Record]:
+    def city_restaurants(self, location_id: int) -> list[Record]:
         return self.query(
             """SELECT r.*,l.name location_name,
           (SELECT jsonb_agg(jsonb_build_object('id',v.id,'created_at',v.created_at,'moderation',v.moderation,

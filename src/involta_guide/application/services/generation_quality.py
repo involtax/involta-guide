@@ -74,6 +74,9 @@ def generation_content(raw: dict[str, Any], *, recorded: bool = False) -> dict[s
             )
     return {
         "intro": research.intro,
+        "discoveredRestaurants": [
+            r.model_dump() for r in getattr(research, "discoveredRestaurants", [])
+        ],
         "restaurants": cards,
         "rankingReport": ranking,
         "candidateReview": manifest,

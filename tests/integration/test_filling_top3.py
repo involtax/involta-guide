@@ -38,6 +38,10 @@ def shortlist(count=10):
 @pytest.mark.parametrize("blocked_leader", [False, True])
 def test_ten_candidates_produce_three_catalogue_winners_and_a_full_audit(database, blocked_leader):
     raw = shortlist()
+    raw["discoveredRestaurants"] = [
+        {"name": "Новая кофейня", "sources": []},
+        {"name": "  новая   кофейня ", "sources": []},
+    ]
     # Equal leaders arrive in reverse alphabetical order; the server owns the ranking.
     raw["candidates"][8]["scores"] = deepcopy(raw["candidates"][9]["scores"])
     if blocked_leader:
@@ -69,7 +73,10 @@ def test_ten_candidates_produce_three_catalogue_winners_and_a_full_audit(databas
             else ["Кандидат 08", "Кандидат 09", "Кандидат 07"]
         )
         assert [r["name"] for r in winners] == expected
-        assert len(queries.rows("restaurants")) == 3
+        assert len(queries.rows("restaurants")) == (10 if blocked_leader else 11)
+        extra = next(r for r in queries.rows("restaurants") if r["name"] == "Новая кофейня")
+        assert extra["active"] == 0 and extra["phone"] is None and extra["ranking"] is None
+        assert extra["description"] is None
         report = stored["report"]
         assert len(report["rankingReport"]) == len(report["candidateReview"]) == 10
         assert report["qualityReport"]["verified"] == (9 if blocked_leader else 10)
@@ -129,6 +136,11 @@ def test_contract_violation_is_saved_without_publication_or_another_post(databas
 def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(database):
     settings, engine, _, queries, city, service, _ = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
+    # Exercise the historical prompt chain without reversing the later,
+    # intentionally irreversible numeric-identity migration in this fixture.
+    command.stamp(config, "restaurant_discovery")
+    command.downgrade(config, "readable_slugs")
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     custom = "Авторский промпт до ограниченного исследования. " * 2
     with engine.begin() as connection:
@@ -159,7 +171,7 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
             ),
             {"job": submitted["id"], "usage": usage, "body": json.dumps(recorded)},
         )
-    command.upgrade(config, "head")
+    command.upgrade(config, "restaurant_discovery")
     with engine.connect() as connection:
         actual = connection.execute(
             text("SELECT value FROM settings WHERE key='prompt'")
@@ -168,6 +180,9 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
     assert queries.get("jobs", pending["id"])["prompt"] == actual
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
     assert task(engine, submitted)["request_json"] == recorded
+    command.stamp(config, "restaurant_discovery")
+    command.downgrade(config, "readable_slugs")
+    command.stamp(config, "audience_stats")
     command.downgrade(config, "filling_v3")
     with engine.connect() as connection:
         assert (
@@ -176,10 +191,10 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         )
     assert queries.get("jobs", pending["id"])["prompt"] == custom
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
-    command.upgrade(config, "head")
+    command.upgrade(config, "restaurant_discovery")
     with engine.begin() as connection:
         connection.execute(text("UPDATE settings SET value='Ручная правка' WHERE key='prompt'"))
-    command.upgrade(config, "head")
+    command.upgrade(config, "restaurant_discovery")
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT value FROM settings WHERE key='prompt'")).scalar_one()
