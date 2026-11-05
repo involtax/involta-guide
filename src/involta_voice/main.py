@@ -119,10 +119,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=dependencies,
         response_model=LocationPurged,
     )
-    def reset_location(location_id: UUID, body: LocationReset) -> Any:
+    def reset_location(location_id: int, body: LocationReset) -> Any:
         from .reset import purge
 
-        return purge(service, str(location_id), body.content_epoch)
+        return purge(service, location_id, body.content_epoch)
 
     @app.post(
         "/internal/v1/submissions",

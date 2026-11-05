@@ -8,7 +8,7 @@ from .db import execute, row
 from .errors import VoiceError
 
 
-def lock_epoch(conn: Connection, location_id: str, epoch: int) -> None:
+def lock_epoch(conn: Connection, location_id: int, epoch: int) -> None:
     execute(
         conn,
         "INSERT INTO location_epochs(location_id,content_epoch) VALUES(:id,1) ON CONFLICT DO NOTHING",
@@ -21,7 +21,7 @@ def lock_epoch(conn: Connection, location_id: str, epoch: int) -> None:
         raise VoiceError("Локация сброшена. Запишите новый отзыв.", "stale_epoch", 409)
 
 
-def purge(service: Any, location_id: str, epoch: int) -> dict[str, Any]:
+def purge(service: Any, location_id: int, epoch: int) -> dict[str, Any]:
     with service.engine.begin() as conn:
         execute(
             conn,
@@ -52,7 +52,7 @@ def purge(service: Any, location_id: str, epoch: int) -> dict[str, Any]:
                 (location_id, epoch),
             )
         }
-        for path in service.storage.root.glob(location_id + ".*"):
+        for path in service.storage.root.glob(str(location_id) + ".*"):
             parts = path.name.split(".")
             if len(parts) >= 4 and parts[1].isdigit() and int(parts[1]) < epoch:
                 paths.add(path.name)
@@ -109,14 +109,20 @@ def purge(service: Any, location_id: str, epoch: int) -> dict[str, Any]:
     return {"purged": True, "content_epoch": epoch}
 
 
-def cleanup_files(service: Any, location_id: str | None = None, epoch: int | None = None) -> None:
+def cleanup_files(service: Any, location_id: int | None = None, epoch: int | None = None) -> None:
     from sqlalchemy import text
 
+    clauses = []
+    if location_id is not None:
+        clauses.append("location_id=:id")
+    if epoch is not None:
+        clauses.append("content_epoch<=:epoch")
     with service.engine.connect() as conn:
         paths = (
             conn.execute(
                 text(
-                    "SELECT path FROM purge_files WHERE (CAST(:id AS uuid) IS NULL OR location_id=CAST(:id AS uuid)) AND (CAST(:epoch AS bigint) IS NULL OR content_epoch<=CAST(:epoch AS bigint))"
+                    "SELECT path FROM purge_files"
+                    + (" WHERE " + " AND ".join(clauses) if clauses else "")
                 ),
                 {"id": location_id, "epoch": epoch},
             )
@@ -136,7 +142,7 @@ def lock_submission(conn: Connection, reference: str) -> dict[str, Any]:
     submission = row(conn, "SELECT * FROM submissions WHERE reference=:id", id=reference)
     if not submission:
         raise VoiceError("Запись не найдена", "not_found", 404)
-    lock_epoch(conn, str(submission["location_id"]), submission["content_epoch"])
+    lock_epoch(conn, submission["location_id"], submission["content_epoch"])
     submission = row(conn, "SELECT * FROM submissions WHERE reference=:id FOR UPDATE", id=reference)
     if not submission:
         raise VoiceError("Запись не найдена", "not_found", 404)

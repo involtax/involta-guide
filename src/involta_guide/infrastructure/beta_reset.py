@@ -27,7 +27,7 @@ class BetaReset:
         self.engine, self.settings, self.jobs = engine, settings, jobs
         self.client = client or VoiceClient(settings)
 
-    def begin(self, location_id: str, key: str, expected_epoch: int, confirmation: str) -> str:
+    def begin(self, location_id: int, key: str, expected_epoch: int, confirmation: str) -> str:
         if not self.settings.beta_reset_enabled:
             raise RuleViolation("Бета-сброс отключён")
         key = str(UUID(key))
@@ -80,7 +80,7 @@ class BetaReset:
             )
             return key
 
-    def cancel_previous(self, location_id: str) -> None:
+    def cancel_previous(self, location_id: int) -> None:
         cancel = getattr(self.jobs.provider, "cancel_generation", None)
         if not cancel:
             return
@@ -112,7 +112,7 @@ class BetaReset:
                 raise Conflict("Worker lease lost")
         self.cancel_previous(location_id)
         result = self.client.json(
-            "POST", "/locations/" + location_id + "/reset", json={"content_epoch": epoch}
+            "POST", f"/locations/{location_id}/reset", json={"content_epoch": epoch}
         )
         if result.get("purged") is not True or result.get("content_epoch") != epoch:
             raise RuleViolation("Voice не подтвердил полное удаление")
@@ -147,7 +147,7 @@ class BetaReset:
                 conn,
                 "DELETE FROM audit WHERE location_id=:id OR target=:target OR target IN (SELECT id::text FROM jobs WHERE location_id=:id) OR target IN (SELECT id::text FROM reviews WHERE location_id=:id)",
                 id=location_id,
-                target=location_id,
+                target=str(location_id),
                 job=job["id"],
             )
             execute(
@@ -194,13 +194,14 @@ class BetaReset:
             execute(conn, "DELETE FROM jobs WHERE id=:id", id=job["id"])
 
 
-def cleanup_files(engine: Engine, settings: Settings, location_id: str | None = None) -> None:
+def cleanup_files(engine: Engine, settings: Settings, location_id: int | None = None) -> None:
     storage = FileAudioStorage(settings.data_dir, settings.max_audio_bytes)
     with engine.connect() as conn:
         paths = (
             conn.execute(
                 text(
-                    "SELECT path FROM beta_cleanup_files WHERE CAST(:id AS uuid) IS NULL OR location_id=CAST(:id AS uuid)"
+                    "SELECT path FROM beta_cleanup_files"
+                    + (" WHERE location_id=:id" if location_id is not None else "")
                 ),
                 {"id": location_id},
             )

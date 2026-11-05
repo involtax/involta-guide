@@ -38,6 +38,19 @@
 </section>
 {%endif%}
 {%endif%}
+{%if c%}
+<section class="panel location-nearby" aria-labelledby="nearby-heading">
+<h3 id="nearby-heading">Рядом <small>{{selected.nearby|length}}</small></h3>
+<p class="admin-muted">Изменения касаются только этого города.</p>
+{%with search_action=settings.path('/admin/locations/'+c.slug+'/nearby/add'), search_method='post', search_add=true, search_label='Добавить локацию', search_query='', location_catalogue=nearby_catalogue%}{%include 'location_search.html'%}{%endwith%}
+{%if nearby_results is defined%}<div class="nearby-search-results">
+{%for choice in nearby_results%}<form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/nearby/add')}}">{{csrf()}}<input type="hidden" name="nearby_id" value="{{choice.id}}"><button>{{choice.name}} · {{choice.region}} — добавить</button></form>{%else%}<p>Ничего не найдено.</p>{%endfor%}
+</div>{%endif%}
+<div class="nearby-list">
+{%for choice in selected.nearby%}<div class="nearby-row"><span><strong>{{choice.name}}</strong><small>{{choice.region}}</small></span><form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/nearby/remove')}}">{{csrf()}}<input type="hidden" name="nearby_id" value="{{choice.id}}"><button aria-label="Убрать {{choice.name}} из списка">Убрать</button></form></div>{%else%}<p>Пока никого. Добавьте локацию через поиск.</p>{%endfor%}
+</div>
+</section>
+{%endif%}
 <section class="panel">
 {%set original=c%}{%set c=location_form if location_form is not none else c%}
 <h2>{{'Новая локация' if new_location else 'Настройки города'}}</h2>
@@ -92,7 +105,6 @@ checked
 </label>
 <label>Границы (JSON)<textarea name="bounds">{{c.bounds|tojson if c and c.bounds else ''}}</textarea>
 </label>
-<label>Связанные локации<select name="related_ids" multiple size="8">{%for choice in location_choices if not c or choice.id!=c.id%}<option value="{{choice.id}}" {{'selected' if choice.id in (c.related_ids if location_form is not none else selected.related_ids)}}>{{choice.name}} · {{choice.slug}}</option>{%endfor%}</select></label>
 <button>Сохранить локацию</button>
 </form>
 </section>

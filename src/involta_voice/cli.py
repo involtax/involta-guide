@@ -67,10 +67,8 @@ def main() -> None:
                         or time.time() - path.stat().st_mtime < 86400
                     ):
                         continue
-                    from uuid import UUID
-
                     try:
-                        location = str(UUID(path.name.split(".")[0]))
+                        location = int(path.name.split(".")[0])
                     except ValueError:
                         location = None
                     if location:

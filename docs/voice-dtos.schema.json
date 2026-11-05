@@ -4,9 +4,9 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "format": "uuid",
+          "minimum": 1,
           "title": "Id",
-          "type": "string"
+          "type": "integer"
         },
         "slug": {
           "maxLength": 200,

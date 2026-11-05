@@ -70,7 +70,7 @@ def recording(seconds=6):
 
 def metadata(**kwargs):
     return SubmissionMetadata(
-        location=LocationContext(id=uuid4(), slug="ivanovo", name="Иваново", content_epoch=1),
+        location=LocationContext(id=1, slug="ivanovo", name="Иваново", content_epoch=1),
         visitor="v" * 64,
         ip="127.0.0.1",
         idempotency_key=uuid4(),

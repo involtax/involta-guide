@@ -14,7 +14,8 @@ class Base(DeclarativeBase):
 
 class LocationRow(Base):
     __tablename__ = "locations"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    nearby_location_ids: Mapped[list[int]] = mapped_column(ARRAY(Integer), server_default="{}")
     name: Mapped[str] = mapped_column(Text)
     region: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text)
@@ -31,7 +32,7 @@ class LocationRow(Base):
     revision: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     kind: Mapped[str] = mapped_column(Text)
-    parent_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    parent_id: Mapped[int | None] = mapped_column(Integer)
     is_hub: Mapped[bool] = mapped_column(Boolean)
     in_phrase: Mapped[str] = mapped_column(Text)
     aliases: Mapped[list[str]] = mapped_column(ARRAY(Text))
@@ -53,7 +54,7 @@ class RestaurantRow(Base):
     ranking: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(Text)
     cuisine: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
@@ -72,7 +73,7 @@ class ReviewRow(Base):
     changes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int] = mapped_column(Integer)
     visitor: Mapped[str] = mapped_column(Text)
     audio: Mapped[str] = mapped_column(Text)
     mime: Mapped[str] = mapped_column(Text)
@@ -96,7 +97,7 @@ class ProposalRow(Base):
     restaurant_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     __tablename__ = "proposals"
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int] = mapped_column(Integer)
     review_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
     kind: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
@@ -119,7 +120,7 @@ class VoiceLinkRow(Base):
     __tablename__ = "voice_links"
     review_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     reference: Mapped[str] = mapped_column(UUID(as_uuid=False))
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int] = mapped_column(Integer)
     number: Mapped[int] = mapped_column(BigInteger)
     active_run: Mapped[int] = mapped_column(Integer)
     context_snapshot: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
@@ -139,7 +140,7 @@ class JobRow(Base):
     changes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     kind: Mapped[str] = mapped_column(Text)
-    location_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int | None] = mapped_column(Integer)
     content_epoch: Mapped[int] = mapped_column(BigInteger)
     model: Mapped[str] = mapped_column(Text)
     baseline_revision: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
@@ -188,16 +189,10 @@ class LoginAttemptRow(Base):
     reset_at: Mapped[int] = mapped_column(BigInteger)
 
 
-class LocationRelationRow(Base):
-    __tablename__ = "location_relations"
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-    related_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
-
-
 class LocationRedirectRow(Base):
     __tablename__ = "location_slug_redirects"
     slug: Mapped[str] = mapped_column(Text, primary_key=True)
-    location_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int] = mapped_column(Integer)
 
 
 class AdminSessionRow(Base):
@@ -230,7 +225,7 @@ class VoiceInboxRow(Base):
     review_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
     run: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(Text)
-    location_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    location_id: Mapped[int | None] = mapped_column(Integer)
     content_epoch: Mapped[int] = mapped_column(BigInteger)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     state: Mapped[str] = mapped_column(Text)

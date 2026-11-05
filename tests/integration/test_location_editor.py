@@ -20,7 +20,7 @@ def test_city_shows_current_data_and_only_supported_edit_channels(database):
         assert "Сохранить вступление" in page.text
         assert "Восстановить" not in page.text
         assert "Сохранённые версии" not in client.get("/guide/admin/restaurants").text
-        assert client.get("/guide/logs/history/" + city["id"]).status_code in (404, 422)
+        assert client.get("/guide/logs/history/" + str(city["id"])).status_code in (404, 422)
         for action in ("intro", "content", "restore", "publish", "select-restaurant"):
             assert (
                 client.post(

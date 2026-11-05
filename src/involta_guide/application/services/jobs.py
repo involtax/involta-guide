@@ -133,12 +133,12 @@ class JobService:
             "message": "Найдём места, которые стоит посетить. Поиск может занять несколько минут.",
         }
 
-    def public_fill_state(self, location_id: str) -> Record:
+    def public_fill_state(self, location_id: int) -> Record:
         with self.uow() as uow:
             location = require(uow.repo, "locations", location_id)
             return self._public_state(uow.repo, location)
 
-    def enqueue_public_fill(self, location_id: str) -> Record:
+    def enqueue_public_fill(self, location_id: int) -> Record:
         """TEMPORARY authless initial fill; never replace existing editorial data."""
         if not self.public_fill_enabled:
             raise RuleViolation("Временное наполнение отключено")

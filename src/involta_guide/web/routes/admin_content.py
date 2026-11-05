@@ -13,9 +13,12 @@ from starlette.datastructures import FormData
 from involta_guide.application.commands.schemas import LocationInput
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.location_slug import location_slug
+from involta_guide.domain.location_search import search_locations
+from involta_guide.domain.rules import KINDS
+from involta_guide.infrastructure.location_catalog import export_catalog
 from involta_guide.web.http import check_csrf, context, form_data, require_admin
 
-from .admin import key, log_redirect, render, uid
+from .admin import key, log_redirect, render
 
 
 def number_param(request: Request, name: str = "page") -> int:
@@ -41,10 +44,9 @@ def location_values(form: FormData, *, new: bool = False) -> dict[str, Any]:
     if new and not fields["slug"]:
         fields["slug"] = location_slug(fields["name"])
     fields.update(
-        parent_id=uid(key(form, "parent_id")) if key(form, "parent_id") else None,
+        parent_id=int(key(form, "parent_id")) if key(form, "parent_id") else None,
         aliases=[v.strip() for v in key(form, "aliases").split(",") if v.strip()],
         top_limit=int(key(form, "top_limit") or 3),
-        related_ids=[uid(str(v)) for v in form.getlist("related_ids") if v],
         bounds=json.loads(key(form, "bounds")) if key(form, "bounds") else None,
     )
     for name in ("is_hub", "listed", "population_verified"):
@@ -63,6 +65,7 @@ def location_page(
     message: str = "",
     entered_intro: str | None = None,
     entered_settings: dict[str, Any] | None = None,
+    nearby_results: list[dict[str, Any]] | None = None,
 ) -> Response:
     ctx = context(request)
     params = request.query_params
@@ -78,8 +81,20 @@ def location_page(
     selected = (
         ctx.queries.admin_location(slug)
         if slug
-        else ({"location": None, "related_ids": [], "intro_events": []} if new else None)
+        else ({"location": None, "nearby": [], "intro_events": []} if new else None)
     )
+    choices = ctx.queries.rows("locations", limit=100000)
+    current_id = selected["location"]["id"] if selected and selected["location"] else None
+    nearby_catalogue = [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "context": KINDS[row["kind"]] + " · " + row["region"],
+            "url": ctx.settings.path("/" + row["slug"]),
+        }
+        for row in sorted(choices, key=lambda row: (row["name"], row["id"]))
+        if row["id"] != current_id
+    ]
     return render(
         request,
         "admin.html",
@@ -93,7 +108,9 @@ def location_page(
             "selected": selected,
             "location_form": entered_settings,
             "new_location": new,
-            "location_choices": ctx.queries.rows("locations", limit=100000),
+            "location_choices": choices,
+            "nearby_catalogue": nearby_catalogue,
+            **({"nearby_results": nearby_results} if nearby_results is not None else {}),
             "entered_intro": entered_intro,
             "reset_request_key": selected["location"]["reset_key"]
             if selected and selected["location"] and selected["location"]["reset_pending"]
@@ -141,8 +158,44 @@ def routes(prefix: str) -> APIRouter:
     def export(request: Request) -> Response:
         require_admin(request)
         return JSONResponse(
-            jsonable_encoder(context(request).queries.rows("locations", limit=100000)),
+            jsonable_encoder(
+                export_catalog(
+                    context(request).settings.root_dir,
+                    context(request).queries.rows("locations", limit=100000),
+                    context(request).queries.rows("location_slug_redirects", limit=100000),
+                )
+            ),
             headers={"Cache-Control": "private, no-store"},
+        )
+
+    @router.post(prefix + "/admin/locations/{slug}/nearby/{action}")
+    def nearby(
+        request: Request, slug: str, action: str, form: FormData = Depends(form_data)
+    ) -> Response:
+        require_admin(request)
+        check_csrf(request, form)
+        if action not in {"add", "remove"}:
+            raise HTTPException(404)
+        ctx = context(request)
+        current = ctx.queries.admin_location(slug)["location"]
+        if action == "add" and not key(form, "nearby_id"):
+            choices = ctx.queries.rows("locations", limit=100000)
+            matches = search_locations(
+                sorted(choices, key=lambda row: (row["name"], row["id"])), key(form, "q")
+            )
+            return location_page(
+                request,
+                slug,
+                nearby_results=[row for row in matches if row["id"] != current["id"]][:6],
+            )
+        try:
+            other = int(key(form, "nearby_id"))
+            ctx.locations.nearby(current["id"], other, remove=action == "remove")
+        except (ValueError, RuleViolation) as exc:
+            return location_page(request, slug, message=str(exc))
+        return log_redirect(
+            request,
+            "/admin/locations/" + slug + "?" + urlencode({"message": "Список «Рядом» сохранён"}),
         )
 
     @router.get(prefix + "/admin/locations/{slug}")
@@ -164,7 +217,6 @@ def routes(prefix: str) -> APIRouter:
                 **(current or {}),
                 **dict(form),
                 "aliases": key(form, "aliases").split(","),
-                "related_ids": [str(v) for v in form.getlist("related_ids")],
                 "bounds": None,
             }
             return location_page(

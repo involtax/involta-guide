@@ -1,4 +1,4 @@
-"""Only the currently released Guide/Voice schemas and a clean install are supported."""
+"""Historical beta_core cutover; current numeric-ID cutover is in test_location_ids."""
 
 from uuid import uuid4
 
@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from involta_guide.infrastructure.beta_reset import cleanup_files
 from involta_guide.infrastructure.persistence.unit_of_work import create_database
-from involta_voice.db import migrate
+from involta_voice.db import migrate_connection
 from involta_voice.reset import cleanup_files as voice_cleanup
 from involta_voice.service import VoiceService
 
@@ -98,8 +98,8 @@ def test_populated_released_transition_preserves_owners_and_clears_incompatible_
         path = settings.data_dir / "audio" / "legacy.wav"
         path.parent.mkdir(exist_ok=True)
         path.write_bytes(b"old Guide audio")
-        command.upgrade(config, "head")
-        command.upgrade(config, "head")  # No repeated deletion on startup/migration.
+        command.upgrade(config, "audience_stats")
+        command.upgrade(config, "audience_stats")  # No repeated deletion on startup/migration.
         with engine.connect() as conn:
             after = dict(conn.execute(text("SELECT * FROM restaurants")).mappings().one())
             assert {k: after[k] for k in before} == before
@@ -179,11 +179,13 @@ def test_populated_voice_v3_transition_deletes_files_explicitly_and_keeps_sequen
     service.storage.root.mkdir(parents=True, exist_ok=True)
     path = service.storage.root / "old.wav"
     path.write_bytes(b"old Voice audio")
-    migrate(engine)
+    with engine.begin() as conn:
+        migrate_connection(conn, version=9)
     assert path.exists()  # The manifest survives the schema transaction; deletion is explicit.
     voice_cleanup(service)
     assert not path.exists()
-    migrate(engine)
+    with engine.begin() as conn:
+        migrate_connection(conn, version=9)
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM submissions")).scalar() == 0
         assert conn.execute(text("SELECT count(*) FROM purge_files")).scalar() == 0

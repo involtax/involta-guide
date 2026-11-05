@@ -130,7 +130,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 conn.execute("UPDATE unrelated_original SET payload='changed independently'")
                 conn.execute(
-                    "CREATE TABLE unrelated_sentinel(location_id uuid REFERENCES locations(id))"
+                    "CREATE TABLE unrelated_sentinel(location_id integer REFERENCES locations(id))"
                 )
             try:
                 call([*backup_command, "restore"], dump)
@@ -141,7 +141,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "restaurant_discovery"
+                    == "location_ids"
                 )
                 assert conn.execute("SELECT sum(hits) FROM audience_daily").fetchone()[0] == 3
                 conn.execute("DROP TABLE unrelated_sentinel")
@@ -178,7 +178,7 @@ def main() -> None:
             with psycopg.connect(url, autocommit=True) as conn:
                 conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
 
-    for previous in (5, 6, 7, 8):
+    for previous in (5, 6, 7, 8, 9):
         voice_schema = "test_voice_restore_" + uuid4().hex
         env.update(
             VOICE_DATABASE_SCHEMA=voice_schema, VOICE_SERVICE_SECRET="local-test-" + "x" * 40
@@ -235,7 +235,7 @@ def main() -> None:
                     == "keep"
                 )
             print(
-                f"Voice: real shared-schema v{previous} → v9 → pg_restore v{previous} passed",
+                f"Voice: real shared-schema v{previous} → v10 → pg_restore v{previous} passed",
                 flush=True,
             )
         finally:

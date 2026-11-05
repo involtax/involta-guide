@@ -483,6 +483,22 @@ def test_combined_voice_rollout_and_rollback_use_matching_topology(tmp_path, fai
         assert "voice" not in services
     if failure == "after_copy":
         calls = [json.loads(line)[1] for line in Path(str(state) + ".log").read_text().splitlines()]
+        target_calls = [
+            json.loads(line)[1]
+            for line in Path(str(state) + ".log").read_text().splitlines()
+            if json.loads(line)[2] == B
+        ]
+        voice_backup = next(
+            i
+            for i, args in enumerate(target_calls)
+            if "involta_guide.infrastructure.voice.release_backup" in args and args[-1] == "backup"
+        )
+        guide_migration = next(i for i, args in enumerate(target_calls) if "alembic" in args)
+        seed = next(i for i, args in enumerate(target_calls) if args[-2:] == ["guide", "seed"])
+        voice_migration = next(
+            i for i, args in enumerate(target_calls) if args[-1] == "voice-migrate"
+        )
+        assert voice_backup < guide_migration < seed < voice_migration
         assert any(
             "involta_guide.infrastructure.voice.release_backup" in args and "restore" in args
             for args in calls

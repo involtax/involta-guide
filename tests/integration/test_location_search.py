@@ -1,5 +1,4 @@
 import re
-from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import event, text
@@ -19,14 +18,12 @@ def add_location(
     ready=False,
     parent=None,
 ):
-    key = uuid4()
     with engine.begin() as connection:
-        connection.execute(
-            text("""INSERT INTO locations(id,name,slug,region,aliases,listed,active,initialized_at,parent_id)
-          VALUES(:id,:name,:slug,:region,:aliases,:listed,:active,
-          CASE WHEN :ready THEN now() ELSE NULL END,:parent)"""),
+        key = connection.execute(
+            text("""INSERT INTO locations(name,slug,region,aliases,listed,active,initialized_at,parent_id)
+          VALUES(:name,:slug,:region,:aliases,:listed,:active,
+          CASE WHEN :ready THEN now() ELSE NULL END,:parent) RETURNING id"""),
             {
-                "id": key,
                 "name": name,
                 "slug": slug,
                 "region": region,
@@ -37,7 +34,7 @@ def add_location(
                 "parent": parent,
             },
         )
-    return key
+    return key.scalar_one()
 
 
 def test_catalogue_request_has_compact_fields_validators_and_no_visitors_or_jobs(database):

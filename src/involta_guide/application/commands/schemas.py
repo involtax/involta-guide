@@ -55,7 +55,7 @@ class Hours(BaseModel):
 class RestaurantInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: UUID | None = None
-    locationId: UUID | None = None
+    locationId: int | None = Field(default=None, ge=1)
     locationName: str | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
@@ -286,7 +286,7 @@ class LocationInput(BaseModel):
     region: str = Field(min_length=1, max_length=200)
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=200)
     kind: str = "city"
-    parent_id: UUID | None = None
+    parent_id: int | None = Field(default=None, ge=1)
     is_hub: bool = False
     in_phrase: str = Field(min_length=3, max_length=200)
     aliases: list[str] = Field(default_factory=list, max_length=30)
@@ -300,7 +300,6 @@ class LocationInput(BaseModel):
     coverage_note: str = Field(default="", max_length=3000)
     bounds: dict[str, float] | None = None
     listed: bool = True
-    related_ids: list[UUID] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def bounds_valid(self) -> "LocationInput":

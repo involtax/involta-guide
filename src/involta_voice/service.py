@@ -12,7 +12,7 @@ from .storage import AudioStorage
 
 
 def rate_limit(
-    conn: Connection, key: str, limit: int, seconds: int, location: str, epoch: int
+    conn: Connection, key: str, limit: int, seconds: int, location: int, epoch: int
 ) -> None:
     value = row(
         conn,
@@ -22,7 +22,7 @@ def rate_limit(
           THEN 1 ELSE intake_windows.count+1 END,
         started_at=CASE WHEN intake_windows.started_at<now()-make_interval(secs=>:seconds)
           THEN now() ELSE intake_windows.started_at END RETURNING count""",
-        key=location + ":" + str(epoch) + ":" + key,
+        key=str(location) + ":" + str(epoch) + ":" + key,
         location=location,
         epoch=epoch,
         seconds=seconds,
@@ -41,7 +41,7 @@ class VoiceService:
         from .reset import lock_epoch
 
         sha = hashlib.sha256(content).hexdigest()
-        location = str(metadata.location.id)
+        location = metadata.location.id
         epoch = metadata.location.content_epoch
         payload_hash = hashlib.sha256(
             encoded(

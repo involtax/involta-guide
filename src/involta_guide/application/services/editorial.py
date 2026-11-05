@@ -6,7 +6,7 @@ from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
 from involta_guide.domain.rules import assert_revision, restaurant_rank_key, restaurant_score
 
 
-def require(repo: Repository, table: str, key: str, *, lock: bool = False) -> Record:
+def require(repo: Repository, table: str, key: str | int, *, lock: bool = False) -> Record:
     row = repo.get(table, key, lock=lock)
     if row is None:
         raise NotFound("Запись не найдена")
@@ -85,7 +85,7 @@ def field_diff(before: Record, after: Record) -> list[Record]:
 
 def save(
     repo: Repository,
-    location_id: str,
+    location_id: int,
     content: Record,
     expected: str | None,
     *,

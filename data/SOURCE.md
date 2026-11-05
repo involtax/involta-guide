@@ -33,3 +33,4 @@ URL каталога приведены к [согласованной тран�
 отдельная атомарная миграция; обычный seed сохраняет ручные правки.
 Файлы исходных импортов выше — архив источников, их старые URL не используются
 при запуске. Приложение импортирует только `location-catalog.json`.
+seed uses permanent numeric IDs and preserves existing content/geography. Each import replaces nearby_location_ids from this Git file; see docs/LOCATION_IDS.md.

@@ -1,6 +1,8 @@
-(async () => {
-  const form = document.querySelector('[data-location-search]');
-  if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
+(() => {
+  async function mount(form) {
+  if (form.dataset.searchMounted || !window.autoComplete || !window.GuideLocationIndex) return;
+  form.dataset.searchMounted = 'true';
+  const lifecycle = new AbortController();
   let catalogue;
   try {
     const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
@@ -92,6 +94,12 @@
       selection: event => {
         const selected = event.detail.selection?.value;
         if (!selected) return;
+        if (form.hasAttribute('data-location-add')) {
+          if (!Number.isSafeInteger(selected.id) || selected.id < 1) return;
+          form.querySelector('[name=nearby_id]').value = selected.id;
+          form.requestSubmit();
+          return;
+        }
         // The catalogue stores a slug; the Guide prefix belongs to the form.
         const target = new URL(encodeURIComponent(selected.location), form.action);
         if (target.origin === location.origin && target.pathname.startsWith(new URL(form.action).pathname)) {
@@ -153,9 +161,22 @@
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; begin(); });
   clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
-  window.addEventListener('resize', fitResults);
-  window.visualViewport?.addEventListener('resize', fitResults);
-  new ResizeObserver(resizeSurface).observe(content);
+  window.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  window.visualViewport?.addEventListener('resize', fitResults, {signal: lifecycle.signal});
+  const observer = new ResizeObserver(resizeSurface);
+  observer.observe(content);
+  document.addEventListener('htmx:beforeCleanupElement', event => {
+    if (event.detail.elt === form || event.detail.elt.contains(form)) {
+      lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
+    }
+  }, {signal: lifecycle.signal});
   resizeSurface();
   if (input.value.trim()) begin();
+  }
+  function mountAll(root) {
+    if (root.matches?.('[data-location-search]')) mount(root);
+    root.querySelectorAll('[data-location-search]').forEach(mount);
+  }
+  mountAll(document);
+  document.addEventListener('htmx:load', event => mountAll(event.detail.elt));
 })();

@@ -92,7 +92,8 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
 ):
     settings, engine, uow, queries, city, service, queue = setup(database)
     config = Config(str(settings.root_dir / "alembic.ini"))
-    # URL-only migration has no schema downgrade; this fixture tests the filling schema.
+    # Exercise the historical prompt chain without reversing the later,
+    # intentionally irreversible numeric-identity migration in this fixture.
     command.stamp(config, "audience_stats")
     command.downgrade(config, "canonical_rank")
     old_prompt = "Сохранённый старый промпт до смены контракта. " * 2
@@ -128,7 +129,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     monkeypatch.setattr("sys.argv", ["release_backup", "needed"])
     release_backup.main()
     assert capsys.readouterr().out.strip() == "yes"
-    command.upgrade(config, "head")
+    command.upgrade(config, "audience_stats")
     new_prompt = (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
     assert queries.setting("prompt") == new_prompt
     assert queries.get("jobs", untouched["id"])["prompt"] == new_prompt
@@ -189,7 +190,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
             assert recorded == old_request
         with uow() as tx:
             tx.repo.set_setting("prompt", "Ручной новый стиль после перехода. " * 3)
-        command.upgrade(config, "head")
+        command.upgrade(config, "audience_stats")
         assert queries.setting("prompt").startswith("Ручной новый стиль")
     finally:
         provider.close()

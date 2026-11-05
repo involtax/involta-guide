@@ -7,6 +7,7 @@ from argon2 import PasswordHasher
 from sqlalchemy import inspect, text
 
 from involta_guide.config import Settings
+from involta_guide.infrastructure.location_catalog import export_catalog
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.seed import seed
 
@@ -17,6 +18,7 @@ def main() -> None:
         "command",
         choices=[
             "seed",
+            "export-locations",
             "schema-audit",
             "hash-password",
             "beta-cleanup-files",
@@ -48,6 +50,14 @@ def main() -> None:
     try:
         if args.command == "seed":
             print(f"Locations added: {seed(PostgresUow(engine), settings.root_dir)}")
+        elif args.command == "export-locations":
+            with PostgresUow(engine) as work:
+                catalog = export_catalog(
+                    settings.root_dir,
+                    work.repo.rows("locations", limit=100000),
+                    work.repo.rows("location_slug_redirects", limit=100000),
+                )
+            print(json.dumps(catalog, ensure_ascii=False, indent=2))
         elif args.command == "schema-audit":
             inspector = inspect(engine)
             result: dict[str, Any] = {}

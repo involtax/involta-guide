@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 from contextlib import contextmanager
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -124,7 +124,7 @@ def test_combined_voice_delivers_once_and_stops_without_waiting_for_backoff(shar
     meta = metadata().model_copy(
         update={
             "location": LocationContext(
-                id=UUID(str(location["id"])),
+                id=location["id"],
                 slug=location["slug"],
                 name=location["name"],
                 content_epoch=1,

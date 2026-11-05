@@ -155,7 +155,7 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                     "GPT-6.1 Sol"
                 )
                 model_form.get_by_role("button", name="Сохранить настройки наполнения").click()
-                expect(page.get_by_role("status")).to_contain_text("Настройки сохранены")
+                expect(page.locator(".notice[role=status]")).to_contain_text("Настройки сохранены")
                 assert queries.setting("generation_model") == "gpt-6.1-sol"
                 page.goto(base + "/admin/locations/" + location["slug"])
                 # Current content is applied by generation/review services, not direct snapshot forms.
@@ -171,7 +171,7 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                     "Ручное вступление из браузера"
                 )
                 intro_form.get_by_role("button", name="Сохранить вступление").click()
-                expect(page.get_by_role("status")).to_contain_text("Вступление сохранено")
+                expect(page.locator(".notice[role=status]")).to_contain_text("Вступление сохранено")
                 page.reload()
                 expect(page.get_by_role("textbox", name="Вступление", exact=True)).to_have_value(
                     "Ручное вступление из браузера"
