@@ -116,10 +116,10 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
                 "в Иванове, плюс, из Иванова"
             )
             expect(page.locator(".recognition-after")).to_contain_text("Алхимист")
-            expect(page.get_by_text("Sherpa · сильные подсказки", exact=True)).to_have_count(1)
+            expect(page.get_by_text("Sherpa · словарные подсказки", exact=True)).to_have_count(1)
             expect(
                 page.get_by_text(
-                    "Словарь: Алхимист · Иваново · Огонёк · Сыроварня · алхимист · иваново · огонёк · сыроварня",
+                    "Словарь: Алхимист · Иванова · Иванове · Иваново · Ивановом · Иванову · Огонёк · Сыроварня · алхимист · иванова · иванове · иваново · ивановом · иванову · огонёк · сыроварня",
                     exact=True,
                 )
             ).to_have_count(1)

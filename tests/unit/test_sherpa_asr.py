@@ -28,7 +28,7 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
     config = settings(tmp_path)
     names = ["Алхимист", "Огонёк", "Алхимист", "  Сыроварня  "]
     biased = options(config, engine, "sherpa_hotwords_strong", names)
-    assert biased["hotwords_score"] == 5.5 and biased["max_active_paths"] == 8
+    assert biased["hotwords_score"] == 2.5 and biased["max_active_paths"] == 16
     with pytest.raises(ValueError):
         options(config, engine, "sherpa_plain", names)
     assert biased["dictionary"] == [

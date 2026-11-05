@@ -76,7 +76,24 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
     queued = reports(engine, [reference])[reference]
     assert len(queued) == 1 and all(r["state"] == "queued" for r in queued)
     assert [r["dictionary"] for r in queued if r["variant"] == "sherpa_hotwords_strong"] == [
-        ["Алхимист", "Иваново", "Огонёк", "Сыроварня", "алхимист", "иваново", "огонёк", "сыроварня"]
+        [
+            "Алхимист",
+            "Иванова",
+            "Иванове",
+            "Иваново",
+            "Ивановом",
+            "Иванову",
+            "Огонёк",
+            "Сыроварня",
+            "алхимист",
+            "иванова",
+            "иванове",
+            "иваново",
+            "ивановом",
+            "иванову",
+            "огонёк",
+            "сыроварня",
+        ]
     ]
     meta.location.recognition_dictionary.append("Добавлено позже")
     provider = GigaResults()
@@ -88,14 +105,22 @@ def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent
     assert [(r["engine"], r["variant"]) for r in rows] == [("gigaam", "sherpa_hotwords_strong")]
     assert all(r["state"] == "completed" for r in rows)
     assert all(r["dictionary"] == [] for r in rows if r["variant"] == "sherpa_plain")
-    assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows] == [(5.5, 8)]
+    assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows] == [(2.5, 16)]
     assert rows[0]["dictionary"] == [
         "Алхимист",
+        "Иванова",
+        "Иванове",
         "Иваново",
+        "Ивановом",
+        "Иванову",
         "Огонёк",
         "Сыроварня",
         "алхимист",
+        "иванова",
+        "иванове",
         "иваново",
+        "ивановом",
+        "иванову",
         "огонёк",
         "сыроварня",
     ]
@@ -203,9 +228,9 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
         assert page.status_code == 200
         assert page.text.count('class="recognition-dictionary"') == 1
         assert page.text.count("Алхимист") == 1
-        assert page.text.count("Плёс · Ресторан 000") == 1
+        assert page.text.count("Плёс · Плёса · Плёсе · Плёсом · Плёсу · Ресторан 000") == 1
         assert "Переименован" not in page.text
-        assert page.text.count("Sherpa · сильные подсказки") == 1
+        assert page.text.count("Sherpa · словарные подсказки") == 1
         assert "Ресторан 204" in page.text
         public = client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()
         assert public["rows"][0]["transcript"] == "gigaam / sherpa_hotwords_strong"
@@ -320,8 +345,21 @@ def test_recommended_profile_publishes_canonical_spelling_but_keeps_raw_results(
     class ActualText(FakeProvider):
         def call(self, kind, request, audio, mime):
             assert request["variant"] == "sherpa_hotwords_strong"
-            assert request["hotwords_score"] == 5.5 and request["max_active_paths"] == 8
-            assert request["dictionary"] == ["Грандъ Сова", "Плёс", "грандъ сова", "плёс"]
+            assert request["hotwords_score"] == 2.5 and request["max_active_paths"] == 16
+            assert request["dictionary"] == [
+                "Грандъ Сова",
+                "Плёс",
+                "Плёса",
+                "Плёсе",
+                "Плёсом",
+                "Плёсу",
+                "грандъ сова",
+                "плёс",
+                "плёса",
+                "плёсе",
+                "плёсом",
+                "плёсу",
+            ]
             return {"status_code": 200, "body": json.dumps({"text": raw_text})}
 
     assert Worker(ve, vs, ActualText()).once()
@@ -365,7 +403,7 @@ def test_new_primary_failure_and_lease_recovery_are_bound_to_frozen_profile(voic
         )
     assert service.status(ref)["state"] == "transcription_failed"
     assert service.status(ref)["transcript"] is None
-    assert SHERPA_PROFILES["sherpa_hotwords_strong"] == (5.5, 8, "catalogue")
+    assert SHERPA_PROFILES["sherpa_hotwords_strong"] == (2.5, 16, "catalogue")
 
 
 def test_previously_received_onnx_primary_keeps_its_original_publication_source(voice_database):
