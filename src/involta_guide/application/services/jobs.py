@@ -201,9 +201,10 @@ class JobService:
             parents = uow.repo.tree(location["id"], ancestors=True)
             baseline_changed = location["revision"] != baseline
         if job["kind"] == "generate":
-            scope = (
-                location["coverage_note"]
-                or "Только " + location["name"] + ", " + location["region"]
+            scope = location["coverage_note"] or (
+                f"{location['name']}, {location['region']}: "
+                "город и доступные гастрономические окрестности, включая сильные "
+                "загородные рестораны; административная граница не ограничивает подборку"
             )
             replacements = {
                 "{локация}": location["name"],
