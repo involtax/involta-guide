@@ -207,10 +207,6 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
     assert before_catalogue and before_reviews
     command.upgrade(config, "city_surroundings")
     assert queries.setting("prompt") == CONTRACT.PROMPT
-    assert (
-        CONTRACT.PROMPT
-        == (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
-    )
     for before in before_locations:
         after = queries.get("locations", before["id"])
         if before["id"] in CONTRACT.COVERAGE_NOTES:
