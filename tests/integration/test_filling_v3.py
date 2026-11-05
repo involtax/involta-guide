@@ -1,11 +1,11 @@
 import json
-from importlib import import_module
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import text
@@ -133,7 +133,9 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     release_backup.main()
     assert capsys.readouterr().out.strip() == "yes"
     command.upgrade(config, "restaurant_discovery")
-    new_prompt = import_module("migrations.versions.restaurant_discovery").PROMPT
+    new_prompt = (
+        ScriptDirectory.from_config(config).get_revision("restaurant_discovery").module.PROMPT
+    )
     assert queries.setting("prompt") == new_prompt
     assert queries.get("jobs", untouched["id"])["prompt"] == new_prompt
     assert queries.get("jobs", submitted["id"])["prompt"] == old_prompt

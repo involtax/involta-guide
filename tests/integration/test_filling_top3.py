@@ -1,12 +1,12 @@
 import json
 from copy import deepcopy
-from importlib import import_module
 from uuid import uuid4
 
 import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -177,7 +177,10 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         actual = connection.execute(
             text("SELECT value FROM settings WHERE key='prompt'")
         ).scalar_one()
-    assert actual == import_module("migrations.versions.restaurant_discovery").PROMPT
+    assert (
+        actual
+        == ScriptDirectory.from_config(config).get_revision("restaurant_discovery").module.PROMPT
+    )
     assert queries.get("jobs", pending["id"])["prompt"] == actual
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
     assert task(engine, submitted)["request_json"] == recorded
