@@ -1,6 +1,5 @@
 import json
 import os
-from urllib.parse import parse_qs, urlsplit
 
 from integration.editor_fixture import FixtureEditor
 from integration.test_editorial import CONTENT
@@ -11,10 +10,11 @@ from playwright.sync_api import expect, sync_playwright
 from involta_guide.application.services.locations import Queries
 from involta_guide.domain.location_search import search_locations
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+from involta_guide.infrastructure.security import Security
 from involta_guide.main import create_app
 
 
-def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(database, tmp_path):
+def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tmp_path):
     settings, engine = database
 
     def factory():
@@ -26,57 +26,59 @@ def test_real_search_keyboard_touch_main_page_submit_and_javascript_free_form(da
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
-        for label, width, height in [("desktop", 1440, 1100), ("mobile", 390, 950)]:
+        for label, width, height in [
+            ("desktop", 1440, 1100),
+            ("mobile", 390, 950),
+            ("small-mobile", 320, 850),
+        ]:
             page = browser.new_page(
-                viewport={"width": width, "height": height}, has_touch=width == 390
+                viewport={"width": width, "height": height}, has_touch=width < 650
             )
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            page.goto(origin + "/guide/")
-            field = page.get_by_role("combobox", name="Поиск локации")
-            button = page.get_by_role("button", name="Найти", exact=True)
+            page.goto(origin + "/guide/", wait_until="networkidle")
+            field = page.get_by_role("combobox", name="Выбор локации")
+            button = page.get_by_role("button", name="Выбери", exact=True)
             assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
-            assert button.evaluate("el=>getComputedStyle(el).backgroundColor") == "rgb(40, 97, 235)"
+            assert button.evaluate("el=>el.scrollWidth<=el.clientWidth")
+            assert field.bounding_box()["width"] >= 70
+            assert field.get_attribute("name") is None
+            assert field.evaluate("el=>el.form===null")
+            button.click()
+            expect(page.get_by_role("option")).to_have_count(6)
+            expect(button).to_have_attribute("aria-expanded", "true")
+            expect(field).to_have_value("")
+            field.press("Enter")
+            assert page.url == origin + "/guide/"
             field.fill("нов")
             expect(page.get_by_role("option")).to_have_count(6)
             field.press("ArrowDown")
             expect(page.get_by_role("option").first).to_have_attribute("aria-selected", "true")
             assert "Великий Новгород" in page.get_by_role("option").first.inner_text()
-            page.wait_for_function("""() => {
-                const shell = document.querySelector('.search-surface');
-                return !shell.getAnimations().length && shell.offsetHeight > 80;
-            }""")
-            assert (
-                page.locator(".search-surface").evaluate("el=>getComputedStyle(el).borderRadius")
-                == "34px"
+            page.wait_for_function(
+                "!document.querySelector('.search-surface').getAnimations().length"
             )
-            page.screenshot(path=str(tmp_path / f"search-{label}.png"), full_page=True)
+            page.screenshot(path=str(tmp_path / f"picker-{label}.png"), full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
-            field.fill("пле")
-            expect(page.get_by_role("option")).to_have_count(1)
-            expect(page.get_by_role("button", name="Все результаты")).to_have_count(0)
-            button.click()
-            page.wait_for_url(lambda u: parse_qs(urlsplit(u).query).get("q") == ["пле"])
-            expect(page.locator(".city-link")).to_have_count(1)
-            field = page.get_by_role("combobox", name="Поиск локации")
             field.fill("плес")
             expect(page.get_by_role("option")).to_have_count(1)
-            if width == 390:
+            field.press("Enter")
+            assert page.url == origin + "/guide/"
+            if width < 650:
                 page.get_by_role("option").first.tap()
             else:
                 field.press("ArrowDown")
                 field.press("Enter")
             page.wait_for_url(origin + "/guide/ples")
-            assert errors == []
+            assert not errors, errors
             page.close()
         context = browser.new_context(java_script_enabled=False)
         page = context.new_page()
         page.goto(origin + "/guide/")
-        page.get_by_label("Поиск локации").fill("новгород нижний")
-        page.get_by_role("button", name="Найти", exact=True).click()
-        expect(page.locator(".city-link")).to_have_count(1)
-        expect(page.locator(".city-link")).to_contain_text("Нижний Новгород")
-        expect(page.locator(".search-suggestions")).to_be_hidden()
+        page.get_by_label("Выбор локации").fill("Иваново")
+        page.get_by_role("button", name="Выбери", exact=True).click()
+        assert page.url == origin + "/guide/"
+        expect(page.locator(".cities")).to_have_count(0)
         browser.close()
 
 
@@ -96,7 +98,7 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         )
         page = browser.new_page()
         page.goto(origin + "/guide/", wait_until="networkidle")
-        field = page.get_by_role("combobox", name="Поиск локации")
+        field = page.get_by_role("combobox", name="Выбор локации")
         expect(field).to_be_visible()
         page.evaluate("""() => {
             window.searchMessages = [];
@@ -107,7 +109,7 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         page.on("request", lambda request: requests.append(request.url))
         page.context.set_offline(True)
         result = page.evaluate("""async () => {
-            const input = document.querySelector('input[name=q]');
+            const input = document.querySelector('[data-location-input]');
             input.focus(); input.value = 'и'; input.dispatchEvent(new Event('input', {bubbles:true}));
             await new Promise(requestAnimationFrame);
             return {names:[...document.querySelectorAll('.result-name')].map(node=>node.textContent),
@@ -141,7 +143,7 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         browser.close()
 
 
-def test_browser_and_native_matching_agree_on_real_catalogue_and_five_thousand_rows(
+def test_browser_and_admin_matching_agree_on_real_catalogue_and_five_thousand_rows(
     database, tmp_path
 ):
     settings, _ = database
@@ -195,7 +197,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1100})
         page.goto(origin + "/guide/")
-        field = page.get_by_role("combobox", name="Поиск локации")
+        field = page.get_by_role("combobox", name="Выбор локации")
         shell = page.locator(".search-surface")
         panel = page.locator(".search-suggestions")
         city_top = page.locator(".home-reviews").bounding_box()["y"]
@@ -212,7 +214,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         assert page.locator(".home-reviews").bounding_box()["y"] == city_top
         field.press("Escape")
         expect(panel).to_be_visible()
-        page.get_by_role("button", name="Найти", exact=True).focus()
+        page.get_by_role("button", name="Выбери", exact=True).focus()
         expect(panel).to_be_hidden()
         expect(field).to_have_value("нов")
         field.focus()
@@ -236,7 +238,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         browser.close()
 
 
-def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_form(database):
+def test_one_catalogue_request_uses_latest_input_and_failure_retries_without_navigation(database):
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
         browser = p.chromium.launch(
@@ -247,7 +249,7 @@ def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_
             held = []
             page.route("**/api/locations/catalogue", lambda route: held.append(route))
             page.goto(origin + "/guide/")
-            field = page.get_by_label("Поиск локации")
+            field = page.get_by_label("Выбор локации")
             field.fill("иван")
             field.fill(final_query)
             page.locator("h1").click()
@@ -271,10 +273,70 @@ def test_one_background_request_uses_latest_input_and_load_failure_keeps_native_
             assert len(held) == 1
             page.close()
         page = browser.new_page()
-        page.route("**/api/locations/catalogue", lambda route: route.fulfill(status=503))
+        attempts = []
+
+        def retry(route):
+            attempts.append(route.request.url)
+            if len(attempts) == 1:
+                route.fulfill(status=503)
+            else:
+                route.fulfill(
+                    json=[{"name": "Плёс", "context": "Ивановская область", "location": "ples"}]
+                )
+
+        page.route("**/api/locations/catalogue", retry)
         page.goto(origin + "/guide/", wait_until="networkidle")
-        page.get_by_label("Поиск локации").fill("плес")
-        page.get_by_role("button", name="Найти", exact=True).click()
-        expect(page.locator(".city-link")).to_have_count(1)
-        expect(page.locator(".city-link")).to_contain_text("Плёс")
+        field = page.get_by_role("combobox", name="Выбор локации")
+        field.fill("плес")
+        expect(page.locator(".search-message")).to_contain_text("Не удалось загрузить")
+        assert page.url == origin + "/guide/" and len(attempts) == 1
+        page.get_by_role("button", name="Выбери", exact=True).click()
+        expect(page.get_by_role("option")).to_have_count(1)
+        assert len(attempts) == 2
+        field.press("ArrowDown")
+        field.press("Enter")
+        page.wait_for_url(origin + "/guide/ples")
+        browser.close()
+
+
+def test_shared_admin_picker_posts_ids_and_remounts_after_htmx(database):
+    settings, engine = database
+    choices = [
+        ("Локация Выбора Один", "picker-admin-one"),
+        ("Локация Выбора Два", "picker-admin-two"),
+    ]
+    ids = [add_location(engine, name, slug) for name, slug in choices]
+
+    def factory():
+        return PostgresUow(engine)
+
+    token = Security(settings, factory).login("test-password-123456", "test-ip")
+    with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        context = browser.new_context()
+        context.add_cookies([{"name": "guide_admin", "value": token, "url": origin}])
+        page = context.new_page()
+        errors, requests = [], []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.on("request", lambda request: requests.append(request.url))
+        page.goto(origin + "/guide/admin/locations/ivanovo")
+        for name, slug in choices:
+            field = page.get_by_role("combobox", name="Добавить локацию")
+            field.fill(name)
+            option = page.locator(".destination-results").get_by_role("option")
+            expect(option).to_have_count(1)
+            with page.expect_request(
+                lambda request: (
+                    request.method == "POST" and request.url.endswith("/ivanovo/nearby/add")
+                )
+            ):
+                option.click()
+            expect(page.locator(".nearby-list").get_by_text(name, exact=True)).to_be_visible()
+        city = Queries(factory).admin_location("ivanovo")["location"]
+        assert set(ids).issubset(city["nearby_location_ids"])
+        assert not any("?q=" in url or "/api/locations/catalogue" in url for url in requests)
+        assert errors == []
         browser.close()

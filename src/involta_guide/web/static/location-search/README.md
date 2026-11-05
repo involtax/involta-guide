@@ -10,4 +10,6 @@ location-index.js builds a name-only index from a public snapshot fetched once o
 location-search.js adapts it to the widget; typing never fetches data or waits on debounce.
 The snapshot uses name/location/context, where location is a slug without the Guide prefix.
 HTTP ETag revalidation reuses unchanged data; blur folds the list without discarding the query.
-Native GET matching is mirrored by domain/location_search.py and checked against this index.
+The public picker only navigates after selecting a suggestion; it never submits a GET form.
+The “Выбери ↓” button opens options, including six baseline entries for an empty input.
+The admin-only POST fallback uses domain/location_search.py, checked against this index.

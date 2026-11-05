@@ -42,7 +42,7 @@
 <section class="panel location-nearby" aria-labelledby="nearby-heading">
 <h3 id="nearby-heading">Рядом <small>{{selected.nearby|length}}</small></h3>
 <p class="admin-muted">Изменения касаются только этого города.</p>
-{%with search_action=settings.path('/admin/locations/'+c.slug+'/nearby/add'), search_method='post', search_add=true, search_label='Добавить локацию', search_query='', location_catalogue=nearby_catalogue%}{%include 'location_search.html'%}{%endwith%}
+{%with search_action=settings.path('/admin/locations/'+c.slug+'/nearby/add'), search_add=true, search_label='Добавить локацию', search_query='', location_catalogue=nearby_catalogue%}{%include 'location_search.html'%}{%endwith%}
 {%if nearby_results is defined%}<div class="nearby-search-results">
 {%for choice in nearby_results%}<form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/nearby/add')}}">{{csrf()}}<input type="hidden" name="nearby_id" value="{{choice.id}}"><button>{{choice.name}} · {{choice.region}} — добавить</button></form>{%else%}<p>Ничего не найдено.</p>{%endfor%}
 </div>{%endif%}
