@@ -1,4 +1,5 @@
 import json
+from importlib import import_module
 from pathlib import Path
 from uuid import uuid4
 
@@ -132,7 +133,7 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     release_backup.main()
     assert capsys.readouterr().out.strip() == "yes"
     command.upgrade(config, "restaurant_discovery")
-    new_prompt = (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
+    new_prompt = import_module("migrations.versions.restaurant_discovery").PROMPT
     assert queries.setting("prompt") == new_prompt
     assert queries.get("jobs", untouched["id"])["prompt"] == new_prompt
     assert queries.get("jobs", submitted["id"])["prompt"] == old_prompt

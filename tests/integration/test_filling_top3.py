@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from importlib import import_module
 from uuid import uuid4
 
 import httpx
@@ -176,7 +177,7 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         actual = connection.execute(
             text("SELECT value FROM settings WHERE key='prompt'")
         ).scalar_one()
-    assert actual == (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
+    assert actual == import_module("migrations.versions.restaurant_discovery").PROMPT
     assert queries.get("jobs", pending["id"])["prompt"] == actual
     assert queries.get("jobs", submitted["id"])["prompt"] == custom
     assert task(engine, submitted)["request_json"] == recorded
