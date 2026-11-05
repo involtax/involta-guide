@@ -113,26 +113,27 @@ UUID через запятую: ответ publication_statuses сообщает
 review_publication добавляет ограничение IN(0,1,2). Voice migration 7 создаёт новые
 события для уже сохранённых терминальных ошибок GigaAM, не вызывая ASR снова.
 
-## Пять профилей Sherpa с родным токенизатором
+## Один профиль Sherpa и нормализация словоформ
 
-Новые записи создают пять заданий: sherpa_gigaam_plain (без подсказок, поиск8),
-sherpa_gigaam_hotwords (основной5/8), sherpa_gigaam_hotwords_weak (4.5/8),
-sherpa_gigaam_hotwords_strong (5.5/8), sherpa_gigaam_hotwords_wide (5/16).
-Задания onnx-asr/Parakeet/только-город не создаются. Исторические этапы/результаты
-сохраняются, данные схемы9 и ключ (submission,run,engine,variant) не меняются.
+Новые записи создают одно задание `sherpa_gigaam_hotwords_strong`: сила5.5, поиск8,
+город и все рестораны. Других заданий нет. Исторические этапы/результаты и уже
+принятые задания сохраняют исходные параметры. Schema9 и ключ кандидата прежние.
 
-Guide передаёт LocationContext.recognition_dictionary: название города и все
-названия его ресторанов без ограничения публичной подборкой или 200 строками.
-Voice добавляет исходный/строчный регистр и фиксирует фактический словарь каждого
-профиля. На инференсе нет загрузок моделей/токенизатора и редактирования словаря.
+Guide передаёт LocationContext.recognition_dictionary из города и всех ресторанов,
+без ограничения публичной подборкой. ASR получает канонические и строчные названия.
+Новые runs.snapshot фиксируют primary_variant=sherpa_hotwords_strong,
+restore_dictionary_case=true, name_normalization=catalogue-inflections-v1 и
+name_forms — таблицу словоформ, полученную закреплённым pymorphy3/русским словарём.
+Словоформы используются только после ASR. Уже принятые запросы не меняются при
+редактировании каталога. Старые runs без name_forms используют прежнее правило
+точного совпадения, без переобработки истории.
 
-Новые runs.snapshot содержат primary_variant=sherpa_hotwords и
-restore_dictionary_case=true. Отсутствующий primary_variant исторического задания
-означает прежний onnx. Только зафиксированный primary даёт gigaam_ready/failed;
-успешные сравнения не заменяют ошибочный primary. События schema_version=2 и
-publication_status 0/1 сохраняются. Новые события публикуют текст5/8 после
-восстановления точного каталогового написания слов. Созвучия, е/ё и грамматические
-формы не подменяются. Исходный текст остаётся в candidate.transcript/provider_calls.
+Только frozen primary даёт gigaam_ready/failed. Отсутствующий primary_variant
+исторического задания означает onnx. События schema_version=2 и publication_status
+0/1 сохраняются. Публикуемый текст восстанавливает регистр/ё словарной формы,
+сохраняя падеж: «в иванове» → «в Иванове». Производные прилагательные и созвучия
+не заменяются, неизвестные бренды не склоняются автоматически. Сырые ответы
+provider_calls и candidate.transcript сохраняются без изменений.
 
 Приватный batch /admin/recognitions: максимум30 references, три SQL-запроса.
 Каждая строка содержит variant/variant_label/text/raw_text/primary/state/error,

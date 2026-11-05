@@ -11,7 +11,7 @@ rollback описаны в [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md). Ста�
 
 Voice использует ту же PostgreSQL БД, что Guide, со схемой `voice` и отдельным
 аудиотомом. Контейнер `voice` запускает API и доставку результатов в Guide;
-`voice-worker` — пять локальных профилей GigaAM/Sherpa для новых отзывов. Internal API не публикуется через Nginx.
+`voice-worker` — один локальный проход GigaAM/Sherpa5.5/8 для новых отзывов. Internal API не публикуется через Nginx.
 [Устройство, остановка и перенос существующей БД](VOICE_RUNTIME.md).
 
 Для локальной сборки нужны Python 3.13 с development headers, uv, C++ compiler,

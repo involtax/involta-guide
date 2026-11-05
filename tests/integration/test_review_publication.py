@@ -16,6 +16,7 @@ from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
 
 from .test_jobs import setup
+from .test_sherpa_comparison import add_saved_comparison
 from .test_voice_guide import client_for
 from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
@@ -37,6 +38,7 @@ def test_primary_failure_unpublishes_but_retains_audio_and_logs(database, voice_
     )
     service = VoiceService(ve, vs)
     reference = service.submit(meta, recording(), "audio/wav")["reference"]
+    add_saved_comparison(ve, reference)
     consumer = Consumer(engine, client_for(settings, vs))
     assert consumer.once() == 1
     assert queries.get("reviews", reference)["publication_status"] == 1
@@ -44,7 +46,7 @@ def test_primary_failure_unpublishes_but_retains_audio_and_logs(database, voice_
 
     class PrimaryFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
-            if request.get("variant", "onnx") == "sherpa_hotwords":
+            if request.get("variant", "onnx") == "sherpa_hotwords_strong":
                 if failure == "empty":
                     return {"status_code": 200, "body": json.dumps({"text": "  "})}
                 raise ProviderFailure("GigaAM test failure", unknown=failure == "unknown")
@@ -99,9 +101,11 @@ def test_comparison_failure_does_not_unpublish_primary_text(database, voice_data
     )
     reference = VoiceService(ve, vs).submit(meta, recording(), "audio/wav")["reference"]
 
+    add_saved_comparison(ve, reference)
+
     class ComparisonFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
-            if request.get("variant", "onnx") != "sherpa_hotwords":
+            if request.get("variant", "onnx") != "sherpa_hotwords_strong":
                 raise ProviderFailure("Comparison test failure")
             return super().call(kind, request, audio, mime)
 

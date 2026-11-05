@@ -12,7 +12,7 @@ from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.web.http import admin_token, check_csrf, context, form_data, require_admin
 from involta_guide.web.routes.admin import render
 from involta_guide.web.routes.voice import voice_client
-from involta_voice.variants import RESULTS, VARIANT_LABELS
+from involta_voice.variants import PRIMARY_VARIANT, RESULTS, VARIANT_LABELS
 
 
 def routes(prefix: str) -> APIRouter:
@@ -50,6 +50,7 @@ def routes(prefix: str) -> APIRouter:
                         "state": "unavailable" if unavailable else "not_scheduled",
                     }
                     for engine, variant in RESULTS
+                    if variant == PRIMARY_VARIANT
                     if review["reference"]
                 ],
             )

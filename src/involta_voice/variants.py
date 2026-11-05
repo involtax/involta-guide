@@ -1,18 +1,21 @@
-"""Five Sherpa profiles; the frozen recommended profile publishes text."""
+"""One active Sherpa profile; saved requests retain their original identities."""
 
 # score, search width, dictionary source. Frozen in each run at intake.
-SHERPA_PROFILES = {
-    "sherpa_plain": (5.0, 8, "none"),
-    "sherpa_hotwords_weak": (4.5, 8, "catalogue"),
-    "sherpa_hotwords": (5.0, 8, "catalogue"),
-    "sherpa_hotwords_strong": (5.5, 8, "catalogue"),
-    "sherpa_hotwords_wide": (5.0, 16, "catalogue"),
-}
+PRIMARY_VARIANT = "sherpa_hotwords_strong"
+SHERPA_PROFILES = {PRIMARY_VARIANT: (5.5, 8, "catalogue")}
+# Identities remain readable/executable for accepted jobs and saved history.
 SHERPA_STAGES = {
     "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)
-    for variant in SHERPA_PROFILES
+    for variant in (
+        "sherpa_plain",
+        "sherpa_hotwords_weak",
+        "sherpa_hotwords",
+        PRIMARY_VARIANT,
+        "sherpa_hotwords_wide",
+        "sherpa_hotwords_city",
+    )
 }
-STAGES = ("transcription", *SHERPA_STAGES, "sherpa_gigaam_hotwords_city")
+STAGES = ("transcription", *SHERPA_STAGES)
 RESULTS = tuple(SHERPA_STAGES.values())
 VARIANT_LABELS = {
     "onnx": "Базовый · onnx-asr",
@@ -28,8 +31,6 @@ VARIANT_LABELS = {
 def result_identity(kind: str, primary: str = "gigaam") -> tuple[str, str]:
     if kind in SHERPA_STAGES:
         return SHERPA_STAGES[kind]
-    if kind == "sherpa_gigaam_hotwords_city":
-        return "gigaam", "sherpa_hotwords_city"
     if kind == "transcription":
         return primary, "onnx"
     if kind == "comparison":

@@ -13,7 +13,6 @@ from involta_voice.db import migrate
 from involta_voice.provider import FakeProvider, ProviderFailure
 from involta_voice.recognition import reports
 from involta_voice.service import VoiceService
-from involta_voice.variants import RESULTS
 from involta_voice.worker import Worker
 
 from .test_jobs import setup
@@ -21,6 +20,23 @@ from .test_voice_guide import client_for
 from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 from .test_web import login
+
+
+def add_saved_comparison(engine, reference, variant="sherpa_plain"):
+    """An already accepted experimental job, never created by today's intake."""
+    with engine.begin() as conn:
+        snapshot = conn.execute(
+            text("SELECT snapshot FROM runs WHERE submission=:id"), {"id": reference}
+        ).scalar_one()
+        request = dict(snapshot["sherpa_models"]["sherpa_gigaam_hotwords_strong"])
+        request.update(variant=variant, hotwords_score=5.0, dictionary=[])
+        kind = "sherpa_gigaam_" + variant.removeprefix("sherpa_")
+        conn.execute(
+            text(
+                "INSERT INTO stages(submission,run,kind,request) VALUES(:id,1,:kind,CAST(:request AS jsonb))"
+            ),
+            {"id": reference, "kind": kind, "request": json.dumps(request)},
+        )
 
 
 class GigaResults(FakeProvider):
@@ -46,7 +62,9 @@ class GigaResults(FakeProvider):
         }
 
 
-def test_five_profiles_share_audio_and_freeze_dictionary_with_idempotent_intake(voice_database):
+def test_single_profile_freezes_dictionary_and_freeze_dictionary_with_idempotent_intake(
+    voice_database,
+):
     settings, engine = voice_database
     settings = settings.model_copy(update={"asr_beta_enabled": True})
     meta = metadata()
@@ -56,28 +74,22 @@ def test_five_profiles_share_audio_and_freeze_dictionary_with_idempotent_intake(
     reference = service.submit(meta, audio, "audio/wav")["reference"]
     assert service.submit(meta, audio, "audio/wav")["reference"] == reference
     queued = reports(engine, [reference])[reference]
-    assert len(queued) == 5 and all(r["state"] == "queued" for r in queued)
-    assert [r["dictionary"] for r in queued if r["variant"] == "sherpa_hotwords"] == [
+    assert len(queued) == 1 and all(r["state"] == "queued" for r in queued)
+    assert [r["dictionary"] for r in queued if r["variant"] == "sherpa_hotwords_strong"] == [
         ["Алхимист", "Иваново", "Огонёк", "Сыроварня", "алхимист", "иваново", "огонёк", "сыроварня"]
     ]
     meta.location.recognition_dictionary.append("Добавлено позже")
     provider = GigaResults()
     worker = Worker(engine, settings, provider)
-    assert all(worker.once() for _ in range(5)) and not worker.once()
-    assert len(provider.calls) == 5
+    assert all(worker.once() for _ in range(1)) and not worker.once()
+    assert len(provider.calls) == 1
     assert {call[3] for call in provider.calls} == {hashlib.sha256(audio).hexdigest()}
     rows = reports(engine, [reference])[reference]
-    assert [(r["engine"], r["variant"]) for r in rows] == list(RESULTS)
+    assert [(r["engine"], r["variant"]) for r in rows] == [("gigaam", "sherpa_hotwords_strong")]
     assert all(r["state"] == "completed" for r in rows)
     assert all(r["dictionary"] == [] for r in rows if r["variant"] == "sherpa_plain")
-    assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows] == [
-        (5.0, 8),
-        (4.5, 8),
-        (5.0, 8),
-        (5.5, 8),
-        (5.0, 16),
-    ]
-    assert rows[2]["dictionary"] == [
+    assert [(r["hotwords_score"], r["max_active_paths"]) for r in rows] == [(5.5, 8)]
+    assert rows[0]["dictionary"] == [
         "Алхимист",
         "Иваново",
         "Огонёк",
@@ -87,19 +99,19 @@ def test_five_profiles_share_audio_and_freeze_dictionary_with_idempotent_intake(
         "огонёк",
         "сыроварня",
     ]
-    assert rows[2]["primary"] and sum(r["primary"] for r in rows) == 1
+    assert rows[0]["primary"] and sum(r["primary"] for r in rows) == 1
     assert all(not r["dictionary"] for r in rows if r["variant"] in ("onnx", "sherpa_plain"))
-    assert service.status(reference)["transcript"] == "gigaam / sherpa_hotwords"
+    assert service.status(reference)["transcript"] == "gigaam / sherpa_hotwords_strong"
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM submissions")).scalar_one() == 1
-        assert conn.execute(text("SELECT count(*) FROM asr_candidates")).scalar_one() == 5
+        assert conn.execute(text("SELECT count(*) FROM asr_candidates")).scalar_one() == 1
         assert (
             conn.execute(text("SELECT count(*) FROM outbox WHERE kind='gigaam_ready'")).scalar_one()
             == 1
         )
 
 
-@pytest.mark.parametrize("failed", list(RESULTS))
+@pytest.mark.parametrize("failed", [("gigaam", "sherpa_hotwords_strong")])
 def test_comparison_failure_is_independent_and_sherpa_never_becomes_public(
     database, voice_database, failed
 ):
@@ -123,16 +135,20 @@ def test_comparison_failure_is_independent_and_sherpa_never_becomes_public(
     consumer = Consumer(engine, client_for(settings, vs))
     assert consumer.once() == 1
     worker = Worker(ve, vs, GigaResults(failed))
-    assert all(worker.once() for _ in range(5)) and not worker.once()
+    assert all(worker.once() for _ in range(1)) and not worker.once()
     assert consumer.once() == 1 and consumer.once() == 0
     rows = reports(ve, [reference])[reference]
     assert sum(r["state"] == "failed" for r in rows) == 1
     failed_row = next(r for r in rows if (r["engine"], r["variant"]) == failed)
     assert failed_row["error"] == "Independent recognition failure"
     stored = queries.get("reviews", reference)
-    assert stored["publication_status"] == (0 if failed == ("gigaam", "sherpa_hotwords") else 1)
+    assert stored["publication_status"] == (
+        0 if failed == ("gigaam", "sherpa_hotwords_strong") else 1
+    )
     assert stored["transcript"] == (
-        None if failed == ("gigaam", "sherpa_hotwords") else "gigaam / sherpa_hotwords"
+        None
+        if failed == ("gigaam", "sherpa_hotwords_strong")
+        else "gigaam / sherpa_hotwords_strong"
     )
     assert list((vs.data_dir / "audio").glob("*.wav"))
 
@@ -180,19 +196,19 @@ def test_dictionary_contains_all_city_restaurants_and_admin_displays_frozen_inpu
         with engine.begin() as conn:
             conn.execute(text("UPDATE restaurants SET name='Переименован' WHERE name='Алхимист'"))
         worker = Worker(ve, vs, GigaResults())
-        assert all(worker.once() for _ in range(5))
+        assert all(worker.once() for _ in range(1))
         Consumer(engine, client_for(settings, vs)).once()
         login(client)
         page = client.get("/guide/admin/reviews/ivanovo")
         assert page.status_code == 200
-        assert page.text.count('class="recognition-dictionary"') == 5
-        assert page.text.count("Алхимист") == 4
-        assert page.text.count("Плёс · Ресторан 000") == 4
+        assert page.text.count('class="recognition-dictionary"') == 1
+        assert page.text.count("Алхимист") == 1
+        assert page.text.count("Плёс · Ресторан 000") == 1
         assert "Переименован" not in page.text
-        assert page.text.count("Sherpa · текущие подсказки") == 1
+        assert page.text.count("Sherpa · сильные подсказки") == 1
         assert "Ресторан 204" in page.text
         public = client.get("/guide/voice/api/v1/reviews?location=ivanovo").json()
-        assert public["rows"][0]["transcript"] == "gigaam / sherpa_hotwords"
+        assert public["rows"][0]["transcript"] == "gigaam / sherpa_hotwords_strong"
         assert not any(
             key in public["rows"][0]
             for key in ("variant", "dictionary", "hotwords_score", "max_active_paths")
@@ -243,7 +259,6 @@ def test_sherpa_interruption_retries_locally_and_saved_response_is_reused(voice_
     service = VoiceService(engine, settings)
     reference = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, GigaResults())
-    assert worker.once() and worker.once()
     interrupted = worker.claim()
     assert interrupted["kind"].startswith("sherpa_")
     # A process can die immediately after claiming, before persisting its request.
@@ -276,7 +291,7 @@ def test_sherpa_interruption_retries_locally_and_saved_response_is_reused(voice_
         r for r in reports(engine, [reference])[reference] if r["text"] == "Saved Sherpa result"
     )
     assert row["variant"].startswith("sherpa_")
-    assert service.status(reference)["transcript"] == "gigaam / sherpa_hotwords"
+    assert service.status(reference)["transcript"] == "Saved Sherpa result"
 
 
 def test_recommended_profile_publishes_canonical_spelling_but_keeps_raw_results(
@@ -304,8 +319,8 @@ def test_recommended_profile_publishes_canonical_spelling_but_keeps_raw_results(
 
     class ActualText(FakeProvider):
         def call(self, kind, request, audio, mime):
-            assert request["variant"] == "sherpa_hotwords"
-            assert request["hotwords_score"] == 5 and request["max_active_paths"] == 8
+            assert request["variant"] == "sherpa_hotwords_strong"
+            assert request["hotwords_score"] == 5.5 and request["max_active_paths"] == 8
             assert request["dictionary"] == ["Грандъ Сова", "Плёс", "грандъ сова", "плёс"]
             return {"status_code": 200, "body": json.dumps({"text": raw_text})}
 
@@ -317,7 +332,7 @@ def test_recommended_profile_publishes_canonical_spelling_but_keeps_raw_results(
         assert conn.execute(text("SELECT transcript FROM asr_candidates")).scalar_one() == raw_text
         response = conn.execute(text("SELECT response FROM provider_calls")).scalar_one()
         assert json.loads(response["body"])["text"] == raw_text
-        assert conn.execute(text("SELECT count(*) FROM stages")).scalar_one() == 5
+        assert conn.execute(text("SELECT count(*) FROM stages")).scalar_one() == 1
     assert Consumer(guide, client_for(settings, vs)).once() == 2
     assert queries.get("reviews", ref)["transcript"] == expected
 
@@ -331,7 +346,7 @@ def test_new_primary_failure_and_lease_recovery_are_bound_to_frozen_profile(voic
     ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
     worker = Worker(engine, settings, GigaResults())
     stage = worker.claim()
-    assert stage["kind"] == "sherpa_gigaam_hotwords"
+    assert stage["kind"] == "sherpa_gigaam_hotwords_strong"
     with engine.begin() as conn:
         conn.execute(
             text(
@@ -340,7 +355,7 @@ def test_new_primary_failure_and_lease_recovery_are_bound_to_frozen_profile(voic
             {"id": ref, "kind": stage["kind"]},
         )
     next_stage = worker.claim()
-    assert next_stage["kind"] != stage["kind"]
+    assert next_stage is None
     with engine.connect() as conn:
         assert (
             conn.execute(
@@ -349,9 +364,8 @@ def test_new_primary_failure_and_lease_recovery_are_bound_to_frozen_profile(voic
             == 1
         )
     assert service.status(ref)["state"] == "transcription_failed"
-    worker.process(next_stage)
     assert service.status(ref)["transcript"] is None
-    assert SHERPA_PROFILES["sherpa_hotwords"] == (5.0, 8, "catalogue")
+    assert SHERPA_PROFILES["sherpa_hotwords_strong"] == (5.5, 8, "catalogue")
 
 
 def test_previously_received_onnx_primary_keeps_its_original_publication_source(voice_database):
@@ -383,7 +397,7 @@ def test_already_received_city_only_job_finishes_without_creating_new_city_jobs(
         frozen = conn.execute(
             text("SELECT snapshot FROM runs WHERE submission=:id"), {"id": ref}
         ).scalar_one()
-        request = dict(frozen["sherpa_models"]["sherpa_gigaam_hotwords"])
+        request = dict(frozen["sherpa_models"]["sherpa_gigaam_hotwords_strong"])
         request.update(
             variant="sherpa_hotwords_city",
             dictionary=["Плёс"],
@@ -396,7 +410,7 @@ def test_already_received_city_only_job_finishes_without_creating_new_city_jobs(
             {"id": ref, "request": json.dumps(request)},
         )
     worker = Worker(engine, settings, GigaResults())
-    for _ in range(6):
+    for _ in range(2):
         assert worker.once()
     assert not worker.once()
     with engine.connect() as conn:
@@ -406,4 +420,67 @@ def test_already_received_city_only_job_finishes_without_creating_new_city_jobs(
             ).scalar_one()
             == "gigaam / sherpa_hotwords_city"
         )
-    assert service.status(ref)["transcript"] == "gigaam / sherpa_hotwords"
+    assert service.status(ref)["transcript"] == "gigaam / sherpa_hotwords_strong"
+
+
+def test_form_dictionary_is_frozen_and_inflections_are_published_without_changing_raw(
+    voice_database,
+):
+    settings, engine = voice_database
+    settings = settings.model_copy(update={"asr_beta_enabled": True})
+    service = VoiceService(engine, settings)
+    meta = metadata()
+    meta.location.recognition_dictionary = ["Иваново", "Алхимист"]
+    ref = service.submit(meta, recording(), "audio/wav")["reference"]
+    with engine.connect() as conn:
+        frozen = conn.execute(
+            text("SELECT snapshot FROM runs WHERE submission=:id"), {"id": ref}
+        ).scalar_one()
+    assert frozen["name_forms"]["иванове"] == "Иванове"
+    assert frozen["name_normalization"] == "catalogue-inflections-v1"
+    meta.location.name = "Переименован"
+
+    class Raw(FakeProvider):
+        def call(self, *args):
+            return {
+                "status_code": 200,
+                "body": json.dumps({"text": "В иванове есть ивановский ресторан алхимист."}),
+            }
+
+    assert Worker(engine, settings, Raw()).once()
+    assert service.status(ref)["transcript"] == "В Иванове есть ивановский ресторан Алхимист."
+    report = reports(engine, [ref])[ref][0]
+    assert report["raw_text"] == "В иванове есть ивановский ресторан алхимист."
+    assert report["text"] == service.status(ref)["transcript"]
+    assert not Worker(engine, settings, Raw()).once()
+
+
+def test_accepted_old_primary_retains_five_eight_source_and_exact_normalization(voice_database):
+    settings, engine = voice_database
+    settings = settings.model_copy(update={"asr_beta_enabled": True})
+    service = VoiceService(engine, settings)
+    ref = service.submit(metadata(), recording(), "audio/wav")["reference"]
+    add_saved_comparison(engine, ref, "sherpa_hotwords")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE runs SET snapshot=(snapshot-'name_forms'-'name_normalization')||'{\"primary_variant\":\"sherpa_hotwords\"}'::jsonb WHERE submission=:id"
+            ),
+            {"id": ref},
+        )
+        before = dict(
+            conn.execute(
+                text("SELECT request FROM stages WHERE kind='sherpa_gigaam_hotwords'")
+            ).scalar_one()
+        )
+
+    class Old(FakeProvider):
+        def call(self, kind, request, *args):
+            assert request == before
+            return {"status_code": 200, "body": json.dumps({"text": "в иванове"})}
+
+    assert Worker(engine, settings, Old()).once()
+    assert service.status(ref)["transcript"] == "в иванове"
+    assert Worker(engine, settings, GigaResults()).once()
+    assert service.status(ref)["transcript"] == "в иванове"
+    assert len(reports(engine, [ref])[ref]) == 2
