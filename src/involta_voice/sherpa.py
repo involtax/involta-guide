@@ -17,6 +17,7 @@ from .variants import SHERPA_PROFILES, dictionary_names
 
 # Includes the NeMo TDT beam-search/length-reward fix, upstream PR #4084.
 RUNTIME_REVISION = "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb"
+VAD_TAIL_CONTEXT = "short-tail-context-v1"
 MODELS: dict[str, dict[str, Any]] = {
     "gigaam": {
         "repository": "csukuangfj/sherpa-onnx-nemo-transducer-punct-giga-am-v3-russian-2025-12-16",
@@ -64,12 +65,30 @@ def options(
         "vad_revision": VAD["revision"],
         "max_speech_duration_s": 20,
         "min_silence_duration_ms": 500,
+        "vad_tail_context": VAD_TAIL_CONTEXT,
         "preprocessing": "av-mono-16k-v1",
     }
 
 
 def model_path(settings: Settings, engine: str) -> Path:
     return settings.asr_models_dir / "sherpa" / engine / str(MODELS[engine]["revision"])
+
+
+def join_short_tail(
+    segments: list[tuple[int, int]], sample_rate: int, max_duration_s: float
+) -> list[tuple[int, int]]:
+    """Give an isolated short final sound its preceding speech context, without cutting it."""
+    if len(segments) < 2:
+        return segments
+    previous_start, previous_end = segments[-2]
+    start, end = segments[-1]
+    if (
+        0 < (end - start) * 1000 < 400 * sample_rate
+        and 0 <= start - previous_end <= 3 * sample_rate
+        and end - previous_start <= min(max_duration_s, 20) * sample_rate
+    ):
+        return [*segments[:-2], (previous_start, end)]
+    return segments
 
 
 def prepare(settings: Settings) -> None:
@@ -111,6 +130,8 @@ class LocalSherpa:
             gc.collect()
 
     def warmup(self, request: dict[str, Any]) -> None:
+        if request.get("vad_tail_context") not in (None, VAD_TAIL_CONTEXT):
+            raise ProviderFailure("Неизвестная версия обработки хвоста VAD")
         engine = str(request.get("model") or "")
         if (
             request.get("engine") != "sherpa-onnx"
@@ -199,14 +220,23 @@ class LocalSherpa:
                 self.warmup(request)
                 waveform = decode(audio)
                 loaded = time.monotonic()
-                segments = next(
-                    self._vad.segment_batch(
-                        waveform[None, :],
-                        np.asarray([len(waveform)], dtype=np.int64),
-                        16000,
-                        max_speech_duration_s=request["max_speech_duration_s"],
-                        min_silence_duration_ms=request["min_silence_duration_ms"],
+                vad_segments = list(
+                    next(
+                        self._vad.segment_batch(
+                            waveform[None, :],
+                            np.asarray([len(waveform)], dtype=np.int64),
+                            16000,
+                            max_speech_duration_s=request["max_speech_duration_s"],
+                            min_silence_duration_ms=request["min_silence_duration_ms"],
+                        )
                     )
+                )
+                segments = (
+                    join_short_tail(
+                        vad_segments, request["sample_rate"], request["max_speech_duration_s"]
+                    )
+                    if request.get("vad_tail_context") == VAD_TAIL_CONTEXT
+                    else vad_segments
                 )
                 parts: list[dict[str, Any]] = []
                 for start, end in segments:
@@ -233,6 +263,10 @@ class LocalSherpa:
                     "elapsed_seconds": time.monotonic() - started,
                     "inference_seconds": time.monotonic() - loaded,
                     "segments": parts,
+                    "vad_segments": [
+                        {"start": start / 16000, "end": end / 16000} for start, end in vad_segments
+                    ],
+                    "vad_tail_context_applied": segments != vad_segments,
                     "settings": request,
                 }
                 return {

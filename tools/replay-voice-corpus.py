@@ -31,6 +31,11 @@ def main() -> None:
     parser.add_argument("--catalogue", choices=["saved", "latest"], default="saved")
     parser.add_argument("--extra-words", nargs="*", default=[])
     parser.add_argument("--extra-restaurants", nargs="*", default=[])
+    parser.add_argument(
+        "--no-tail-context",
+        action="store_true",
+        help="Compare the original independent VAD segments",
+    )
     parser.add_argument("--output", type=Path, default=Path("var/voice-corpus/replay.json"))
     args = parser.parse_args()
     index = json.loads((args.corpus / "index.json").read_text())
@@ -74,6 +79,8 @@ def main() -> None:
                     location_name=city,
                 )
                 request.update(hotwords_score=score, max_active_paths=args.search)
+                if args.no_tail_context:
+                    request.pop("vad_tail_context", None)
                 if score == 0:
                     request["dictionary"] = []
                 body = json.loads(provider.call(request, audio)["body"])
@@ -96,6 +103,8 @@ def main() -> None:
                     "audio_sha256": body["audio_sha256"],
                     "pcm_sha256": body["pcm_sha256"],
                     "segments": body.get("segments"),
+                    "vad_segments": body.get("vad_segments"),
+                    "vad_tail_context_applied": body.get("vad_tail_context_applied", False),
                     "elapsed_seconds": body["elapsed_seconds"],
                 }
                 rows.append(row)
