@@ -20,6 +20,7 @@ from .test_background_generation import configured, envelope, task
 from .test_editorial import CONTENT
 from .test_filling_top3 import shortlist
 from .test_jobs import setup
+from .test_web import login
 
 SPEC = spec_from_file_location(
     "city_surroundings",
@@ -103,6 +104,12 @@ def test_countryside_competes_in_the_city_list_with_its_real_locality(
     try:
         initial_location_count = len(queries.rows("locations"))
         assert location["id"] == location_id
+        scope = CONTRACT.COVERAGE_NOTES[location_id]
+        with TestClient(create_app(settings)) as client:
+            empty = client.get("/guide/" + location["slug"])
+            assert empty.status_code == 200
+            assert scope not in empty.text
+            assert 'class="coverage"' not in empty.text
         assert Worker(queue, service).once()
         assert queries.get("jobs", job["id"])["status"] == "done"
         prompt = requests[0]["input"][1]["content"]
@@ -127,6 +134,13 @@ def test_countryside_competes_in_the_city_list_with_its_real_locality(
             html = client.get("/guide/" + location["slug"]).text
             assert description in html
             assert countryside["mapsUrl"] in html
+            assert scope not in html
+            assert 'class="coverage"' not in html
+            assert queries.get("locations", location_id)["coverage_note"] == scope
+            login(client)
+            admin = client.get("/guide/admin/locations/" + location["slug"])
+            assert admin.status_code == 200
+            assert scope in admin.text
     finally:
         provider.close()
 
