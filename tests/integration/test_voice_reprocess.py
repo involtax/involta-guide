@@ -246,3 +246,16 @@ def test_rerun_failure_or_deletion_never_erases_or_resurrects_public_review(
     assert review["transcript"] == "Прежний текст."
     assert review["publication_status"] == (1 if finish == "failed" else 0)
     assert review["status"] == ("transcribed" if finish == "failed" else "deleted")
+
+
+def test_voice_readiness_requires_numeric_location_schema(voice_database):
+    from involta_voice.db import migrate
+    from involta_voice.main import create_app as create_voice_app
+
+    settings, engine = voice_database
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM voice_schema_versions WHERE version=10"))
+    with TestClient(create_voice_app(settings)) as client:
+        assert client.get("/health/ready").status_code == 503
+        migrate(engine)
+        assert client.get("/health/ready").status_code == 200

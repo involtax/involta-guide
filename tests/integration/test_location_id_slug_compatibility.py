@@ -27,8 +27,12 @@ def test_numeric_identity_survives_catalogue_url_change_and_manual_slug(database
     original_read = Path.read_text
     catalog_path = settings.root_dir / "data/location-catalog.json"
     catalog = json.loads(catalog_path.read_text())
-    city = next(row for row in catalog["locations"] if row["slug"] == "plyos")
-    expected = city["id"]
+    legacy_id = uuid5(NAMESPACE_URL, "https://involta.ru/guide/plyos")
+    identities = json.loads(
+        (settings.root_dir / "migrations/data/location_id_uuids.json").read_text()
+    )
+    expected = identities[str(legacy_id)]
+    city = next(row for row in catalog["locations"] if row["id"] == expected)
     city["slug"] = "ples"
 
     def changed_catalog(path, *args, **kwargs):
@@ -45,7 +49,7 @@ def test_numeric_identity_survives_catalogue_url_change_and_manual_slug(database
                 text(
                     "INSERT INTO locations(id,slug,name,region,intro) VALUES(:id,'my-ples','Плёс','Ивановская область','Сохранённое вступление')"
                 ),
-                {"id": uuid5(NAMESPACE_URL, "https://involta.ru/guide/plyos")},
+                {"id": legacy_id},
             )
         monkeypatch.setattr(Path, "read_text", changed_catalog)
         command.upgrade(config, "head")
