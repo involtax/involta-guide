@@ -1,8 +1,10 @@
 """One active Sherpa profile; saved requests retain their original identities."""
 
 # score, search width, dictionary source. Frozen in each run at intake.
+# Sherpa boosts each token: 5.5 overwhelmed speech with repeated catalogue names.
+# Keep the historical variant ID; each run records its actual numeric weight.
 PRIMARY_VARIANT = "sherpa_hotwords_strong"
-SHERPA_PROFILES = {PRIMARY_VARIANT: (5.5, 8, "catalogue")}
+SHERPA_PROFILES = {PRIMARY_VARIANT: (2.5, 16, "catalogue")}
 # Identities remain readable/executable for accepted jobs and saved history.
 SHERPA_STAGES = {
     "sherpa_gigaam_" + variant.removeprefix("sherpa_"): ("gigaam", variant)
@@ -22,7 +24,7 @@ VARIANT_LABELS = {
     "sherpa_plain": "Sherpa · без словаря",
     "sherpa_hotwords_weak": "Sherpa · слабые подсказки",
     "sherpa_hotwords": "Sherpa · текущие подсказки",
-    "sherpa_hotwords_strong": "Sherpa · сильные подсказки",
+    "sherpa_hotwords_strong": "Sherpa · словарные подсказки",
     "sherpa_hotwords_wide": "Sherpa · широкий поиск",
     "sherpa_hotwords_city": "Sherpa · только город",
 }

@@ -37,6 +37,11 @@ def options(
         raise ValueError("Неизвестный вариант Sherpa")
     score, paths, source = SHERPA_PROFILES[variant]
     dictionary = [location_name, *names] if source == "catalogue" else []
+    if location_name and source == "catalogue":
+        from .text import name_forms
+
+        # Spoken city names are inflected; freeze real forms before ASR as well.
+        dictionary.extend(sorted(name_forms(location_name, city=True)))
     return {
         "engine": "sherpa-onnx",
         "model": engine,
