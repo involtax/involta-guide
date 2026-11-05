@@ -1,8 +1,15 @@
-(() => {
+(async () => {
   const form = document.querySelector('[data-location-search]');
   if (!form || !window.autoComplete || !window.GuideLocationIndex) return;
   let catalogue;
-  try { catalogue = JSON.parse(form.querySelector('#location-catalogue').textContent); }
+  try {
+    const response = await fetch(form.dataset.catalogueUrl, {credentials: 'omit', signal: AbortSignal.timeout(5000)});
+    if (!response.ok) return;
+    catalogue = await response.json();
+    if (!Array.isArray(catalogue) || catalogue.some(item => !item ||
+      typeof item.name !== 'string' || typeof item.context !== 'string' ||
+      typeof item.location !== 'string' || !item.location)) return;
+  }
   catch { return; }
   const search = GuideLocationIndex(catalogue);
   const input = form.querySelector('input[name="q"]');
@@ -72,8 +79,8 @@
     events: {input: {
       input: () => begin(),
       focus: () => { if (!composing && !expanded) begin(); },
-      // A populated search stays open when focus moves elsewhere.
-      blur: () => {},
+      // Keep the query, but fold the panel when focus leaves the input.
+      blur: () => widget.close(),
       keydown: event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
         if (event.key === 'Escape') { event.preventDefault(); return; }
@@ -85,15 +92,14 @@
       selection: event => {
         const selected = event.detail.selection?.value;
         if (!selected) return;
-        const url = selected.url;
-        // Only canonical Guide links from this origin can be selected.
-        const target = new URL(url, location.href);
-        if (target.origin === location.origin && target.pathname.startsWith(form.getAttribute('action'))) {
+        // The catalogue stores a slug; the Guide prefix belongs to the form.
+        const target = new URL(encodeURIComponent(selected.location), form.action);
+        if (target.origin === location.origin && target.pathname.startsWith(new URL(form.action).pathname)) {
           location.assign(target.href);
         }
       },
       open: () => {
-        if (!input.value.trim()) { widget.close(); return; }
+        if (!input.value.trim() || document.activeElement !== input) { widget.close(); return; }
         panel.hidden = false;
         panel.inert = false;
         panel.setAttribute('aria-hidden', 'false');

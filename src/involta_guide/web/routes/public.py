@@ -1,3 +1,4 @@
+from hashlib import sha256
 from textwrap import shorten
 from urllib.parse import urlencode
 from uuid import UUID
@@ -40,9 +41,8 @@ def routes(prefix: str) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid page number") from exc
         searching = bool(q.strip())
-        catalogue = ctx.queries.public_location_catalogue()
         if searching:
-            matches = search_locations(catalogue, q)
+            matches = search_locations(ctx.queries.public_location_catalogue(), q)
             pages = max(1, (len(matches) + 59) // 60)
             current = max(1, min(pages, page_number))
             result = {
@@ -62,26 +62,50 @@ def routes(prefix: str) -> APIRouter:
             context={
                 "settings": ctx.settings,
                 "q": q,
-                "location_catalogue": [
-                    {
-                        "name": row["name"],
-                        "context": " · ".join(
-                            dict.fromkeys(
-                                value
-                                for value in (KINDS[row["kind"]], row["parent_name"], row["region"])
-                                if value
-                            )
-                        ),
-                        "url": ctx.settings.path("/" + row["slug"]),
-                    }
-                    for row in catalogue
-                ],
                 "result": result,
                 "kinds": KINDS,
                 "indexable": True,
                 "page_query": lambda n: urlencode({"q": q, "page": n}),
             },
         )
+
+    @router.get(prefix + "/api/locations/catalogue")
+    def location_catalogue(request: Request) -> Response:
+        rows = context(request).queries.public_location_catalogue()
+        response = JSONResponse(
+            [
+                {
+                    "name": row["name"],
+                    "location": row["slug"],
+                    "context": " · ".join(
+                        dict.fromkeys(
+                            value
+                            for value in (
+                                KINDS[row["kind"]] if row["kind"] != "city" else None,
+                                row["parent_name"],
+                                row["region"],
+                            )
+                            if value
+                        )
+                    ),
+                }
+                for row in rows
+            ]
+        )
+        etag = '"' + sha256(response.body).hexdigest() + '"'
+        headers = {
+            "ETag": etag,
+            "Cache-Control": "public, max-age=0, must-revalidate",
+            "X-Robots-Tag": "noindex",
+        }
+        validators = [
+            value.strip().removeprefix("W/")
+            for value in request.headers.get("if-none-match", "").split(",")
+        ]
+        if etag in validators or "*" in validators:
+            return Response(status_code=304, headers=headers)
+        response.headers.update(headers)
+        return response
 
     @router.get(prefix + "/about")
     def about(request: Request) -> Response:
