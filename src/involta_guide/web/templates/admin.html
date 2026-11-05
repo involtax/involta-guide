@@ -13,7 +13,7 @@
 <article>
 <strong>{{overview.reviews}}</strong> сохранённых отзывов</article>
 </section>
-<p><a href="{{settings.path('/admin/locations')}}">Все локации</a> · <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые</a> · <a href="{{settings.path('/admin/locations')}}?status=filled">Наполненные</a> · <a href="{{settings.path('/logs')}}">Логи наполнения</a></p>
+<p><a href="{{settings.path('/admin/locations')}}">Все локации</a> · <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые</a> · <a href="{{settings.path('/admin/locations')}}?status=filled">Наполненные</a></p>
 <section class="panel"><h2>Использование OpenAI сегодня</h2><dl class="admin-facts">
 {%for label,value in [('Вызовы',overview.usage.calls),('Входные токены',overview.usage.input_tokens),('Выходные токены',overview.usage.output_tokens)]%}<div><dt>{{label}}</dt><dd>{{value}}</dd></div>{%endfor%}</dl></section>
 {%endif%}
@@ -30,8 +30,8 @@
 <button>Сохранить настройки наполнения</button>
 </form>
 </section><section class="panel">{%include 'generation_models.html'%}
-<p>Первичное наполнение запускается на публичной странице пустого города. Повторный запрос и переобработка доступны администратору в конкретном логе.</p>
-<a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a> · <a href="{{settings.path('/logs')}}">Логи и очередь</a>
+<p>Первичное наполнение запускается на публичной странице пустого города.</p>
+<a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a>
 </section>
 {%endif%}
 {%if active_section=='restaurants'%}

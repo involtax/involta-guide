@@ -2,14 +2,21 @@ from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.datastructures import FormData
 
 from involta_guide.infrastructure.voice.client import VoiceUnavailable
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
-from involta_guide.web.http import admin_token, check_csrf, context, form_data, require_admin
+from involta_guide.web.http import (
+    admin_token,
+    check_csrf,
+    context,
+    form_data,
+    require_admin,
+    require_diagnostics,
+)
 from involta_guide.web.routes.admin import render
 from involta_guide.web.routes.voice import voice_client
 from involta_voice.variants import PRIMARY_VARIANT, RESULTS, VARIANT_LABELS
@@ -100,11 +107,48 @@ def routes(prefix: str) -> APIRouter:
             base + "/" + slug + "?page=" + str(page) + "#review-" + str(number), status_code=303
         )
 
-    @router.get(prefix + "/logs/reviews/{slug}/{number:int}")
-    def log(request: Request, slug: str, number: int) -> Response:
+    diagnostic_headers = {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Content-Type-Options": "nosniff",
+    }
+
+    def review_detail(request: Request, slug: str, number: int) -> dict[str, Any]:
+        admin = require_diagnostics(request)
         read = VoiceReadModel(context(request).engine)
         identity, _ = read.resolve(slug, number)
         detail = read.detail(identity)
+        if detail["review"]["status"] == "deleted" and not admin:
+            raise HTTPException(404, "Отзыв удалён")
+        return detail
+
+    @router.get(prefix + "/logs/reviews.json")
+    def export_index(
+        request: Request, after: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200)
+    ) -> Response:
+        require_diagnostics(request)
+        settings = context(request).settings
+        rows = VoiceReadModel(context(request).engine).retained(after, limit + 1)
+        more = len(rows) > limit
+        rows = rows[:limit]
+        for item in rows:
+            path = "/logs/reviews/" + item["slug"] + "/" + str(item["number"])
+            item["log_url"] = settings.path(path)
+            item["json_url"] = settings.path(path + ".json")
+            item["audio_url"] = settings.path(path + "/audio") if item["reference"] else None
+        return JSONResponse(
+            jsonable_encoder(
+                {
+                    "schema_version": 1,
+                    "reviews": rows,
+                    "next_after": rows[-1]["number"] if more else None,
+                }
+            ),
+            headers=diagnostic_headers,
+        )
+
+    def diagnostic_data(request: Request, slug: str, number: int) -> dict[str, Any]:
+        detail = review_detail(request, slug, number)
         remote = comparison = None
         unavailable = ""
         if detail["link"]:
@@ -128,21 +172,47 @@ def routes(prefix: str) -> APIRouter:
                 "admin_password",
             )
         )
-        return render(
+        content = public_log(
+            jsonable_encoder(
+                {
+                    "schema_version": 1,
+                    "detail": detail,
+                    "voice": remote,
+                    "asr": comparison,
+                    "unavailable": unavailable,
+                    "consumer_health": VoiceReadModel(context(request).engine).consumer_health(),
+                }
+            ),
+            secrets,
+        )
+        path = "/logs/reviews/" + slug + "/" + str(number)
+        content["audio_url"] = settings.path(path + "/audio") if detail["link"] else None
+        return content
+
+    @router.get(prefix + "/logs/reviews/{slug}/{number:int}")
+    def log(request: Request, slug: str, number: int) -> Response:
+        data = diagnostic_data(request, slug, number)
+        response = render(
             request,
             "voice_log.html",
             {
                 "active_section": "reviews",
-                "v": public_log(jsonable_encoder(detail), secrets),
-                "remote": public_log(remote, secrets),
-                "comparison": public_log(comparison, secrets),
-                "voice_unavailable": unavailable,
-                "consumer_health": read.consumer_health(),
+                "v": data["detail"],
+                "remote": data["voice"],
+                "comparison": data["asr"],
+                "voice_unavailable": data["unavailable"],
+                "consumer_health": data["consumer_health"],
                 "show_admin_nav": context(request).security.principal(admin_token(request))
                 is not None,
                 "workspace_boost": False,
             },
         )
+        response.headers.update(diagnostic_headers)
+        return response
+
+    @router.get(prefix + "/logs/reviews/{slug}/{number:int}.json")
+    def export_detail(request: Request, slug: str, number: int) -> Response:
+        return JSONResponse(diagnostic_data(request, slug, number), headers=diagnostic_headers)
 
     @router.post(base + "/{slug}/{number:int}/delete")
     def delete(
@@ -169,22 +239,37 @@ def routes(prefix: str) -> APIRouter:
                 )
         return RedirectResponse(base + "/" + slug, status_code=303)
 
-    @router.get(base + "/{slug}/{number:int}/audio")
-    def audio(request: Request, slug: str, number: int) -> Response:
-        require_admin(request)
-        read = VoiceReadModel(context(request).engine)
-        identity, _ = read.resolve(slug, number)
-        link = read.detail(identity)["link"]
+    @router.get(prefix + "/logs/reviews/{slug}/{number:int}/audio")
+    def audio(request: Request, slug: str, number: int, playback: bool = False) -> Response:
+        link = review_detail(request, slug, number)["link"]
         if not link:
             raise HTTPException(404, "Аудио недоступно")
         remote = voice_client(request).request(
-            "GET", "/admin/submissions/" + str(link["reference"]) + "/audio"
+            "GET",
+            "/admin/submissions/" + str(link["reference"]) + "/audio",
+            params={"playback": str(playback).lower()},
+            headers={
+                name: request.headers[name]
+                for name in ("range", "if-range")
+                if name in request.headers
+            },
         )
+        forwarded = {
+            name: remote.headers[name]
+            for name in (
+                "accept-ranges",
+                "content-range",
+                "content-length",
+                "etag",
+                "last-modified",
+            )
+            if name in remote.headers
+        }
         return Response(
             remote.content,
             status_code=remote.status_code,
             media_type=remote.headers.get("content-type", "application/octet-stream"),
-            headers={"Cache-Control": "private,no-store"},
+            headers={**diagnostic_headers, **forwarded},
         )
 
     @router.post(base + "/inbox/{event_id}/retry")

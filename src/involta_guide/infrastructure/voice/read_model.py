@@ -152,6 +152,20 @@ class VoiceReadModel:
             "total": total,
         }
 
+    def retained(self, after: int, limit: int) -> list[dict[str, Any]]:
+        with self.engine.connect() as conn:
+            return [
+                dict(r)
+                for r in conn.execute(
+                    text("""SELECT r.id,r.number,r.created_at,
+                r.transcript,r.publication_status,r.duration_seconds,l.slug,l.name location_name,
+                v.reference FROM reviews r JOIN locations l ON l.id=r.location_id
+                LEFT JOIN voice_links v ON v.review_id=r.id
+                WHERE r.status<>'deleted' AND r.number>:after ORDER BY r.number LIMIT :limit"""),
+                    {"after": after, "limit": limit},
+                ).mappings()
+            ]
+
     def path(self, review_id: str) -> str:
         with self.engine.connect() as conn:
             item = row(

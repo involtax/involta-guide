@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -225,13 +225,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return service.status(str(reference), admin=True)
 
     @app.get("/internal/v1/admin/submissions/{reference}/audio", dependencies=dependencies)
-    def audio(reference: UUID) -> FileResponse:
+    def audio(reference: UUID, request: Request, playback: bool = False) -> Response:
         with engine.connect() as conn:
             submission = row(
                 conn, "SELECT audio,mime FROM submissions WHERE reference=:id", id=str(reference)
             )
         if not submission:
             raise VoiceError("Запись не найдена", "not_found", 404)
+        if playback and submission["mime"] == "audio/webm":
+            from .playback import playback_response, seekable_webm
+
+            return playback_response(
+                seekable_webm(service.storage.path(submission["audio"])),
+                request.headers.get("range", ""),
+                request.headers.get("if-range", ""),
+            )
         return FileResponse(
             service.storage.path(submission["audio"]),
             media_type=submission["mime"],
