@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block brand_context %}MCP{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{settings.path('/assets/agents.css')}}">{% endblock %}
+{% block body %}
+<main class="agents-page">
+  <h1>Гид для<br><em>ассистентов.</em></h1>
+  <p class="agents-lead">Подборки ресторанов и настоящие отзывы людей — прямо в вашем ИИ-ассистенте.</p>
+  <div class="agents-endpoint">
+    <span class="agents-label">Адрес подключения</span>
+    <code>{{settings.url('/mcp')}}</code>
+    <small>Streamable HTTP · Без регистрации · Только чтение</small>
+  </div>
+  <section>
+    <h2><code>Location</code></h2>
+    <p>Передайте точное название или slug локации. В ответе — подборка ресторанов, последние 10 отзывов и ссылки на страницы.</p>
+    <pre>{"location": "Иваново"}</pre>
+  </section>
+  <section>
+    <h2><code>Restaurant</code></h2>
+    <p>Передайте ID ресторана из ответа Location. Получите карточку, контакты, карту и известные часы работы.</p>
+    <pre>{"restaurant_id": "ID из Location"}</pre>
+    <small>Отзывы ресторана появятся после достоверной привязки. Пока они относятся к локации.</small>
+  </section>
+  <section>
+    <h2>Подключите один раз.</h2>
+    <p>Добавьте адрес MCP в настройках совместимого клиента. После подключения ассистент увидит оба инструмента и описание их параметров.</p>
+    <p>В <a href="https://chatgpt.com/plugins">ChatGPT Plugins</a>: «+» → Add custom MCP server → адрес выше → без авторизации → Create as a plugin. Возможность подключения зависит от настроек аккаунта и рабочего пространства.</p>
+    <details class="agents-config">
+      <summary>Пример конфигурации</summary>
+      <pre>{"mcpServers": {
+  "involta-guide": {
+    "url": "{{settings.url('/mcp')}}"
+  }
+}}</pre>
+      <p>Названия настроек зависят от клиента. Для удалённого сервера выберите Streamable HTTP, авторизацию — без входа.</p>
+    </details>
+    <p>Публикация этой страницы не подключает гид ко всем GPT автоматически: доступными инструментами управляет приложение, в котором работает ассистент.</p>
+  </section>
+  <nav class="agents-links" aria-label="Документация MCP">
+    <a href="{{settings.path('/llms.txt')}}">Инструкция для агентов ↗</a>
+    <a href="{{settings.path('/api/locations/catalogue')}}">Каталог локаций ↗</a>
+    <a href="{{settings.path('/mcp-server.json')}}">Манифест MCP ↗</a>
+  </nav>
+</main>
+{% endblock %}
