@@ -23,6 +23,7 @@ from involta_voice.db import row
 
 LABELS = {"new": "Новый", "ok": "ОК", "bugs": "Баги", "other": "Разное"}
 BUCKET = """CASE
+ WHEN a.manual_category='bugs' THEN 'bugs'
  WHEN a.source_text IS DISTINCT FROM r.transcript OR a.result IS NULL OR j.status IS DISTINCT FROM 'done' THEN 'new'
  WHEN a.result->>'category' IN ('bugs','other') THEN a.result->>'category'
  WHEN a.approved_at IS NULL THEN 'new'
@@ -54,7 +55,7 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(f"""SELECT r.id,r.number,r.transcript,r.ip,r.user_agent,r.created_at,
-              l.name location_name,l.slug,a.result,a.source_text,a.job_id,j.status job_status,j.error
+              l.name location_name,l.slug,a.result,a.source_text,a.job_id,a.manual_category,j.status job_status,j.error
               {BASE_QUERY} WHERE {LIVE} AND ({BUCKET})=:status
               ORDER BY r.created_at DESC,r.number DESC LIMIT 20 OFFSET :offset"""),
                     {"status": status, "offset": (page - 1) * 20},
@@ -82,7 +83,10 @@ def routes(prefix: str) -> APIRouter:
                 "selected": status,
                 "page": page,
                 "pages": pages,
-                "processing": any(r["job_status"] in (None, "queued", "running") for r in rows),
+                "processing": any(
+                    not r["manual_category"] and r["job_status"] in (None, "queued", "running")
+                    for r in rows
+                ),
             },
         )
 
@@ -105,6 +109,8 @@ def routes(prefix: str) -> APIRouter:
         service = ReviewAnalysis(ctx.engine, ctx.settings)
         if action == "approve":
             service.approve(identity, str(form.get("job_id", "")), principal["id"])
+        elif action == "bug":
+            service.mark_bug(identity, principal["id"])
         elif action == "delete":
             service.delete(identity, principal["id"])
         else:
@@ -165,7 +171,7 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_deleted') ORDER BY created_at"
+                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_deleted','review_marked_bug') ORDER BY created_at"
                     ),
                     {"id": identity},
                 ).mappings()

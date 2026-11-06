@@ -29,6 +29,7 @@ class ReviewAnalysis:
               LEFT JOIN review_analyses a ON a.review_id=r.id
               WHERE r.status='transcribed' AND length(trim(r.transcript))>0
                 AND NOT l.reset_pending AND NOT l.is_hub AND r.content_epoch=l.content_epoch
+                AND coalesce(a.manual_category,'') <> 'bugs'
                 AND (a.review_id IS NULL OR a.source_text IS DISTINCT FROM r.transcript)
               ORDER BY r.created_at,r.id LIMIT 20 FOR UPDATE OF l,r SKIP LOCKED""")
                 )
@@ -191,6 +192,8 @@ class ReviewAnalysis:
                 or review["content_epoch"] != location["content_epoch"]
             ):
                 raise Conflict("Результат ещё не готов или устарел. Обновите страницу.")
+            if analysis["manual_category"] == "bugs":
+                raise Conflict("Отзыв вручную отмечен как баг")
             if analysis["approved_at"]:
                 return
             result = Analysis.model_validate(analysis["result"])
@@ -279,6 +282,41 @@ class ReviewAnalysis:
                     "after": result.edited_text,
                     "mentions": resolved,
                     "votes": applied,
+                },
+            )
+
+    def mark_bug(self, review_id: str, actor: str) -> None:
+        with self.engine.begin() as conn:
+            self._lock_location(conn, review_id)
+            review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=review_id)
+            analysis = row(
+                conn, "SELECT * FROM review_analyses WHERE review_id=:id FOR UPDATE", id=review_id
+            )
+            if not review or review["status"] == "deleted":
+                raise NotFound("Отзыв удалён")
+            if analysis and analysis["manual_category"] == "bugs":
+                return
+            if (
+                analysis
+                and analysis["approved_at"]
+                and analysis["source_text"] == review["transcript"]
+            ):
+                raise Conflict("Ручной перенос доступен для новых отзывов")
+            execute(
+                conn,
+                """INSERT INTO review_analyses(review_id,source_text,manual_category)
+                VALUES(:id,:source,'bugs') ON CONFLICT(review_id) DO UPDATE SET manual_category='bugs'""",
+                id=review_id,
+                source=review["transcript"] or "",
+            )
+            self._audit(
+                conn,
+                review_id,
+                "review_marked_bug",
+                {
+                    "actor": actor,
+                    "before": analysis["result"] if analysis else None,
+                    "after": "bugs",
                 },
             )
 
