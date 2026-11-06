@@ -104,6 +104,6 @@ def test_home_empty_feed_and_escaped_transcript_with_local_time(database):
         home = client.get("/guide/")
         assert transcript not in home.text and "&lt;img" in home.text
         assert "7 ноя · 02:30" in home.text and "2026-11-07T02:30:00+03:00" in home.text
-        assert "Еда. Люди. Качество." in home.text
+        assert "ЕДА. ЛЮДИ. КАЧЕСТВО." in home.text
         assert "Куда отправимся?" not in home.text and "Прислушиваемся к вам." not in home.text
         assert "Жизнь кипит" in client.get("/guide/?q=%20%20").text
