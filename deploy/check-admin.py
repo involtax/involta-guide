@@ -12,6 +12,7 @@ class Form(HTMLParser):
         super().__init__()
         self.csrf = ""
         self.login = False
+        self.admin_link = False
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
@@ -19,6 +20,8 @@ class Form(HTMLParser):
             self.csrf = values.get("value", "")
         if tag == "input" and values.get("type") == "password":
             self.login = True
+        if tag == "a" and "header-admin-link" in values.get("class", "").split():
+            self.admin_link = values.get("href") == "/guide/admin"
 
 
 def main():
@@ -53,14 +56,18 @@ def main():
             "/admin/locations/ivanovo",
             "/admin/restaurants?location=ivanovo",
             "/admin/reviews",
+            "/admin/reviews-2",
             "/admin/stats",
             "/admin/settings/filling",
             "/admin/sessions",
-            "/logs",
         ):
             page = request(path)
             assert not page.login and page.csrf, f"Authenticated page unavailable: {path}"
             print(f"PASS authenticated GET {path}", flush=True)
+        # Public logs have an authenticated header link, not a logout/CSRF form.
+        logs = request("/logs")
+        assert not logs.login and logs.admin_link, "Authenticated public logs header unavailable"
+        print("PASS authenticated GET /logs", flush=True)
     finally:
         request("/admin/logout", {"_csrf": admin.csrf})
     assert request("/admin").login, "Smoke session was not revoked"
