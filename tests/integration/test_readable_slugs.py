@@ -16,6 +16,8 @@ from involta_guide.main import create_app
 from .test_editorial import CONTENT, services
 from .test_web import login
 
+pytestmark = pytest.mark.full_catalog
+
 
 def previous_catalogue(database):
     settings, engine = database

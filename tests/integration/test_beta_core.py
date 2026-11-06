@@ -24,6 +24,7 @@ from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
 
 
+@pytest.mark.full_catalog
 def test_fresh_schema_has_single_owner_and_explicit_lifecycle(database):
     settings, engine = database
     tables = inspect(engine).get_table_names(schema=settings.database_schema)

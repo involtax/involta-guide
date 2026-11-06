@@ -1,8 +1,11 @@
+import pytest
 from alembic import command
 from alembic.config import Config
 
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_guide.infrastructure.seed import seed
+
+pytestmark = pytest.mark.full_catalog
 
 
 def test_migrations_and_geography_are_idempotent(database):

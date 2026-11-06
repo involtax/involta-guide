@@ -1,7 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import event, text
 
 from involta_guide.main import create_app
+
+pytestmark = pytest.mark.full_catalog
 
 
 def add_location(
