@@ -100,7 +100,7 @@ def test_remote_reads_platform_manifest_by_digest(monkeypatch):
     monkeypatch.setattr(
         publisher.subprocess,
         "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, DIGEST, ""),
+        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, json.dumps(DIGEST), ""),
     )
     platform_digest = "sha256:" + "3" * 64
     docker = Mock(
@@ -127,3 +127,16 @@ def test_remote_reads_platform_manifest_by_digest(monkeypatch):
         IMAGE + "@" + platform_digest,
         "--raw",
     )
+
+
+@pytest.mark.parametrize(
+    "response", ["Name: image\nDigest: " + DIGEST, '"not-a-digest"', "{}", "null"]
+)
+def test_remote_rejects_unstructured_or_invalid_digest(monkeypatch, response):
+    monkeypatch.setattr(
+        publisher.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, response, ""),
+    )
+    with pytest.raises(RuntimeError, match="invalid manifest digest"):
+        publisher.remote(IMAGE, SHA)
