@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from copy import deepcopy
 
 from integration.editor_fixture import FixtureEditor
@@ -61,7 +62,7 @@ def test_two_waves_debounce_stale_answers_and_cache(database, tmp_path):
         page.wait_for_timeout(350)
         assert len(held) == 3
         held[2].fulfill(response=held[2].fetch())
-        expect(page.locator(".result-context", has_text="Ресторан · Иваново")).to_be_visible()
+        expect(page.locator(".result-context", has_text=re.compile(r"^Иваново$"))).to_be_visible()
         assert page.locator(".destination-results").get_by_role("option").count() <= 8
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         page.screenshot(path=str(tmp_path / "hybrid-mobile.png"), full_page=True)
@@ -164,10 +165,10 @@ def test_keyboard_selection_does_not_jump_and_restaurant_anchor_opens_details(da
         page.wait_for_timeout(350)
         held[0].fulfill(response=held[0].fetch())
         expect(page.get_by_role("option", selected=True)).to_have_text(selected)
-        expect(page.locator(".result-context", has_text="Ресторан · Иваново")).to_be_visible()
+        expect(page.locator(".result-context", has_text=re.compile(r"^Иваново$"))).to_be_visible()
         page.locator(
             ".destination-result",
-            has=page.locator(".result-context", has_text="Ресторан · Иваново"),
+            has=page.locator(".result-context", has_text=re.compile(r"^Иваново$")),
         ).click()
         page.wait_for_url(origin + "/guide/ivanovo#restaurant-" + card_id)
         target = page.locator("#restaurant-" + card_id)
