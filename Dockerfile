@@ -59,11 +59,11 @@ RUN chmod -R a+rX /app/data /app/migrations \
     && mkdir -p /app/var/audio /app/var/voice/audio /app/var/asr-models \
     && chown -R guide:guide /app/var
 # Large browser VAD binaries do not change when widget JavaScript changes.
-COPY src/involta_voice/static/vad /app/project/involta_voice/static/vad
-COPY --exclude=vad src/involta_voice/static /app/project/involta_voice/static
-COPY src/involta_guide/web/static /app/project/involta_guide/web/static
+COPY --chmod=u=rwX,go=rX src/involta_voice/static/vad /app/project/involta_voice/static/vad
+COPY --chmod=u=rwX,go=rX --exclude=vad src/involta_voice/static /app/project/involta_voice/static
+COPY --chmod=u=rwX,go=rX src/involta_guide/web/static /app/project/involta_guide/web/static
 # Keep templates last: a text edit changes only this small filesystem layer.
-COPY src/involta_guide/web/templates /app/project/involta_guide/web/templates
+COPY --chmod=u=rwX,go=rX src/involta_guide/web/templates /app/project/involta_guide/web/templates
 USER 10001:10001
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
