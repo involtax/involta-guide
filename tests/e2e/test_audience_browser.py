@@ -24,8 +24,11 @@ def test_about_cookie_and_statistics_table_at_desktop_and_mobile_widths(database
         page.goto(origin + "/guide/")
         footer = page.locator("footer")
         expect(footer.get_by_role("link", name="Я тут в первый раз")).to_be_visible()
-        assert footer.get_by_role("link").count() == 1
-        footer.get_by_role("link").click()
+        expect(footer.get_by_role("link")).to_have_count(2)
+        expect(footer.get_by_role("link", name="Для ассистентов", exact=True)).to_have_attribute(
+            "href", "/guide/for-agents"
+        )
+        footer.get_by_role("link", name="Я тут в первый раз", exact=True).click()
         expect(page.locator(".brand sup")).to_have_text("О проекте")
         expect(page.get_by_role("main", name="О проекте")).to_be_visible()
         expect(page.locator(".about-steps > li")).to_have_count(3)
