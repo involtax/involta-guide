@@ -1,4 +1,5 @@
 import copy
+import re
 from uuid import uuid4
 
 from involta_guide.application.ports.repositories import Record, Repository
@@ -83,6 +84,30 @@ def field_diff(before: Record, after: Record) -> list[Record]:
     return changes
 
 
+def match_restaurant(catalogue: list[Record], card: Record) -> Record | None:
+    """Match only within this location; never guess between ambiguous identities."""
+
+    def name(value: str) -> str:
+        return " ".join(value.casefold().replace("ё", "е").split())
+
+    def organization(value: str) -> str | None:
+        match = re.search(r"/org/(?:[^/]+/)?(\d+)(?:/|$|\?)", value)
+        return match.group(1) if match else None
+
+    org = organization(card.get("mapsUrl") or "")
+    matches = [r for r in catalogue if org and organization(r["maps_url"] or "") == org]
+    if not matches:
+        matches = [
+            r
+            for r in catalogue
+            if name(r["name"]) == name(card["name"])
+            and (not org or not organization(r["maps_url"] or ""))
+        ]
+    if len(matches) > 1:
+        raise Conflict("Неоднозначное совпадение ресторана: " + card["name"])
+    return matches[0] if matches else None
+
+
 def save(
     repo: Repository,
     location_id: int,
@@ -106,14 +131,16 @@ def save(
     source = require(repo, table, identity, lock=True)
     if source["location_id"] != location_id or source["content_epoch"] != location["content_epoch"]:
         raise Conflict("Цикл локации изменился")
-    if job_id and (source["kind"] != "generate" or location["initialized_at"] is not None):
-        raise Conflict("Подборка уже наполнена; доступен только полный бета-сброс")
+    if job_id and source["kind"] != "generate":
+        raise Conflict("Источник не является запуском наполнения")
     before = current_content(repo, location)
     payload = copy.deepcopy(content)
     ranking = payload.get("rankingReport", [])
+    catalogue = repo.rows("restaurants", {"location_id": location_id}, limit=10000)
     seen = set()
     for card in payload["restaurants"]:
-        card["id"] = card.get("id") or str(uuid4())
+        matched = match_restaurant(catalogue, card) if job_id else None
+        card["id"] = matched["id"] if matched else (card.get("id") or str(uuid4()))
         if card["id"] in seen:
             raise RuleViolation("Ресторан повторяется в подборке")
         seen.add(card["id"])

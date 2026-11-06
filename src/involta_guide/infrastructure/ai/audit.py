@@ -169,7 +169,6 @@ class AIAudit:
         job["can_reprocess"] = (
             job["kind"] == "generate"
             and job["status"] in ("failed", "cancelled")
-            and not job.get("initialized_at")
             and not job.get("reset_pending")
             and job.get("content_epoch") == job.get("current_epoch")
             and state == "completed"
@@ -177,7 +176,6 @@ class AIAudit:
         )
         job["can_resume"] = (
             job["status"] == "failed"
-            and not job.get("initialized_at")
             and not job.get("reset_pending")
             and job.get("content_epoch") == job.get("current_epoch")
             and not job["applied"]

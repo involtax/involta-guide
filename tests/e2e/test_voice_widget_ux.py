@@ -728,7 +728,7 @@ def test_new_review_appears_as_transcribing_then_updates_in_place_once(widget_pa
     page.clock.run_for(1)
     state(widget, "idle")
     expect(widget.get_by_role("heading", name="Отзывы", exact=True)).to_be_visible()
-    entry = widget.locator(".reviews p")
+    entry = widget.locator(".reviews > article")
     expect(entry).to_have_count(1)
     expect(entry.locator(".transcript")).to_have_text("Расшифровка…")
     original = entry.element_handle()
@@ -751,7 +751,7 @@ def test_new_review_appears_as_transcribing_then_updates_in_place_once(widget_pa
     expect(entry).to_have_count(1)
     expect(entry.locator("time")).to_contain_text("08:07")
     expect(entry.locator(".transcript")).to_have_text("Новый отзыв")
-    assert original.evaluate("e=>e===e.getRootNode().querySelector('.reviews p')")
+    assert original.evaluate("e=>e===e.getRootNode().querySelector('.reviews > article')")
     expect(widget.locator(".status")).to_be_empty()
     expect(widget.get_by_text("Текст отзыва сохранён.", exact=True)).to_have_count(0)
 
@@ -813,7 +813,7 @@ def test_late_list_snapshot_cannot_remove_a_newly_accepted_review(widget_page):
     page.clock.run_for(1)
     state(widget, "idle")
     pending[0].fulfill(json={"rows": [], "content_epoch": 1})
-    expect(widget.locator(".reviews p")).to_have_count(1)
+    expect(widget.locator(".reviews > article")).to_have_count(1)
     expect(widget.locator(".reviews .transcript")).to_have_text("Расшифровка…")
 
 
@@ -825,10 +825,10 @@ def test_reset_removes_pending_reviews_even_before_the_first_list_confirmation(w
     press(page, widget)
     page.clock.run_for(1)
     state(widget, "idle")
-    expect(widget.locator(".reviews p")).to_have_count(1)
+    expect(widget.locator(".reviews > article")).to_have_count(1)
     page.route("**/reviews?*", lambda route: route.fulfill(json={"rows": [], "content_epoch": 2}))
     page.clock.run_for(2000)
-    expect(widget.locator(".reviews p")).to_have_count(0)
+    expect(widget.locator(".reviews > article")).to_have_count(0)
     expect(widget.locator(".history")).to_be_hidden()
 
 
@@ -853,20 +853,20 @@ def test_two_pending_reviews_are_updated_without_duplicates(widget_page):
         press(page, widget)
         page.clock.run_for(1)
         state(widget, "idle")
-    expect(widget.locator(".reviews p")).to_have_count(2)
+    expect(widget.locator(".reviews > article")).to_have_count(2)
     rows[1].update(state="result_ready", transcript="Первый текст готов")
     page.route(
         "**/reviews?*",
         lambda route: route.fulfill(json={"rows": rows, "content_epoch": 1}),
     )
     page.clock.run_for(2000)
-    expect(widget.locator(".reviews p")).to_have_count(2)
+    expect(widget.locator(".reviews > article")).to_have_count(2)
     expect(widget.locator(".reviews .transcript").nth(0)).to_have_text("Расшифровка…")
     expect(widget.locator(".reviews .transcript").nth(1)).to_have_text("Первый текст готов")
     rows[0].update(state="result_ready", transcript="Второй текст готов")
     page.clock.run_for(2000)
     expect(widget.locator(".reviews .transcript").nth(0)).to_have_text("Второй текст готов")
-    expect(widget.locator(".reviews p")).to_have_count(2)
+    expect(widget.locator(".reviews > article")).to_have_count(2)
 
 
 def test_permission_wait_has_no_caption_and_denial_is_black_with_a_lock(widget_page):
@@ -900,7 +900,7 @@ def test_failed_publication_disappears_without_a_public_error_message(widget_pag
     press(page, widget)
     page.clock.run_for(1)
     state(widget, "idle")
-    expect(widget.locator(".reviews p")).to_have_count(1)
+    expect(widget.locator(".reviews > article")).to_have_count(1)
 
     def unpublished(route):
         from urllib.parse import parse_qs
@@ -910,7 +910,7 @@ def test_failed_publication_disappears_without_a_public_error_message(widget_pag
 
     page.route("**/reviews?*", unpublished)
     page.clock.run_for(2000)
-    expect(widget.locator(".reviews p")).to_have_count(0)
+    expect(widget.locator(".reviews > article")).to_have_count(0)
     expect(widget.get_by_text("Не удалось расшифровать", exact=False)).to_have_count(0)
     expect(widget.locator(".history")).to_be_hidden()
 
@@ -946,5 +946,5 @@ def test_nonpublished_rows_never_become_public_text(widget_page):
         ),
     )
     page.reload()
-    expect(widget.locator(".reviews p")).to_have_count(1)
+    expect(widget.locator(".reviews > article")).to_have_count(1)
     expect(widget.locator(".reviews .transcript")).to_have_text("Опубликованный текст")

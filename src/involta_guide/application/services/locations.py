@@ -159,7 +159,12 @@ class Queries:
             )
             for event in events:
                 event["data"] = json.loads(event["detail"])
-        return {**self.location(key), "intro_events": events}
+            runs = uow.repo.rows("jobs", {"location_id": key, "kind": "generate"}, limit=1)
+            generation = runs[0] if runs else None
+            if generation:
+                logs = uow.repo.rows("request_logs", {"job_id": generation["id"]}, limit=1)
+                generation["number"] = logs[0]["number"] if logs else None
+        return {**self.location(key), "intro_events": events, "generation": generation}
 
     def restaurant(self, number: int) -> Record:
         with self.uow() as uow:

@@ -36,7 +36,7 @@ class BackgroundGeneration:
         with self.engine.begin() as conn:
             live = conn.execute(
                 text(
-                    "SELECT l.id FROM locations l JOIN jobs j ON j.location_id=l.id WHERE j.id=:id AND j.content_epoch=l.content_epoch AND NOT l.reset_pending AND (j.kind='review_analysis' OR l.initialized_at IS NULL) FOR SHARE OF l"
+                    "SELECT l.id FROM locations l JOIN jobs j ON j.location_id=l.id WHERE j.id=:id AND j.content_epoch=l.content_epoch AND NOT l.reset_pending AND j.kind IN ('generate','review_analysis') AND NOT j.applied FOR SHARE OF l"
                 ),
                 {"id": job_id},
             ).first()
@@ -332,10 +332,9 @@ def resume_generation(
         if (
             location["is_hub"]
             or location["reset_pending"]
-            or location["initialized_at"] is not None
             or job["content_epoch"] != location["content_epoch"]
         ):
-            raise Conflict("Подборка уже наполнена или цикл изменён; доступен полный бета-сброс")
+            raise Conflict("Локация недоступна или цикл изменён")
         if job["applied"] or job["status"] not in ("failed", "cancelled"):
             raise Conflict("Запуск уже применён или ещё выполняется")
         if (

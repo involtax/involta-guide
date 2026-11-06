@@ -21,10 +21,7 @@ class Worker:
     def __init__(self, queue: JobQueue, service: JobService) -> None:
         self.queue = queue
         self.service = service
-        if service.reset_handler is None:
-            from involta_guide.infrastructure.beta_reset import BetaReset
-
-            service.reset_handler = BetaReset(queue.engine, queue.settings, service).perform
+        # Destructive beta reset jobs are no longer executed in production.
         self.stop = threading.Event()
         self.audit = AIAudit(queue.engine, queue.settings)
 

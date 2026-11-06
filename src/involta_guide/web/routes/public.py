@@ -460,6 +460,7 @@ def routes(prefix: str) -> APIRouter:
                 "days": DAYS,
                 "opening_status": opening_status,
                 "public_reviews": public_reviews,
+                "review_timezone": timezone(timedelta(hours=3)),
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
                 and not c["is_hub"]
