@@ -24,7 +24,7 @@ def remote(image: str, sha: str) -> tuple[str, str] | None:
             "inspect",
             reference,
             "--format",
-            "{{.Manifest.Digest}}",
+            "{{json .Manifest.Digest}}",
         ],
         capture_output=True,
         text=True,
@@ -34,8 +34,11 @@ def remote(image: str, sha: str) -> tuple[str, str] | None:
         if reference + ": not found" in result.stderr or "manifest unknown" in result.stderr:
             return None
         raise RuntimeError("Registry inspection failed: " + result.stderr.strip())
-    digest = result.stdout.strip()
-    if not DIGEST.fullmatch(digest):
+    try:
+        digest = json.loads(result.stdout)
+    except ValueError as error:
+        raise RuntimeError("Registry returned an invalid manifest digest") from error
+    if not isinstance(digest, str) or not DIGEST.fullmatch(digest):
         raise RuntimeError("Registry returned an invalid manifest digest")
     manifest = json.loads(docker("buildx", "imagetools", "inspect", image + "@" + digest, "--raw"))
     if "manifests" in manifest:

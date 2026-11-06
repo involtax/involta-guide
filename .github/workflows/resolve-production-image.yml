@@ -61,7 +61,7 @@ jobs:
           [[ -n "$verified" ]] || { echo "No successful main CI/publish for $sha within 45 minutes"; exit 1; }
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
-          digest=$(docker buildx imagetools inspect "$image:$sha" --format '{{.Manifest.Digest}}')
+          digest=$(docker buildx imagetools inspect "$image:$sha" --format '{{json .Manifest.Digest}}' | jq -r .)
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           printf 'sha=%s\nimage=%s\ndigest=%s\n' "$sha" "$image" "$digest" >> "$GITHUB_OUTPUT"
           {
