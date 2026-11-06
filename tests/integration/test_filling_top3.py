@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from html.parser import HTMLParser
 from uuid import uuid4
 
 import httpx
@@ -16,6 +17,17 @@ from involta_guide.main import create_app
 
 from .test_background_generation import configured, envelope, task
 from .test_jobs import provider_payload, setup
+
+
+class RestaurantCards(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.cards = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "article" and "restaurant" in attributes.get("class", "").split():
+            self.cards.append(attributes)
 
 
 def shortlist(count=10):
@@ -93,7 +105,12 @@ def test_ten_candidates_produce_three_catalogue_winners_and_a_full_audit(databas
         assert '"publishedLimit": 3' in requests[0]["input"][1]["content"]
         with TestClient(create_app(settings)) as client:
             html = client.get("/guide/" + location["slug"]).text
-            assert html.count('<article class="restaurant">') == 3
+            cards = RestaurantCards()
+            cards.feed(html)
+            assert len(cards.cards) == 3
+            assert [card["id"] for card in cards.cards] == [
+                "restaurant-" + r["id"] for r in winners
+            ]
             assert 'class="more-restaurants"' not in html
             exported = client.get("/guide/logs/" + location["slug"] + "/1.json").json()
             assert len(exported["job"]["report"]["candidateReview"]) == 10
