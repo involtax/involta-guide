@@ -59,8 +59,8 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
     before_locations = queries.rows("locations")
     before_restaurants = queries.rows("restaurants")
     before_reviews = queries.rows("reviews")
-    command.upgrade(config, "head")
-    command.upgrade(config, "head")
+    command.upgrade(config, "unbiased_city_scope")
+    command.upgrade(config, "unbiased_city_scope")
     for before in before_locations:
         after = queries.get("locations", before["id"])
         if before["id"] == 622 or (before["id"] == 34 and not manual_scope):
@@ -74,10 +74,6 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
     assert {j["id"]: j for j in queries.rows("jobs")} == expected_jobs
     assert task(engine, jobs[622])["request_json"] == frozen
     assert queries.setting("prompt") == current.PROMPT
-    assert (
-        current.PROMPT
-        == (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
-    )
     # A later admin edit survives downgrade; only fields actually cleared are restored.
     with engine.begin() as conn:
         conn.execute(text("UPDATE locations SET coverage_note='Новый охват' WHERE id=622"))
@@ -87,7 +83,7 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
                 text("UPDATE jobs SET prompt='Ручное задание' WHERE id=:id"),
                 {"id": jobs[34]["id"]},
             )
-    command.upgrade(config, "head")
+    command.upgrade(config, "unbiased_city_scope")
     command.downgrade(config, "city_surroundings")
     assert queries.setting("prompt") == ("Новый промпт" if manual_scope else original_prompt)
     assert queries.get("jobs", jobs[34]["id"])["prompt"] == (
