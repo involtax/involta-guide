@@ -1,0 +1,104 @@
+{
+  "name": "Винотеррия",
+  "status": "verified",
+  "reason": "Подтверждены ресторан с полноценной кухней, телефон и точная карта напротив хутора Семигорский. Административный адрес относится к Новороссийску, но ресторан входит в гастрономические окрестности Анапы.",
+  "exclusionCode": null,
+  "verificationIssues": [],
+  "cuisine": "Современная южная кухня",
+  "description": "Загородный ресторан у хутора Семигорский, на территории Новороссийска, между виноградниками и трассой А-290. Здесь стоит задержаться ради южной кухни, мяса из смокера и вин собственного хозяйства.",
+  "mapsUrl": "https://yandex.com/maps/org/vinoterriya/1746594421/",
+  "phone": "+79892400382",
+  "sources": [
+    "https://vinoterria.com/food/",
+    "https://vinoterria.com/contacts/",
+    "https://yandex.com/maps/org/vinoterriya/1746594421/",
+    "https://yandex.com/maps/org/vinoterriya/1746594421/reviews/",
+    "https://south.wheretoeat.ru/publications/news/wheretoeat-yug-2026-itogi/",
+    "https://www.rbc.ru/wine/news/696f50a69a79471f7b0c716d"
+  ],
+  "openingHours": null,
+  "latitude": null,
+  "longitude": null,
+  "scores": {
+    "food": 8,
+    "consistency": 8,
+    "identity": 8,
+    "localConnection": 9,
+    "atmosphere": 8,
+    "service": 7,
+    "value": 7,
+    "destination": 9
+  },
+  "evidence": [
+    {
+      "factor": "food",
+      "reason": "Гости подробно хвалят мясные блюда, пироги и тартар; ресторан также входит в тройку региональной премии 2026 года.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4,
+        5
+      ]
+    },
+    {
+      "factor": "consistency",
+      "reason": "Содержательные отзывы разных авторов и признание в разные сезоны подтверждают повторяемость впечатления, без обещания безупречного визита.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4,
+        5
+      ]
+    },
+    {
+      "factor": "identity",
+      "reason": "Смокер, дровяная печь и собственная винодельня образуют самостоятельную концепцию, а не обычный ресторан при ночлеге.",
+      "confidence": "medium",
+      "sourceRefs": [
+        1,
+        6
+      ]
+    },
+    {
+      "factor": "localConnection",
+      "reason": "Кухня и винная карта связаны с южным регионом и собственным винодельческим хозяйством.",
+      "confidence": "medium",
+      "sourceRefs": [
+        1,
+        6
+      ]
+    },
+    {
+      "factor": "atmosphere",
+      "reason": "Отзывы подтверждают комфорт веранды и интерьер; вид на виноградники не переносится на оценку еды.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "service",
+      "reason": "Есть конкретные положительные свидетельства внимательного обслуживания и помощи с выбором; данных недостаточно для исключительной оценки.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "value",
+      "reason": "Гости называют посещение дорогим, одновременно подробно описывая блюда и обслуживание как оправдывающие поездку; оценки расходов субъективны.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "destination",
+      "reason": "Самостоятельный загородный ресторан кухни и вина имеет сильное региональное признание; доступен отдельно от проживания.",
+      "confidence": "medium",
+      "sourceRefs": [
+        2,
+        5,
+        6
+      ]
+    }
+  ]
+}

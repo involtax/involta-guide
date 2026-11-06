@@ -165,3 +165,80 @@ def test_current_repository_prompt_is_active_after_upgrade(database):
         queries.setting("prompt")
         == (settings.root_dir / "data/prompts/restaurant-research-v4.txt").read_text()
     )
+
+
+@pytest.mark.parametrize("scenario", ["local_research", "low_score", "missing_phone"])
+def test_unhinted_anapa_input_accepts_vinoterria_with_its_real_novorossiysk_address(
+    database, scenario
+):
+    # Other candidates are fixed historical comparisons; this venue is newly researched.
+    raw = json.loads((FIXTURES / "anapa-comparison-response.json").read_text())
+    assert all(c["name"] != "Винотеррия" for c in raw["candidates"])
+    venue = json.loads((FIXTURES / "vinoterria-local-candidate.json").read_text())
+    if scenario == "low_score":
+        venue["scores"] = dict.fromkeys(venue["scores"], 2)
+    elif scenario == "missing_phone":
+        venue.update(
+            status="needs_verification",
+            phone="",
+            verificationIssues=["phone"],
+            reason="Искусственный контроль неподтверждённого телефона",
+        )
+    raw["candidates"].append(venue)
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        response = envelope()
+        response["output"][0]["content"][0]["text"] = json.dumps(raw, ensure_ascii=False)
+        return httpx.Response(200, json=response)
+
+    settings, engine, queries, city, service, queue, provider, job = configured(
+        database, handler, location_query="Анапа"
+    )
+    try:
+        assert city["id"] == 34 and city["coverage_note"] == ""
+        assert Worker(queue, service).once()
+        stored = queries.get("jobs", job["id"])
+        assert stored["status"] == "done" and stored["applied"]
+        cards = queries.location(34)["content"]["restaurants"]
+        names = [r["name"] for r in cards]
+        assert ("Винотеррия" in names) == (scenario == "local_research")
+        if scenario == "local_research":
+            assert names == ["Винотеррия", "Устрицы & Вино — Yummy Oysters", "ГастроБархан"]
+            assert "Новороссийска" in cards[0]["description"]
+            assert cards[0]["mapsUrl"] == venue["mapsUrl"]
+            entry = next(r for r in queries.rows("restaurants") if r["name"] == "Винотеррия")
+            assert entry["location_id"] == 34
+        prompt = requests[0]["input"][1]["content"]
+        for clue in ("Винотеррия", "vinoterria", "Семигор", "Nesterov", "Нестеров"):
+            assert clue not in prompt
+        saved = task(engine, job)["response_json"]
+        assert json.loads(saved["output"][0]["content"][0]["text"]) == raw
+        with TestClient(create_app(settings)) as client:
+            page = client.get("/guide/anapa")
+            assert ("Винотеррия" in page.text) == (scenario == "local_research")
+        proof = Path("var/evaluations/rural-discovery/anapa")
+        proof.mkdir(parents=True, exist_ok=True)
+        (proof / (scenario + ".json")).write_text(
+            json.dumps(
+                {
+                    "scenario": scenario,
+                    "public": names,
+                    "ranking": [
+                        {k: r[k] for k in ("name", "totalScore")}
+                        for r in stored["report"]["rankingReport"]
+                    ],
+                    "prompt": prompt,
+                    "simulated_provider_response": True,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        if scenario == "local_research":
+            (proof / "simulated-response.json").write_text(
+                json.dumps(raw, ensure_ascii=False, indent=2)
+            )
+    finally:
+        provider.close()

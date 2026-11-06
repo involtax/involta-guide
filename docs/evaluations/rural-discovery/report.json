@@ -335,5 +335,125 @@
       ],
       "simulated_provider_response": false
     }
+  },
+  "anapa_control": {
+    "method": "Directed local assistant research and simulated response; other candidates are fixed historical comparisons, not newly generated.",
+    "discovery_queries": [
+      "Анапа гастрономические окрестности рестораны винодельни",
+      "Семигорье рестораны винодельни южная кухня"
+    ],
+    "location_id": 34,
+    "expected_venue": "Винотеррия",
+    "hint_in_input": false,
+    "cases": {
+      "local_research": {
+        "scenario": "local_research",
+        "public": [
+          "Винотеррия",
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан"
+        ],
+        "ranking": [
+          {
+            "name": "Винотеррия",
+            "totalScore": 8.0
+          },
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      },
+      "low_score": {
+        "scenario": "low_score",
+        "public": [
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан",
+          "Villa Aristov — рестобар"
+        ],
+        "ranking": [
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          },
+          {
+            "name": "Винотеррия",
+            "totalScore": 2.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      },
+      "missing_phone": {
+        "scenario": "missing_phone",
+        "public": [
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан",
+          "Villa Aristov — рестобар"
+        ],
+        "ranking": [
+          {
+            "name": "Винотеррия",
+            "totalScore": 8.0
+          },
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      }
+    }
   }
 }
