@@ -111,9 +111,9 @@ def test_beta_export_original_ranges_privacy_deletion_and_alpha_gate(
         login(client)
         assert client.get(root + "/audio").content == source
         page = client.get("/guide/admin/reviews/ivanovo")
-        assert not any(
-            "/logs" in href for href in __import__("re").findall(r'href="([^"]+)"', page.text)
-        )
+        hrefs = __import__("re").findall(r'href="([^"]+)"', page.text)
+        assert "/guide/logs" in hrefs
+        assert not any("/logs/reviews/" in href for href in hrefs)
         assert "nodownload noplaybackrate noremoteplayback" in page.text
         assert "/admin/reviews/ivanovo/" + str(review["number"]) + "/audio" not in page.text
         assert (
