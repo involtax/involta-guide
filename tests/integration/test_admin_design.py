@@ -194,14 +194,17 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                         ).count()
                         == 0
                     )
-                    audio = page.locator(".review-top audio").first.bounding_box()
+                    audio = page.locator(".review-player-controls").first.bounding_box()
                     label = page.locator(
                         ".review-top:has(audio) .review-label"
                     ).first.bounding_box()
-                    assert (
-                        audio["y"] < label["y"] + label["height"]
-                        and audio["y"] + audio["height"] > label["y"]
-                    )
+                    if width > 650:
+                        assert (
+                            audio["y"] < label["y"] + label["height"]
+                            and audio["y"] + audio["height"] > label["y"]
+                        )
+                    else:
+                        assert audio["y"] >= label["y"] + label["height"]
                     assert (
                         page.get_by_role("navigation", name="Администрирование")
                         .get_by_role("link", name="Отзывы", exact=True)
