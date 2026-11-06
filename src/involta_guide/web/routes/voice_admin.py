@@ -227,23 +227,11 @@ def routes(prefix: str) -> APIRouter:
     ) -> Response:
         principal = require_admin(request)
         check_csrf(request, form)
-        from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
-        from involta_voice.db import encoded, row
+        from involta_guide.review_analysis.service import ReviewAnalysis
 
         ctx = context(request)
         identity, _ = VoiceReadModel(ctx.engine).resolve(slug, number)
-        with PostgresUow(ctx.engine) as uow:
-            removed = row(
-                uow.session.connection(),
-                "UPDATE reviews SET status='deleted',publication_status=0 WHERE id=:id AND status<>'deleted' RETURNING id",
-                id=identity,
-            )
-            if removed:
-                uow.repo.audit(
-                    "review_deleted",
-                    identity,
-                    encoded({"actor": principal["id"], "slug": slug, "number": number}),
-                )
+        ReviewAnalysis(ctx.engine, ctx.settings).delete(identity, principal["id"])
         return RedirectResponse(base + "/" + slug, status_code=303)
 
     @router.post(base + "/{slug}/{number:int}/reprocess")

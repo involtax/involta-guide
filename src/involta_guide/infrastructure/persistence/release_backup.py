@@ -62,6 +62,8 @@ def owned_tables(settings: Settings) -> set[str]:
         "ai_daily_usage",
         "audience_daily",
         "search_attempts",
+        "review_analyses",
+        "review_restaurant_votes",
     }
 
 

@@ -1,6 +1,6 @@
 <nav class="admin-tabs" aria-label="Администрирование">
-{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Настройки наполнения'),('reviews','Отзывы'),('restaurants','Рестораны'),('stats','Статистика'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
-{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions','reviews':'/admin/reviews','ratings':'/admin/ratings','contacts':'/admin/contacts','stats':'/admin/stats'}.get(key)%}
+{%for key,label in [('overview','Обзор'),('locations','Локации'),('fill','Настройки наполнения'),('reviews','Отзывы'),('reviews2','Отзывы 2'),('restaurants','Рестораны'),('stats','Статистика'),('ratings','Оценки'),('contacts','Телефоны'),('sessions','Сессии')]%}
+{%set route={'overview':'/admin','locations':'/admin/locations','fill':'/admin/settings/filling','restaurants':'/admin/restaurants','sessions':'/admin/sessions','reviews':'/admin/reviews','reviews2':'/admin/reviews-2','ratings':'/admin/ratings','contacts':'/admin/contacts','stats':'/admin/stats'}.get(key)%}
 <a href="{{settings.path(route)}}" class="{{'selected' if active_section==key else ''}}" {%if active_section==key%}aria-current="page"{%endif%}>{{label}}</a>
 {%endfor%}
 </nav>
