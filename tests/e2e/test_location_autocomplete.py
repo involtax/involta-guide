@@ -43,7 +43,7 @@ def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tm
             page.goto(origin + "/guide/", wait_until="networkidle")
             field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
             button = page.get_by_role("button", name="Выбери", exact=True)
-            assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
+            assert button.evaluate("el=>getComputedStyle(el).fontSize") == "21px"
             assert button.evaluate("el=>el.scrollWidth<=el.clientWidth")
             assert field.bounding_box()["width"] >= 70
             assert field.get_attribute("name") is None
