@@ -55,7 +55,14 @@ def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(da
         assert old.status_code == 200 and 'class="admin-tabs"' in old.text
         log = client.get("/guide/logs/ivanovo-new/1")
         assert 'name="job_id"' not in log.text
+        # An active request cannot be submitted again. Failed requests expose
+        # retry controls with the renamed canonical identity.
+        assert 'name="log_slug"' not in log.text
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE jobs SET status='failed' WHERE id=:id"), {"id": job["id"]})
+        log = client.get("/guide/logs/ivanovo-new/1")
         assert 'name="log_slug" value="ivanovo-new"' in log.text
+        assert 'name="log_number" value="1"' in log.text
 
 
 def test_concurrent_completed_requests_receive_monotonic_persisted_numbers(database):

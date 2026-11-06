@@ -1,4 +1,5 @@
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -12,7 +13,7 @@ from involta_guide.application.services.locations import Queries
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 
 
-def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
+def test_browser_public_htmx_intro_logs_and_rebuild(database, tmp_path):
     settings, engine = database
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -236,15 +237,29 @@ def test_browser_public_htmx_intro_logs_and_reset(database, tmp_path):
                     page.keyboard.press("Escape")
                     expect(voice).to_have_attribute("data-voice-state", "idle")
                 page.goto(base + "/admin/locations/ivanovo")
-                reset = page.locator('form[action$="/reset-and-fill"]')
-                expect(
-                    reset.get_by_role("button", name="Очистить локацию и наполнить заново")
-                ).to_be_visible()
-                reset.get_by_label("Для подтверждения введите Иваново").fill("Иваново")
-                reset.get_by_role("button", name="Очистить локацию и наполнить заново").click()
-                expect(page.get_by_text("Сброс выполняется.", exact=False)).to_be_visible()
-                assert queries.get("locations", location["id"])["reset_pending"]
-                assert queries.get("locations", location["id"])["content_epoch"] == 2
+                rebuild = page.locator('form[action$="/rebuild"]')
+                button = rebuild.get_by_role("button", name="Пересобрать подборку")
+                expect(button).to_be_visible()
+                before_location = queries.get("locations", location["id"])
+                before_restaurants = queries.rows("restaurants", {"location_id": location["id"]})
+                before_reviews = queries.rows("reviews", {"location_id": location["id"]})
+                button.click()
+                expect(page).to_have_url(re.compile(r"/guide/logs/ivanovo/\d+$"))
+                after = queries.get("locations", location["id"])
+                assert not after["reset_pending"]
+                assert after["content_epoch"] == before_location["content_epoch"]
+                assert after["intro"] == before_location["intro"]
+                assert (
+                    queries.rows("restaurants", {"location_id": location["id"]})
+                    == before_restaurants
+                )
+                assert queries.rows("reviews", {"location_id": location["id"]}) == before_reviews
+                pending = queries.rows(
+                    "jobs", {"location_id": location["id"], "kind": "generate", "status": "queued"}
+                )
+                assert len(pending) == 1
+                page.goto(base + "/admin/locations/ivanovo")
+                expect(page.locator('form[action$="/rebuild"] button')).to_be_disabled()
                 assert not errors
                 browser.close()
         finally:
