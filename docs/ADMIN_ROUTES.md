@@ -9,7 +9,7 @@ admin-сессию, same-origin и CSRF. Вход `/admin`, выход `/admin/l
 | Обзор | `/admin` | Сводка и переходы |
 | Статистика | `/admin/stats` | Последние 30 дней, даты в столбцах; хиты, уники, отзывы, хиты / уники; без пагинации |
 | Локации | `/admin/locations`, `/admin/locations/{slug}` | Sidebar, настройки географии/навигации, отдельный POST `/intro` с revision |
-| Полный бета-сброс | POST `/admin/locations/{slug}/reset-and-fill` | Название-подтверждение, request_key, content_epoch; только обычный город, флаг BETA_RESET_ENABLED |
+| Пересобрать подборку | POST `/admin/locations/{slug}/rebuild` | Админ + CSRF; тот же промпт наполнения; сохраняет рестораны, отзывы, голоса, аудио и логи |
 | Рестораны | `/admin/restaurants`, `/admin/restaurants/{slug}`, `/admin/restaurants/{number}` | Город в пути, ссылка на публичную страницу в новой вкладке, рейтинг и данные карточки |
 | Отзывы | `/admin/reviews`, `/admin/reviews/{slug}` | Города слева, лента справа; permalink `/{slug}/{number}` открывает страницу и якорь |
 | Повтор доставки | POST `/admin/reviews/inbox/{event_id}/retry` | Повтор сохранённого ошибочного Voice event |

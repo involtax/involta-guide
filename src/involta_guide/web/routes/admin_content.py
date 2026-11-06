@@ -3,7 +3,6 @@
 import json
 from typing import Any
 from urllib.parse import urlencode
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -112,9 +111,6 @@ def location_page(
             "nearby_catalogue": nearby_catalogue,
             **({"nearby_results": nearby_results} if nearby_results is not None else {}),
             "entered_intro": entered_intro,
-            "reset_request_key": selected["location"]["reset_key"]
-            if selected and selected["location"] and selected["location"]["reset_pending"]
-            else str(uuid4()),
         },
     )
 
@@ -267,26 +263,18 @@ def routes(prefix: str) -> APIRouter:
             ),
         )
 
-    @router.post(prefix + "/admin/locations/{slug}/reset-and-fill")
-    def reset_location(
+    @router.post(prefix + "/admin/locations/{slug}/rebuild")
+    def rebuild_location(
         request: Request, slug: str, form: FormData = Depends(form_data)
     ) -> Response:
-        require_admin(request)
+        principal = require_admin(request)
         check_csrf(request, form)
         ctx = context(request)
         location = ctx.queries.admin_location(slug)["location"]
-        from involta_guide.infrastructure.beta_reset import BetaReset
-
-        try:
-            BetaReset(ctx.engine, ctx.settings, ctx.jobs).begin(
-                location["id"],
-                key(form, "request_key"),
-                int(key(form, "content_epoch")),
-                key(form, "confirmation"),
-            )
-        except ValueError as exc:
-            return location_page(request, slug, message=str(exc))
-        return log_redirect(request, "/admin/locations/" + slug)
+        job_id = ctx.jobs.rebuild(location["id"], actor=principal["id"])
+        with ctx.jobs.uow() as uow:
+            log = uow.repo.rows("request_logs", {"job_id": job_id}, limit=1)[0]
+        return log_redirect(request, f"/logs/{slug}/{log['number']}")
 
     @router.get(prefix + "/admin/restaurants")
     def restaurants(request: Request) -> Response:

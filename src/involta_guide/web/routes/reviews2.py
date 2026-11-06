@@ -22,7 +22,11 @@ from involta_guide.web.routes.admin import render
 from involta_voice.db import row
 
 LABELS = {"new": "Новый", "ok": "ОК", "bugs": "Баги", "other": "Разное"}
-BUCKET = "CASE WHEN a.approved_at IS NULL OR a.source_text IS DISTINCT FROM r.transcript THEN 'new' ELSE a.result->>'category' END"
+BUCKET = """CASE
+ WHEN a.source_text IS DISTINCT FROM r.transcript OR a.result IS NULL OR j.status IS DISTINCT FROM 'done' THEN 'new'
+ WHEN a.result->>'category' IN ('bugs','other') THEN a.result->>'category'
+ WHEN a.approved_at IS NULL THEN 'new'
+ ELSE a.result->>'category' END"""
 BASE_QUERY = "FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN review_analyses a ON a.review_id=r.id LEFT JOIN jobs j ON j.id=a.job_id"
 LIVE = "r.status='transcribed' AND r.content_epoch=l.content_epoch AND NOT l.reset_pending"
 

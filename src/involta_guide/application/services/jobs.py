@@ -154,6 +154,22 @@ class JobService:
             self._queue_generation(repo, location)
             return self._public_state(repo, location)
 
+    def rebuild(self, location_id: int, *, actor: str | None = None) -> str:
+        """Same generation request as initial filling; current content stays live."""
+        with self.uow() as uow:
+            location = require(uow.repo, "locations", location_id, lock=True)
+            if not location["active"] or location["is_hub"] or location["reset_pending"]:
+                raise RuleViolation("Локация недоступна для пересборки")
+            job_id = self._queue_generation(uow.repo, location)
+            if not job_id:
+                raise Conflict("Для этой локации уже есть запрос в очереди или в работе")
+            uow.repo.audit(
+                "selection_rebuild",
+                job_id,
+                json.dumps({"location_id": location_id, "actor": actor}),
+            )
+            return job_id
+
     def regenerate(self, job_id: str, *, model: str | None = None) -> str:
         with self.uow() as uow:
             uow.repo.health()
@@ -163,11 +179,10 @@ class JobService:
             location = require(uow.repo, "locations", old["location_id"], lock=True)
             if not location["active"] or location["is_hub"] or location["reset_pending"]:
                 raise RuleViolation("Локация отключена")
-            if (
-                location["initialized_at"] is not None
-                or old["content_epoch"] != location["content_epoch"]
-            ):
-                raise Conflict("Подборка уже наполнена; доступен только полный бета-сброс")
+            if (location["initialized_at"] is not None and old["status"] == "done") or old[
+                "content_epoch"
+            ] != location["content_epoch"]:
+                raise Conflict("Подборка уже наполнена; пересоберите её на странице локации")
             new_id = self._queue_generation(uow.repo, location, model=model)
             if not new_id:
                 raise Conflict("Для этой локации уже есть запрос в очереди или в работе")
@@ -193,9 +208,8 @@ class JobService:
                 location["content_epoch"] != job["content_epoch"]
                 or location["reset_pending"]
                 or location["is_hub"]
-                or location["initialized_at"] is not None
             ):
-                raise Conflict("Запуск больше не относится к текущему пустому циклу")
+                raise Conflict("Запуск больше не относится к текущей локации")
             baseline = job["baseline_revision"]
             saved_prompt = uow.repo.generation_prompt(job["id"])
             parents = uow.repo.tree(location["id"], ancestors=True)
