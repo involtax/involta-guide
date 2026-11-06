@@ -3,28 +3,34 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Optional commit SHA; leave empty to deploy current main"
+        description: "Reviewed main commit; empty means current main"
         required: false
         type: string
+      operation:
+        description: "Release full stack, or inspect beta progress"
+        type: choice
+        default: release
+        options: [release, report]
 permissions:
   contents: read
-# Shared across BOTH workflows; never cancel an active production operation.
 concurrency:
   group: involta-guide-production
   cancel-in-progress: false
 jobs:
-  build:
-    if: github.ref == 'refs/heads/main'
+  resolve:
+    if: github.ref == 'refs/heads/main' && inputs.operation == 'release'
     permissions:
       contents: read
-      packages: write
-    uses: ./.github/workflows/ci.yml
+      actions: read
+      packages: read
+    uses: ./.github/workflows/resolve-production-image.yml
     with:
       sha: ${{ inputs.sha || github.sha }}
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+  operate:
+    needs: resolve
+    if: always() && github.ref == 'refs/heads/main' && (needs.resolve.result == 'success' || inputs.operation != 'release')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     environment:
       name: prod
       url: https://involta.ru/guide/
@@ -32,8 +38,8 @@ jobs:
       contents: read
       packages: read
     env:
-      TARGET_SHA: ${{ needs.build.outputs.sha }}
-      IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      TARGET_SHA: ${{ needs.resolve.outputs.sha || inputs.sha || github.sha }}
+      IMAGE_REF: ${{ needs.resolve.outputs.digest && format('{0}@{1}', needs.resolve.outputs.image, needs.resolve.outputs.digest) || '' }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
@@ -41,27 +47,41 @@ jobs:
       DEPLOY_ROOT: /opt/involta-guide
       PUBLIC_URL: https://involta.ru/guide/
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      # Empty or "-" temporarily disables host-key verification; a real pin enables strict checking.
       DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - id: remote
-        name: Update Guide only, with automatic rollback
+      - name: Back up data and provision private Voice configuration
+        if: inputs.operation == 'release'
+        run: bash deploy/ssh-release.sh voice-prepare
+      - id: release
+        name: Release Guide and Voice with pinned ASR models
+        if: inputs.operation == 'release'
         run: bash deploy/ssh-release.sh deploy
-      - name: Verify HTTPS from outside the server
+      - name: Enable the ready Voice gateway
+        if: inputs.operation == 'release'
+        run: bash deploy/ssh-release.sh voice-activate
+      - name: Verify public HTTPS release
+        if: inputs.operation == 'release'
         run: bash deploy/check-release.sh "$PUBLIC_URL" "$TARGET_SHA" external
-      - name: Restore previous image if the external check fails
-        if: failure() && steps.remote.outcome == 'success'
+      - name: Report health and beta progress
+        run: bash deploy/ssh-release.sh voice-report
+      - name: Verify authenticated pages and revoke the test session
+        if: inputs.operation == 'release'
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: python3 deploy/check-admin.py
+      - name: Restore previous release if a later check fails
+        if: failure() && inputs.operation == 'release' && steps.release.outcome == 'success'
         run: bash deploy/ssh-release.sh rollback
       - name: Deployment summary
         if: always()
         run: |
           {
-            echo '### Guide production release'
             echo "Commit: $TARGET_SHA"
             echo "Image: $IMAGE_REF"
-            echo "Job: ${{ job.status }}"
+            echo "Result: ${{ job.status }}"
+            echo "Deployment consumed the verified CI image without rebuilding."
           } >> "$GITHUB_STEP_SUMMARY"
