@@ -1,0 +1,459 @@
+{
+  "snapshot_date": "2026-11-06",
+  "production": {
+    "medvezhegorsk": {
+      "log_url": "https://involta.ru/guide/logs/medvezhegorsk/2.json",
+      "model": "gpt-6.1-sol",
+      "status": "done",
+      "prompt_sha256": "c18b0e88ad851467933afe8d7c230189f75f943df51b9c4b9d1168ff5100f9ba",
+      "contains_search_order": true,
+      "contains_expected_venue_hint": false,
+      "queries": [
+        "Медвежьегорск окрестности ресторан загородный Медвежка Заонежье",
+        "Медвежьегорск лучшие рестораны кафе карельская кухня",
+        "Медвежьегорск окрестности Повенец Пиндуши Сегозеро ресторан база отдыха",
+        "Пергуба ресторан Медвежьегорск",
+        "Повенец Пиндуши ресторан кафе база отдыха",
+        "Медвежьегорск ресторан Большая Медведица Медвежонок",
+        "\"Повенец\" \"ресторан\"",
+        "\"Пиндуши\" \"кафе\"",
+        "\"Большая медведица\" \"Войгуба\" ресторан",
+        "\"Медвежка\" ресторан site:yandex.ru/maps/org",
+        "\"Медвежьегорск\" \"Медвежка\" \"ресторан\" \"yandex\"",
+        "\"Медвежьегорск\" \"Зангезур\" site:yandex.ru/maps",
+        "\"Медвежьегорск\" \"Moroshka\" site:yandex.ru/maps",
+        "\"Медвежьегорск\" \"Прованс\" site:yandex.ru/maps",
+        "Зангезур Медвежьегорск Яндекс карты ресторан",
+        "Moroshka Медвежьегорск Яндекс карты",
+        "Прованс Медвежьегорск ресторан Яндекс карты",
+        "Едем Едим Медвежьегорск Яндекс карты",
+        "\"Зангезур\" \"Медвежьегорск\"",
+        "\"Большая медведица\" \"ресторан\" \"Войгуба\" \"гостей\"",
+        "\"Moroshka\" \"Медвежьегорск\" \"Дзержинского\"",
+        "\"В Медвежке\" ресторан закрыт",
+        "\"Moroshka\" \"Медвежьегорск\" кафе телефон",
+        "\"Едем&Едим\" \"Верхняя\" site:yandex.com/maps/org",
+        "\"Большая медведица\" \"Войгуба\" ресторан сайт beartour",
+        "\"site:yandex.ru/maps/org\" \"moroshka\" \"Медвежьегорск\"",
+        "\"site:yandex.ru/maps/org\" \"Едем\" \"Медвежьегорск\"",
+        "\"site:yandex.com/maps/org\" \"Медвежьегорск\" \"Морошка\"",
+        "\"moroshka\" \"Карла Маркса, 30\" \"maps\"",
+        "\"Едем&Едим\" \"61\" \"maps\"",
+        "\"Морошка\" \"Медвежьегорск\" \"Яндекс\"",
+        "Moroshka Медвежьегорск",
+        "Едем Едим Медвежьегорск",
+        "\"Едем&Едим\" Медвежьегорск",
+        "\"Едем&Едим\" \"Верхняя\" Яндекс",
+        "\"Едем&Едим\" \"yandex\" \"org\"",
+        "\"Yedem\" \"Medvezhyegorsk\" \"yandex\"",
+        "\"Edem\" \"Medvezhyegorsk\" \"maps\"",
+        "\"Большая медведица\" \"Войгуба\" \"ресторан\" \"без проживания\"",
+        "\"Большая медведица\" \"Войгуба\" site:yandex.ru/maps/org"
+      ],
+      "candidates": [
+        {
+          "name": "Moroshka",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Зангезур",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Едем&Едим",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Прованс",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Большая медведица — кафе эко-турбазы",
+          "status": "needs_verification",
+          "verificationIssues": [
+            "operating_status",
+            "map",
+            "scores",
+            "evidence"
+          ],
+          "exclusionCode": null
+        },
+        {
+          "name": "В Медвежке",
+          "status": "excluded",
+          "verificationIssues": [],
+          "exclusionCode": "closed"
+        }
+      ],
+      "discovered": [
+        "Фламинго",
+        "Карельские рецепты",
+        "Таверна",
+        "У причала",
+        "Life",
+        "Винтаж",
+        "Онежский",
+        "Железнодорожник",
+        "Sushi-City",
+        "Берёзка"
+      ]
+    },
+    "anapa": {
+      "log_url": "https://involta.ru/guide/logs/anapa/1.json",
+      "model": "gpt-6.1-sol",
+      "status": "done",
+      "prompt_sha256": "6d784b74c76d15d6619592ed0404d0f247fcb4bd649c7b135b742fef961c806b",
+      "contains_search_order": false,
+      "contains_expected_venue_hint": true,
+      "queries": [
+        "Анапа лучшие рестораны Витязево Утриш Виноградный Семигорье Винотеррия",
+        "site.vinoterria.com ресторан контакты меню",
+        "Виноградный ресторан винодельня кухня Анапа",
+        "Анапа рестораны Брынза Мацони La veranda гастрономический",
+        "site.yandex.ru/maps Винотеррия отзывы",
+        "site.yandex.ru/maps Форт Утриш отзывы",
+        "site.yandex.ru/maps La Veranda Анапа отзывы",
+        "Виноградный ресторан усадьба Скалистый берег кухня",
+        "Гастробархан Витязево официальный ресторан",
+        "Виноградный Анапа ресторан кухня винодельня Поместье Голубицкое Каракезиди",
+        "site.yandex.ru/maps Брынза Анапа Шевченко 1а",
+        "\"Форт Утриш\" \"site:yandex.ru/maps/org\" \"ресторан\"",
+        "\"Брынза\" \"Анапа\" \"yandex.com/maps/org\"",
+        "\"Виноградный\" \"ресторан\" \"Анапа\" винодельня",
+        "Брынза Анапа отзывы Яндекс карты ресторан Шевченко",
+        "\"Форт Утриш\" \"ресторан\" \"yandex\" \"258\"",
+        "Villa Aristov ресторан Виноградный официальный меню",
+        "site.yandex.com/maps/org \"Villa Aristov\"",
+        "site:yandex.ru/maps/org/ustritsy_vino/150395721396 отзывы устрицы суп",
+        "site:yandex.ru/maps/org/gastrobarhan/178367686188 отзывы меню",
+        "site:vinoterria.com ресторан меню брискет цена",
+        "Гастробархан 178367686188 отзывы",
+        "Устрицы Вино Терская 130 отзывы цены суп",
+        "Villa Aristov ресторан отзывы утка уха"
+      ],
+      "candidates": [
+        {
+          "name": "Винотеррия",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Устрицы & Вино — Yummy Oysters",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "ГастроБархан",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Villa Aristov — рестобар",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Форт Утриш",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "La Veranda",
+          "status": "verified",
+          "verificationIssues": [],
+          "exclusionCode": null
+        },
+        {
+          "name": "Брынза",
+          "status": "needs_verification",
+          "verificationIssues": [
+            "location",
+            "map",
+            "scores",
+            "evidence"
+          ],
+          "exclusionCode": null
+        }
+      ],
+      "discovered": [
+        "20/19",
+        "Сад и море",
+        "Мацони",
+        "Вино и Море",
+        "Море",
+        "БИКЬЮ",
+        "Бора-Бора",
+        "Бородашвили",
+        "Ковчег",
+        "Причал",
+        "Сицилия",
+        "Сказка",
+        "Соль-Кале",
+        "Сыроварня Анапа",
+        "Тэатри",
+        "Яем",
+        "Фрегат",
+        "Сытый Грек",
+        "Трата Сушечки",
+        "Репин",
+        "On Cheese",
+        "Blanc de Noir"
+      ]
+    }
+  },
+  "local_replay": {
+    "local_research": {
+      "scenario": "local_research",
+      "public": [
+        "Руна",
+        "Moroshka",
+        "Зангезур"
+      ],
+      "ranking": [
+        {
+          "name": "Руна",
+          "totalScore": 7.38
+        },
+        {
+          "name": "Moroshka",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Зангезур",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Едем&Едим",
+          "totalScore": 5.38
+        },
+        {
+          "name": "Прованс",
+          "totalScore": 4.38
+        }
+      ],
+      "simulated_provider_response": true
+    },
+    "low_score": {
+      "scenario": "low_score",
+      "public": [
+        "Moroshka",
+        "Зангезур",
+        "Едем&Едим"
+      ],
+      "ranking": [
+        {
+          "name": "Moroshka",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Зангезур",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Едем&Едим",
+          "totalScore": 5.38
+        },
+        {
+          "name": "Прованс",
+          "totalScore": 4.38
+        },
+        {
+          "name": "Руна",
+          "totalScore": 2.0
+        }
+      ],
+      "simulated_provider_response": true
+    },
+    "missing_phone": {
+      "scenario": "missing_phone",
+      "public": [
+        "Moroshka",
+        "Зангезур",
+        "Едем&Едим"
+      ],
+      "ranking": [
+        {
+          "name": "Руна",
+          "totalScore": 7.38
+        },
+        {
+          "name": "Moroshka",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Зангезур",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Едем&Едим",
+          "totalScore": 5.38
+        },
+        {
+          "name": "Прованс",
+          "totalScore": 4.38
+        }
+      ],
+      "simulated_provider_response": true
+    },
+    "production": {
+      "scenario": "production",
+      "public": [
+        "Moroshka",
+        "Зангезур",
+        "Едем&Едим"
+      ],
+      "ranking": [
+        {
+          "name": "Moroshka",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Зангезур",
+          "totalScore": 6.0
+        },
+        {
+          "name": "Едем&Едим",
+          "totalScore": 5.38
+        },
+        {
+          "name": "Прованс",
+          "totalScore": 4.38
+        }
+      ],
+      "simulated_provider_response": false
+    }
+  },
+  "anapa_control": {
+    "method": "Directed local assistant research and simulated response; other candidates are fixed historical comparisons, not newly generated.",
+    "discovery_queries": [
+      "Анапа гастрономические окрестности рестораны винодельни",
+      "Семигорье рестораны винодельни южная кухня"
+    ],
+    "location_id": 34,
+    "expected_venue": "Винотеррия",
+    "hint_in_input": false,
+    "cases": {
+      "local_research": {
+        "scenario": "local_research",
+        "public": [
+          "Винотеррия",
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан"
+        ],
+        "ranking": [
+          {
+            "name": "Винотеррия",
+            "totalScore": 8.0
+          },
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      },
+      "low_score": {
+        "scenario": "low_score",
+        "public": [
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан",
+          "Villa Aristov — рестобар"
+        ],
+        "ranking": [
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          },
+          {
+            "name": "Винотеррия",
+            "totalScore": 2.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      },
+      "missing_phone": {
+        "scenario": "missing_phone",
+        "public": [
+          "Устрицы & Вино — Yummy Oysters",
+          "ГастроБархан",
+          "Villa Aristov — рестобар"
+        ],
+        "ranking": [
+          {
+            "name": "Винотеррия",
+            "totalScore": 8.0
+          },
+          {
+            "name": "Устрицы & Вино — Yummy Oysters",
+            "totalScore": 7.38
+          },
+          {
+            "name": "ГастроБархан",
+            "totalScore": 7.13
+          },
+          {
+            "name": "Villa Aristov — рестобар",
+            "totalScore": 6.88
+          },
+          {
+            "name": "Форт Утриш",
+            "totalScore": 6.75
+          },
+          {
+            "name": "La Veranda",
+            "totalScore": 6.0
+          }
+        ],
+        "simulated_provider_response": true,
+        "prompt_sha256": "01f98374bf0866bf1bf41f194562919d9e499c6dbdae3ac25d3fb4cbc7a198df"
+      }
+    }
+  }
+}

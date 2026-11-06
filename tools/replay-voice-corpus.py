@@ -4,10 +4,11 @@
 import argparse
 import hashlib
 import json
+from itertools import product
 from pathlib import Path
 
 from involta_voice.config import Settings
-from involta_voice.sherpa import LocalSherpa, options
+from involta_voice.sherpa import SPEECH_CHUNKING, LocalSherpa, options
 from involta_voice.text import REVIEW_TEXT_FORMAT, catalogue_forms, clean_review_text, restore_names
 from involta_voice.variants import COMMON_RECOGNITION_NAMES, PRIMARY_VARIANT
 
@@ -28,6 +29,18 @@ def main() -> None:
     parser.add_argument("--reviews", type=int, nargs="+")
     parser.add_argument("--scores", type=float, nargs="+", default=[2.5])
     parser.add_argument("--search", type=int, default=16)
+    parser.add_argument(
+        "--chunk-pauses-ms",
+        type=int,
+        nargs="+",
+        choices=[0, 200, 300, 500],
+        help="Compare packed speech pauses; 0 retains the previous VAD/tail behaviour",
+    )
+    parser.add_argument(
+        "--pack-all",
+        action="store_true",
+        help="Research only: pack all speech, bypassing the conservative fragmentation gate",
+    )
     parser.add_argument("--catalogue", choices=["saved", "latest"], default="saved")
     parser.add_argument("--extra-words", nargs="*", default=[])
     parser.add_argument("--extra-restaurants", nargs="*", default=[])
@@ -71,7 +84,7 @@ def main() -> None:
             names = list(dict.fromkeys([*names, *args.extra_restaurants]))
             forms = catalogue_forms(names, city=city)
             forms.update({n.lower().replace("ё", "е"): n for n in COMMON_RECOGNITION_NAMES})
-            for score in args.scores:
+            for score, pause in product(args.scores, args.chunk_pauses_ms or [None]):
                 request = options(
                     settings,
                     "gigaam",
@@ -80,8 +93,18 @@ def main() -> None:
                     location_name=city,
                 )
                 request.update(hotwords_score=score, max_active_paths=args.search)
+                if pause == 0:
+                    request.pop("speech_chunking", None)
+                    request.pop("max_pause_ms", None)
+                elif pause is not None:
+                    request.update(speech_chunking=SPEECH_CHUNKING, max_pause_ms=pause)
+                if args.pack_all and request.get("speech_chunking"):
+                    request["force_speech_packing"] = True
                 if args.no_tail_context:
                     request.pop("vad_tail_context", None)
+                    request.pop("speech_chunking", None)
+                    request.pop("max_pause_ms", None)
+                    request.pop("force_speech_packing", None)
                 if score == 0:
                     request["dictionary"] = []
                 body = json.loads(provider.call(request, audio)["body"])
@@ -93,6 +116,7 @@ def main() -> None:
                     "review": item["number"],
                     "slug": item["slug"],
                     "request": request,
+                    "chunk_pause_ms": request.get("max_pause_ms"),
                     "catalogue": args.catalogue,
                     "extra_words": args.extra_words,
                     "extra_restaurants": args.extra_restaurants,
@@ -108,6 +132,9 @@ def main() -> None:
                     "segments": body.get("segments"),
                     "vad_segments": body.get("vad_segments"),
                     "vad_tail_context_applied": body.get("vad_tail_context_applied", False),
+                    "speech_chunking_applied": body.get("speech_chunking_applied", False),
+                    "asr_input_seconds": body.get("asr_input_seconds"),
+                    "inference_seconds": body.get("inference_seconds"),
                     "elapsed_seconds": body["elapsed_seconds"],
                 }
                 rows.append(row)

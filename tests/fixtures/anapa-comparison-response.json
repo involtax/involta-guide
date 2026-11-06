@@ -1,0 +1,753 @@
+{
+  "intro": "У Анапы есть вкус не только морского берега, но и виноградных предгорий: здесь хочется задержаться за устрицами, черноморской рыбой и неспешным загородным обедом. Между маленьким устричным баром, ужином у витязевских дюн и поездкой в Семигорье получается совсем разное настроение.",
+  "candidates": [
+    {
+      "name": "Устрицы & Вино — Yummy Oysters",
+      "status": "verified",
+      "exclusionCode": null,
+      "reason": "Официальный сайт и Яндекс подтверждают один ресторан на Терской, 130, его телефон и действующий статус. Одноимённая точка на Пионерском проспекте в оценку не включена.",
+      "description": "Камерный устричный бар на Терской, 130, с полноценной средиземноморской кухней. Главный повод зайти — сравнить моллюсков и разобраться в их вкусе с помощью команды; гастрогид отдельно рекомендует запечённые устрицы с сыром и беконом. Ассортимент не ограничивается местными морепродуктами.",
+      "cuisine": "Морепродукты, средиземноморская",
+      "phone": "+79388669633",
+      "mapsUrl": "https://yandex.com/maps/org/ustritsy_vino/150395721396/",
+      "latitude": null,
+      "longitude": null,
+      "openingHours": {
+        "timezone": "Europe/Moscow",
+        "week": [
+          [
+            [
+              "12:00",
+              "22:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "22:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "22:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "22:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "23:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "23:00"
+            ]
+          ],
+          [
+            [
+              "12:00",
+              "22:00"
+            ]
+          ]
+        ],
+        "exceptions": {}
+      },
+      "scores": {
+        "food": 8,
+        "consistency": 7,
+        "identity": 8,
+        "localConnection": 5,
+        "atmosphere": 8,
+        "service": 8,
+        "value": 7,
+        "destination": 8
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Гастрогид подтверждает свежесть моллюсков и удачные запечённые устрицы; гости отдельно хвалят выбор живых и приготовленных морепродуктов.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            3
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "У нескольких авторов в разные даты совпадают положительные впечатления от кухни; независимая публикация поддерживает их, но многолетняя повторяемость раскрыта слабее.",
+          "confidence": "medium",
+          "sourceRefs": [
+            2,
+            3
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Небольшой бар строится вокруг сравнения устриц и знакомства с их вкусом, сохраняя горячую средиземноморскую кухню.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Есть российские вина и сочетания с игристым местных хозяйств, но моллюски поступают из разных регионов мира.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Гости описывают спокойную камерную посадку, приглушённый свет и интерьер без визуальной перегрузки.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            2
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "В независимом описании и гостевых свидетельствах повторяется содержательное объяснение видов устриц и способов их есть.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            3
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "При указанном на карте ориентире 1000–1500 рублей гости отмечают полноценный выбор и качество морепродуктов; большой заказ деликатесов этим ориентиром не ограничен.",
+          "confidence": "medium",
+          "sourceRefs": [
+            2
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Возможность сравнить разные устрицы с объяснениями хозяйки — самостоятельный повод выбрать именно этот небольшой городской бар.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "sources": [
+        "https://oysters-anapa.ru/",
+        "https://yandex.com/maps/org/ustritsy_vino/150395721396/",
+        "https://yuguide.ru/chto-i-gde-poprobovat-v-anape-i-okrestnostyah"
+      ],
+      "verificationIssues": []
+    },
+    {
+      "name": "ГастроБархан",
+      "status": "verified",
+      "exclusionCode": null,
+      "reason": "Подтверждён ресторан при отеле «Песок и Море» в Витязеве, Скифская, 28. Карточка Яндекса, телефон и отзывы внешних посетителей относятся к этой площадке.",
+      "description": "Ресторан в селе Витязево, при отеле «Песок и Море» на Скифской, 28; сюда приходят и непроживающие гости. По содержательным отзывам интересны судак с овощами, барабуля и паста с кальмаром, беконом и кабачком. Главная оговорка — повторяющиеся сообщения о задержках обслуживания.",
+      "cuisine": "Европейская, средиземноморская, черноморская рыба",
+      "phone": "+79002987858",
+      "mapsUrl": "https://yandex.com/maps/org/gastrobarkhan/178367686188/",
+      "latitude": null,
+      "longitude": null,
+      "openingHours": null,
+      "scores": {
+        "food": 8,
+        "consistency": 8,
+        "identity": 7,
+        "localConnection": 6,
+        "atmosphere": 8,
+        "service": 6,
+        "value": 7,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Конкретно хвалят судака с овощами, барабулю, пасту с кальмаром; более ранние независимые отзывы отмечают севиче, саргана и пиццу из печи.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            2,
+            4
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Положительные свидетельства о разных блюдах есть за 2022–2023 годы и в отзывах 2025 года; даже часть недовольных сервисом гостей хвалит приготовление.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            4
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Меню сочетает черноморскую рыбу, морепродукты и пиццу из печи; характер заметен, хотя кухня остаётся широкой и международной.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            4
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Барабуля, сарган и рапаны неоднократно фигурируют в описаниях заказов, но местное происхождение всего сырья не подтверждено.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            4
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Отмечают комфортное зонирование, кондиционируемые залы, веранду и удобство семейной посадки; старые отзывы содержат замечания к террасе.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Наряду с помощью при выборе блюд повторяются независимые эпизоды долгого ожидания, исчезающих официантов и отсутствия предупреждения о задержке.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            4
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Карта указывает ориентир 1200–1800 рублей; качество блюд получает предметные похвалы, но ожидание иногда ухудшает соответствие расходов впечатлению.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            2,
+            4
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Для Витязева это повод специально выбрать рыбный ужин у дюн, хотя более дальнюю поездку ограничивают риски организации сервиса.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            2,
+            4
+          ]
+        }
+      ],
+      "sources": [
+        "https://yandex.com/maps/org/gastrobarkhan/178367686188/",
+        "https://yandex.com/maps/org/gastrobarkhan/178367686188/reviews/",
+        "https://gastrobarhan.clients.site/",
+        "https://www.tripadvisor.ru/Restaurant_Review-g2619350-d21248790-Reviews-GastroBarhan-Vityazevo_Anapsky_District_Krasnodar_Krai_Southern_District.html"
+      ],
+      "verificationIssues": []
+    },
+    {
+      "name": "Villa Aristov — рестобар",
+      "status": "verified",
+      "exclusionCode": null,
+      "reason": "Подтверждён круглогодичный рестобар с полноценной кухней внутри GastroMall Villa Aristov в посёлке Виноградный, Заводская, 21. Карта и официальный контакт относятся к этому комплексу; оценка не переносит впечатления от магазина на кухню.",
+      "description": "Рестобар в посёлке Виноградный, на Заводской, 21, внутри комплекса Villa Aristov. Поездку можно совместить с выбором региональных вин и знакомством с собственной пивоварней; в опубликованном меню представлены утка с апельсиновым конфи и уха. Отзывы о приготовлении неоднородны, а опубликованные в гастрономической заметке цены относятся к 2024 году.",
+      "cuisine": "Европейская с локальными продуктами",
+      "phone": "+78612980007",
+      "mapsUrl": "https://yandex.com/maps/org/villa_aristov/107331404681/",
+      "latitude": null,
+      "longitude": null,
+      "openingHours": null,
+      "scores": {
+        "food": 7,
+        "consistency": 6,
+        "identity": 7,
+        "localConnection": 7,
+        "atmosphere": 7,
+        "service": 7,
+        "value": 7,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Есть предметные похвалы утке с апельсином, борщу и пасте, но также жалобы на температуру супа, соусы и приготовление баклажанов.",
+          "confidence": "medium",
+          "sourceRefs": [
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Содержательные отзывы о ресторане расходятся: удачные обеды соседствуют с замечаниями к нескольким блюдам одного заказа.",
+          "confidence": "medium",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Ресторанная посадка объединена с собственной пивоварней и винотекой; предусмотрены разные зоны для вина, пива и быстрого питания.",
+          "confidence": "high",
+          "sourceRefs": [
+            5,
+            6
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Подтверждены использование локальных продуктов, вина «Кубань-Вино» и собственное пиво комплекса в Виноградном.",
+          "confidence": "high",
+          "sourceRefs": [
+            5,
+            6
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Панорамные окна, зонирование, терраса и детские пространства удобны для семейного формата, но это ресторан внутри торгового комплекса.",
+          "confidence": "high",
+          "sourceRefs": [
+            4,
+            5,
+            6
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Есть конкретные свидетельства грамотных рекомендаций по винам и меню; встречаются и отдельные жалобы на общение и организацию зала.",
+          "confidence": "medium",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "Публикация 2024 года приводит чек около 2000 рублей и конкретные цены; гостевые оценки в целом поддерживают разумность расходов, но актуальность этих сумм ограничена.",
+          "confidence": "low",
+          "sourceRefs": [
+            3,
+            5
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Рестобар, собственная пивоварня и региональная винотека позволяют спланировать отдельную гастрономическую остановку, не сводя визит к дегустации.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            5,
+            6
+          ]
+        }
+      ],
+      "sources": [
+        "https://aristovwine.ru/contacts",
+        "https://yandex.com/maps/org/villa_aristov/107331404681/",
+        "https://yandex.com/maps/org/villa_aristov/107331404681/reviews/",
+        "https://yandex.com/maps/org/villa_aristov/107331404681/reviews/?page=4",
+        "https://news.vinoilyudi.ru/restorany-restobar-villa-aristov-p-vinogradnyj-krasnodarskij-kraj/",
+        "https://ariant.ru/zh/news/Villa-Aristov-otkroet-obnovlennyy-restorannyy-kompleks"
+      ],
+      "verificationIssues": []
+    },
+    {
+      "name": "Форт Утриш",
+      "status": "verified",
+      "exclusionCode": null,
+      "reason": "Подтверждён именно ресторан в селе Большой Утриш, Набережная, 1, а не одноимённый яхт-клуб. Официальный телефон совпадает с ресторанной карточкой Яндекса; внешние гости могут приехать поесть.",
+      "description": "Ресторан в селе Большой Утриш, на Набережной, 1, с террасой над морем. В отзывах предметно хвалят местные мидии и барабулю, но встречаются замечания к другим блюдам и высокому счёту. До поездки стоит уточнить условия въезда: сообщения о депозите и разъяснения администрации расходятся.",
+      "cuisine": "Черноморская, рыба и морепродукты",
+      "phone": "+79892581258",
+      "mapsUrl": "https://yandex.com/maps/org/fort_utrish/1150480251/",
+      "latitude": null,
+      "longitude": null,
+      "openingHours": null,
+      "scores": {
+        "food": 7,
+        "consistency": 6,
+        "identity": 7,
+        "localConnection": 8,
+        "atmosphere": 8,
+        "service": 6,
+        "value": 5,
+        "destination": 7
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "Есть подробная похвала свежим мидиям и барабуле; другие гости описывают жёсткую говядину и неудачные салаты, поэтому высокая оценка всей кухни не оправдана.",
+          "confidence": "high",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Повторные гости подтверждают удачные посещения, однако у разных авторов встречаются заметно расходящиеся оценки приготовления.",
+          "confidence": "high",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Полноценная черноморская кухня на берегу Большого Утриша формирует понятный рыбный ресторанный формат.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "Официально заявлены местные продукты и черноморские морепродукты; гости отдельно подтверждают заказы местных мидий и барабули.",
+          "confidence": "high",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Террасу, чистоту и возможность спокойно сидеть у воды хвалят разные гости; живая музыка подходит не всем сценариям тихого ужина.",
+          "confidence": "high",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Внимательное сопровождение заказов подтверждено, но повторяются недоразумения с въездом и депозитом; администрация признаёт необходимость уточнять правила сотрудникам.",
+          "confidence": "high",
+          "sourceRefs": [
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "При ориентире карты 2000–3500 рублей несколько гостей считают расходы чрезмерными относительно еды; положительные оценки ценности тоже есть.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Ужин с черноморской рыбой непосредственно у воды оправдывает специальный выезд в Большой Утриш, но не снимает оговорок к кухне и стоимости.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            3,
+            4
+          ]
+        }
+      ],
+      "sources": [
+        "https://fort-utrish.ru/",
+        "https://yandex.com/maps/org/fort_utrish/1150480251/",
+        "https://yandex.com/maps/org/fort_utrish/1150480251/reviews/",
+        "https://travel.yandex.ru/hotels/krasnodar-krai/fort-utrish-naberezhnaia-ulitsa/reviews/"
+      ],
+      "verificationIssues": []
+    },
+    {
+      "name": "La Veranda",
+      "status": "verified",
+      "exclusionCode": null,
+      "reason": "Подтверждён ресторан на Ленина, 3, при «Анапа-Океан», с действующей карточкой Яндекса и телефоном +7 918 634-71-34. Данные других одноимённых заведений не использованы.",
+      "description": "Городской ресторан на Ленина, 3, при «Анапа-Океан», с итальянской кухней, пиццей и летней верандой. В опубликованных отзывах выделяют карбонару и тирамису, но впечатления от скорости обслуживания неоднородны. Это скорее спокойный городской ужин, чем отдельное загородное гастрономическое путешествие.",
+      "cuisine": "Итальянская, средиземноморская",
+      "phone": "+79186347134",
+      "mapsUrl": "https://yandex.com/maps/org/la_veranda/1341287556/",
+      "latitude": null,
+      "longitude": null,
+      "openingHours": null,
+      "scores": {
+        "food": 7,
+        "consistency": 6,
+        "identity": 6,
+        "localConnection": 4,
+        "atmosphere": 8,
+        "service": 6,
+        "value": 5,
+        "destination": 6
+      },
+      "evidence": [
+        {
+          "factor": "food",
+          "reason": "В сводке содержательных отзывов выделяются карбонара, пицца и тирамису; имеются конкретные отрицательные свидетельства о напитках и температуре блюд.",
+          "confidence": "medium",
+          "sourceRefs": [
+            2,
+            3
+          ]
+        },
+        {
+          "factor": "consistency",
+          "reason": "Есть положительные впечатления повторных гостей разных сезонов и противоречащие им сообщения об ухудшении кухни и ожидании.",
+          "confidence": "medium",
+          "sourceRefs": [
+            2,
+            3
+          ]
+        },
+        {
+          "factor": "identity",
+          "reason": "Последовательный итальянский формат с пиццей и пастой, но убедительных свидетельств самостоятельной авторской школы недостаточно.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "localConnection",
+          "reason": "В отзывах упоминаются вина Гай-Кодзора и сарган, однако основу концепции составляет итальянская, а не местная кухня.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            3
+          ]
+        },
+        {
+          "factor": "atmosphere",
+          "reason": "Повторные гости описывают комфорт внутри и снаружи, спокойный вечер и удачное музыкальное сопровождение; туалет расположен в отельной части.",
+          "confidence": "high",
+          "sourceRefs": [
+            2
+          ]
+        },
+        {
+          "factor": "service",
+          "reason": "Знание меню и помощь с выбором подтверждены, но разные авторы сообщают о затянутой подаче и недостаточной организации обслуживания.",
+          "confidence": "high",
+          "sourceRefs": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "value",
+          "reason": "При указанном на карте чеке 2500–3000 рублей встречаются прямые претензии к соответствию цены кухне и скорости работы.",
+          "confidence": "medium",
+          "sourceRefs": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "factor": "destination",
+          "reason": "Удобный повод для итальянского ужина в городе, но имеющиеся свидетельства не делают его обязательной специальной поездкой.",
+          "confidence": "medium",
+          "sourceRefs": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "sources": [
+        "https://anapaocean.ru/restaurants_and_bars/restoran-la-veranda/",
+        "https://yandex.com/maps/org/la_veranda/1341287556/",
+        "https://restaurantguru.ru/La-Veranda-Anapa-4",
+        "https://yandex.com/maps/org/la_veranda/1341287556/panorama/"
+      ],
+      "verificationIssues": []
+    },
+    {
+      "name": "Брынза",
+      "status": "needs_verification",
+      "exclusionCode": null,
+      "reason": "Официальные контакты и меню называют Шевченко, 1а, а актуальная страница Яндекс Бизнеса с тем же телефоном — Таманскую, 26В. Не установлено, обозначают ли адреса одну площадку, переезд или разные помещения; конкретная карточка карты не просмотрена. Чтобы не смешивать отзывы, сравнительные оценки не выставлены.",
+      "description": "Кавказский ресторан с грузинскими и армянскими блюдами, который стоит рассмотреть ради национального меню и собственной брынзы. Перед включением в подборку необходимо разрешить расхождение адресов Шевченко, 1а, и Таманская, 26В; рекомендации по конкретному залу пока преждевременны.",
+      "cuisine": "Грузинская, армянская",
+      "phone": "+79283325555",
+      "mapsUrl": null,
+      "latitude": null,
+      "longitude": null,
+      "openingHours": null,
+      "scores": {},
+      "evidence": [],
+      "sources": [
+        "https://acm-rest.ru/contacts",
+        "https://brynza.clients.site/",
+        "https://vilka.net/ru/kda/anapa/brynza-dqn6rr2htc/menu",
+        "https://anapa.ugosti.com/brynza"
+      ],
+      "verificationIssues": [
+        "location",
+        "map",
+        "scores",
+        "evidence"
+      ]
+    }
+  ],
+  "discoveredRestaurants": [
+    {
+      "name": "20/19",
+      "sources": [
+        "https://20-19.ru/"
+      ]
+    },
+    {
+      "name": "Сад и море",
+      "sources": [
+        "https://yuguide.ru/chto-i-gde-poprobovat-v-anape-i-okrestnostyah",
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Мацони",
+      "sources": [
+        "https://anapaocean.ru/restaurants_and_bars/restoran-la-veranda/",
+        "https://www.sobaka.ru/nvr/bars/chtogdeest/98901"
+      ]
+    },
+    {
+      "name": "Вино и Море",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurant_Review-g608960-d23681265-Reviews-Vino_i_More-Anapa_Krasnodar_Krai_Southern_District.html"
+      ]
+    },
+    {
+      "name": "Море",
+      "sources": [
+        "https://acm-rest.ru/contacts"
+      ]
+    },
+    {
+      "name": "БИКЬЮ",
+      "sources": [
+        "https://acm-rest.ru/contacts"
+      ]
+    },
+    {
+      "name": "Бора-Бора",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Бородашвили",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Ковчег",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Причал",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Сицилия",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Сказка",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Соль-Кале",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Сыроварня Анапа",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Тэатри",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Яем",
+      "sources": [
+        "https://www.afisha.ru/anapa/restaurants/restaurant_list/verandah/"
+      ]
+    },
+    {
+      "name": "Фрегат",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurants-g2619350-Vityazevo_Anapsky_District_Krasnodar_Krai_Southern_District.html"
+      ]
+    },
+    {
+      "name": "Сытый Грек",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurants-g2619350-Vityazevo_Anapsky_District_Krasnodar_Krai_Southern_District.html"
+      ]
+    },
+    {
+      "name": "Трата Сушечки",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurants-g2619350-Vityazevo_Anapsky_District_Krasnodar_Krai_Southern_District.html"
+      ]
+    },
+    {
+      "name": "Репин",
+      "sources": [
+        "https://www.tripadvisor.ru/Restaurant_Review-g2619350-d21248790-Reviews-GastroBarhan-Vityazevo_Anapsky_District_Krasnodar_Krai_Southern_District.html"
+      ]
+    },
+    {
+      "name": "On Cheese",
+      "sources": [
+        "https://telegram.me/s/nevvino?q=%23%D1%85%D0%BE%D1%80%D0%BE%D1%88%D0%B5%D0%B5_%D0%BC%D0%B5%D1%81%D1%82%D0%BE",
+        "https://t.me/s/nevvino?before=13969&q=%23%D0%B0%D0%BD%D0%B0%D0%BF%D0%B0"
+      ]
+    },
+    {
+      "name": "Blanc de Noir",
+      "sources": [
+        "https://t.me/s/nevvino?before=13969&q=%23%D0%B0%D0%BD%D0%B0%D0%BF%D0%B0"
+      ]
+    }
+  ],
+  "warnings": [
+    "У «Брынзы» не разрешено расхождение адресов; отзывы и оценки разных возможных площадок не объединены.",
+    "У «Форта Утриш» противоречивые сведения о депозите на въезде: гости сообщают о 5000 рублях, администрация утверждает, что для посещения только ресторана депозит не нужен. Условия следует согласовать до поездки.",
+    "Числовые ориентиры расходов не являются обещанием текущего счёта. Особенно ограничена оценка value у Villa Aristov: содержательная публикация с ценами датирована 15 ноября 2024 года."
+  ]
+}

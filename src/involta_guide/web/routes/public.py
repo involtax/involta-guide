@@ -13,7 +13,13 @@ from involta_guide.domain.rules import KINDS
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.infrastructure.voice.upload_logs import UploadLogs
-from involta_guide.web.http import admin_token, check_origin, context, require_diagnostics
+from involta_guide.web.http import (
+    admin_token,
+    check_origin,
+    context,
+    remember_location,
+    require_diagnostics,
+)
 from involta_guide.web.routes.admin import render
 
 
@@ -143,6 +149,8 @@ def routes(prefix: str) -> APIRouter:
             + escape(ctx.settings.url("/"))
             + "</loc></url><url><loc>"
             + escape(ctx.settings.url("/about"))
+            + "</loc></url><url><loc>"
+            + escape(ctx.settings.url("/for-agents"))
             + "</loc></url>"
         )
         body += (
@@ -438,7 +446,7 @@ def routes(prefix: str) -> APIRouter:
                     ],
                 }
             )
-        return request.app.state.templates.TemplateResponse(
+        response = request.app.state.templates.TemplateResponse(
             request=request,
             name="location.html",
             context={
@@ -461,5 +469,7 @@ def routes(prefix: str) -> APIRouter:
             },
             headers={"Cache-Control": "private, no-store"},
         )
+        remember_location(request, response, c["id"])
+        return response
 
     return router

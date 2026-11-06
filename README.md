@@ -38,6 +38,11 @@ uv run guide-worker
 Рестораны, в том числе раскрываемые через «Ещё», присутствуют в исходном HTML.
 Режим работы и «Ещё» раскрываются без JS; микрофон использует небольшой vanilla widget.
 
+Публичный MCP: `https://involta.ru/guide/mcp`, Streamable HTTP, без авторизации.
+Ровно два инструмента — `Location` и `Restaurant`; отзывы входят в карточки.
+[Подключение и контракт](docs/MCP.md), страница `/guide/for-agents`, инструкция
+`/guide/llms.txt`. Доступность production зависит от развёрнутой версии приложения.
+
 ## Архитектура
 
 - `domain/`: чистые dataclasses, состояния и правила. Нет FastAPI/SQLAlchemy/Pydantic.

@@ -29,6 +29,10 @@ class Worker:
         self.audit = AIAudit(queue.engine, queue.settings)
 
     def once(self) -> bool:
+        from involta_guide.review_analysis.service import ReviewAnalysis
+
+        analysis = ReviewAnalysis(self.queue.engine, self.queue.settings)
+        analysis.schedule()
         job = self.queue.claim()
         if not job:
             return False
@@ -50,7 +54,12 @@ class Worker:
                 self.audit.record(
                     job["id"], "job_started", {"attempt": job["attempts"], "job": job}
                 )
-            self.service.process(job)
+            if job["kind"] == "review_analysis":
+                if not isinstance(self.service.provider, OpenAIProvider):
+                    raise RuleViolation("Review analysis requires the configured OpenAI provider")
+                analysis.process(job, self.service.provider)
+            else:
+                self.service.process(job)
             self.audit.record(
                 job["id"],
                 "job_completed",

@@ -64,7 +64,7 @@ class VoiceReadModel:
                 dict(r)
                 for r in conn.execute(
                     text("""SELECT id::text reference,
-                transcript,created_at,number,publication_status,
+                coalesce(edited_text,transcript) transcript,created_at,number,publication_status,
                 CASE WHEN status='transcribed' THEN 'result_ready' ELSE 'accepted' END state
                 FROM reviews WHERE location_id=:location AND publication_status=1 AND status IN ('received','transcribed')
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
@@ -77,7 +77,7 @@ class VoiceReadModel:
             return [
                 dict(item)
                 for item in conn.execute(
-                    text(f"""SELECT r.transcript,r.created_at,r.number,
+                    text(f"""SELECT coalesce(r.edited_text,r.transcript) transcript,r.created_at,r.number,
                     l.name location_name,l.slug location_slug
                     FROM reviews r JOIN locations l ON l.id=r.location_id
                     WHERE r.publication_status=1 AND r.status IN ('received','transcribed')

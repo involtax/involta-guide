@@ -160,3 +160,25 @@
 .nearby-row form { margin:0; }
 .nearby-row button { background:transparent;color:var(--muted);padding:8px;border:0;font-size:12px; }
 .nearby-search-results { margin-top:24px; }
+
+/* Reviews 2: automatic analysis, explicit approval, one document scroll. */
+.reviews2-layout { display:grid; grid-template-columns:245px minmax(0,1fr); gap:36px; }
+.reviews2-filters a { display:flex; justify-content:space-between; padding:16px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+.reviews2-filters a.selected { background:var(--soft); box-shadow:inset 3px 0 var(--black); }
+.reviews2-filters span { color:var(--muted); }
+.reviews2-card { border-bottom:1px solid var(--line); padding:0 0 28px; margin-bottom:28px; }
+.reviews2-card header { display:flex; justify-content:space-between; gap:16px; font-size:12px; }
+.reviews2-card time { margin-left:12px; color:var(--muted); }
+.reviews2-card small { display:block; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.07em; margin-bottom:9px; }
+.reviews2-before { margin:18px 0 16px; padding:15px 18px; background:var(--soft); }
+.reviews2-before p { font-size:15px; line-height:1.6; margin:0; white-space:pre-wrap; }
+.reviews2-after p { font-size:19px; line-height:1.55; margin:0 0 16px; white-space:pre-wrap; }
+.reviews2-attributes { display:flex; flex-wrap:wrap; gap:10px 22px; font-size:13px; margin-bottom:16px; }
+.reviews2-attributes span { color:var(--muted); margin-right:8px; }
+.reviews2-attributes em { display:inline-block; background:var(--soft); font-style:normal; padding:5px 8px; margin:0 5px 5px 0; font-size:12px; }
+.reviews2-meta { color:var(--muted); font:11px/1.7 monospace; overflow-wrap:anywhere; }
+.reviews2-actions { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+.admin-workspace .reviews2-actions form { margin:0; }
+.reviews2-delete { margin-left:auto!important; }
+.reviews2-delete button { background:none; border:0; color:var(--muted); text-decoration:underline; font-size:12px; }
+@media(max-width:650px) { .reviews2-layout { display:block; } .reviews2-filters { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:28px; } .reviews2-filters a { border:1px solid var(--line); gap:12px; padding:10px 12px; } .reviews2-card time { display:block; margin:5px 0 0; } .reviews2-after p { font-size:18px; } }
