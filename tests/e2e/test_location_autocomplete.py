@@ -26,6 +26,7 @@ def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tm
     city = Queries(factory).directory(query="Великий Новгород")["rows"][0]
     FixtureEditor(factory).save(city["id"], CONTENT, None)
     with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
@@ -40,7 +41,7 @@ def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tm
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(origin + "/guide/", wait_until="networkidle")
-            field = page.get_by_role("combobox", name="Выбор локации")
+            field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
             button = page.get_by_role("button", name="Выбери", exact=True)
             assert button.evaluate("el=>getComputedStyle(el).fontSize") == "22px"
             assert button.evaluate("el=>el.scrollWidth<=el.clientWidth")
@@ -48,13 +49,13 @@ def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tm
             assert field.get_attribute("name") is None
             assert field.evaluate("el=>el.form===null")
             button.click()
-            expect(page.get_by_role("option")).to_have_count(6)
+            expect(page.get_by_role("option")).to_have_count(8)
             expect(button).to_have_attribute("aria-expanded", "true")
             expect(field).to_have_value("")
             field.press("Enter")
             assert page.url == origin + "/guide/"
             field.fill("нов")
-            expect(page.get_by_role("option")).to_have_count(6)
+            expect(page.get_by_role("option")).to_have_count(8)
             field.press("ArrowDown")
             expect(page.get_by_role("option").first).to_have_attribute("aria-selected", "true")
             assert "Великий Новгород" in page.get_by_role("option").first.inner_text()
@@ -78,7 +79,7 @@ def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tm
         context = browser.new_context(java_script_enabled=False)
         page = context.new_page()
         page.goto(origin + "/guide/")
-        page.get_by_label("Выбор локации").fill("Иваново")
+        page.get_by_label("Поиск локаций и ресторанов").fill("Иваново")
         page.get_by_role("button", name="Выбери", exact=True).click()
         assert page.url == origin + "/guide/"
         expect(page.locator(".cities")).to_have_count(0)
@@ -96,12 +97,13 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
     )
     add_location(engine, '</script><img src=x onerror="window.__searchXss=true">', "unsafe-name")
     with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         page = browser.new_page()
         page.goto(origin + "/guide/", wait_until="networkidle")
-        field = page.get_by_role("combobox", name="Выбор локации")
+        field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
         expect(field).to_be_visible()
         page.evaluate("""() => {
             window.searchMessages = [];
@@ -141,7 +143,7 @@ def test_local_names_are_ready_before_next_frame_offline_and_do_not_search_metad
         expect(page.locator(".search-suggestions")).to_be_visible()
         page.get_by_role("button", name="Очистить поиск").click()
         expect(page.locator(".search-suggestions")).to_be_hidden()
-        assert not requests
+        assert all("/api/search" in url for url in requests)
         assert page.evaluate("searchMessages.every(text => !text.includes('Ищем'))")
         browser.close()
 
@@ -151,6 +153,7 @@ def test_browser_and_admin_matching_agree_on_real_catalogue_and_five_thousand_ro
 ):
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
@@ -195,22 +198,23 @@ def test_browser_and_admin_matching_agree_on_real_catalogue_and_five_thousand_ro
 def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motion(database):
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1100})
         page.goto(origin + "/guide/")
-        field = page.get_by_role("combobox", name="Выбор локации")
+        field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
         shell = page.locator(".search-surface")
         panel = page.locator(".search-suggestions")
         city_top = page.locator(".home-reviews").bounding_box()["y"]
         assert shell.evaluate("el=>el.offsetHeight") == 80
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         field.fill("н")
-        expect(page.get_by_role("option")).to_have_count(6)
+        expect(page.get_by_role("option")).to_have_count(8)
 
         field.fill("нов")
-        expect(page.get_by_role("option")).to_have_count(6)
+        expect(page.get_by_role("option")).to_have_count(8)
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         expanded_height = shell.evaluate("el=>el.getBoundingClientRect().height")
         assert expanded_height > 80
@@ -244,6 +248,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
 def test_one_catalogue_request_uses_latest_input_and_failure_retries_without_navigation(database):
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
+        settings.site_url = origin + settings.base_path
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
@@ -252,7 +257,7 @@ def test_one_catalogue_request_uses_latest_input_and_failure_retries_without_nav
             held = []
             page.route("**/api/locations/catalogue", lambda route: held.append(route))
             page.goto(origin + "/guide/")
-            field = page.get_by_label("Выбор локации")
+            field = page.get_by_label("Поиск локаций и ресторанов")
             field.fill("иван")
             field.fill(final_query)
             page.locator("h1").click()
@@ -289,7 +294,7 @@ def test_one_catalogue_request_uses_latest_input_and_failure_retries_without_nav
 
         page.route("**/api/locations/catalogue", retry)
         page.goto(origin + "/guide/", wait_until="networkidle")
-        field = page.get_by_role("combobox", name="Выбор локации")
+        field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
         field.fill("плес")
         expect(page.locator(".search-message")).to_contain_text("Не удалось загрузить")
         assert page.url == origin + "/guide/" and len(attempts) == 1

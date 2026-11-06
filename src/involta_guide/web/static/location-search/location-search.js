@@ -13,7 +13,8 @@
     const inputRow = picker.querySelector('.search-input-row');
     const status = picker.querySelector('[role="status"]');
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    let catalogue = [], search, rows = [], loading = false, loadError = false;
+    let catalogue = [], search, rows = [], loading = false, loadError = false, hybrid;
+    let renderedKey = '', restoreId = null;
     let composing = false, allowEmpty = false, expanded = false, closeTimer;
 
     const folded = value => value.toLowerCase().replaceAll('ё', 'е');
@@ -40,18 +41,31 @@
       searchEngine: () => ' ',
       resultsList: {
         class: 'destination-results', destination: () => content, position: 'beforeend',
-        maxResults: 6, noResults: true,
+        maxResults: picker.hasAttribute('data-location-add') ? 6 : 8, noResults: true,
         element: (list, data) => {
           if (!data.results.length) {
             const item = document.createElement('li');
             item.className = 'search-message'; item.role = 'presentation';
-            item.textContent = loadError
+            item.textContent = hybrid?.failed
+              ? 'Поиск временно недоступен. Нажмите «Выбери», чтобы повторить.'
+              : loadError && !hybrid?.canRenderEmpty
               ? 'Не удалось загрузить локации. Нажмите «Выбери», чтобы повторить.'
-              : 'Не нашли такую локацию. Попробуйте другое название.';
+              : hybrid ? 'Ничего не нашли. Попробуйте другое название.' : 'Не нашли такую локацию. Попробуйте другое название.';
             list.append(item);
           }
-          status.textContent = loadError ? 'Список локаций недоступен'
-            : data.results.length ? `Подсказок: ${data.results.length}` : 'Ничего не найдено';
+          status.textContent = data.results.length ? `Подсказок: ${data.results.length}`
+            : hybrid?.failed ? 'Поиск временно недоступен'
+            : loadError && !hybrid?.canRenderEmpty ? 'Список локаций недоступен' : 'Ничего не найдено';
+          const key = renderedKey, selected = restoreId;
+          const displayed = data.results.map(row => row.value);
+          queueMicrotask(() => {
+            if (lifecycle.signal.aborted || key !== renderedKey || document.activeElement !== input) return;
+            if (selected) {
+              const index = widget.feedback?.results.findIndex(row => row.value.id === selected);
+              if (index >= 0) widget.goTo(index);
+            }
+            if (widget.isOpen) hybrid?.shown(displayed);
+          });
           requestAnimationFrame(fitResults);
         }
       },
@@ -62,7 +76,7 @@
           const name = document.createElement('span'); name.className = 'result-name';
           title(name, data.value.name);
           const context = document.createElement('span'); context.className = 'result-context';
-          context.textContent = data.value.context;
+          context.textContent = (data.value.kind === 'restaurant' ? 'Ресторан · ' : '') + data.value.context;
           text.append(name, context);
           const arrow = document.createElement('span'); arrow.className = 'result-arrow';
           arrow.textContent = '→'; arrow.ariaHidden = 'true';
@@ -70,15 +84,16 @@
         }
       },
       events: {input: {
-        input: () => begin(),
-        focus: () => { if (!composing && !expanded) begin(); },
-        blur: () => { allowEmpty = false; widget.close(); },
+        input: () => { if (composing) return; hybrid?.change(input.value); begin(); },
+        focus: () => { hybrid?.resume(); if (!composing && !expanded) begin(); },
+        blur: () => { hybrid?.end(); allowEmpty = false; widget.close(); },
         keydown: event => {
           if (composing || event.isComposing || event.keyCode === 229) return;
           if (event.key === 'Escape') { event.preventDefault(); return; }
           if (event.key === 'Enter') {
             event.preventDefault();
             if (widget.isOpen && widget.feedback?.results.length && widget.cursor >= 0) widget.select(widget.cursor);
+            else if (hybrid?.failed) { hybrid.retry(); begin(true); }
             else if (loadError) { allowEmpty = true; loadCatalogue(); }
             else begin(true);
             return;
@@ -101,10 +116,14 @@
           }
           const base = new URL(picker.dataset.locationBase, location.href);
           const target = new URL(encodeURIComponent(selected.location), base);
-          if (target.origin === location.origin && target.pathname.startsWith(base.pathname)) location.assign(target.href);
+          if (selected.kind === 'restaurant' && /^restaurant-[0-9a-f-]{36}$/i.test(selected.anchor)) target.hash = selected.anchor;
+          if (target.origin === location.origin && target.pathname.startsWith(base.pathname)) {
+            hybrid?.select(selected);
+            location.assign(target.href);
+          }
         },
         open: () => {
-          if ((!search && !loadError) || (!input.value.trim() && !allowEmpty) || document.activeElement !== input) {
+          if ((!search && !loadError && !rows.length && !hybrid?.canRenderEmpty) || (!input.value.trim() && !allowEmpty) || document.activeElement !== input) {
             widget.close(); return;
           }
           panel.hidden = false; panel.inert = false;
@@ -112,6 +131,7 @@
           clearTimeout(closeTimer);
           panel.getBoundingClientRect();
           expanded = true; control.classList.add('is-open');
+          hybrid?.shown(rows);
           requestAnimationFrame(fitResults);
         },
         close: () => {
@@ -135,8 +155,14 @@
       clear.hidden = !input.value;
       allowEmpty = showEmpty;
       if (!input.value.trim() && !showEmpty) { widget.close(); status.textContent = ''; return; }
-      if (composing || (!search && !loadError)) return;
-      rows = search ? (input.value.trim() ? search(input.value) : catalogue).slice(0, 6) : [];
+      if (composing || (!search && !loadError && !hybrid)) return;
+      const local = search ? (input.value.trim() ? search(input.value) : catalogue) : [];
+      const locked = renderedKey === hybrid?.key && widget.isOpen && (widget.cursor >= 0 || widget.list.matches(':hover'));
+      const selected = locked && widget.cursor >= 0 ? widget.feedback?.results[widget.cursor]?.value.id : null;
+      rows = hybrid ? hybrid.merge(local, rows, locked) : local.slice(0, 6);
+      renderedKey = hybrid?.key || '';
+      if (hybrid && !rows.length && !hybrid.canRenderEmpty && !loadError) { widget.close(); return; }
+      restoreId = selected;
       widget.start(input.value);
     }
     async function loadCatalogue() {
@@ -154,7 +180,7 @@
             typeof item.name !== 'string' || typeof item.context !== 'string' ||
             typeof item.location !== 'string' || !item.location)) throw new Error('Invalid catalogue');
         }
-        if (!lifecycle.signal.aborted) search = GuideLocationIndex(catalogue);
+        if (!lifecycle.signal.aborted) { search = GuideLocationIndex(catalogue); hybrid?.localLoaded(); }
       } catch { loadError = true; }
       finally {
         loading = false;
@@ -179,22 +205,29 @@
     choose.addEventListener('click', () => {
       const wasOpen = expanded;
       input.focus();
-      if (!search) { allowEmpty = true; loadCatalogue(); }
+      if (hybrid?.failed) { hybrid.retry(); begin(true); }
+      else if (!search) { allowEmpty = true; loadCatalogue(); }
       else if (wasOpen) widget.close();
       else begin(true);
     });
-    input.addEventListener('compositionstart', () => { composing = true; });
-    input.addEventListener('compositionend', () => { composing = false; begin(); });
-    clear.addEventListener('click', () => { input.value = ''; allowEmpty = false; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
+    input.addEventListener('compositionstart', () => { composing = true; hybrid?.suspend(); });
+    input.addEventListener('compositionend', () => { composing = false; hybrid?.change(input.value); begin(); });
+    clear.addEventListener('click', () => { input.value = ''; hybrid?.change(''); allowEmpty = false; clear.hidden = true; widget.close(); status.textContent = ''; input.focus(); });
     window.addEventListener('resize', fitResults, {signal: lifecycle.signal});
     window.visualViewport?.addEventListener('resize', fitResults, {signal: lifecycle.signal});
     const observer = new ResizeObserver(resizeSurface);
     observer.observe(content);
     document.addEventListener('htmx:beforeCleanupElement', event => {
       if (event.detail.elt === picker || event.detail.elt.contains(picker)) {
-        lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
+        hybrid?.destroy(); lifecycle.abort(); observer.disconnect(); clearTimeout(closeTimer);
       }
     }, {signal: lifecycle.signal});
+    if (picker.dataset.searchUrl && window.GuideHybridSearch) {
+      hybrid = GuideHybridSearch({searchUrl: picker.dataset.searchUrl, eventUrl: picker.dataset.searchEventsUrl,
+        onChange: () => { if (document.activeElement === input) begin(allowEmpty); }});
+      hybrid.change(input.value);
+      window.addEventListener('pagehide', () => hybrid.end('leave'), {signal: lifecycle.signal});
+    }
     resizeSurface();
     loadCatalogue();
   }

@@ -15,7 +15,7 @@
 <h1>Хорошие места.<br>
 <span class="serif">Без лишних слов.</span>
 </h1>
-{%with search_label='Выбор локации', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
+{%with search_label='Поиск локаций и ресторанов', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
 </section>
 <section class="home-reviews" aria-labelledby="home-reviews-title">
 <div class="section-heading"><h2 id="home-reviews-title">Жизнь кипит</h2></div>
@@ -37,5 +37,6 @@
 {% block scripts %}
 <script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
 <script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
+<script defer src="{{settings.path('/assets/location-search/hybrid-search.js')}}"></script>
 <script defer src="{{settings.path('/assets/location-search/location-search.js')}}"></script>
 {% endblock %}
