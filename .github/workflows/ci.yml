@@ -44,38 +44,25 @@ jobs:
           set -euo pipefail
           sha=$(git rev-parse HEAD)
           printf 'sha=%s\nimage=ghcr.io/%s\n' "$sha" "${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - name: Prepare system dependencies from the official Ubuntu archive
-        timeout-minutes: 5
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          set -euo pipefail
-          # The Azure mirror throttled a 9 MB package to more than three minutes.
-          # Change only the hosted CI mirror; Ubuntu package signatures stay verified.
-          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
-            sudo sed -Ei 's#https?://azure\.archive\.ubuntu\.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
-          fi
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-            sudo apt-get "${apt_options[@]}" update
-            sudo env DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: "0.12.23"
-          enable-cache: true
-      # Sherpa's CMake cache retains an isolated build interpreter's temporary path.
-      # A restored uv source/build cache can point to a Python that no longer exists.
-      - run: uv sync --frozen --extra voice-local --no-cache
-      - run: uv run ruff check src tests migrations deploy
-      - run: uv run ruff format --check src tests migrations deploy
-      - run: uv run mypy
-      - run: uv run playwright install --with-deps chromium
-      - run: uv run pytest -q tests/unit tests/integration tests/e2e tests/deployment
-        env:
-          CHROMIUM_PATH: ""
       - uses: docker/setup-buildx-action@v3
+      - name: Build cached test environment
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          load: true
+          platforms: linux/amd64
+          provenance: false
+          tags: involta-guide:test
+          cache-from: |
+            type=gha,scope=test-linux-amd64
+            type=gha,scope=production-linux-amd64
+          cache-to: type=gha,scope=test-linux-amd64,mode=max,ignore-error=true
+      - run: deploy/test-container.sh ruff check src tests migrations deploy
+      - run: deploy/test-container.sh ruff format --check src tests migrations deploy
+      - run: deploy/test-container.sh mypy
+      - name: Run full test suite
+        run: deploy/test-container.sh pytest -q tests/unit tests/integration tests/e2e tests/deployment --durations=25
       - id: build
         name: Build the production image once
         uses: docker/build-push-action@v6
@@ -90,26 +77,28 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ steps.revision.outputs.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha,scope=production-linux-amd64
+          cache-from: |
+            type=gha,scope=production-linux-amd64
+            type=gha,scope=test-linux-amd64
           cache-to: type=gha,scope=production-linux-amd64,mode=max,ignore-error=true
       - id: identity
         name: Record the exact image that will be tested
         run: echo "image_id=$(docker image inspect --format '{{.Id}}' involta-guide:ci)" >> "$GITHUB_OUTPUT"
       - name: Verify installed code, resources and runtime
-        run: uv run python tests/deployment/image_smoke.py
+        run: deploy/test-container.sh python tests/deployment/image_smoke.py
       - name: Verify current-state cutover and real database rollback
-        run: uv run python tests/deployment/current_state_smoke.py
+        run: deploy/test-container.sh python tests/deployment/current_state_smoke.py
       - name: Verify combined Voice and shared database
-        run: uv run python tests/deployment/voice_stack_smoke.py
+        run: deploy/test-container.sh python tests/deployment/voice_stack_smoke.py
         env:
           VOICE_TEST_IMAGE: involta-guide:ci
       - name: Validate generated routes with real nginx
-        run: uv run python tests/deployment/nginx_smoke.py
+        run: deploy/test-container.sh python tests/deployment/nginx_smoke.py
       - name: Check deployment shell scripts
         run: |
           bash -n deploy/*.sh
           shellcheck --severity=warning deploy/*.sh
-      - run: uv run python -m compileall -q deploy
+      - run: deploy/test-container.sh python -m compileall -q deploy
       - name: Validate workflows
         env:
           GOTOOLCHAIN: auto

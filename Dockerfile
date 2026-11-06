@@ -22,6 +22,25 @@ RUN --mount=type=secret,id=proxy_ca \
     uv sync --frozen --extra voice-local --no-dev --no-install-project --no-cache \
     && chmod -R a+rX /app/.venv
 
+# Cached tooling branches from the exact production dependencies. Source is mounted
+# at test time: editing Python, templates or tests cannot invalidate this layer.
+FROM dependencies AS test
+ENV PATH="/app/.venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
+    CHROMIUM_PATH=/usr/bin/chromium
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca GIT_SSL_CAINFO=/run/secrets/proxy_ca CMAKE_TLS_CAINFO=/run/secrets/proxy_ca; fi; \
+    uv sync --frozen --extra voice-local --no-install-project --no-cache
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    playwright install --with-deps chromium \
+    && ln -s "$(find /opt/playwright -path '*/chrome-linux*/chrome' -type f | head -n 1)" /usr/bin/chromium \
+    && chmod -R a+rX /opt/playwright
+CMD ["pytest", "-q", "tests/unit", "tests/integration", "tests/e2e", "tests/deployment"]
+
 # Install application metadata and entry points separately from the large venv.
 # Exclusions are relative to src; frontend edits must not rebuild this stage.
 FROM dependencies AS application
