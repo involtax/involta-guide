@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any
 
 from .asr import VAD, decode
+from .audio_chunks import fragmented_speech, pack_speech
 from .config import Settings
 from .provider import ProviderFailure
 from .sherpa_tokenizer import ENCODING, TOKENIZER_SHA256, VOCAB_FILE, VOCAB_SHA256, vocabulary
@@ -18,6 +19,7 @@ from .variants import COMMON_RECOGNITION_NAMES, SHERPA_PROFILES, dictionary_name
 # Includes the NeMo TDT beam-search/length-reward fix, upstream PR #4084.
 RUNTIME_REVISION = "3898de1380029e96a3b0a3df9e21e3f5ee5eb7fb"
 VAD_TAIL_CONTEXT = "short-tail-context-v1"
+SPEECH_CHUNKING = "fragmented-pauses-v1"
 MODELS: dict[str, dict[str, Any]] = {
     "gigaam": {
         "repository": "csukuangfj/sherpa-onnx-nemo-transducer-punct-giga-am-v3-russian-2025-12-16",
@@ -66,6 +68,8 @@ def options(
         "max_speech_duration_s": 20,
         "min_silence_duration_ms": 500,
         "vad_tail_context": VAD_TAIL_CONTEXT,
+        "speech_chunking": SPEECH_CHUNKING,
+        "max_pause_ms": 300,
         "preprocessing": "av-mono-16k-v1",
     }
 
@@ -130,6 +134,15 @@ class LocalSherpa:
             gc.collect()
 
     def warmup(self, request: dict[str, Any]) -> None:
+        if type(request.get("force_speech_packing", False)) is not bool:
+            raise ProviderFailure("Неизвестный режим сборки речевых блоков")
+        if request.get("speech_chunking") not in (None, SPEECH_CHUNKING):
+            raise ProviderFailure("Неизвестная версия сборки речевых блоков")
+        if request.get("speech_chunking") is not None and (
+            type(request.get("max_pause_ms")) is not int
+            or request["max_pause_ms"] not in (200, 300, 500)
+        ):
+            raise ProviderFailure("Неизвестная длина паузы речевого блока")
         if request.get("vad_tail_context") not in (None, VAD_TAIL_CONTEXT):
             raise ProviderFailure("Неизвестная версия обработки хвоста VAD")
         engine = str(request.get("model") or "")
@@ -238,15 +251,57 @@ class LocalSherpa:
                     if request.get("vad_tail_context") == VAD_TAIL_CONTEXT
                     else vad_segments
                 )
+                packing = request.get("speech_chunking") == SPEECH_CHUNKING and (
+                    request.get("force_speech_packing", False)
+                    or fragmented_speech(vad_segments, request["sample_rate"])
+                )
+                chunks = (
+                    pack_speech(
+                        vad_segments,
+                        request["sample_rate"],
+                        min(request["max_speech_duration_s"], 20),
+                        request["max_pause_ms"],
+                    )
+                    if packing
+                    else [[segment] for segment in segments]
+                )
                 parts: list[dict[str, Any]] = []
-                for start, end in segments:
+                input_samples = 0
+                for ranges in chunks:
+                    samples = (
+                        np.concatenate([waveform[start:end] for start, end in ranges])
+                        if len(ranges) > 1
+                        else waveform[ranges[0][0] : ranges[0][1]]
+                    )
                     stream = self._model.create_stream()
                     stream.set_option("length_reward", str(request["length_reward"]))
-                    stream.accept_waveform(16000, waveform[start:end])
+                    stream.accept_waveform(16000, samples)
                     self._model.decode_stream(stream)
-                    parts.append(
-                        {"start": start / 16000, "end": end / 16000, "text": stream.result.text}
-                    )
+                    part = {
+                        "start": ranges[0][0] / 16000,
+                        "end": ranges[-1][1] / 16000,
+                        "text": stream.result.text,
+                    }
+                    if packing:
+                        offset = 0
+                        mapping = []
+                        for start, end in ranges:
+                            mapping.append(
+                                {
+                                    "source_start": start / 16000,
+                                    "source_end": end / 16000,
+                                    "input_start": offset / 16000,
+                                    "input_end": (offset + end - start) / 16000,
+                                }
+                            )
+                            offset += end - start
+                        part.update(
+                            source_ranges=mapping,
+                            input_duration=len(samples) / 16000,
+                            pcm_sha256=hashlib.sha256(samples.tobytes()).hexdigest(),
+                        )
+                    input_samples += len(samples)
+                    parts.append(part)
                 text = " ".join(p["text"].strip() for p in parts if p["text"].strip())
                 if not text or not any(c.isalnum() for c in text):
                     raise ProviderFailure("Речь не обнаружена")
@@ -260,13 +315,15 @@ class LocalSherpa:
                     "audio_sha256": hashlib.sha256(audio).hexdigest(),
                     "pcm_sha256": hashlib.sha256(waveform.tobytes()).hexdigest(),
                     "duration": len(waveform) / 16000,
+                    "asr_input_seconds": input_samples / 16000,
                     "elapsed_seconds": time.monotonic() - started,
                     "inference_seconds": time.monotonic() - loaded,
                     "segments": parts,
                     "vad_segments": [
                         {"start": start / 16000, "end": end / 16000} for start, end in vad_segments
                     ],
-                    "vad_tail_context_applied": segments != vad_segments,
+                    "vad_tail_context_applied": not packing and segments != vad_segments,
+                    "speech_chunking_applied": packing,
                     "settings": request,
                 }
                 return {
