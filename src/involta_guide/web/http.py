@@ -4,8 +4,37 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
 from starlette.datastructures import FormData
+from starlette.responses import Response
 
 from .context import Context
+
+RECENT_LOCATIONS_COOKIE = "guide_recent_locations"
+RECENT_LOCATIONS_LIMIT = 20
+
+
+def remember_location(request: Request, response: Response, location_id: int) -> None:
+    value = request.cookies.get(RECENT_LOCATIONS_COOKIE, "")
+    recent = [location_id]
+    # Twenty positive PostgreSQL integer IDs need at most 219 characters with separators.
+    if len(value) <= 219:
+        for part in value.split("."):
+            if not part.isascii() or not part.isdecimal():
+                continue
+            key = int(part)
+            if 0 < key <= 2147483647 and key not in recent:
+                recent.append(key)
+            if len(recent) == RECENT_LOCATIONS_LIMIT:
+                break
+    settings = context(request).settings
+    response.set_cookie(
+        RECENT_LOCATIONS_COOKIE,
+        ".".join(str(key) for key in recent),
+        max_age=90 * 86400,
+        path=settings.base_path,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+    )
 
 
 def context(request: Request) -> Context:
