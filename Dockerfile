@@ -39,6 +39,9 @@ RUN --mount=type=secret,id=proxy_ca \
     playwright install --with-deps chromium \
     && ln -s "$(find /opt/playwright -path '*/chrome-linux*/chrome' -type f | head -n 1)" /usr/bin/chromium \
     && chmod -R a+rX /opt/playwright
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 CMD ["pytest", "-q", "tests/unit", "tests/integration", "tests/e2e", "tests/deployment"]
 
 # Install application metadata and entry points separately from the large venv.
