@@ -1,0 +1,102 @@
+{
+  "name": "Руна",
+  "status": "verified",
+  "reason": "Официальный сайт подтверждает ресторан и приём гостей без проживания. Адрес Кажма, 74, телефон и карта относятся к ресторану отеля «Заонежье» в Медвежьегорском районе.",
+  "exclusionCode": null,
+  "verificationIssues": [],
+  "cuisine": "Современная северная и карельская кухня",
+  "description": "В деревне Кажма, при отеле «Заонежье», готовят северные блюда в современном прочтении. Здесь можно попробовать лохикейто и карельские калитки; ресторан открыт и для гостей без проживания.",
+  "mapsUrl": "https://yandex.com/maps/org/runa/189406320983/",
+  "phone": "+79212255087",
+  "sources": [
+    "https://zaonezhie.com/restaurant",
+    "https://zaonezhie.com/contacts",
+    "https://yandex.com/maps/org/runa/189406320983/",
+    "https://yandex.com/maps/org/runa/189406320983/reviews/",
+    "https://ticrk.ru/regions/region/?ID=7511"
+  ],
+  "openingHours": null,
+  "latitude": null,
+  "longitude": null,
+  "scores": {
+    "food": 8,
+    "consistency": 6,
+    "identity": 8,
+    "localConnection": 9,
+    "atmosphere": 8,
+    "service": 6,
+    "value": 6,
+    "destination": 8
+  },
+  "evidence": [
+    {
+      "factor": "food",
+      "reason": "В отзывах отмечены рыба, тартар и выразительные блюда; есть и конкретная претензия к пересолу.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "consistency",
+      "reason": "Положительные отзывы от 11.08.2025 и 04.12.2025 соседствуют с отзывом от 03.12.2025 о неравномерности блюд.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "identity",
+      "reason": "Северная кухня соединяется с современной интерпретацией; гости отдельно отмечают характер блюд.",
+      "confidence": "medium",
+      "sourceRefs": [
+        1,
+        4
+      ]
+    },
+    {
+      "factor": "localConnection",
+      "reason": "Меню строится вокруг карельских блюд и местных продуктов; региональный характер замечают и гости.",
+      "confidence": "medium",
+      "sourceRefs": [
+        1,
+        4
+      ]
+    },
+    {
+      "factor": "atmosphere",
+      "reason": "Деревянный интерьер, камин и камерная обстановка подтверждены отзывами; данных об акустике мало.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "service",
+      "reason": "Есть свидетельства внимательного приёма, но также жалобы на коммуникацию и несогласованное время питания.",
+      "confidence": "medium",
+      "sourceRefs": [
+        4
+      ]
+    },
+    {
+      "factor": "value",
+      "reason": "На карте ориентир 1000–3500 рублей; впечатления о соответствии расходов качеству расходятся.",
+      "confidence": "medium",
+      "sourceRefs": [
+        3,
+        4
+      ]
+    },
+    {
+      "factor": "destination",
+      "reason": "Самостоятельный ресторан северной кухни дополняет поездку по Заонежью и принимает внешних гостей.",
+      "confidence": "medium",
+      "sourceRefs": [
+        1,
+        4,
+        5
+      ]
+    }
+  ]
+}
