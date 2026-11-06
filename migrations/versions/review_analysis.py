@@ -27,7 +27,7 @@ def upgrade() -> None:
       value smallint NOT NULL CHECK(value IN (-1,1)),
       PRIMARY KEY(review_id,restaurant_id)
     );
-    CREATE FUNCTION apply_review_vote() RETURNS trigger LANGUAGE plpgsql AS $$
+    CREATE OR REPLACE FUNCTION apply_review_vote() RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE target uuid; delta integer;
     BEGIN
       IF TG_OP='DELETE' THEN target=OLD.restaurant_id; delta=-OLD.value;
@@ -38,7 +38,7 @@ def upgrade() -> None:
     END $$;
     CREATE TRIGGER review_vote_total AFTER INSERT OR DELETE ON review_restaurant_votes
       FOR EACH ROW EXECUTE FUNCTION apply_review_vote();
-    CREATE FUNCTION invalidate_review_analysis() RETURNS trigger LANGUAGE plpgsql AS $$
+    CREATE OR REPLACE FUNCTION invalidate_review_analysis() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
       IF NEW.status='deleted' OR OLD.transcript IS DISTINCT FROM NEW.transcript THEN
         DELETE FROM review_restaurant_votes WHERE review_id=NEW.id;

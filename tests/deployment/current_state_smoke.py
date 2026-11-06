@@ -42,7 +42,7 @@ def main() -> None:
         }
     }
     docker = ["docker", "--host=unix:///var/run/docker.sock"]
-    for previous in ["review_urls", "beta_core"]:
+    for previous in ["review_urls", "beta_core", "hybrid_search"]:
         schema = "test_release_" + uuid4().hex
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
@@ -98,7 +98,7 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 conn.execute(
                     "INSERT INTO locations(id,name,region,slug,intro) VALUES(%s,'Current city','Region','current-city','Current intro')",
-                    (location_id := str(uuid4()),),
+                    (location_id := 900001 if previous == "hybrid_search" else str(uuid4()),),
                 )
                 if previous == "beta_core":
                     conn.execute(
@@ -113,7 +113,7 @@ def main() -> None:
                 conn.execute("CREATE TABLE unrelated_original(payload text)")
                 conn.execute("INSERT INTO unrelated_original VALUES('before')")
             assert call([*backup_command, "needed"]).strip() == (
-                b"yes" if previous == "beta_core" else b"manual-beta-transition"
+                b"manual-beta-transition" if previous == "review_urls" else b"yes"
             )
             dump = call([*backup_command, "backup"])
             assert dump.startswith(b"PGDMP")
@@ -175,8 +175,26 @@ def main() -> None:
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
                     == previous
                 )
-                assert conn.execute("SELECT to_regclass('audience_daily')").fetchone()[0] is None
-                assert conn.execute("SELECT to_regclass('search_attempts')").fetchone()[0] is None
+                if previous == "hybrid_search":
+                    assert conn.execute("SELECT count(*) FROM audience_daily").fetchone()[0] == 0
+                    assert conn.execute("SELECT count(*) FROM search_attempts").fetchone()[0] == 0
+                else:
+                    assert (
+                        conn.execute("SELECT to_regclass('audience_daily')").fetchone()[0] is None
+                    )
+                    assert (
+                        conn.execute("SELECT to_regclass('search_attempts')").fetchone()[0] is None
+                    )
+                assert (
+                    conn.execute("SELECT to_regprocedure('apply_review_vote()')").fetchone()[0]
+                    is None
+                )
+                assert (
+                    conn.execute(
+                        "SELECT to_regprocedure('invalidate_review_analysis()')"
+                    ).fetchone()[0]
+                    is None
+                )
                 assert conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
                 if previous == "beta_core":
                     row = conn.execute(
@@ -196,6 +214,16 @@ def main() -> None:
                     conn.execute("SELECT payload FROM unrelated_original").fetchone()[0]
                     == "changed independently"
                 )
+            if previous == "hybrid_search":
+                call(["alembic", "upgrade", "head"])
+                assert call([*backup_command, "needed"]).strip() == b"no"
+                with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                    assert (
+                        conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
+                    )
+                    assert conn.execute("SELECT to_regprocedure('apply_review_vote()')").fetchone()[
+                        0
+                    ]
             print(
                 previous + ": real backup, cutover, atomic refusal and restore passed", flush=True
             )
