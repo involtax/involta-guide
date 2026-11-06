@@ -129,6 +129,12 @@ h4 {
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
 }
+.header-admin-link {
+  font-size: 12px;
+  white-space: nowrap;
+  margin-left: 12px;
+  padding: 8px 0;
+}
 .brand {
   font-size: 28px;
   letter-spacing: -1.5px;
