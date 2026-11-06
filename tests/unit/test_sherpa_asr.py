@@ -9,7 +9,7 @@ import pytest
 from involta_voice.asr import VAD
 from involta_voice.config import Settings
 from involta_voice.provider import ProviderFailure
-from involta_voice.sherpa import VAD_TAIL_CONTEXT, LocalSherpa, model_path, options
+from involta_voice.sherpa import SPEECH_CHUNKING, VAD_TAIL_CONTEXT, LocalSherpa, model_path, options
 from involta_voice.sherpa_tokenizer import VOCAB_FILE, tokenizer, vocabulary
 from involta_voice.variants import SHERPA_PROFILES
 
@@ -42,6 +42,9 @@ def test_sherpa_comparison_changes_only_dictionary_not_search_or_preprocessing(t
         "сыроварня",
     ]
     assert biased["decoding_method"] == "modified_beam_search"
+    assert biased["speech_chunking"] == SPEECH_CHUNKING
+    assert biased["max_pause_ms"] == 300
+    assert "force_speech_packing" not in biased
     names.append("Не должно попасть в запрос")
     assert len(biased["dictionary"]) == 8
 
@@ -56,8 +59,9 @@ def test_missing_models_are_reported_before_import_or_any_download(tmp_path):
 
 @pytest.mark.parametrize("variant", list(SHERPA_PROFILES))
 @pytest.mark.parametrize("tail_policy", [None, VAD_TAIL_CONTEXT])
+@pytest.mark.parametrize("pack_mode", [None, "adaptive", "all"])
 def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
-    tmp_path, monkeypatch, variant, tail_policy
+    tmp_path, monkeypatch, variant, tail_policy, pack_mode
 ):
     from involta_voice import sherpa
 
@@ -66,6 +70,12 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     request = options(config, engine, variant, ["Алхимист", "Бар / Кухня"], location_name="Плёс")
     if tail_policy is None:
         request.pop("vad_tail_context")
+    packing = pack_mode == "all"
+    if packing:
+        request.update(speech_chunking=SPEECH_CHUNKING, max_pause_ms=300, force_speech_packing=True)
+    elif pack_mode is None:
+        request.pop("speech_chunking")
+        request.pop("max_pause_ms")
     for path in (model_path(config, engine), config.asr_models_dir / "vad" / VAD["revision"]):
         path.mkdir(parents=True)
         (path / "READY.json").write_text("{}")
@@ -145,16 +155,30 @@ def test_sherpa_uses_cpu_dictionary_file_same_vad_segments_and_saved_settings(
     assert result["pcm_sha256"] == hashlib.sha256(waveform.tobytes()).hexdigest()
     assert result["audio_sha256"] == hashlib.sha256(b"private fixture").hexdigest()
     assert result["vad_segments"] == [{"start": 0, "end": 0.5}, {"start": 0.75, "end": 1}]
-    assert result["vad_tail_context_applied"] == (tail_policy is not None)
+    assert result["vad_tail_context_applied"] == (not packing and tail_policy is not None)
+    assert result["speech_chunking_applied"] == packing
     assert result["segments"] == (
-        [{"start": 0, "end": 1, "text": "Ресторан Алхимист."}]
+        [
+            {
+                "start": 0,
+                "end": 1,
+                "text": "Ресторан Алхимист.",
+                "input_duration": 1,
+                "pcm_sha256": result["pcm_sha256"],
+                "source_ranges": [
+                    {"source_start": 0, "source_end": 1, "input_start": 0, "input_end": 1}
+                ],
+            }
+        ]
+        if packing
+        else [{"start": 0, "end": 1, "text": "Ресторан Алхимист."}]
         if tail_policy
         else [
             {"start": 0, "end": 0.5, "text": "Ресторан Алхимист."},
             {"start": 0.75, "end": 1, "text": "Ресторан Алхимист."},
         ]
     )
-    assert accepted_lengths == ([16000] if tail_policy else [8000, 4000])
+    assert accepted_lengths == ([16000] if packing or tail_policy else [8000, 4000])
     from pathlib import Path
 
     if captured["hotwords_file"]:
@@ -216,3 +240,56 @@ def test_unknown_tail_policy_fails_before_loading_models(tmp_path):
     request["vad_tail_context"] = "unknown-v9"
     with pytest.raises(ProviderFailure, match="Неизвестная версия"):
         LocalSherpa(settings(tmp_path)).call(request, b"not-an-audio")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"speech_chunking": "unknown"},
+        {"speech_chunking": SPEECH_CHUNKING},
+        {"speech_chunking": SPEECH_CHUNKING, "max_pause_ms": -1},
+        {"speech_chunking": SPEECH_CHUNKING, "max_pause_ms": "300"},
+        {"speech_chunking": SPEECH_CHUNKING, "max_pause_ms": True},
+        {"force_speech_packing": "true"},
+    ],
+)
+def test_unknown_chunk_policy_fails_before_loading_models(tmp_path, fields):
+    request = options(settings(tmp_path), "gigaam", "sherpa_hotwords_strong", [])
+    request.pop("max_pause_ms")
+    request.update(fields)
+    with pytest.raises(ProviderFailure, match="Неизвестн"):
+        LocalSherpa(settings(tmp_path)).call(request, b"not-an-audio")
+
+
+def test_packed_runtime_maps_original_samples_to_shortened_timeline(tmp_path, monkeypatch):
+    from involta_voice import sherpa
+
+    config = settings(tmp_path)
+    request = options(config, "gigaam", "sherpa_hotwords_strong", [])
+    request.update(speech_chunking=SPEECH_CHUNKING, max_pause_ms=300, force_speech_packing=True)
+    waveform = np.arange(48000, dtype=np.float32)
+    monkeypatch.setattr(sherpa, "decode", lambda audio: waveform)
+    local = LocalSherpa(config)
+    monkeypatch.setattr(local, "warmup", lambda request: None)
+    local._vad = SimpleNamespace(
+        segment_batch=lambda *args, **kw: iter([[(0, 8000), (40000, 48000)]])
+    )
+    received = []
+    stream = SimpleNamespace(
+        result=SimpleNamespace(text="Целая фраза."),
+        set_option=lambda *args: None,
+        accept_waveform=lambda rate, samples: received.append(samples),
+    )
+    local._model = SimpleNamespace(create_stream=lambda: stream, decode_stream=lambda stream: None)
+    body = json.loads(local.call(request, b"original")["body"])
+    expected = np.concatenate([waveform[:10400], waveform[37600:]])
+    np.testing.assert_array_equal(received[0], expected)
+    assert body["duration"] == 3
+    assert body["asr_input_seconds"] == 1.3
+    assert body["pcm_sha256"] == hashlib.sha256(waveform.tobytes()).hexdigest()
+    part = body["segments"][0]
+    assert part["pcm_sha256"] == hashlib.sha256(expected.tobytes()).hexdigest()
+    assert part["source_ranges"] == [
+        {"source_start": 0, "source_end": 0.65, "input_start": 0, "input_end": 0.65},
+        {"source_start": 2.35, "source_end": 3, "input_start": 0.65, "input_end": 1.3},
+    ]
