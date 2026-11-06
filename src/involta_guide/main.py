@@ -93,7 +93,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     directory = Path(__file__).parent / "web"
-    app.state.templates = Jinja2Templates(directory=directory / "templates")
+
+    def public_header_context(request: Request) -> dict[str, bool]:
+        admin_path = settings.path("/admin")
+        if request.url.path == admin_path or request.url.path.startswith(admin_path + "/"):
+            return {"show_admin_link": False}
+        token = request.cookies.get("guide_admin")
+        return {"show_admin_link": ctx.security.principal(token) is not None}
+
+    app.state.templates = Jinja2Templates(
+        directory=directory / "templates", context_processors=[public_header_context]
+    )
     app.state.templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
     app.mount(settings.path("/assets"), StaticFiles(directory=directory / "static"), name="assets")
     assert involta_voice.__file__ is not None
