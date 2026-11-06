@@ -294,6 +294,9 @@ main {
   transform: translateX(3px);
 }
 footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
   max-width: 1232px;
   margin: 0 auto;
   border-top: 1px solid var(--line);
