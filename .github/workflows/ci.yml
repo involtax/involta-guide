@@ -159,7 +159,10 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: var/test-results/
+          path: |
+            var/test-results/summary.json
+            var/test-results/*/pytest.log
+            var/test-results/*/junit.xml
           if-no-files-found: ignore
           retention-days: 7
           overwrite: true
