@@ -4,6 +4,7 @@ import os
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import psycopg
+import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -84,6 +85,7 @@ def test_nearby_is_directed_and_settings_save_does_not_clear_it(database):
         assert 'id="nearby-title"' not in client.get("/guide/kostroma").text
 
 
+@pytest.mark.full_catalog
 def test_git_lists_replace_db_lists_without_overwriting_content(database):
     settings, engine = database
     catalog = load_catalog(settings.root_dir)

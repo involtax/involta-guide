@@ -46,9 +46,11 @@ GHCR и production Docker передают только отсутствующи
 текста меняет маленький слой, но остаётся полноценным релизом: обязательные тесты,
 новый manifest/digest, замена своих контейнеров и проверки. Горячего редактирования
 production-файлов и отдельной несогласованной версии шаблонов нет.
-Полный pytest продолжает выполняться на каждом CI. Docker cache хранит окружение,
-но никогда не результаты тестов. Длительности 25 самых медленных тестов печатаются
-в логе pytest для следующего этапа оптимизации.
+Все проверки приложения и браузера выполняются на каждом CI; дополнительные
+проверки контроллера деплоя и исторических откатов зависят от затронутых файлов.
+Неопределённость означает полный профиль. Две группы могут работать параллельно.
+Docker cache хранит окружение, но никогда не результаты тестов. Правила выбора,
+небольшие фикстуры БД и отчёты: [TESTING.md](TESTING.md).
 
 Для проверки слоёв собери базовый образ, затем в отдельной копии исходников
 добавь комментарий в один Jinja-шаблон и собери probe. `docker image inspect`
@@ -88,10 +90,10 @@ runner и предназначен только для одноразового 
 ```sh
 docker build --target test -t involta-guide:test .
 export TEST_DATABASE_URL=postgresql://test:test@127.0.0.1:5432/guide_test
-deploy/test-container.sh pytest -q tests/unit tests/integration tests/e2e tests/deployment --durations=25
+deploy/test-container.sh python deploy/run_tests.py --profile full
 ```
 
 В managed cloud передавай доверенный CA через `--secret id=proxy_ca,src=...`.
 Сокет Docker и Compose plugin должны быть доступны. Никакой установки Python-
 зависимостей на хосте больше не требуется. Shellcheck, actionlint и проверка
-Compose остаются на runner; проверки Python и production-контейнеров — в target `test`.
+Compose полного профиля остаются на runner; проверки Python и production-контейнеров — в target `test`.

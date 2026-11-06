@@ -6,12 +6,15 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import psycopg
+import pytest
 from alembic import command
 from alembic.config import Config
 from psycopg import sql
 from sqlalchemy import text
 
 from involta_guide.infrastructure.persistence.unit_of_work import create_database
+
+pytestmark = pytest.mark.full_catalog
 
 
 def test_numeric_identity_survives_catalogue_url_change_and_manual_slug(database, monkeypatch):

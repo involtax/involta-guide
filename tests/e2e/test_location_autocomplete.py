@@ -1,6 +1,7 @@
 import json
 import os
 
+import pytest
 from integration.editor_fixture import FixtureEditor
 from integration.test_editorial import CONTENT
 from integration.test_location_search import add_location
@@ -12,6 +13,8 @@ from involta_guide.domain.location_search import search_locations
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
 from involta_guide.infrastructure.security import Security
 from involta_guide.main import create_app
+
+pytestmark = pytest.mark.full_catalog
 
 
 def test_picker_button_keyboard_and_touch_never_open_a_results_page(database, tmp_path):

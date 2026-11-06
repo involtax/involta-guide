@@ -77,6 +77,7 @@ def test_shared_restaurants_use_current_data_and_reject_foreign_ids(database):
     assert queries.get("restaurants", card["id"])["location_id"] == first["id"]
 
 
+@pytest.mark.full_catalog
 def test_location_alias_cycles_visibility_and_shared_direction(database):
     from sqlalchemy.exc import IntegrityError
 
