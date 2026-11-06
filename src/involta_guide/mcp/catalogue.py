@@ -9,6 +9,7 @@ from involta_guide.application.services.editorial import current_content
 from involta_guide.config import Settings
 from involta_guide.infrastructure.persistence.repositories.public_catalogue import PUBLIC
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow
+from involta_guide.review_analysis.visibility import PUBLIC_REVIEW
 
 from .models import (
     LocationCard,
@@ -92,8 +93,8 @@ class PublicGuide:
                 self.reference(visible[key]) for key in row["nearby_location_ids"] if key in visible
             ]
             reviews = repo.query(
-                """SELECT id::text,transcript,created_at,count(*) OVER() total FROM reviews
-                WHERE location_id=:id AND publication_status=1 AND status IN ('received','transcribed')
+                f"""SELECT id::text,coalesce(edited_text,transcript) transcript,created_at,count(*) OVER() total FROM reviews r
+                WHERE location_id=:id AND {PUBLIC_REVIEW}
                 AND nullif(btrim(transcript),'') IS NOT NULL
                 ORDER BY created_at DESC,number DESC LIMIT 10""",
                 {"id": row["id"]},

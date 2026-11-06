@@ -5,6 +5,7 @@ from sqlalchemy import Engine, text
 
 from involta_guide.domain.entities import NotFound
 from involta_guide.infrastructure.persistence.repositories.public_catalogue import PUBLIC
+from involta_guide.review_analysis.visibility import PUBLIC_REVIEW
 from involta_voice.db import row
 
 
@@ -63,10 +64,10 @@ class VoiceReadModel:
             return [
                 dict(r)
                 for r in conn.execute(
-                    text("""SELECT id::text reference,
+                    text(f"""SELECT r.id::text reference,
                 coalesce(edited_text,transcript) transcript,author_name,created_at,number,publication_status,
                 CASE WHEN status='transcribed' THEN 'result_ready' ELSE 'accepted' END state
-                FROM reviews WHERE location_id=:location AND publication_status=1 AND status IN ('received','transcribed')
+                FROM reviews r WHERE location_id=:location AND {PUBLIC_REVIEW}
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
                     {"location": location_id},
                 ).mappings()
@@ -80,7 +81,7 @@ class VoiceReadModel:
                     text(f"""SELECT coalesce(r.edited_text,r.transcript) transcript,r.created_at,r.number,
                     l.name location_name,l.slug location_slug
                     FROM reviews r JOIN locations l ON l.id=r.location_id
-                    WHERE r.publication_status=1 AND r.status IN ('received','transcribed')
+                    WHERE {PUBLIC_REVIEW}
                     AND l.active=1 AND {PUBLIC}
                     ORDER BY r.created_at DESC,r.number DESC LIMIT 10""")
                 ).mappings()
@@ -94,7 +95,7 @@ class VoiceReadModel:
                 str(r["id"]): r["publication_status"]
                 for r in conn.execute(
                     text(
-                        "SELECT id,publication_status FROM reviews WHERE location_id=:location AND id=ANY(CAST(:references AS uuid[]))"
+                        f"SELECT r.id,CASE WHEN {PUBLIC_REVIEW} THEN 1 ELSE 0 END publication_status FROM reviews r WHERE location_id=:location AND id=ANY(CAST(:references AS uuid[]))"
                     ),
                     {"location": location_id, "references": references},
                 ).mappings()
