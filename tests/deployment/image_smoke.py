@@ -7,10 +7,12 @@ import subprocess
 from pathlib import Path
 
 CHECK = """
-import hashlib, importlib, importlib.metadata, json, os, shutil, subprocess, sys
+import hashlib, importlib, importlib.metadata, importlib.util, json, os, shutil, subprocess, sys
 from pathlib import Path
 assert os.getuid() == 10001
 assert shutil.which("uv") is None and shutil.which("gcc") is None
+for tool in ("pytest", "playwright", "mypy", "ruff"):
+    assert importlib.util.find_spec(tool) is None, f"Test tooling leaked into production: {tool}"
 expected = json.load(sys.stdin)
 for relative, digest in expected.items():
     package, name = relative.split("/", 1)
