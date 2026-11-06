@@ -143,6 +143,8 @@ def routes(prefix: str) -> APIRouter:
             + escape(ctx.settings.url("/"))
             + "</loc></url><url><loc>"
             + escape(ctx.settings.url("/about"))
+            + "</loc></url><url><loc>"
+            + escape(ctx.settings.url("/for-agents"))
             + "</loc></url>"
         )
         body += (

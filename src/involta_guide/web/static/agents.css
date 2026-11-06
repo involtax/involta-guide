@@ -1,0 +1,24 @@
+.agents-page { max-width:860px;padding:64px 40px 80px;margin:auto;font-size:16px; }
+.agents-page h1 { font-size:72px;font-weight:400;line-height:1.02;letter-spacing:-4px;margin-bottom:28px; }
+.agents-page h1 em { font-family:Georgia,serif;font-weight:400; }
+.agents-lead { max-width:620px;font-size:19px;line-height:1.5; }
+.agents-endpoint { margin:34px 0 42px;padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line); }
+.agents-label { font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase; }
+.agents-page code,.agents-page pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+.agents-endpoint code { display:block;font-size:18px;overflow-wrap:anywhere;margin:7px 0; }
+.agents-page section { margin:36px 0; }
+.agents-page h2 { font-size:25px;letter-spacing:-.7px;font-weight:400;margin-bottom:12px; }
+.agents-page p { margin-bottom:14px; }
+.agents-page pre { font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;border-left:2px solid var(--line);padding-left:18px; }
+.agents-config { margin-bottom:20px; }
+.agents-config summary { cursor:pointer;text-decoration:underline;text-underline-offset:4px; }
+.agents-config p { margin-top:15px;font-size:14px; }
+.agents-links { display:flex;flex-wrap:wrap;gap:20px;margin-top:42px;font-size:13px; }
+.agents-links a { text-decoration:underline;text-underline-offset:4px; }
+@media(max-width:650px) {
+  .agents-page { padding:42px 25px 60px; }
+  .agents-page h1 { font-size:46px;letter-spacing:-2.5px; }
+  .agents-lead { font-size:17px; }
+  .agents-endpoint code { font-size:15px; }
+  .agents-page h2 { font-size:23px; }
+}

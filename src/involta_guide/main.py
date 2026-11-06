@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.routing import Route
 
 import involta_voice
 from involta_guide.application.services.jobs import JobService
@@ -18,7 +19,15 @@ from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, c
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
 from involta_guide.web.context import Context
 from involta_guide.web.middleware.audience import AudienceStats
-from involta_guide.web.routes import admin, admin_content, public, search, voice, voice_admin
+from involta_guide.web.routes import (
+    admin,
+    admin_content,
+    agents,
+    public,
+    search,
+    voice,
+    voice_admin,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -37,12 +46,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         JobService(factory, provider, public_fill_enabled=settings.temporary_public_fill_enabled),
         Security(settings, factory),
     )
+    from involta_guide.mcp.server import create_server
+
+    mcp_server, mcp_app = create_server(engine, settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        yield
-        provider.close()
-        engine.dispose()
+        try:
+            async with mcp_server.session_manager.run():
+                yield
+        finally:
+            provider.close()
+            engine.dispose()
 
     app = FastAPI(
         lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False
@@ -57,6 +72,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from starlette.concurrency import run_in_threadpool
 
         response = await call_next(request)
+        if request.url.path == settings.path("/mcp"):
+            response.headers.update({"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+            return response
         token = request.cookies.get("guide_admin", "")
         if (
             token
@@ -151,6 +169,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Specific review diagnostics must precede generic /logs/{slug} routes.
     app.include_router(voice_admin.routes(settings.base_path))
     app.include_router(search.routes(settings.base_path))
+    # Exact ASGI route preserves /guide/mcp without a trailing-slash redirect.
+    app.router.routes.append(
+        Route(settings.path("/mcp"), mcp_app, methods=["GET", "POST", "DELETE"])
+    )
+    app.include_router(agents.routes(settings.base_path))
     app.include_router(public.routes(settings.base_path))
     app.include_router(voice.routes(settings.base_path))
     return app
