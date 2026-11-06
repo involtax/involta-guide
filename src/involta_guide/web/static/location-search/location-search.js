@@ -76,7 +76,7 @@
           const name = document.createElement('span'); name.className = 'result-name';
           title(name, data.value.name);
           const context = document.createElement('span'); context.className = 'result-context';
-          context.textContent = (data.value.kind === 'restaurant' ? 'Ресторан · ' : '') + data.value.context;
+          context.textContent = data.value.context;
           text.append(name, context);
           const arrow = document.createElement('span'); arrow.className = 'result-arrow';
           arrow.textContent = '→'; arrow.ariaHidden = 'true';
