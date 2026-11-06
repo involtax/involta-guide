@@ -219,6 +219,16 @@ def main() -> None:
                         )
                         + ";\n"
                     )
+                if "review_analyses" not in archived:
+                    # Table-only pg_dump does not own standalone trigger functions.
+                    # Remove this feature's trigger and functions when restoring a
+                    # pre-analysis backup; never CASCADE into unrelated objects.
+                    schema = quote(settings.database_schema)
+                    prefix += (
+                        f"DROP TRIGGER IF EXISTS review_analysis_source ON {schema}.reviews;\n"
+                        f"DROP FUNCTION IF EXISTS {schema}.invalidate_review_analysis();\n"
+                        f"DROP FUNCTION IF EXISTS {schema}.apply_review_vote();\n"
+                    )
             # Drop only Guide tables absent in the backup. No DROP SCHEMA / CASCADE.
             sql_file.write_text(prefix + sql_file.read_text())
             run(
