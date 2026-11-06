@@ -165,7 +165,13 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                     abs(box["x"] - baseline["x"]) < 1 and abs(box["width"] - baseline["width"]) < 1
                 ), (name, width)
                 assert page.get_by_role("heading", name="Рабочий стол.").count() == 0, name
-                assert page.locator(".header .admin-logout").count() == 1, name
+                if path.startswith("/admin"):
+                    assert page.locator(".header .admin-logout").count() == 1, name
+                    assert page.locator(".header-admin-link").count() == 0, name
+                else:
+                    # Public diagnostics keep the public header, even with admin controls.
+                    assert page.locator(".header-admin-link").count() == 1, name
+                    assert page.locator(".header .admin-logout").count() == 0, name
                 assert page.locator(".header-note").count() == 0, name
                 if width != 768:
                     page.screenshot(path=str(shots / f"{name}-{width}.png"), full_page=True)

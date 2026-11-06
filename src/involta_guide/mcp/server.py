@@ -9,6 +9,7 @@ from pydantic import Field, StringConstraints
 from sqlalchemy import Engine
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from involta_guide.config import Settings
 
@@ -28,6 +29,15 @@ Location reviews describe the location; do not attribute them to a specific rest
 Restaurant reviews.status=not_linked means reliable restaurant attribution is not available.
 Not-found/unfilled results must not be interpreted as permission to generate content.
 Both tools are public, read-only and require no authentication."""
+
+
+class MCPTransport:
+    """Keep the route stable while each application lifespan gets a fresh manager."""
+
+    app: ASGIApp
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self.app(scope, receive, send)
 
 
 def create_server(engine: Engine, settings: Settings) -> tuple[MCPServer, Starlette]:

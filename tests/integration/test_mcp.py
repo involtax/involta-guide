@@ -39,6 +39,17 @@ def call(client, name, arguments):
     return structured
 
 
+def test_mcp_transport_survives_restarting_the_same_application(database):
+    settings, _ = database
+    app = create_app(settings)
+    for _ in range(2):
+        with TestClient(app) as client:
+            tools = rpc(client, "tools/list")["result"]["tools"]
+            assert {tool["name"] for tool in tools} == {"Location", "Restaurant"}
+            result = call(client, "Location", {"location": "ivanovo"})
+            assert result["location"]["location"] == "ivanovo"
+
+
 def snapshot(engine):
     with engine.connect() as conn:
         return {

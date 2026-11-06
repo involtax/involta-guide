@@ -47,13 +47,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         JobService(factory, provider, public_fill_enabled=settings.temporary_public_fill_enabled),
         Security(settings, factory),
     )
-    from involta_guide.mcp.server import create_server
+    from involta_guide.mcp.server import MCPTransport, create_server
 
-    mcp_server, mcp_app = create_server(engine, settings)
+    mcp_app = MCPTransport()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
+            mcp_server, mcp_app.app = create_server(engine, settings)
             async with mcp_server.session_manager.run():
                 yield
         finally:
