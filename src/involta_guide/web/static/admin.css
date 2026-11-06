@@ -108,11 +108,22 @@
 .review-feed-heading p { margin: 0; font-size: 12px; }
 .review-feed-heading > a { font-size: 12px; flex-shrink: 0; }
 .review-card { border: 1px solid var(--line); padding: 20px 22px; margin-bottom: 16px; scroll-margin-top: 20px; }
-.review-top { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
-.review-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; flex: 0 1 230px; }
+.review-top { display: grid; grid-template-columns: minmax(100px, 200px) minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-bottom: 10px; }
+.review-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
 .admin-workspace .review-label h3 { font-size: 14px; margin: 0; white-space: nowrap; }
 .review-label time { font-size: 11px; color: var(--muted); }
-.admin-workspace .review-top audio { flex: 1; width: 0; min-width: 120px; height: 32px; }
+.review-player { min-width: 0; }
+.admin-workspace .review-player audio { width: 100%; height: 38px; }
+.review-player.is-enhanced > audio, .review-player [hidden] { display: none; }
+.review-player-controls { display: flex; align-items: center; gap: 12px; height: 38px; min-width: 0; }
+.admin-workspace .review-play { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--black); transition: none; }
+.admin-workspace .review-play:hover, .admin-workspace .review-play:disabled { opacity: 1; }
+.review-play svg { width: 17px; height: 17px; fill: currentColor; }
+.admin-workspace .review-seek { appearance: none; flex: 1; min-width: 0; width: 0; height: 4px; margin: 0; padding: 0; border: 0; border-radius: 0; cursor: pointer; background: linear-gradient(to right, var(--black) 0 var(--progress, 0%), var(--line) var(--progress, 0%) 100%); }
+.review-seek::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; border-radius: 50%; background: var(--black); }
+.review-seek::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--black); }
+.review-time { min-width: 65px; text-align: right; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.review-player-error { margin: 6px 0 0; font-size: 12px; }
 .review-top > a { font-size: 12px; white-space: nowrap; }
 .review-transcripts { margin: 0; }
 .review-transcripts > div { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 12px; padding: 12px 0; }
@@ -123,12 +134,13 @@
 .review-transcripts dd { margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .review-metadata { display: block; border-top: 1px solid var(--line); margin: 6px 0 0; padding: 11px 0 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .review-pagination { display: flex; justify-content: space-between; gap: 20px; font-size: 13px; }
-@media (max-width: 1100px) { .review-label { flex-basis: 120px; } }
+@media (min-width: 651px) and (max-width: 1100px) { .review-top { grid-template-columns: minmax(100px, 140px) minmax(0, 1fr); } .review-actions { grid-column: 2; justify-content: flex-end; } }
 @media (max-width: 650px) {
   .review-cities { max-height: 180px; }
   .review-card { padding: 14px; }
-  .review-top { gap: 8px; }
-  .review-label { flex: 0 1 90px; }
+  .review-top { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .review-label { gap: 12px; }
+  .review-actions { justify-content: flex-end; }
   .admin-workspace .review-label h3 { font-size: 12px; white-space: normal; }
   .review-label time { font-size: 10px; }
   .review-top > a { font-size: 11px; }
@@ -142,7 +154,9 @@
 .review-top form { margin: 0; }
 .review-delete { border: 0; padding: .3rem; background: none; font: inherit; text-decoration: underline; }
 
-.review-actions { display: flex; flex-direction: column; gap: 4px; font-size: 11px; white-space: nowrap; }
+.review-actions { display: flex; align-items: center; gap: 18px; font-size: 11px; white-space: nowrap; }
+.admin-workspace .review-actions form, .admin-workspace .review-actions form + form { margin: 0; }
+.admin-workspace .review-actions form > button { margin: 0; padding: 8px 0; white-space: nowrap; overflow-wrap: normal; }
 
 .review-actions .review-delete { color: var(--black); font-size: 11px; }
 

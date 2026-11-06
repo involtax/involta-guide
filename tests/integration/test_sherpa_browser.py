@@ -134,14 +134,16 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
             page.wait_for_function(
                 "(a)=>Number.isFinite(a.duration)&&a.duration>6", arg=audio.element_handle()
             )
-            width_before = audio.evaluate("a=>a.getBoundingClientRect().width")
-            audio.evaluate("a=>a.play()")
+            player = page.locator(".review-player-controls")
+            expect(player).to_be_visible()
+            width_before = player.bounding_box()["width"]
+            page.locator(".review-play").click()
             page.wait_for_function("a=>a.currentTime>0.1", arg=audio.element_handle())
             audio.evaluate("a=>{a.currentTime=3}")
             page.wait_for_function(
                 "(a)=>a.currentTime>=3&&a.currentTime<4", arg=audio.element_handle()
             )
-            assert audio.evaluate("a=>a.getBoundingClientRect().width") == width_before
+            assert player.bounding_box()["width"] == width_before
             page.locator(".review-card").screenshot(
                 path=str(folder / f"player-playing-{width}.png")
             )
