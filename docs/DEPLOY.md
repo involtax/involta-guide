@@ -10,19 +10,19 @@
 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`:
 
 - **Bootstrap production** (`bootstrap-production.yml`) — первоначальная установка.
-- **Deploy production** (`deploy-production.yml`) — обновление только Guide.
+- **Deploy production** (`deploy-production.yml`) — обновление Guide и Voice одним проверенным образом.
 
 Оба запускаются вручную через Actions → Run workflow, ветка **main**. Поле `sha`
 можно оставить пустым: будет выбрана версия main на момент запуска. Для запуска
 конкретной прежней версии можно указать её полный 40-символьный commit SHA.
-Выбранный SHA автоматически фиксируется на весь build/deploy и показывается
+Выбранный SHA автоматически фиксируется на весь deploy и показывается
 в Summary. PR и push сами production не меняют.
 До слияния PR и отдельного подтверждения запускать эти workflows не нужно.
 
 ## Однократная настройка GitHub
 
 Обязательные reviewers не нужны. Подтверждение запуска — нажатие **Run workflow**
-для ветки main. После успешной сборки bootstrap продолжает настройку сервера
+для ветки main. После успешного CI выбранной версии bootstrap продолжает настройку сервера
 без отдельного Approve deployment. Environment **prod** используется для secrets.
 Если в нём ранее включались Required reviewers или wait timer, отключите эти
 необязательные ограничения в Settings → Environments → prod: workflow не обходит
@@ -152,17 +152,20 @@ bootstrap не усыновляет и не останавливает их. С�
 
 ## Обновления и rollback
 
-CI тестирует выбранный SHA, собирает multi-stage image и публикует **только**
-`ghcr.io/involtax/involta-guide:<full-SHA>`. Production запускает захваченный build
+CI один раз тестирует выбранный SHA, собирает multi-stage image, проверяет его на настоящих контейнерах и публикует **тот же образ** под
+`ghcr.io/involtax/involta-guide:<full-SHA>`. Production запускает опубликованный
 **digest**, не изменяемый tag. Проверяются и OCI revision, и `revision` в readiness.
-`latest` нигде не используется. SHA-tag может быть повторно опубликован rerun,
-поэтому state и rollback всегда хранят именно digest.
+`latest` нигде не используется. Повторная публикация другого образа под существующим SHA запрещена; rerun может
+переиспользовать только тот же image ID. State и rollback хранят digest.
+Деплой и bootstrap ждут успешный main CI и используют готовый образ,
+не запуская тесты и сборку повторно. Слои и ограничения: [IMAGE_RELEASE.md](IMAGE_RELEASE.md).
 
 Общая concurrency group у обоих production workflow и серверный flock запрещают
 одновременные операции. Процессы не отменяются новым запуском.
-`deploy-production.yml` обновляет **только web/worker Guide**: PostgreSQL, Nginx,
-пакеты, env и volumes не изменяются. Предыдущий worker останавливается gracefully,
-затем проверяются новый web, worker и public HTTPS. При неудаче возвращаются
+`deploy-production.yml` использует существующий полный release-путь Guide + Voice:
+резервная копия и проверка приватной конфигурации Voice, обновление своих сервисов,
+проверка Voice gateway, public HTTPS, health-report и входа в админку.
+Чужие контейнеры и основной сайт не пересоздаются. Предыдущие workers останавливаются gracefully. При неудаче возвращаются
 сохранённые Compose snapshot и image digest предыдущей версии. Старые release
 snapshots и image digests нужно сохранять для rollback.
 

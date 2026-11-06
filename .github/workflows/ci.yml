@@ -3,24 +3,12 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:
-    inputs:
-      sha:
-        required: true
-        type: string
-    outputs:
-      sha:
-        value: ${{ jobs.verify.outputs.sha }}
-      image:
-        value: ${{ jobs.verify.outputs.image }}
-      digest:
-        value: ${{ jobs.publish.outputs.digest }}
 permissions:
   contents: read
-# Never cancel a workflow while it might be changing production.
+# Only obsolete PR checks can be cancelled. Main publication is never cancelled.
 concurrency:
-  group: checks-${{ github.event_name }}-${{ github.ref }}-${{ inputs.sha || github.sha }}
-  cancel-in-progress: false
+  group: checks-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -28,6 +16,7 @@ jobs:
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       image: ${{ steps.revision.outputs.image }}
+      image_id: ${{ steps.identity.outputs.image_id }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -46,21 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - id: revision
         name: Resolve and validate immutable revision
-        env:
-          REQUESTED_SHA: ${{ inputs.sha }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           sha=$(git rev-parse HEAD)
-          if [[ -n "$REQUESTED_SHA" ]]; then
-            [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ && "$sha" == "$REQUESTED_SHA" ]]
-            git merge-base --is-ancestor "$sha" origin/main
-          fi
           printf 'sha=%s\nimage=ghcr.io/%s\n' "$sha" "${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       - uses: astral-sh/setup-uv@v6
         with:
@@ -83,8 +65,28 @@ jobs:
       - run: uv run pytest -q tests/unit tests/integration tests/e2e tests/deployment
         env:
           CHROMIUM_PATH: ""
-      - name: Build production image (also for pull requests)
-        run: docker build -t involta-guide:ci .
+      - uses: docker/setup-buildx-action@v3
+      - id: build
+        name: Build the production image once
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          provenance: false
+          tags: |
+            involta-guide:ci
+            ${{ steps.revision.outputs.image }}:${{ steps.revision.outputs.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.revision.outputs.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=production-linux-amd64
+          cache-to: type=gha,scope=production-linux-amd64,mode=max,ignore-error=true
+      - id: identity
+        name: Record the exact image that will be tested
+        run: echo "image_id=$(docker image inspect --format '{{.Id}}' involta-guide:ci)" >> "$GITHUB_OUTPUT"
+      - name: Verify installed code, resources and runtime
+        run: uv run python tests/deployment/image_smoke.py
       - name: Verify current-state cutover and real database rollback
         run: uv run python tests/deployment/current_state_smoke.py
       - name: Verify combined Voice and shared database
@@ -121,6 +123,22 @@ jobs:
           done
           docker compose -f deploy/compose.production.yaml -f deploy/compose.voice.yaml config --quiet
           docker compose -f deploy/compose.host.yaml -f deploy/compose.voice.host.yaml config --quiet
+      - name: Export the verified image without rebuilding
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.revision.outputs.image }}:${{ steps.revision.outputs.sha }}
+          TESTED_IMAGE_ID: ${{ steps.identity.outputs.image_id }}
+        run: |
+          set -euo pipefail
+          [[ "$(docker image inspect --format '{{.Id}}' "$IMAGE")" == "$TESTED_IMAGE_ID" ]]
+          docker image save "$IMAGE" | gzip -1 > "$RUNNER_TEMP/production-image.tar.gz"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: verified-image-${{ steps.revision.outputs.sha }}
+          path: ${{ runner.temp }}/production-image.tar.gz
+          compression-level: 0
+          retention-days: 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -129,7 +147,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   publish:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -137,7 +155,7 @@ jobs:
       contents: read
       packages: write
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.publish.outputs.digest }}
     concurrency:
       group: ghcr-${{ needs.verify.outputs.sha }}
       cancel-in-progress: false
@@ -146,20 +164,35 @@ jobs:
         with:
           ref: ${{ needs.verify.outputs.sha }}
           persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-image-${{ needs.verify.outputs.sha }}
+          path: ${{ runner.temp }}/verified-image
+      - name: Load the verified image
+        run: docker image load --input "$RUNNER_TEMP/verified-image/production-image.tar.gz"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ needs.verify.outputs.image }}:${{ needs.verify.outputs.sha }}
-          labels: |
-            org.opencontainers.image.revision=${{ needs.verify.outputs.sha }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - id: publish
+        name: Publish exactly the tested image
+        env:
+          IMAGE: ${{ needs.verify.outputs.image }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          TESTED_IMAGE_ID: ${{ needs.verify.outputs.image_id }}
+        run: python3 deploy/publish-image.py "$IMAGE" "$SHA" "$TESTED_IMAGE_ID"
+      - name: Publication summary
+        env:
+          IMAGE: ${{ needs.verify.outputs.image }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          TESTED_IMAGE_ID: ${{ needs.verify.outputs.image_id }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          {
+            echo "Commit: $SHA"
+            echo "Tested and published image ID: $TESTED_IMAGE_ID"
+            echo "Production reference: $IMAGE@$DIGEST"
+            echo "Publication loaded the tested artifact; no second build."
+          } >> "$GITHUB_STEP_SUMMARY"

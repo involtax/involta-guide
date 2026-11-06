@@ -1,0 +1,71 @@
+name: Resolve verified production image
+on:
+  workflow_call:
+    inputs:
+      sha:
+        required: true
+        type: string
+    outputs:
+      sha:
+        value: ${{ jobs.resolve.outputs.sha }}
+      image:
+        value: ${{ jobs.resolve.outputs.image }}
+      digest:
+        value: ${{ jobs.resolve.outputs.digest }}
+permissions:
+  contents: read
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    outputs:
+      sha: ${{ steps.image.outputs.sha }}
+      image: ${{ steps.image.outputs.image }}
+      digest: ${{ steps.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: image
+        name: Select the successful main CI image without rebuilding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          sha="$REQUESTED_SHA"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$sha" origin/main
+          verified=''
+          for _ in $(seq 1 270); do
+            row=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --event push \
+              --json databaseId,status,conclusion --jq \
+              '([.[] | select(.conclusion == "success")][0] // .[0] // {}) | [.databaseId // "", .status // "", .conclusion // ""] | @tsv')
+            read -r run status conclusion <<< "$row"
+            if [[ "$status" == completed ]]; then
+              [[ "$conclusion" == success ]] || {
+                echo "CI failed ($conclusion): https://github.com/$GITHUB_REPOSITORY/actions/runs/$run"
+                exit 1
+              }
+              verified="$run"
+              break
+            fi
+            sleep 10
+          done
+          [[ -n "$verified" ]] || { echo "No successful main CI/publish for $sha within 45 minutes"; exit 1; }
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          digest=$(docker buildx imagetools inspect "$image:$sha" --format '{{.Manifest.Digest}}')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'sha=%s\nimage=%s\ndigest=%s\n' "$sha" "$image" "$digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "Verified CI: https://github.com/$GITHUB_REPOSITORY/actions/runs/$verified"
+            echo "Commit: $sha"
+            echo "Image: $image@$digest"
+          } >> "$GITHUB_STEP_SUMMARY"
