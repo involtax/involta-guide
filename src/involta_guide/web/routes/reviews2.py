@@ -21,11 +21,11 @@ from involta_guide.web.http import (
 from involta_guide.web.routes.admin import render
 from involta_voice.db import row
 
-LABELS = {"new": "Новый", "ok": "ОК", "bugs": "Баги", "other": "Разное"}
+LABELS = {"new": "Новый", "ok": "ОК", "humor": "Юмор", "bugs": "Баги", "other": "Разное"}
 BUCKET = """CASE
  WHEN a.manual_category='bugs' THEN 'bugs'
  WHEN a.source_text IS DISTINCT FROM r.transcript OR a.result IS NULL OR j.status IS DISTINCT FROM 'done' THEN 'new'
- WHEN a.result->>'category' IN ('bugs','other') THEN a.result->>'category'
+ WHEN a.result->>'category' IN ('humor','bugs','other') THEN a.result->>'category'
  WHEN a.approved_at IS NULL THEN 'new'
  ELSE a.result->>'category' END"""
 BASE_QUERY = "FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN review_analyses a ON a.review_id=r.id LEFT JOIN jobs j ON j.id=a.job_id"
