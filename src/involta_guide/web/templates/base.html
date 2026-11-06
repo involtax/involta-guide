@@ -42,6 +42,7 @@
 {% block footer %}
 <footer>
 <a href="{{ settings.path('/about') }}">{{'О проекте' if request.cookies.get('guide_about_seen')=='1' or request.url.path==settings.path('/about') else 'Я тут в первый раз'}}</a>
+<a href="{{ settings.path('/for-agents') }}">Для ассистентов</a>
 </footer>
 {% endblock %}
 {% block scripts %}
