@@ -1015,9 +1015,11 @@ pre.audit-json {
 .candidate-review a { display: block; font-size: 11px; }
 
 .public-reviews { margin: 2rem 0; }
-.public-reviews .reviews > p { padding: 1.25rem 0; border-bottom: 1px solid #ddd; }
-.public-reviews time { color: #777; font-size: .8rem; }
-.public-reviews .transcript { white-space: pre-wrap; }
+.public-reviews { max-width:860px; }
+.public-reviews .section-heading { margin-bottom:8px; }
+.public-reviews .review-author { font:italic 19px/1.4 Georgia,'Times New Roman',serif; letter-spacing:-.015em; overflow-wrap:anywhere; }
+.public-reviews .home-review time { grid-column:2; }
+@media(max-width:650px) { .public-reviews .review-author { font-size:17px; } }
 
 .nearby-locations { border-top:1px solid var(--line);padding:28px 0 40px;margin-top:30px; }
 .nearby-locations h2 { margin-bottom:22px; }

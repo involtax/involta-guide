@@ -1,4 +1,5 @@
 {%extends 'base.html'%}
+{% block page_styles %}<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">{% endblock %}
 {% block social_meta %}
 {% include 'open_graph.html' %}
 {% endblock %}
@@ -114,8 +115,17 @@
 {%if not location.is_hub%}
 <div id="guide-voice"></div>
 <section data-public-reviews class="public-reviews" aria-label="Отзывы" {%if not public_reviews%}hidden{%endif%}>
-<h2>Отзывы</h2><div class="reviews">
-{%for review in public_reviews%}<p data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}"><time datetime="{{review.created_at.isoformat()}}">{{review.created_at.strftime('%d.%m.%Y %H:%M')}}</time><br><span class="transcript">{{review.transcript or 'Расшифровка…'}}</span></p>{%endfor%}
+<div class="section-heading"><h2>Отзывы</h2></div><div class="reviews">
+{%for review in public_reviews%}
+{%set posted=review.created_at.astimezone(review_timezone)%}
+<article class="home-review" data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}">
+<div class="home-review-meta">
+{%if review.author_name%}<span class="review-author">{{review.author_name}}</span>{%endif%}
+<time datetime="{{posted.isoformat()}}" title="UTC+3">{{posted.strftime('%d.%m.%Y · %H:%M')}}</time>
+</div>
+<p class="transcript">{{review.transcript or 'Расшифровка…'}}</p>
+</article>
+{%endfor%}
 </div></section>
 {%endif%}
 {%if related%}

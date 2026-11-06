@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 
 from fastapi.testclient import TestClient
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import text
 
 from involta_guide.main import create_app
 
@@ -12,7 +13,12 @@ from .voice_fixture import imported
 
 
 def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(database):
-    settings, _, _, _, city, _, _ = imported(database)
+    settings, engine, _, _, city, reference, _ = imported(database)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE reviews SET author_name=:name WHERE id=:id"),
+            {"name": "Алекс", "id": reference},
+        )
     app = create_app(settings)
     screenshots = Path("var/screenshots")
     screenshots.mkdir(parents=True, exist_ok=True)
@@ -41,7 +47,33 @@ def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(databas
 
             page.route("**/*", respond)
             page.goto("http://localhost/guide/" + city["slug"])
-            expect(page.locator("[data-public-reviews] .reviews > p")).to_have_count(1)
+            feed = page.locator("[data-public-reviews]")
+            expect(feed.locator(".reviews > article")).to_have_count(1)
+            expect(feed.locator(".review-author")).to_have_text("Алекс")
+            expect(feed.locator(".home-review:last-child")).to_have_css(
+                "border-bottom-width", "0px"
+            )
+            assert "Алекс" in client.get("/guide/" + city["slug"]).text
+            # Wait for the widget refresh: it must preserve the server-rendered author.
+            page.wait_for_function(
+                "document.querySelector('[data-public-reviews] time').dateTime.endsWith('Z')"
+            )
+            expect(feed.locator(".review-author")).to_have_text("Алекс")
+            with engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE reviews SET author_name=NULL WHERE id=:id"), {"id": reference}
+                )
+            page.reload()
+            page.wait_for_function(
+                "document.querySelector('[data-public-reviews] time').dateTime.endsWith('Z')"
+            )
+            expect(feed.locator(".review-author")).to_have_count(0)
+            with engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE reviews SET author_name='Алекс' WHERE id=:id"), {"id": reference}
+                )
+            page.reload()
+            expect(feed.locator(".review-author")).to_have_text("Алекс")
             expect(page.locator("#guide-voice .reviews")).to_have_count(0)
             expect(page.locator("#guide-voice .primary")).to_be_visible()
             expect(page.get_by_role("heading", name="Отзывы", exact=True)).to_have_count(1)

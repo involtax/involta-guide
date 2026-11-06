@@ -1244,6 +1244,15 @@
       }
       function showReview(element, data) {
         element.replaceChildren();
+        element.classList.add("home-review");
+        const meta = document.createElement("div");
+        meta.className = "home-review-meta";
+        if (data.author_name) {
+          const author = document.createElement("span");
+          author.className = "review-author";
+          author.textContent = data.author_name;
+          meta.append(author);
+        }
         const created =
           typeof data.created_at === "string"
             ? new Date(data.created_at.replace(" ", "T"))
@@ -1251,20 +1260,21 @@
         if (created && Number.isFinite(created.getTime())) {
           const time = document.createElement("time");
           time.dateTime = created.toISOString();
+          time.title = "UTC+3";
           time.textContent = new Intl.DateTimeFormat("ru-RU", {
+            timeZone: "Europe/Moscow",
             day: "2-digit",
             month: "2-digit",
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
           }).format(created);
-          element.append(time);
+          meta.append(time);
         }
-        const text = document.createElement("span");
+        element.append(meta);
+        const text = document.createElement("p");
         text.className = "transcript";
         text.textContent = data.transcript || "Расшифровка…";
-        if (element.childNodes.length)
-          element.append(document.createElement("br"));
         element.append(text);
         element.dataset.processing = String(!data.transcript);
       }
@@ -1281,7 +1291,7 @@
           return null;
         }
         if (!item) {
-          item = document.createElement("p");
+          item = document.createElement("article");
           item.dataset.reference = data.reference;
           reviewList.prepend(item);
         }
