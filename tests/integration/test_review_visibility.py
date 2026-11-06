@@ -11,7 +11,7 @@ from .test_reviews2 import RESULT, SOURCE, prepared, state
 from .test_web import login, token
 
 
-@pytest.mark.parametrize("category", ["ok", "bugs", "other"])
+@pytest.mark.parametrize("category", ["ok", "humor", "bugs", "other"])
 def test_new_visible_then_classification_controls_every_public_feed(database, category):
     settings, engine, city, review, _, _, worker, provider, _ = prepared(
         database, {**RESULT, "category": category}
@@ -22,7 +22,7 @@ def test_new_visible_then_classification_controls_every_public_feed(database, ca
         assert read.latest_public_texts()
         assert PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
         assert worker.once()
-        visible = category == "ok"
+        visible = category in ("ok", "humor")
         assert bool(read.public_texts(city["id"])) == visible
         assert bool(read.latest_public_texts()) == visible
         assert (

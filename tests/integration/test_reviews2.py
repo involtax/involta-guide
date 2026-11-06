@@ -194,7 +194,7 @@ def test_changed_source_invalidates_votes_and_stale_approval(database):
         provider.close()
 
 
-@pytest.mark.parametrize("category", ["bugs", "other"])
+@pytest.mark.parametrize("category", ["humor", "bugs", "other"])
 def test_non_restaurant_categories_never_create_restaurants(database, category):
     _, engine, _, review, _, service, worker, provider, _ = prepared(
         database, {**RESULT, "category": category}

@@ -142,7 +142,7 @@ def test_rebuild_preserves_reviews_votes_catalogue_and_prompt(database):
         provider.close()
 
 
-@pytest.mark.parametrize("category", ["bugs", "other"])
+@pytest.mark.parametrize("category", ["humor", "bugs", "other"])
 def test_categories_are_visible_without_approval_and_return_to_new_on_text_change(
     database, category
 ):
