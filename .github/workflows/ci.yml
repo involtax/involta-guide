@@ -44,6 +44,23 @@ jobs:
           set -euo pipefail
           sha=$(git rev-parse HEAD)
           printf 'sha=%s\nimage=ghcr.io/%s\n' "$sha" "${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Prepare system dependencies from the official Ubuntu archive
+        timeout-minutes: 5
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          # The Azure mirror throttled a 9 MB package to more than three minutes.
+          # Change only the hosted CI mirror; Ubuntu package signatures stay verified.
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -Ei 's#https?://azure\.archive\.ubuntu\.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+            sudo apt-get "${apt_options[@]}" update
+            sudo env DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.12.23"
@@ -51,13 +68,6 @@ jobs:
       # Sherpa's CMake cache retains an isolated build interpreter's temporary path.
       # A restored uv source/build cache can point to a Python that no longer exists.
       - run: uv sync --frozen --extra voice-local --no-cache
-      - name: Ensure FFmpeg is available
-        run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version
       - run: uv run ruff check src tests migrations deploy
       - run: uv run ruff format --check src tests migrations deploy
       - run: uv run mypy
@@ -139,6 +149,7 @@ jobs:
           path: ${{ runner.temp }}/production-image.tar.gz
           compression-level: 0
           retention-days: 1
+          overwrite: true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -146,6 +157,7 @@ jobs:
           path: var/screenshots/
           if-no-files-found: ignore
           retention-days: 7
+          overwrite: true
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
