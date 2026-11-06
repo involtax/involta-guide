@@ -1,0 +1,17 @@
+{%extends 'admin_shell.html'%}
+{%from 'macros.html' import csrf with context%}
+{%block admin_content%}
+<section class="reviews2-layout" {%if processing%}hx-get="{{settings.path('/admin/reviews-2/'+selected)}}?page={{page}}" hx-trigger="every 5s" hx-target="#admin-main" hx-select="#admin-main" hx-swap="outerHTML"{%endif%}>
+<nav class="reviews2-filters" aria-label="Статусы отзывов">{%for key,label in labels.items()%}<a href="{{settings.path('/admin/reviews-2/'+key)}}" class="{{'selected' if key==selected else ''}}" {%if key==selected%}aria-current="page"{%endif%}>{{label}}<span>{{counts.get(key,0)}}</span></a>{%endfor%}</nav>
+<div class="reviews2-feed">{%for review in rows%}
+<article class="reviews2-card" id="review-{{review.number}}">
+<header><div><strong>{{review.location_name}} / {{review.number}}</strong><time>{{review.date}} · UTC+3</time></div>{%if review.ready%}<span>ИИ: {{labels[review.result.category]}}</span>{%endif%}</header>
+<div class="reviews2-before"><small>До · итоговая расшифровка</small><p>{{review.transcript}}</p></div>
+<div class="reviews2-after"><small>После · обработка ИИ</small>{%if review.ready%}<p>{{review.result.edited_text}}</p>{%else%}<p class="admin-muted">{{review.error or 'Автоматическая обработка в очереди…'}}</p>{%endif%}</div>
+{%if review.ready and review.result.category=='ok'%}<div class="reviews2-attributes"><div><span>Имя</span> {{review.result.author_name or 'Не названо'}}</div><div><span>Рестораны</span> {%for mention in review.result.mentions%}<em>{{mention.name}} · {{'+1' if mention.sentiment==1 else '−1' if mention.sentiment==-1 else 'без оценки'}}{%if not mention.restaurant_id%} · {{'добавим по ОК' if mention.suggested else 'не сопоставлено'}}{%endif%}</em>{%else%}Не упомянуты{%endfor%}</div></div>{%endif%}
+<div class="reviews2-meta">IP {{review.ip}}<br>UA {{review.user_agent}}</div>
+<div class="reviews2-actions">{%if selected=='new'%}<form method="post" action="{{settings.path('/admin/reviews-2/'+review.slug+'/'+review.number|string+'/approve')}}">{{csrf()}}<input type="hidden" name="job_id" value="{{review.job_id or ''}}"><input type="hidden" name="status" value="{{selected}}"><button {%if not review.ready%}disabled{%endif%}>ОК</button></form>{%endif%}<form class="reviews2-delete" method="post" action="{{settings.path('/admin/reviews-2/'+review.slug+'/'+review.number|string+'/delete')}}">{{csrf()}}<input type="hidden" name="status" value="{{selected}}"><button>Удалить</button></form></div>
+</article>{%else%}<p class="admin-muted">Здесь пока нет отзывов.</p>{%endfor%}
+{%if pages>1%}<nav aria-label="Страницы отзывов">{%if page>1%}<a href="{{settings.path('/admin/reviews-2/'+selected)}}?page={{page-1}}">← Новее</a>{%endif%} {{page}} / {{pages}} {%if page<pages%}<a href="{{settings.path('/admin/reviews-2/'+selected)}}?page={{page+1}}">Старее →</a>{%endif%}</nav>{%endif%}
+</div></section>
+{%endblock%}

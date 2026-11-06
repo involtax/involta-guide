@@ -32,6 +32,7 @@
 <div><dt>Телефон</dt><dd>{%if r.phone%}<a href="tel:{{r.phone}}">{{r.phone}}</a>{%else%}Не указан{%endif%}</dd></div>
 <div><dt>Карта</dt><dd>{%if r.maps_url and r.maps_url.startswith('https://')%}<a href="{{r.maps_url}}" target="_blank" rel="noopener noreferrer">Открыть на карте ↗</a>{%else%}Не указана{%endif%}</dd></div>
 <div><dt>Координаты</dt><dd>{{r.latitude if r.latitude is not none else '—'}}, {{r.longitude if r.longitude is not none else '—'}}</dd></div>
+<div><dt>Голоса из отзывов</dt><dd>{{r.review_score}}</dd></div>
 <div><dt>Оценка посетителей</dt><dd>{{'%.2f'|format(r.review_scores.rating) if r.review_scores.rating is not none else 'Нет оценки'}} · одобренных записей: {{r.review_count}}</dd></div>
 <div><dt>Тональность / рекомендация</dt><dd>{{'%.2f'|format(r.review_scores.sentiment) if r.review_scores.sentiment is not none else '—'}} / {{'%.2f'|format(r.review_scores.recommendation) if r.review_scores.recommendation is not none else '—'}}</dd></div>
 <div><dt>Подборки</dt><dd>{%for c in r.collections or []%}<a href="{{settings.path('/admin/locations/'+c.slug)}}">{{c.name}}</a>{{', ' if not loop.last}}{%endfor%}</dd></div>
