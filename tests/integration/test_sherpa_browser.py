@@ -125,7 +125,8 @@ def test_single_profile_and_exact_dictionary_in_existing_admin_shell(
             ).to_have_count(1)
             expect(page.get_by_role("button", name="Удалить отзыв", exact=False)).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-            assert page.locator('a[href*="/logs"]').count() == 0
+            expect(page.locator('.admin-tabs a[href="/guide/logs"]')).to_be_visible()
+            assert page.locator('.review-card a[href*="/logs"]').count() == 0
             audio = page.locator("audio")
             expect(audio).to_have_attribute(
                 "controlslist", "nodownload noplaybackrate noremoteplayback"
