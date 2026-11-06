@@ -3,7 +3,7 @@
 {% include 'open_graph.html' %}
 {% endblock %}
 {%macro card(r,i)%}
-<article class="restaurant">
+<article class="restaurant" id="restaurant-{{r.id}}">
 <span class="rank">{{'%02d'|format(i+1)}}</span>
 <div>
 <p class="eyebrow">{{r.cuisine}}
@@ -129,6 +129,7 @@
 </main>
 {%endblock%}
 {%block scripts%}
+<script defer src="{{settings.path('/assets/location-search/restaurant-anchor.js')}}"></script>
 {%if temporary_fill%}
 <script defer src="{{settings.path('/assets/public-fill.js')}}"></script>
 {%endif%}

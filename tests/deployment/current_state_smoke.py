@@ -13,6 +13,8 @@ from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 import psycopg
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
@@ -22,6 +24,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
+    expected_head = ScriptDirectory.from_config(
+        Config(str(ROOT / "alembic.ini"))
+    ).get_current_head()
     url = os.environ["TEST_DATABASE_URL"]
     container_url = os.getenv("GUIDE_CONTAINER_DATABASE_URL", url)
     env = {
@@ -71,7 +76,11 @@ def main() -> None:
                 timeout=90,
             )
             if result.returncode:
-                error = result.stderr.decode(errors="replace")
+                error = (result.stderr or result.stdout).decode(errors="replace")
+                if not error:
+                    error = (
+                        f"Container command {command[0]} failed with exit code {result.returncode}"
+                    )
                 for secret in (
                     url,
                     container_url,
@@ -115,6 +124,20 @@ def main() -> None:
                     "INSERT INTO audience_daily(day,visitor_id,hits) VALUES(CURRENT_DATE,%s,3)",
                     (str(uuid4()),),
                 )
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                conn.execute(
+                    "INSERT INTO search_attempts(token,query,ip,version) VALUES(%s,'backup-marker','203.0.113.57','hybrid-names-v1')",
+                    (str(uuid4()),),
+                )
+            search_dump = call([*backup_command, "backup"])
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                conn.execute("DELETE FROM search_attempts")
+            call([*backup_command, "restore"], search_dump)
+            with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
+                assert conn.execute("SELECT query,host(ip) FROM search_attempts").fetchone() == (
+                    "backup-marker",
+                    "203.0.113.57",
+                )
             if previous == "beta_core":
                 with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                     row = conn.execute("SELECT name,ranking,alex_star FROM restaurants").fetchone()
@@ -141,9 +164,10 @@ def main() -> None:
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
                 assert (
                     conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-                    == "unbiased_city_scope"
+                    == expected_head
                 )
                 assert conn.execute("SELECT sum(hits) FROM audience_daily").fetchone()[0] == 3
+                assert conn.execute("SELECT count(*) FROM search_attempts").fetchone()[0] == 1
                 conn.execute("DROP TABLE unrelated_sentinel")
             call([*backup_command, "restore"], dump)
             with psycopg.connect(url, options=f"-c search_path={schema}") as conn:
@@ -152,6 +176,7 @@ def main() -> None:
                     == previous
                 )
                 assert conn.execute("SELECT to_regclass('audience_daily')").fetchone()[0] is None
+                assert conn.execute("SELECT to_regclass('search_attempts')").fetchone()[0] is None
                 assert conn.execute("SELECT intro FROM locations").fetchone()[0] == "Current intro"
                 if previous == "beta_core":
                     row = conn.execute(

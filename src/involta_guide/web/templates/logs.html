@@ -8,6 +8,7 @@
 <nav class="log-kinds" aria-label="Тип журналов">
 <a href="{{settings.path('/logs')}}" class="{{'selected' if log_kind=='fill' else ''}}" {%if log_kind=='fill'%}aria-current="page"{%endif%}>Наполнение страниц</a>
 <a href="{{settings.path('/logs')}}?kind=uploads" class="{{'selected' if log_kind=='uploads' else ''}}" {%if log_kind=='uploads'%}aria-current="page"{%endif%}>Загрузки голоса</a>
+<a href="{{settings.path('/logs/search')}}">Поиск</a>
 </nav>
 {%if log_kind=='uploads'%}{%include 'upload_logs.html'%}{%else%}
 <div class="logs-layout">

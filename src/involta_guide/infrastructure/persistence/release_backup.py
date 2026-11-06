@@ -61,6 +61,7 @@ def owned_tables(settings: Settings) -> set[str]:
         "beta_transition_report",
         "ai_daily_usage",
         "audience_daily",
+        "search_attempts",
     }
 
 
