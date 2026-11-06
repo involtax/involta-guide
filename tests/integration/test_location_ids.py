@@ -37,6 +37,10 @@ def test_nearby_is_directed_and_settings_save_does_not_clear_it(database):
         ]
     }
     kostroma, kineshma, yaroslavl = (cities[slug] for slug in cities)
+    # This scenario starts empty independently of the editorial Git catalogue.
+    with PostgresUow(engine) as work:
+        for city in cities.values():
+            work.repo.change("locations", city["id"], {"nearby_location_ids": []})
     with TestClient(create_app(settings)) as client:
         csrf = login(client)
         endpoint = "/guide/admin/locations/kostroma/nearby/"
@@ -101,7 +105,11 @@ def test_git_lists_replace_db_lists_without_overwriting_content(database):
         row = work.repo.get("locations", city["id"])
         assert row["nearby_location_ids"] == city["nearby_location_ids"]
         assert row["intro"] == "Сохранить вступление"
-        assert all(type(row["id"]) is int for row in work.repo.rows("locations", limit=100000))
+        imported = work.repo.rows("locations", limit=100000)
+        assert all(type(row["id"]) is int for row in imported)
+        assert {row["id"]: row["nearby_location_ids"] for row in imported} == {
+            row["id"]: row["nearby_location_ids"] for row in catalog["locations"]
+        }
 
 
 def test_populated_uuid_cutover_preserves_content_and_pending_voice(database, monkeypatch):
@@ -296,6 +304,11 @@ def test_shared_search_adds_only_current_city_after_htmx_navigation(database):
     settings, engine = database
     screenshots = Path("var/screenshots/nearby")
     screenshots.mkdir(parents=True, exist_ok=True)
+    # The search scenario adds its own links instead of relying on empty seed data.
+    with PostgresUow(engine) as work:
+        for slug in ("kostroma", "kineshma"):
+            city = work.repo.rows("locations", {"slug": slug})[0]
+            work.repo.change("locations", city["id"], {"nearby_location_ids": []})
     with TestClient(create_app(settings)) as client, sync_playwright() as p:
         login(client)
         browser = p.chromium.launch(
