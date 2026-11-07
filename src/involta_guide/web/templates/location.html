@@ -1,7 +1,10 @@
 {%extends 'base.html'%}
-{% block page_styles %}<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">{% endblock %}
 {% block social_meta %}
 {% include 'open_graph.html' %}
+{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">
+{%if temporary_fill%}<link rel="stylesheet" href="{{settings.path('/assets/public-fill.css')}}">{%endif%}
 {% endblock %}
 {%macro card(r,i)%}
 <article class="restaurant" id="restaurant-{{r.id}}">
@@ -57,12 +60,15 @@
 </article>
 {%endmacro%}
 {%block body%}
-<main>
+<main {%if temporary_fill%}data-fill-state="{{temporary_fill.state}}"{%endif%}>
 <section class="city-hero">
 <h1>Где поесть <br>
 <span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
 </h1>
+<div {%if temporary_fill%}class="public-fill-intro"{%endif%}>
 <p class="lead">{{content.intro or ('Выберите район или курорт ниже.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
+{%if temporary_fill%}<canvas class="public-fill-spoiler" data-fill-spoiler aria-hidden="true"></canvas>{%endif%}
+</div>
 </section>
 {%if children%}
 <section class="location-children">
@@ -87,17 +93,26 @@
 </div>
 </section>
 {%endif%}
-<section class="restaurant-list">
+<section class="restaurant-list {%if temporary_fill%}public-fill-section{%endif%}">
+{%if not temporary_fill%}
 <div class="section-heading">
 <h2>{{'Стоит зайти' if content.restaurants else 'Подборка в работе'}}</h2>
 </div>
+{%endif%}
 {%if temporary_fill%}
-<section data-public-fill data-status-url="{{settings.path('/api/locations/'+location.slug+'/fill/status')}}" data-pending="{{'true' if not temporary_fill.can_start else 'false'}}">
-<form method="post" action="{{settings.path('/api/locations/'+location.slug+'/fill')}}">
+{%set fill_pending = temporary_fill.state in ['queued', 'running']%}
+<section class="public-fill" data-public-fill data-status-url="{{settings.path('/api/locations/'+location.slug+'/fill/status')}}">
+<form method="post" action="{{settings.path('/api/locations/'+location.slug+'/fill')}}" {%if not temporary_fill.can_start%}hidden{%endif%}>
 <button type="submit" {%if not temporary_fill.can_start%}disabled{%endif%}>Запарсить эти данные</button>
 </form>
-<p class="muted" role="status" aria-live="polite">{{temporary_fill.message}}</p>
-<noscript><p>После запуска обновите страницу через несколько минут.</p></noscript>
+<div class="public-fill-waiting" data-fill-waiting tabindex="-1" role="group" aria-label="Поиск ресторанов" {%if not fill_pending%}hidden{%endif%}>
+<svg class="public-fill-spinner" viewBox="0 0 96 96" aria-hidden="true">
+{%for dot in range(12)%}<circle cx="48" cy="12" r="3" transform="rotate({{dot*30}} 48 48)" style="--dot:{{dot}}"/>{%endfor%}
+</svg>
+<p class="public-fill-message" data-fill-message aria-hidden="true">Запускаем гастрономическую разведку.</p>
+</div>
+<p class="public-fill-status {%if fill_pending%}public-fill-sr{%endif%}" role="status" aria-live="polite" aria-atomic="true">{{'Идёт поиск ресторанов. Готовая подборка появится автоматически.' if fill_pending else temporary_fill.message}}</p>
+<noscript><p>После запуска проверяйте готовность, обновляя страницу. <a href="{{settings.path('/'+location.slug)}}">Обновить страницу</a></p></noscript>
 </section>
 {%endif%}
 {%for r in content.restaurants[:location.top_limit]%}
