@@ -23,7 +23,7 @@ from involta_voice.db import row
 
 LABELS = {"new": "Новый", "ok": "ОК", "humor": "Юмор", "bugs": "Баги", "other": "Разное"}
 BUCKET = """CASE
- WHEN a.manual_category='bugs' THEN 'bugs'
+ WHEN a.manual_category IS NOT NULL THEN a.manual_category
  WHEN a.source_text IS DISTINCT FROM r.transcript OR a.result IS NULL OR j.status IS DISTINCT FROM 'done' THEN 'new'
  WHEN a.result->>'category' IN ('humor','bugs','other') THEN a.result->>'category'
  WHEN a.approved_at IS NULL THEN 'new'
@@ -111,6 +111,8 @@ def routes(prefix: str) -> APIRouter:
             service.approve(identity, str(form.get("job_id", "")), principal["id"])
         elif action == "bug":
             service.mark_bug(identity, principal["id"])
+        elif action == "humor":
+            service.mark_humor(identity, principal["id"])
         elif action == "delete":
             service.delete(identity, principal["id"])
         else:
