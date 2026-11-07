@@ -53,6 +53,10 @@ def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(databas
             expect(feed.locator(".home-review:last-child")).to_have_css(
                 "border-bottom-width", "0px"
             )
+            expect(feed.locator(".home-review-meta")).to_have_css("display", "grid")
+            expect(feed.locator(".transcript")).to_have_css(
+                "line-height", "26.4px" if width == 390 else "28.05px"
+            )
             assert "Алекс" in client.get("/guide/" + city["slug"]).text
             # Wait for the widget refresh: it must preserve the server-rendered author.
             page.wait_for_function(

@@ -22,7 +22,7 @@ def test_home_reviews_replace_city_grid_and_choices_cover_all_types(database):
         editor.save(other["id"], CONTENT, None)
         home = client.get("/guide/")
         assert f'href="/guide/{city["slug"]}"' not in home.text
-        assert "Жизнь кипит" in home.text and 'class="city-grid"' not in home.text
+        assert "Пульс:" in home.text and 'class="city-grid"' not in home.text
         assert f'href="/guide/{other["slug"]}"' not in home.text
         assert '<select name="kind"' not in home.text
         catalogue = client.get("/guide/api/locations/catalogue").json()

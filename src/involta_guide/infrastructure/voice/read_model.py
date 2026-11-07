@@ -79,8 +79,14 @@ class VoiceReadModel:
                 dict(item)
                 for item in conn.execute(
                     text(f"""SELECT coalesce(r.edited_text,r.transcript) transcript,r.created_at,r.number,
+                    r.author_name,venue.name restaurant_name,
                     l.name location_name,l.slug location_slug
                     FROM reviews r JOIN locations l ON l.id=r.location_id
+                    LEFT JOIN review_analyses a ON a.review_id=r.id
+                        AND a.approved_at IS NOT NULL AND a.source_text=r.transcript
+                    LEFT JOIN restaurants venue ON venue.id=CAST(
+                        a.result->'mentions'->0->>'restaurant_id' AS uuid)
+                        AND venue.location_id=r.location_id
                     WHERE {PUBLIC_REVIEW}
                     AND l.active=1 AND {PUBLIC}
                     ORDER BY r.created_at DESC,r.number DESC LIMIT 10""")

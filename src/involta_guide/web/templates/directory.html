@@ -18,14 +18,29 @@
 {%with search_label='Поиск локаций и ресторанов', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
 </section>
 <section class="home-reviews" aria-labelledby="home-reviews-title">
-<div class="section-heading"><h2 id="home-reviews-title">Жизнь кипит</h2></div>
+<div class="section-heading"><h2 id="home-reviews-title">Пульс:</h2></div>
 <div class="home-reviews-list">
 {%for review in home_reviews%}
 {%set posted=review.created_at.astimezone(review_timezone)%}
 <a class="home-review" href="{{settings.path('/'+review.location_slug)}}">
+<div class="home-review-heading">
+<div class="home-review-place">
+{%if review.restaurant_name%}
+<span class="home-review-restaurant" title="{{review.restaurant_name}}">{{review.restaurant_name}}</span>
+<span class="home-review-divider" aria-hidden="true">·</span>
+{%endif%}
+<span class="home-review-city-group{%if not review.restaurant_name%} home-review-city-only{%endif%}">
+<span class="home-review-city" title="{{review.location_name}}">{{review.location_name}}</span>
+<span class="home-review-city-arrow" aria-hidden="true">→</span>
+</span>
+</div>
 <div class="home-review-meta">
-<span class="home-review-city">{{review.location_name}}<span class="home-review-city-arrow" aria-hidden="true">→</span></span>
+{%if review.author_name%}
+<span class="home-review-author" title="{{review.author_name}}">{{review.author_name}}</span>
+<span class="home-review-meta-divider" aria-hidden="true">·</span>
+{%endif%}
 <time title="{{posted.strftime('%d.%m.%Y %H:%M')}}" datetime="{{posted.isoformat()}}">{{posted.day}} {{months[posted.month-1]}} · {{posted.strftime('%H:%M')}}</time>
+</div>
 </div>
 <p>{{review.transcript or 'Расшифровка…'}}</p>
 </a>

@@ -65,7 +65,16 @@ def test_global_feed_has_only_ten_newest_public_reviews_and_public_active_locati
     ]
     assert {row["location_name"] for row in rows} == {"Первый город", "Второй город"}
     assert all(
-        set(row) == {"transcript", "created_at", "number", "location_name", "location_slug"}
+        set(row)
+        == {
+            "transcript",
+            "created_at",
+            "number",
+            "location_name",
+            "location_slug",
+            "author_name",
+            "restaurant_name",
+        }
         for row in rows
     )
     with TestClient(create_app(settings)) as client:
@@ -97,7 +106,7 @@ def test_home_empty_feed_and_escaped_transcript_with_local_time(database):
     city = add_location(engine, "Тестовый город", "feed-safe")
     with TestClient(create_app(settings)) as client:
         empty = client.get("/guide/")
-        assert "Жизнь кипит" in empty.text and "Пока нет отзывов." in empty.text
+        assert "Пульс:" in empty.text and "Пока нет отзывов." in empty.text
         assert 'class="home-review"' not in empty.text
         transcript = '<img src=x onerror="window.__reviewXss=true"> Вкусный суп.'
         add_review(engine, city, transcript, datetime(2026, 11, 6, 23, 30, tzinfo=UTC))
@@ -106,4 +115,81 @@ def test_home_empty_feed_and_escaped_transcript_with_local_time(database):
         assert "7 ноя · 02:30" in home.text and "2026-11-07T02:30:00+03:00" in home.text
         assert "ЕДА. ЛЮДИ. КАЧЕСТВО." in home.text
         assert "Куда отправимся?" not in home.text and "Прислушиваемся к вам." not in home.text
-        assert "Жизнь кипит" in client.get("/guide/?q=%20%20").text
+        assert "Пульс:" in client.get("/guide/?q=%20%20").text
+
+
+def prepared_pulse(database, *, restaurant_name="Листва", author="Иван"):
+    """Two confirmed mentions: the first is neutral and outside the public top."""
+    from .test_reviews2 import RESULT, prepared
+
+    first, second = str(uuid4()), str(uuid4())
+    source = f"Меня зовут {author}. Были в {restaurant_name}. Затем во Втором месте, вкусно."
+    answer = {
+        **RESULT,
+        "author_name": author,
+        "edited_text": source.split(". ", 1)[1],
+        "mentions": [
+            {
+                "name": name,
+                "restaurant_id": identity,
+                "sentiment": sentiment,
+                "suggested": False,
+                "evidence": name,
+                "source_name": name,
+            }
+            for name, identity, sentiment in [
+                (restaurant_name, first, None),
+                ("Втором месте", second, 1),
+            ]
+        ],
+    }
+    context = prepared(database, answer)
+    _, engine, city, review, *_ = context
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE reviews SET transcript=:source WHERE id=:id"),
+            {"source": source, "id": review},
+        )
+        for identity, name in [(first, restaurant_name), (second, "Втором месте")]:
+            conn.execute(
+                text(
+                    "INSERT INTO restaurants(id,location_id,name,active) VALUES(:id,:loc,:name,0)"
+                ),
+                {"id": identity, "loc": city["id"], "name": name},
+            )
+    return context
+
+
+def test_home_header_uses_first_confirmed_mention_even_without_vote(database):
+    from .test_reviews2 import state
+
+    settings, engine, city, review, _, service, worker, provider, calls = prepared_pulse(database)
+    read = VoiceReadModel(engine)
+    try:
+        assert worker.once()
+        analysis = state(engine, review)
+        assert analysis["result"] and not analysis["approved_at"]
+        assert read.latest_public_texts()[0]["restaurant_name"] is None
+        assert read.latest_public_texts()[0]["author_name"] is None
+        service.approve(review, str(analysis["job_id"]), "admin")
+        entry = read.latest_public_texts()[0]
+        assert entry["restaurant_name"] == "Листва" and entry["author_name"] == "Иван"
+        assert entry["transcript"] == "Были в Листва. Затем во Втором месте, вкусно."
+        with engine.connect() as conn:
+            # Only the second mention has a vote; it must not replace the first.
+            assert conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar() == 1
+        with TestClient(create_app(settings)) as client:
+            home = client.get("/guide/").text
+            assert 'class="home-review-restaurant" title="Листва">Листва</span>' in home
+            assert 'class="home-review-author" title="Иван">Иван</span>' in home
+            assert f'href="/guide/{city["slug"]}"' in home
+            assert 'class="home-review-restaurant" title="Втором месте"' not in home
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE reviews SET transcript='Новая расшифровка' WHERE id=:id"),
+                {"id": review},
+            )
+        assert read.latest_public_texts()[0]["restaurant_name"] is None
+        assert len(calls) == 1  # All analysis calls are mocked; reading schedules nothing.
+    finally:
+        provider.client.close()
