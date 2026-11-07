@@ -5,7 +5,7 @@ from sqlalchemy import Engine, text
 
 from involta_guide.domain.entities import NotFound
 from involta_guide.infrastructure.persistence.repositories.public_catalogue import PUBLIC
-from involta_guide.review_analysis.visibility import PUBLIC_REVIEW
+from involta_guide.review_analysis.visibility import PUBLIC_REVIEW, VISITOR_REVIEW
 from involta_voice.db import row
 
 
@@ -59,7 +59,7 @@ class VoiceReadModel:
             and not status.get("error_type"),
         }
 
-    def public_texts(self, location_id: int) -> list[dict[str, Any]]:
+    def public_texts(self, location_id: int, visitor: str | None = None) -> list[dict[str, Any]]:
         with self.engine.connect() as conn:
             return [
                 dict(r)
@@ -67,9 +67,9 @@ class VoiceReadModel:
                     text(f"""SELECT r.id::text reference,
                 coalesce(edited_text,transcript) transcript,author_name,created_at,number,publication_status,
                 CASE WHEN status='transcribed' THEN 'result_ready' ELSE 'accepted' END state
-                FROM reviews r WHERE location_id=:location AND {PUBLIC_REVIEW}
+                FROM reviews r WHERE location_id=:location AND {VISITOR_REVIEW}
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
-                    {"location": location_id},
+                    {"location": location_id, "visitor": visitor},
                 ).mappings()
             ]
 
@@ -87,7 +87,9 @@ class VoiceReadModel:
                 ).mappings()
             ]
 
-    def publication_states(self, location_id: int, references: list[str]) -> dict[str, int]:
+    def publication_states(
+        self, location_id: int, references: list[str], visitor: str | None = None
+    ) -> dict[str, int]:
         if not references:
             return {}
         with self.engine.connect() as conn:
@@ -95,9 +97,9 @@ class VoiceReadModel:
                 str(r["id"]): r["publication_status"]
                 for r in conn.execute(
                     text(
-                        f"SELECT r.id,CASE WHEN {PUBLIC_REVIEW} THEN 1 ELSE 0 END publication_status FROM reviews r WHERE location_id=:location AND id=ANY(CAST(:references AS uuid[]))"
+                        f"SELECT r.id,CASE WHEN {VISITOR_REVIEW} THEN 1 ELSE 0 END publication_status FROM reviews r WHERE location_id=:location AND id=ANY(CAST(:references AS uuid[]))"
                     ),
-                    {"location": location_id, "references": references},
+                    {"location": location_id, "references": references, "visitor": visitor},
                 ).mappings()
             }
 

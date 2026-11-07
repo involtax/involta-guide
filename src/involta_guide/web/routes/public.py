@@ -396,7 +396,9 @@ def routes(prefix: str) -> APIRouter:
         c = data["location"]
         if data["redirect"]:
             return RedirectResponse(ctx.settings.path("/" + c["slug"]), status_code=308)
-        public_reviews = VoiceReadModel(ctx.engine).public_texts(c["id"])
+        public_reviews = VoiceReadModel(ctx.engine).public_texts(
+            c["id"], visitor=request.cookies.get("guide_visitor") or None
+        )
         request.state.audience_page = True
         title = "Где поесть " + (c["in_phrase"] or "в " + c["name"])
         description = (

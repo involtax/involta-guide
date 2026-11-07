@@ -221,3 +221,55 @@ def test_manual_humor_overrides_late_other_and_retranscription(database):
             assert "Харчо друга" not in client.get("/guide/admin/reviews-2").text
     finally:
         provider.close()
+
+
+@pytest.mark.parametrize(
+    "category,hidden_by",
+    [
+        ("other", None),
+        ("bugs", None),
+        ("other", "deleted"),
+        ("other", "manual_bug"),
+    ],
+)
+def test_only_author_sees_other_on_location_and_widget(database, category, hidden_by):
+    from uuid import uuid4
+
+    settings, engine, city, review, event, service, worker, provider, _ = prepared(
+        database, {**RESULT, "category": category}
+    )
+    try:
+        assert worker.once()
+        if hidden_by == "deleted":
+            service.delete(review, "admin")
+        elif hidden_by == "manual_bug":
+            service.mark_bug(review, "admin")
+        owner = event["metadata"]["visitor"]
+        for visitor in (owner, str(uuid4()), None):
+            visible = visitor == owner and category == "other" and hidden_by is None
+            with TestClient(create_app(settings)) as client:
+                if visitor:
+                    client.cookies.set("guide_visitor", visitor)
+                page = client.get("/guide/" + city["slug"])
+                assert (SOURCE in page.text) == visible
+                assert "no-store" in page.headers["cache-control"]
+                assert "cookie" in page.headers["vary"].lower()
+                response = client.get(
+                    "/guide/voice/api/v1/reviews",
+                    params={"location": city["slug"], "pending": review},
+                )
+                assert response.status_code == 200
+                assert "no-store" in response.headers["cache-control"]
+                data = response.json()
+                assert bool(data["rows"]) == visible
+                assert data["publication_statuses"][review] == int(visible)
+                if visible:
+                    assert data["rows"][0]["transcript"] == SOURCE
+                    assert SOURCE in client.get("/guide/" + city["slug"]).text
+                assert SOURCE not in client.get("/guide/").text
+        read = VoiceReadModel(engine)
+        assert not read.public_texts(city["id"])
+        assert not read.latest_public_texts()
+        assert not PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
+    finally:
+        provider.close()
