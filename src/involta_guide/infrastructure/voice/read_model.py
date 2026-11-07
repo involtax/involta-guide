@@ -83,7 +83,8 @@ class VoiceReadModel:
                     l.name location_name,l.slug location_slug
                     FROM reviews r JOIN locations l ON l.id=r.location_id
                     LEFT JOIN review_analyses a ON a.review_id=r.id
-                        AND a.approved_at IS NOT NULL AND a.source_text=r.transcript
+                        AND a.source_text=r.transcript
+                        AND EXISTS(SELECT 1 FROM jobs aj WHERE aj.id=a.job_id AND aj.status='done')
                     LEFT JOIN restaurants venue ON venue.id=CAST(
                         a.result->'mentions'->0->>'restaurant_id' AS uuid)
                         AND venue.location_id=r.location_id
