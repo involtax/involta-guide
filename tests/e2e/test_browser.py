@@ -80,7 +80,8 @@ def test_browser_public_htmx_intro_logs_and_rebuild(database, tmp_path):
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(base + "/ivanovo")
-                expect(page.get_by_role("heading", name="Подборка в работе")).to_be_visible()
+                expect(page.get_by_role("heading", level=1)).to_contain_text("Где поесть")
+                expect(page.get_by_role("heading", name="Подборка в работе")).to_have_count(0)
                 assert "noindex" in page.locator("meta[name=robots]").get_attribute("content")
                 assert "/_next/" not in page.content()
                 # Keep exercising the real WASM/model, without a diagnostic UI.
@@ -133,11 +134,13 @@ def test_browser_public_htmx_intro_logs_and_rebuild(database, tmp_path):
                     ),
                 )
                 fill_button.click()
-                expect(fill_button).to_be_disabled()
+                expect(fill_button).to_be_hidden()
+                expect(fill.locator("[data-fill-waiting]")).to_be_visible()
                 expect(fill.get_by_role("status")).to_have_text(
                     "Тестовая ошибка поиска", timeout=10000
                 )
-                expect(fill_button).to_be_disabled()
+                expect(fill_button).to_be_hidden()
+                expect(fill.locator("[data-fill-waiting]")).to_be_hidden()
                 assert submissions == ["POST"]
                 page.unroute("**/api/locations/ivanovo/fill")
                 page.unroute("**/api/locations/ivanovo/fill/status")

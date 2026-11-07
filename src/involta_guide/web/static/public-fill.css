@@ -1,0 +1,63 @@
+.public-fill-intro {
+  max-width: 570px;
+  margin-top: 32px;
+}
+.public-fill-intro .lead { margin-top: 0; }
+.public-fill-spoiler { display: none; width: 100%; height: 98px; }
+:is([data-fill-state="queued"], [data-fill-state="running"]) .public-fill-intro .lead { display: none; }
+:is([data-fill-state="queued"], [data-fill-state="running"]) .public-fill-spoiler { display: block; }
+.public-fill-section { border-top: 0; padding-top: 0; }
+.public-fill { padding: 0 0 48px; text-align: center; }
+.public-fill-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 0 0 12px;
+  outline: none;
+}
+.public-fill-waiting[hidden], .public-fill form[hidden] { display: none; }
+.public-fill-spinner { width: 96px; height: 96px; flex: none; }
+.public-fill-spinner circle {
+  fill: var(--black);
+  opacity: 0.14;
+  animation: public-fill-dot 1.2s linear infinite;
+  animation-delay: calc(var(--dot) * 100ms - 1200ms);
+}
+.public-fill-message {
+  width: 100%;
+  max-width: 650px;
+  min-height: 65px;
+  margin: 0;
+  font: 400 23px/1.4 Arial, Helvetica, sans-serif;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  transition: opacity 230ms ease, transform 230ms ease;
+}
+.public-fill-message.is-changing { opacity: 0; transform: translateY(-5px); }
+.public-fill-status { margin: 22px auto 0; max-width: 650px; font-size: 18px; overflow-wrap: anywhere; }
+.public-fill-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+@keyframes public-fill-dot {
+  0%, 100% { opacity: 0.14; }
+  25% { opacity: 1; }
+  65% { opacity: 0.14; }
+}
+@media (max-width: 550px) {
+  .public-fill-spoiler { height: 110px; }
+  .public-fill { padding-bottom: 36px; }
+  .public-fill-waiting { gap: 27px; }
+  .public-fill-spinner { width: 88px; height: 88px; }
+  .public-fill-message { font-size: 21px; min-height: 90px; max-width: 340px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-fill-spinner circle { animation: none; opacity: 0.5; }
+  .public-fill-message { transition: none; }
+}

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Город проявляется — макет ожидания</title>
+<style>
+:root{--ink:#151515;--muted:#747474;--line:#dededb}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:white;color:var(--ink);font:16px/1.6 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}button,select{font:inherit}button,a,select{touch-action:manipulation}button{cursor:pointer}a{color:inherit;text-decoration:none}button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--ink);outline-offset:4px}
+.preview{padding:12px 24px;background:#f5f5f2;border-bottom:1px solid var(--line);display:flex;gap:12px 22px;align-items:center;flex-wrap:wrap;font-size:12px}.preview strong{font-weight:500;letter-spacing:.06em;text-transform:uppercase}.preview label{display:flex;align-items:center;gap:8px}.preview select{font-size:12px;background:white;border:1px solid var(--line);padding:6px}.preview button{border:0;background:none;padding:4px 0;text-decoration:underline;text-underline-offset:3px;font-size:12px}.preview a{margin-left:auto;text-decoration:underline}.clean .preview{display:none}
+.header{max-width:1360px;margin:auto;padding:35px 64px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:baseline;gap:7px;font-size:28px;font-weight:700;letter-spacing:-1.5px}.brand span{font:italic 400 28px Georgia,serif}.brand sup{font-size:10px;letter-spacing:1px;font-weight:400;margin-left:15px;align-self:flex-start;padding-top:9px;text-transform:uppercase}main{max-width:1232px;margin:auto;padding:0 48px}.hero{padding:60px 0 0}.hero h1{font-size:clamp(55px,7.4vw,104px);font-weight:500;line-height:.99;letter-spacing:-.075em;margin:0 0 32px}.serif{font-family:Georgia,serif;font-style:italic;font-weight:400;letter-spacing:-.065em}
+.intro{width:100%;max-width:570px;min-height:98px;position:relative}.intro canvas{display:block;width:100%;height:98px}.intro-real,.intro-idle{margin:0;font-size:18px;line-height:1.6;max-width:570px}.intro-real{animation:reveal .65s ease both}.work-area{padding:40px 0 48px;min-height:276px;display:grid;place-items:center}.waiting{display:flex;flex-direction:column;align-items:center;gap:28px;width:100%}.loader{height:96px;width:96px;position:relative;flex:none}.loader svg{height:100%;width:100%;display:block;overflow:visible}.loader .track{fill:none;stroke:#eeedeb;stroke-width:2}.arc{animation:rotate 2.2s linear infinite}.arc .stroke{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:3 230;animation:stretch 1.8s cubic-bezier(.45,0,.55,1) infinite}.dots circle{fill:var(--ink);opacity:.1;animation:dot 1.2s linear infinite;animation-delay:calc(var(--i)*.1s)}.orbits .outer{transform-origin:48px 48px;animation:rotate 2.5s linear infinite}.orbits .inner{transform-origin:48px 48px;animation:rotate 3.6s linear infinite reverse}.orbits path{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round}.pulse .wave{fill:none;stroke:var(--ink);stroke-width:1.5;transform-origin:48px 48px;animation:wave 2.6s ease-out infinite}.pulse .wave:nth-child(2){animation-delay:1.3s}.pulse .core{fill:var(--ink);transform-origin:48px 48px;animation:breathe 2.6s ease-in-out infinite}
+.message{margin:0;max-width:650px;width:100%;min-height:62px;text-align:center;font:400 23px/1.4 Arial,Helvetica,sans-serif;letter-spacing:-.025em;text-wrap:balance;transition:opacity .23s ease,transform .23s ease}.message.out{opacity:0;transform:translateY(-5px)}.idle,.error{text-align:center;font:400 23px/1.4 Arial,Helvetica,sans-serif;max-width:650px}.idle p,.error p{margin:0 0 24px}.start{padding:14px 24px;border:1px solid var(--ink);background:var(--ink);color:white;font-size:17px}.error a{font-size:16px;text-decoration:underline;text-underline-offset:4px}.result{width:100%;animation:reveal .6s ease both}.result h2{font-size:26px;font-weight:500;letter-spacing:-.04em;margin:0 0 32px}.result h3{font-size:38px;font-weight:500;letter-spacing:-.04em;margin:0 0 16px}.result p{max-width:570px;font-size:16px;margin:0}.result .example{color:var(--muted);font-size:12px;margin-top:18px}.context{padding:30px 0 38px;border-top:1px solid var(--line)}.context h2{font-weight:500;letter-spacing:-.04em;font-size:26px;margin:0 0 12px}.context p{font-size:16px;color:var(--muted);margin:0}.footer{max-width:1232px;margin:auto;border-top:1px solid var(--line);padding:28px 48px 35px;display:flex;gap:24px;color:var(--muted);font-size:11px}
+.gallery-panel{display:none;max-width:1280px;margin:auto;padding:48px}.gallery-mode .preview,.gallery-mode .header,.gallery-mode main,.gallery-mode .footer{display:none}.gallery-mode .gallery-panel{display:block}.gallery-panel h1{font-size:36px;letter-spacing:-.04em;font-weight:500;line-height:1.2;margin:0 0 10px}.gallery-panel>p{color:var(--muted);margin:0 0 44px}.samples{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}.sample{border-top:1px solid var(--line);padding-top:24px}.sample .loader{margin:24px auto 38px}.sample h2{font-size:20px;line-height:1.3;letter-spacing:-.03em;font-weight:400;margin:0 0 12px}.sample p{font-size:15px;color:var(--muted);margin:0}.sample a{display:inline-block;margin-top:24px;font-size:14px;text-decoration:underline;text-underline-offset:4px}.gallery-panel .footnote{margin-top:48px;font-size:13px;max-width:680px}
+@keyframes rotate{to{transform:rotate(360deg)}}@keyframes stretch{0%{stroke-dasharray:3 230;stroke-dashoffset:0}50%{stroke-dasharray:120 230;stroke-dashoffset:-30}100%{stroke-dasharray:3 230;stroke-dashoffset:-228}}@keyframes dot{0%,100%{opacity:.12}25%{opacity:1}65%{opacity:.12}}@keyframes wave{0%{transform:scale(.35);opacity:0}15%{opacity:.65}100%{transform:scale(1);opacity:0}}@keyframes breathe{0%,100%{transform:scale(.7)}50%{transform:scale(1)}}@keyframes reveal{from{opacity:0;filter:blur(5px);transform:translateY(4px)}to{opacity:1;filter:blur(0);transform:translateY(0)}}
+@media(max-width:850px){.header{padding:28px 30px}main{padding:0 30px}.footer{padding-left:30px;padding-right:30px}.samples{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}.gallery-panel{padding:32px}}
+@media(max-width:550px){.preview{padding:12px 20px;gap:8px 14px}.preview strong{width:100%}.preview a{margin-left:0}.header{padding:24px 25px}.brand{font-size:25px}.brand span{font-size:25px}.brand sup{margin-left:9px;font-size:9px}main{padding:0 25px}.hero{padding:45px 0 0}.hero h1{font-size:57px;margin-bottom:28px}.intro{min-height:110px}.intro canvas{height:110px}.intro-real,.intro-idle{font-size:16px}.work-area{min-height:292px;padding:34px 0 36px}.waiting{gap:27px}.loader{width:88px;height:88px}.message{font-size:21px;min-height:90px;max-width:340px}.context{padding:27px 0 32px}.context h2{font-size:22px}.footer{padding:25px}.gallery-panel{padding:28px 22px}.gallery-panel h1{font-size:30px}.samples{gap:24px 20px}.sample h2{font-size:18px}.sample p{font-size:14px}.sample .loader{width:80px;height:80px}.idle,.error{font-size:21px}.result h3{font-size:30px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}.arc .stroke{stroke-dasharray:95 230}.dots circle{opacity:.5}.pulse .wave{opacity:.3}.pulse .core{opacity:1}}
+</style>
+<div class="preview"><strong>Согласованный макет · город проявляется</strong><label>Спиннер <select id="spinner-choice"><option value="arc">1 · Живая дуга</option><option value="dots" selected>2 · Точки</option><option value="orbits">3 · Орбиты</option><option value="pulse">4 · Пульс</option></select></label><label>Состояние <select id="state-choice"><option value="idle">До нажатия</option><option value="loading" selected>Поиск</option><option value="long">Долгое ожидание</option><option value="error">Ошибка</option><option value="ready">Готово · пример</option></select></label><button type="button" id="next">Следующая фраза</button><button type="button" id="finish">Показать результат · пример</button><a href="?gallery=1">Все спиннеры ↗</a></div>
+<header class="header"><a href="#" class="brand">инвольта<span>гид</span><sup>Россия</sup></a></header>
+<main>
+  <section class="hero"><h1>Где поесть<br><span class="serif">в Шуе.</span></h1><div class="intro" aria-busy="true"><canvas id="spoiler" aria-hidden="true"></canvas><p class="intro-idle" hidden>Здесь скоро появится короткая подборка мест, которые стоит посетить.</p><p class="intro-real" hidden>Шуя — город для неспешных прогулок и долгих разговоров за столом. После старых улиц и набережной особенно хочется найти место, в котором тепло, шумно и вкусно.</p></div></section>
+  <section class="work-area" aria-label="Подборка ресторанов"><div class="idle" hidden><p>Найдём места, которые стоит посетить.</p><button class="start" type="button">Запарсить эти данные</button></div><div class="waiting"><div class="loader" id="main-loader" aria-hidden="true"></div><p class="message" aria-hidden="true"></p><span id="accessible-status" role="status" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Идёт поиск ресторанов. Готовая подборка появится автоматически.</span></div><div class="error" role="alert" hidden><p>Поиск завершился с ошибкой.</p><a href="#" id="error-link">Посмотреть, что произошло ↗</a></div><div class="result" hidden><h2>Стоит зайти</h2><h3>01 &nbsp; Марани</h3><p>Грузинская кухня, горячие хачапури и повод задержаться за ужином.</p><p class="example">Демонстрационные вступление и ресторан. В рабочей версии загрузится реальная подборка.</p></div></section>
+  <section class="context"><h2>Твой голос <span class="serif">важен.</span></h2><p>Скажи, что ты думаешь и о каком ресторане.</p></section>
+</main>
+<footer class="footer"><span>Я тут в первый раз</span><span>Для ассистентов</span></footer>
+<section class="gallery-panel"><h1>Четыре движения.<br>Один спокойный интерфейс.</h1><p>Спиннер по центру. Одна фраза под ним. Вся анимация — в офлайн-макете.</p><div class="samples"></div><p class="footnote">Выбран владельцем №2 — точки. Остальные варианты оставлены для сравнения в макете. Во всех вариантах один шрифт текста: Arial.</p></section>
+<script>
+(() => {
+  const messages = [
+    'Запускаем гастрономическую разведку.',
+    'Сканируем город и его окрестности.',
+    'Собираем сигналы: меню, отзывы, репутацию.',
+    'Фильтруем шум. Выделяем сильные места.',
+    'Сопоставляем кухню, сервис и атмосферу.',
+    'Сводим лучшие находки в короткий список.',
+    'Собираем вашу подборку из проверенных мест.'
+  ];
+  const variants = {
+    arc: {name:'1 · Живая дуга', description:'Дуга плавно вытягивается и собирается. Самый спокойный вариант.', svg:'<svg class="arc" viewBox="0 0 96 96"><circle class="track" cx="48" cy="48" r="36"/><circle class="stroke" cx="48" cy="48" r="36"/></svg>'},
+    dots: {name:'2 · Точки', description:'Двенадцать точек загораются по кругу. Чуть больше жизни.', svg:'<svg class="dots" viewBox="0 0 96 96">'+Array.from({length:12},(_,i)=>'<circle cx="48" cy="12" r="3" transform="rotate('+i*30+' 48 48)" style="--i:'+i+'"/>').join('')+'</svg>'},
+    orbits: {name:'3 · Орбиты', description:'Две тонкие дуги движутся навстречу. Более выразительный рисунок.', svg:'<svg class="orbits" viewBox="0 0 96 96"><circle class="track" cx="48" cy="48" r="37"/><circle class="track" cx="48" cy="48" r="24"/><g class="outer"><path d="M48 11a37 37 0 0 1 37 37"/><circle cx="85" cy="48" r="3" fill="#151515"/></g><g class="inner"><path d="M48 72a24 24 0 0 1-24-24"/></g></svg>'},
+    pulse: {name:'4 · Пульс', description:'Круги расходятся от центра. Мягко и без постоянного вращения.', svg:'<svg class="pulse" viewBox="0 0 96 96"><circle class="wave" cx="48" cy="48" r="38"/><circle class="wave" cx="48" cy="48" r="38"/><circle class="core" cx="48" cy="48" r="5"/></svg>'}
+  };
+  const params=new URLSearchParams(location.search);
+  const spinnerChoice=document.querySelector('#spinner-choice');
+  const stateChoice=document.querySelector('#state-choice');
+  const canvas=document.querySelector('#spoiler');
+  const ctx=canvas.getContext('2d');
+  const motion=matchMedia('(prefers-reduced-motion: reduce)');
+  const message=document.querySelector('.message');
+  let messageIndex=0, messageTimer, fadeTimer, frame=0, previousDraw=0, particles=[], loading=false;
+  if(params.get('clean')==='1') document.body.classList.add('clean');
+  if(params.get('gallery')==='1') document.body.classList.add('gallery-mode');
+  if(variants[params.get('spinner')]) spinnerChoice.value=params.get('spinner');
+  if([...stateChoice.options].some(o=>o.value===params.get('state'))) stateChoice.value=params.get('state');
+  document.querySelector('.samples').innerHTML=Object.entries(variants).map(([key,v])=>'<article class="sample"><div class="loader" aria-hidden="true">'+v.svg+'</div><h2>'+v.name+'</h2><p>'+v.description+'</p><a href="?spinner='+key+'">Открыть на странице ↗</a></article>').join('');
+  function resizeSpoiler(){
+    const width=canvas.clientWidth||570, height=canvas.clientHeight||98, dpr=Math.min(devicePixelRatio||1,2);
+    canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+    const widths=width<400?[.97,.88,.96,.61]:[.96,.91,.64];
+    particles=[];
+    let seed=731; const random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};
+    widths.forEach((ratio,row)=>{const lineWidth=width*ratio;for(let i=0;i<lineWidth*1.75;i++) particles.push({x:random()*lineWidth,y:row*27+8+random()*12,r:.45+random()*.7,a:.12+random()*.35,phase:random()*Math.PI*2,speed:.4+random()*.8});});
+    drawSpoiler(0);
+  }
+  function drawSpoiler(time){
+    const w=canvas.clientWidth||570,h=canvas.clientHeight||98;ctx.clearRect(0,0,w,h);
+    const t=motion.matches?0:time/1000;
+    for(const p of particles){const x=p.x+Math.sin(t*p.speed+p.phase)*1.7,y=p.y+Math.cos(t*p.speed*.8+p.phase)*1.2;ctx.beginPath();ctx.arc(x,y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(21,21,21,'+(p.a*(.72+.28*Math.sin(t*1.5+p.phase)))+')';ctx.fill();}
+  }
+  function animate(time){if(!loading||motion.matches||document.hidden)return;if(time-previousDraw>40){drawSpoiler(time);previousDraw=time;}frame=requestAnimationFrame(animate);}
+  function nextMessage(){
+    if(!loading)return;
+    messageIndex=(messageIndex+1)%messages.length;
+    message.classList.add('out');
+    clearTimeout(fadeTimer);
+    fadeTimer=setTimeout(()=>{message.textContent=messages[messageIndex];message.classList.remove('out');},motion.matches?0:230);
+  }
+  function render(){
+    clearInterval(messageTimer);clearTimeout(fadeTimer);cancelAnimationFrame(frame);
+    const state=stateChoice.value;
+    loading=(state==='loading'||state==='long')&&params.get('gallery')!=='1';
+    document.querySelector('.idle').hidden=state!=='idle';
+    document.querySelector('.waiting').hidden=!loading;
+    document.querySelector('.error').hidden=state!=='error';
+    document.querySelector('.result').hidden=state!=='ready';
+    document.querySelector('.intro-real').hidden=state!=='ready';
+    document.querySelector('.intro-idle').hidden=state!=='idle';
+    canvas.hidden=!loading;
+    document.querySelector('.intro').setAttribute('aria-busy',String(loading));
+    document.querySelector('#main-loader').innerHTML=variants[spinnerChoice.value].svg;
+    message.classList.remove('out');messageIndex=0;
+    message.textContent=state==='long'?'Поиск продолжается. Хорошим местам стоит дать немного времени.':messages[0];
+    if(loading){resizeSpoiler();frame=requestAnimationFrame(animate);messageTimer=setInterval(nextMessage,5000);}
+  }
+  spinnerChoice.addEventListener('change',()=>{document.querySelector('#main-loader').innerHTML=variants[spinnerChoice.value].svg;});
+  stateChoice.addEventListener('change',render);
+  document.querySelector('.start').addEventListener('click',()=>{stateChoice.value='loading';render();});
+  document.querySelector('#next').addEventListener('click',nextMessage);
+  document.querySelector('#finish').addEventListener('click',()=>{stateChoice.value='ready';render();});
+  document.querySelector('#error-link').addEventListener('click',e=>e.preventDefault());
+  addEventListener('resize',()=>{if(loading)resizeSpoiler();});
+  document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(frame);if(!document.hidden&&loading)frame=requestAnimationFrame(animate);});
+  motion.addEventListener('change',()=>{cancelAnimationFrame(frame);if(loading){drawSpoiler(0);if(!motion.matches)frame=requestAnimationFrame(animate);}});
+  render();
+})();
+</script>
+</html>
