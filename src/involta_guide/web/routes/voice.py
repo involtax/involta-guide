@@ -373,12 +373,13 @@ def routes(prefix: str) -> APIRouter:
             raise HTTPException(404, "Локация не найдена")
         city = public["location"]
         read = VoiceReadModel(ctx.engine)
-        rows = read.public_texts(city["id"])
+        visitor = request.cookies.get("guide_visitor") or None
+        rows = read.public_texts(city["id"], visitor=visitor)
         try:
             references = [str(UUID(value)) for value in pending.split(",")[:30] if value]
         except ValueError:
             raise HTTPException(422, "Некорректный идентификатор отзыва") from None
-        states = read.publication_states(city["id"], references)
+        states = read.publication_states(city["id"], references, visitor=visitor)
         rows = [item for item in rows if states.get(item["reference"], 1) == 1]
         for item in rows:
             item["log_url"] = ctx.settings.path(
