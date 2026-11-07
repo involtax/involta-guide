@@ -32,6 +32,7 @@ RESULT = {
             "sentiment": 1,
             "suggested": True,
             "evidence": "Добавьте ресторан Листва",
+            "source_name": "Листва",
         }
     ],
     "reason": "Предложение ресторана",
@@ -84,6 +85,87 @@ def state(engine, review):
             .mappings()
             .one()
         )
+
+
+def test_known_restaurant_spelling_is_previewed_and_applied_only_on_approval(database):
+    source = "Ресторан Папараццо, очень вкусно."
+    restaurant = str(uuid4())
+    answer = {
+        **RESULT,
+        "author_name": None,
+        "edited_text": source,
+        "mentions": [
+            {
+                "name": "Paparazzi bistro",
+                "restaurant_id": restaurant,
+                "sentiment": 1,
+                "suggested": False,
+                "evidence": source,
+                "source_name": "Папараццо",
+            }
+        ],
+    }
+    settings, engine, city, review, _, service, worker, provider, calls = prepared(database, answer)
+    expected = "Ресторан Paparazzi bistro, очень вкусно."
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO restaurants(id,location_id,name,active) VALUES(:id,:loc,'Paparazzi bistro',0)"
+                ),
+                {"id": restaurant, "loc": city["id"]},
+            )
+            conn.execute(
+                text("UPDATE reviews SET transcript=:source WHERE id=:id"),
+                {"source": source, "id": review},
+            )
+        assert worker.once()
+        analysis = state(engine, review)
+        assert analysis["result"]["edited_text"] == expected
+        assert analysis["result"]["mentions"][0]["evidence"] == source
+        assert len(calls) == 1
+        schema = calls[0]["text"]["format"]["schema"]["$defs"]["Mention"]
+        assert "source_name" in schema["required"]
+        with engine.connect() as conn:
+            before = (
+                conn.execute(
+                    text("SELECT transcript,edited_text FROM reviews WHERE id=:id"), {"id": review}
+                )
+                .mappings()
+                .one()
+            )
+            assert before["transcript"] == source and before["edited_text"] is None
+            assert (
+                conn.execute(
+                    text("SELECT count(*) FROM review_restaurant_votes WHERE review_id=:id"),
+                    {"id": review},
+                ).scalar()
+                == 0
+            )
+        with TestClient(create_app(settings)) as client:
+            login(client)
+            page = client.get("/guide/admin/reviews-2/new")
+            assert source in page.text and expected in page.text
+        service.approve(review, str(analysis["job_id"]), "admin")
+        service.approve(review, str(analysis["job_id"]), "admin")
+        with engine.connect() as conn:
+            after = (
+                conn.execute(
+                    text("SELECT transcript,edited_text FROM reviews WHERE id=:id"), {"id": review}
+                )
+                .mappings()
+                .one()
+            )
+            assert after["transcript"] == source and after["edited_text"] == expected
+            assert (
+                conn.execute(
+                    text("SELECT value FROM review_restaurant_votes WHERE review_id=:id"),
+                    {"id": review},
+                ).scalar_one()
+                == 1
+            )
+    finally:
+        provider.close()
 
 
 def test_automatic_analysis_then_atomic_approval_new_restaurant_and_delete(database):

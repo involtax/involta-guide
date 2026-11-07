@@ -9,6 +9,7 @@ from involta_guide.infrastructure.ai.background import BackgroundGeneration
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_voice.db import encoded, execute, row
 
+from .names import restore_restaurant_names
 from .schema import Analysis
 
 
@@ -103,9 +104,9 @@ class ReviewAnalysis:
                 "text": {
                     "format": {
                         "type": "json_schema",
-                        "name": "review_analysis_v1",
+                        "name": "review_analysis_v2",
                         "strict": True,
-                        "schema": Analysis.model_json_schema(),
+                        "schema": Analysis.response_schema(),
                     }
                 },
             },
@@ -134,6 +135,7 @@ class ReviewAnalysis:
                 raise RuleViolation("ИИ вернул ресторан вне переданного каталога")
             if mention.suggested and not mention.restaurant_id and mention.sentiment != 1:
                 raise RuleViolation("Предложение нового ресторана должно содержать голос +1")
+        result = restore_restaurant_names(result, payload["review_text"], payload["restaurants"])
         with self.engine.begin() as conn:
             self._lock_location(conn, job["review_id"])
             review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=job["review_id"])
