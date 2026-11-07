@@ -160,7 +160,7 @@ def prepared_pulse(database, *, restaurant_name="Листва", author="Иван
     return context
 
 
-def test_home_header_uses_first_confirmed_mention_even_without_vote(database):
+def test_home_header_shows_known_restaurant_before_approval_but_votes_wait_for_ok(database):
     from .test_reviews2 import state
 
     settings, engine, city, review, _, service, worker, provider, calls = prepared_pulse(database)
@@ -170,7 +170,21 @@ def test_home_header_uses_first_confirmed_mention_even_without_vote(database):
         analysis = state(engine, review)
         assert analysis["result"] and not analysis["approved_at"]
         assert read.latest_public_texts()[0]["restaurant_name"] == "Листва"
-        assert read.latest_public_texts()[0]["author_name"] == "Иван"
+        assert read.latest_public_texts()[0]["author_name"] is None
+        with engine.connect() as conn:
+            assert (
+                conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar_one() == 0
+            )
+            assert (
+                conn.execute(
+                    text("SELECT applied FROM jobs WHERE id=:id"), {"id": analysis["job_id"]}
+                ).scalar_one()
+                is False
+            )
+        with TestClient(create_app(settings)) as client:
+            before = client.get("/guide/").text
+            assert 'class="home-review-restaurant" title="Листва">Листва</span>' in before
+            assert 'class="home-review-author" title="Иван">Иван</span>' not in before
         service.approve(review, str(analysis["job_id"]), "admin")
         entry = read.latest_public_texts()[0]
         assert entry["restaurant_name"] == "Листва" and entry["author_name"] == "Иван"
@@ -193,3 +207,33 @@ def test_home_header_uses_first_confirmed_mention_even_without_vote(database):
         assert len(calls) == 1  # All analysis calls are mocked; reading schedules nothing.
     finally:
         provider.client.close()
+
+
+def test_unknown_suggestion_waits_for_ok_and_failed_analysis_never_supplies_header(database):
+    from .test_reviews2 import prepared, state
+
+    settings, engine, city, review, _, service, worker, provider, _ = prepared(database)
+    read = VoiceReadModel(engine)
+    try:
+        assert worker.once()
+        analysis = state(engine, review)
+        assert read.latest_public_texts()[0]["restaurant_name"] is None
+        with engine.connect() as conn:
+            assert (
+                conn.execute(
+                    text("SELECT count(*) FROM restaurants WHERE name='Листва'")
+                ).scalar_one()
+                == 0
+            )
+            assert (
+                conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar_one() == 0
+            )
+        service.approve(review, str(analysis["job_id"]), "admin")
+        assert read.latest_public_texts()[0]["restaurant_name"] == "Листва"
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE jobs SET status='failed' WHERE id=:id"), {"id": analysis["job_id"]}
+            )
+        assert read.latest_public_texts()[0]["restaurant_name"] is None
+    finally:
+        provider.close()

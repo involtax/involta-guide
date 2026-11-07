@@ -1,7 +1,6 @@
 from typing import Any
 from uuid import uuid4
 
-from pydantic import ValidationError
 from sqlalchemy import Connection, Engine, text
 
 from involta_guide.config import Settings
@@ -20,7 +19,6 @@ class ReviewAnalysis:
 
     def schedule(self) -> int:
         """Only the worker enqueues ready transcripts. GET requests never schedule work."""
-        self.apply_pending()
         prompt = (self.settings.root_dir / "data/prompts/review-analysis-v1.txt").read_text()
         with self.engine.begin() as conn:
             if not conn.execute(text("SELECT pg_try_advisory_xact_lock(47031015)")).scalar():
@@ -139,7 +137,7 @@ class ReviewAnalysis:
                 raise RuleViolation("Предложение нового ресторана должно содержать голос +1")
         result = restore_restaurant_names(result, payload["review_text"], payload["restaurants"])
         with self.engine.begin() as conn:
-            location = self._lock_location(conn, job["review_id"])
+            self._lock_location(conn, job["review_id"])
             review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=job["review_id"])
             live = row(
                 conn,
@@ -150,13 +148,7 @@ class ReviewAnalysis:
                 owner=job["lease_owner"],
                 source=review["transcript"] if review else None,
             )
-            if (
-                not live
-                or not review
-                or review["status"] != "transcribed"
-                or review["content_epoch"] != location["content_epoch"]
-                or location["content_epoch"] != job["content_epoch"]
-            ):
+            if not live or not review or review["status"] != "transcribed":
                 raise Conflict("Результат обработки устарел")
             execute(
                 conn,
@@ -171,65 +163,6 @@ class ReviewAnalysis:
                 id=job["id"],
                 result=result.model_dump_json(),
             )
-            analysis = row(conn, "SELECT * FROM review_analyses WHERE job_id=:id", id=job["id"])
-            if not analysis:
-                raise Conflict("Анализ отзыва отсутствует")
-            self._apply(conn, location, review, analysis)
-
-    def apply_pending(self) -> int:
-        """Apply saved successful analyses without another provider request."""
-        with self.engine.connect() as conn:
-            ids = list(
-                conn.execute(
-                    text("""SELECT a.review_id,a.job_id FROM review_analyses a
-                JOIN jobs j ON j.id=a.job_id JOIN reviews r ON r.id=a.review_id
-                JOIN locations l ON l.id=r.location_id
-                WHERE j.status='done' AND NOT j.applied AND j.error IS NULL
-                AND a.result IS NOT NULL AND a.manual_category IS NULL
-                AND a.source_text=r.transcript AND r.status='transcribed'
-                AND r.content_epoch=l.content_epoch AND NOT l.reset_pending
-                ORDER BY r.created_at,r.id LIMIT 20""")
-                ).mappings()
-            )
-        applied = 0
-        for candidate in ids:
-            identity, expected_job = candidate["review_id"], candidate["job_id"]
-            try:
-                with self.engine.begin() as conn:
-                    location = self._lock_location(conn, str(identity))
-                    review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=identity)
-                    analysis = row(
-                        conn,
-                        "SELECT * FROM review_analyses WHERE review_id=:id FOR UPDATE",
-                        id=identity,
-                    )
-                    if (
-                        not review
-                        or not analysis
-                        or review["status"] != "transcribed"
-                        or analysis["job_id"] != expected_job
-                        or analysis["source_text"] != review["transcript"]
-                        or review["content_epoch"] != location["content_epoch"]
-                    ):
-                        continue
-                    self._apply(conn, location, review, analysis)
-                    applied += 1
-            except (Conflict, RuleViolation, NotFound, ValidationError) as error:
-                with self.engine.begin() as conn:
-                    self._audit(
-                        conn,
-                        str(identity),
-                        "review_auto_apply_failed",
-                        {"job": str(expected_job), "error": str(error)},
-                    )
-                    execute(
-                        conn,
-                        "UPDATE jobs j SET error=:error FROM review_analyses a WHERE a.review_id=:id AND a.job_id=j.id AND j.id=:job AND j.status='done' AND NOT j.applied",
-                        id=identity,
-                        job=expected_job,
-                        error=str(error),
-                    )
-        return applied
 
     @staticmethod
     def _lock_location(conn: Connection, review_id: str) -> dict[str, Any]:
@@ -245,7 +178,6 @@ class ReviewAnalysis:
         return location
 
     def approve(self, review_id: str, job_id: str, actor: str) -> None:
-        """Mark the current applied result as seen; do not change public data."""
         with self.engine.begin() as conn:
             location = self._lock_location(conn, review_id)
             review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=review_id)
@@ -266,119 +198,94 @@ class ReviewAnalysis:
                 raise Conflict("Категория отзыва задана вручную")
             if analysis["approved_at"]:
                 return
-            job = row(conn, "SELECT applied,status FROM jobs WHERE id=:id", id=job_id)
-            if not job or job["status"] != "done" or not job["applied"]:
-                raise Conflict("Результат ещё не применён автоматически. Обновите страницу.")
+            result = Analysis.model_validate(analysis["result"])
+            applied: dict[str, int] = {}
+            resolved = []
+            if result.category == "ok":
+                for mention in result.mentions:
+                    restaurant = None
+                    if mention.restaurant_id:
+                        restaurant = row(
+                            conn,
+                            "SELECT id,name FROM restaurants WHERE id=:id AND location_id=:loc",
+                            id=str(mention.restaurant_id),
+                            loc=location["id"],
+                        )
+                        if not restaurant:
+                            raise Conflict("Ресторан из предложения больше не доступен")
+                    elif mention.suggested:
+                        # The location lock serializes approvals; exact names reuse one catalogue row.
+                        restaurant = row(
+                            conn,
+                            "SELECT id,name FROM restaurants WHERE location_id=:loc AND lower(trim(name))=lower(trim(:name)) ORDER BY number LIMIT 1",
+                            loc=location["id"],
+                            name=mention.name,
+                        )
+                        if not restaurant:
+                            restaurant = {"id": str(uuid4()), "name": mention.name.strip()}
+                            execute(
+                                conn,
+                                """INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,phone,active)
+                                VALUES(:id,:loc,:name,NULL,NULL,NULL,NULL,0)""",
+                                id=restaurant["id"],
+                                loc=location["id"],
+                                name=restaurant["name"],
+                            )
+                    resolved.append(
+                        {
+                            **mention.model_dump(mode="json"),
+                            "restaurant_id": str(restaurant["id"]) if restaurant else None,
+                        }
+                    )
+                    if restaurant and mention.sentiment is not None:
+                        key = str(restaurant["id"])
+                        if key in applied and applied[key] != mention.sentiment:
+                            raise RuleViolation("Противоречащие оценки одного ресторана")
+                        applied[key] = mention.sentiment
+            execute(conn, "DELETE FROM review_restaurant_votes WHERE review_id=:id", id=review_id)
+            for restaurant_id, value in applied.items():
+                execute(
+                    conn,
+                    "INSERT INTO review_restaurant_votes(review_id,restaurant_id,value) VALUES(:review,:restaurant,:value)",
+                    review=review_id,
+                    restaurant=restaurant_id,
+                    value=value,
+                )
             execute(
                 conn,
-                "UPDATE review_analyses SET approved_at=now(),approved_by=:actor WHERE review_id=:id",
+                "UPDATE reviews SET author_name=:name,edited_text=:text,publication_status=CASE WHEN :text='' THEN 0 ELSE publication_status END WHERE id=:id",
+                id=review_id,
+                name=result.author_name,
+                text=result.edited_text,
+            )
+            execute(
+                conn,
+                "UPDATE review_analyses SET approved_at=now(),approved_by=:actor,result=CAST(:result AS jsonb) WHERE review_id=:id",
                 id=review_id,
                 actor=actor,
-            )
-            self._audit(
-                conn, review_id, "review_analysis_acknowledged", {"actor": actor, "job": job_id}
-            )
-
-    def _apply(
-        self,
-        conn: Connection,
-        location: dict[str, Any],
-        review: dict[str, Any],
-        analysis: dict[str, Any],
-    ) -> None:
-        review_id, job_id = str(review["id"]), str(analysis["job_id"])
-        job = row(conn, "SELECT applied,status FROM jobs WHERE id=:id FOR UPDATE", id=job_id)
-        if not job or job["status"] != "done":
-            raise Conflict("Анализ ещё не завершён")
-        if job["applied"] or analysis["manual_category"]:
-            return
-        result = Analysis.model_validate(analysis["result"])
-        applied: dict[str, int] = {}
-        resolved = []
-        if result.category == "ok":
-            for mention in result.mentions:
-                restaurant = None
-                if mention.restaurant_id:
-                    restaurant = row(
-                        conn,
-                        "SELECT id,name FROM restaurants WHERE id=:id AND location_id=:loc",
-                        id=str(mention.restaurant_id),
-                        loc=location["id"],
-                    )
-                    if not restaurant:
-                        raise Conflict("Ресторан из предложения больше не доступен")
-                elif mention.suggested:
-                    # The location lock serializes automatic applications; exact names reuse one catalogue row.
-                    restaurant = row(
-                        conn,
-                        "SELECT id,name FROM restaurants WHERE location_id=:loc AND lower(trim(name))=lower(trim(:name)) ORDER BY number LIMIT 1",
-                        loc=location["id"],
-                        name=mention.name,
-                    )
-                    if not restaurant:
-                        restaurant = {"id": str(uuid4()), "name": mention.name.strip()}
-                        execute(
-                            conn,
-                            """INSERT INTO restaurants(id,location_id,name,cuisine,description,maps_url,phone,active)
-                            VALUES(:id,:loc,:name,NULL,NULL,NULL,NULL,0)""",
-                            id=restaurant["id"],
-                            loc=location["id"],
-                            name=restaurant["name"],
-                        )
-                resolved.append(
+                result=encoded(
                     {
-                        **mention.model_dump(mode="json"),
-                        "restaurant_id": str(restaurant["id"]) if restaurant else None,
+                        **result.model_dump(mode="json"),
+                        "mentions": resolved
+                        if result.category == "ok"
+                        else result.model_dump(mode="json")["mentions"],
                     }
-                )
-                if restaurant and mention.sentiment is not None:
-                    key = str(restaurant["id"])
-                    if key in applied and applied[key] != mention.sentiment:
-                        raise RuleViolation("Противоречащие оценки одного ресторана")
-                    applied[key] = mention.sentiment
-        execute(conn, "DELETE FROM review_restaurant_votes WHERE review_id=:id", id=review_id)
-        for restaurant_id, value in applied.items():
-            execute(
-                conn,
-                "INSERT INTO review_restaurant_votes(review_id,restaurant_id,value) VALUES(:review,:restaurant,:value)",
-                review=review_id,
-                restaurant=restaurant_id,
-                value=value,
+                ),
             )
-        execute(
-            conn,
-            "UPDATE reviews SET author_name=:name,edited_text=:text,publication_status=CASE WHEN :text='' THEN 0 ELSE publication_status END WHERE id=:id",
-            id=review_id,
-            name=result.author_name,
-            text=result.edited_text,
-        )
-        execute(
-            conn,
-            "UPDATE review_analyses SET result=CAST(:result AS jsonb) WHERE review_id=:id",
-            id=review_id,
-            result=encoded(
+            execute(conn, "UPDATE jobs SET applied=true WHERE id=:id", id=job_id)
+            self._audit(
+                conn,
+                review_id,
+                "review_analysis_approved",
                 {
-                    **result.model_dump(mode="json"),
-                    "mentions": resolved
-                    if result.category == "ok"
-                    else result.model_dump(mode="json")["mentions"],
-                }
-            ),
-        )
-        execute(conn, "UPDATE jobs SET applied=true WHERE id=:id", id=job_id)
-        self._audit(
-            conn,
-            review_id,
-            "review_analysis_applied",
-            {
-                "actor": "automatic",
-                "job": job_id,
-                "before": review["transcript"],
-                "after": result.edited_text,
-                "mentions": resolved,
-                "votes": applied,
-            },
-        )
+                    "actor": actor,
+                    "job": job_id,
+                    "before": review["transcript"],
+                    "after": result.edited_text,
+                    "mentions": resolved,
+                    "votes": applied,
+                },
+            )
 
     def mark_bug(self, review_id: str, actor: str) -> None:
         self._mark_category(review_id, actor, "bugs")

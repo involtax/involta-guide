@@ -87,7 +87,7 @@ def state(engine, review):
         )
 
 
-def test_known_restaurant_spelling_is_applied_before_acknowledgement(database):
+def test_known_restaurant_spelling_is_previewed_and_applied_only_on_approval(database):
     source = "Ресторан Папараццо, очень вкусно."
     restaurant = str(uuid4())
     answer = {
@@ -134,13 +134,13 @@ def test_known_restaurant_spelling_is_applied_before_acknowledgement(database):
                 .mappings()
                 .one()
             )
-            assert before["transcript"] == source and before["edited_text"] == expected
+            assert before["transcript"] == source and before["edited_text"] is None
             assert (
                 conn.execute(
                     text("SELECT count(*) FROM review_restaurant_votes WHERE review_id=:id"),
                     {"id": review},
                 ).scalar()
-                == 1
+                == 0
             )
         with TestClient(create_app(settings)) as client:
             login(client)
@@ -168,19 +168,18 @@ def test_known_restaurant_spelling_is_applied_before_acknowledgement(database):
         provider.close()
 
 
-def test_automatic_application_then_acknowledgement_new_restaurant_and_delete(database):
+def test_automatic_analysis_then_atomic_approval_new_restaurant_and_delete(database):
     settings, engine, city, review, _, service, worker, provider, calls = prepared(database)
     try:
         assert worker.once()
         a = state(engine, review)
-        assert a["result"]["edited_text"] == RESULT["edited_text"] and a["approved_at"] is None
-        assert a["result"]["mentions"][0]["restaurant_id"]
+        assert a["result"] == RESULT and a["approved_at"] is None
         assert len(calls) == 1 and "tools" not in calls[0]
         assert "192." not in calls[0]["input"][1]["content"]
         with engine.connect() as conn:
             assert (
                 conn.execute(text("SELECT count(*) FROM restaurants WHERE name='Листва'")).scalar()
-                == 1
+                == 0
             )
         with ThreadPoolExecutor(2) as pool:
             list(pool.map(lambda _: service.approve(review, str(a["job_id"]), "admin"), range(2)))
@@ -556,8 +555,7 @@ def test_real_reviews2_template_in_browser(database, action):
                 page.goto("http://testserver/guide/admin/reviews-2", wait_until="networkidle")
                 assert page.locator(".reviews2-card").count() == 1
                 assert page.locator(".reviews2-before").inner_text().endswith(SOURCE)
-                assert "Листва · +1" in page.locator(".reviews2-attributes").inner_text()
-                assert "по ОК" not in page.locator(".reviews2-attributes").inner_text()
+                assert "добавим по ОК" in page.locator(".reviews2-attributes").inner_text()
                 assert page.locator(".reviews2-actions button").all_text_contents() == [
                     "ОК",
                     "Баг",
@@ -616,118 +614,5 @@ def test_empty_edited_text_is_retained_for_audit_but_not_published(database):
                 and item["edited_text"] == ""
                 and item["publication_status"] == 0
             )
-    finally:
-        provider.close()
-
-
-def saved_pending(database):
-    settings, engine, city, review, event, service, worker, provider, calls = prepared(database)
-    assert service.schedule() == 1
-    job = state(engine, review)["job_id"]
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "UPDATE jobs SET status='done',report=report||jsonb_build_object('result',CAST(:result AS jsonb)) WHERE id=:id"
-            ),
-            {"id": job, "result": json.dumps(RESULT)},
-        )
-        conn.execute(
-            text("UPDATE review_analyses SET result=CAST(:result AS jsonb) WHERE review_id=:id"),
-            {"id": review, "result": json.dumps(RESULT)},
-        )
-    return settings, engine, city, review, event, service, worker, provider, calls
-
-
-def test_saved_analysis_is_applied_without_ai_and_ok_only_acknowledges(database):
-    settings, engine, city, review, _, service, _, provider, calls = saved_pending(database)
-    try:
-        assert service.apply_pending() == 1
-        analysis = state(engine, review)
-        assert analysis["approved_at"] is None
-        from involta_guide.infrastructure.voice.read_model import VoiceReadModel
-
-        before = VoiceReadModel(engine).latest_public_texts()[0]
-        assert before["restaurant_name"] == "Листва"
-        assert before["author_name"] == "Иван"
-        with TestClient(create_app(settings)) as client:
-            login(client)
-            assert "Листва" in client.get("/guide/admin/reviews-2/new").text
-        service.approve(review, str(analysis["job_id"]), "admin")
-        service.approve(review, str(analysis["job_id"]), "admin")
-        assert VoiceReadModel(engine).latest_public_texts()[0] == before
-        with engine.connect() as conn:
-            assert (
-                conn.execute(
-                    text("SELECT count(*) FROM review_restaurant_votes WHERE review_id=:id"),
-                    {"id": review},
-                ).scalar_one()
-                == 1
-            )
-            assert (
-                conn.execute(
-                    text(
-                        "SELECT count(*) FROM audit WHERE target=:id AND action='review_analysis_applied'"
-                    ),
-                    {"id": review},
-                ).scalar_one()
-                == 1
-            )
-            assert (
-                conn.execute(
-                    text(
-                        "SELECT count(*) FROM audit WHERE target=:id AND action='review_analysis_acknowledged'"
-                    ),
-                    {"id": review},
-                ).scalar_one()
-                == 1
-            )
-        with TestClient(create_app(settings)) as client:
-            login(client)
-            assert "Листва" not in client.get("/guide/admin/reviews-2/new").text
-            assert "Листва" in client.get("/guide/admin/reviews-2/ok").text
-        assert service.apply_pending() == 0
-        assert calls == []
-    finally:
-        provider.close()
-
-
-@pytest.mark.parametrize("change", ["deleted", "source", "manual", "epoch"])
-def test_saved_analysis_backfill_does_not_apply_stale_or_manually_classified_results(
-    database, change
-):
-    _, engine, city, review, _, service, _, provider, calls = saved_pending(database)
-    try:
-        with engine.begin() as conn:
-            if change == "deleted":
-                conn.execute(
-                    text("UPDATE reviews SET status='deleted' WHERE id=:id"), {"id": review}
-                )
-            elif change == "source":
-                conn.execute(
-                    text("UPDATE reviews SET transcript='Другой текст' WHERE id=:id"),
-                    {"id": review},
-                )
-            elif change == "manual":
-                conn.execute(
-                    text("UPDATE review_analyses SET manual_category='humor' WHERE review_id=:id"),
-                    {"id": review},
-                )
-            else:
-                conn.execute(
-                    text("UPDATE locations SET content_epoch=content_epoch+1 WHERE id=:id"),
-                    {"id": city["id"]},
-                )
-        assert service.apply_pending() == 0
-        with engine.connect() as conn:
-            assert (
-                conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar_one() == 0
-            )
-            assert (
-                conn.execute(
-                    text("SELECT count(*) FROM restaurants WHERE name='Листва'")
-                ).scalar_one()
-                == 0
-            )
-        assert calls == []
     finally:
         provider.close()
