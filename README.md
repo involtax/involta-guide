@@ -2,7 +2,9 @@
 
 # Инвольта гид
 
-Принципы разработки и инструкции для агентов: [AGENTS.md](AGENTS.md).
+Общие инструкции о процессе работы: [AGENTS.md](AGENTS.md).
+Контекст продукта и карта профильных документов: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
+Авторский подход: [docs/PROJECT_MANIFESTO.md](docs/PROJECT_MANIFESTO.md).
 Текущая лента отзывов, GigaAM-only публикация и переход БД: [docs/ADMIN_REVIEWS.md](docs/ADMIN_REVIEWS.md).
 
 Ресторанный справочник России: города, районы, курорты и направления.
