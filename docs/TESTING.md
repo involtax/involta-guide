@@ -106,3 +106,14 @@ deploy/test-container.sh python deploy/run_tests.py --profile full --workers 1
 Для одного теста остаётся прямой `deploy/test-container.sh pytest ...`.
 На локальном Docker VFS оставляй запас места и запускай проверки реального
 многоконтейнерного стека отдельно от pytest. На production тесты не запускаются.
+
+## Проверенное дерево PR после merge
+
+Main push может пропустить повторный verify только при доказанном совпадении
+Git tree и подходящего профиля с успешным same-repository PR run. Сохраняются
+конкретный run attempt, SHA сборки, image ID и артефакт. Иначе выполняется обычный
+путь выше. workflow_dispatch всегда запускает проверки. Подробности и границы
+доверия: [IMAGE_RELEASE.md](IMAGE_RELEASE.md#переиспользование-pr-после-merge).
+Тесты селектора находятся в test_ci_reuse.py, настоящий save/load образа —
+в tests/deployment/test_promote_image.py. Все существующие проверки сервера
+после деплоя остаются обязательными.
