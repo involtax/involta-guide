@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -118,5 +120,104 @@ def test_manual_bug_button_works_before_ai_and_requires_admin_csrf(database):
             assert SOURCE not in client.get("/guide/admin/reviews-2").text
             assert SOURCE in client.get("/guide/admin/reviews-2/bugs").text
             assert not VoiceReadModel(engine).public_texts(city["id"])
+    finally:
+        provider.close()
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_manual_humor_from_new_or_ok_keeps_text_and_reverses_votes(database, approved):
+    settings, engine, city, review, _, service, worker, provider, _ = prepared(database)
+    try:
+        assert worker.once()
+        job = str(state(engine, review)["job_id"])
+        if approved:
+            service.approve(review, job, "admin")
+        with engine.connect() as conn:
+            number = conn.execute(
+                text("SELECT number FROM reviews WHERE id=:id"), {"id": review}
+            ).scalar_one()
+            before = conn.execute(
+                text("SELECT transcript,edited_text FROM reviews WHERE id=:id"), {"id": review}
+            ).one()
+        path = f"/guide/admin/reviews-2/{city['slug']}/{number}/humor"
+        with TestClient(create_app(settings)) as client:
+            assert client.post(path).status_code == 401
+            login(client)
+            tab = "ok" if approved else "new"
+            page = client.get("/guide/admin/reviews-2/" + tab)
+            assert ">Юмор</button>" in page.text
+            assert client.post(path, headers={"origin": "http://testserver"}).status_code == 403
+            data = {"_csrf": token(page.text), "status": tab}
+            for _ in range(2):
+                assert (
+                    client.post(
+                        path, data=data, headers={"origin": "http://testserver"}
+                    ).status_code
+                    == 200
+                )
+            assert f'id="review-{number}"' not in client.get("/guide/admin/reviews-2/" + tab).text
+            humor = client.get("/guide/admin/reviews-2/humor").text
+            assert SOURCE in humor and "Вручную: Юмор" in humor
+        assert VoiceReadModel(engine).public_texts(city["id"])
+        assert VoiceReadModel(engine).latest_public_texts()
+        assert PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
+        with engine.connect() as conn:
+            assert (
+                conn.execute(
+                    text("SELECT transcript,edited_text FROM reviews WHERE id=:id"), {"id": review}
+                ).one()
+                == before
+            )
+            assert (
+                conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar_one() == 0
+            )
+            assert (
+                conn.execute(
+                    text("SELECT coalesce(sum(review_score),0) FROM restaurants")
+                ).scalar_one()
+                == 0
+            )
+            audit = (
+                conn.execute(
+                    text(
+                        "SELECT detail FROM audit WHERE action='review_marked_humor' AND target=:id"
+                    ),
+                    {"id": review},
+                )
+                .scalars()
+                .all()
+            )
+            assert len(audit) == 1
+            detail = json.loads(audit[0])
+            assert detail["actor"] == str(
+                conn.execute(text("SELECT id FROM admin_sessions")).scalar_one()
+            )
+            assert len(detail["removed_votes"]) == int(approved)
+        with pytest.raises(Conflict):
+            service.approve(review, job, "admin")
+    finally:
+        provider.close()
+
+
+def test_manual_humor_overrides_late_other_and_retranscription(database):
+    settings, engine, city, review, _, service, worker, provider, _ = prepared(
+        database, {**RESULT, "category": "other"}
+    )
+    try:
+        service.schedule()
+        service.mark_humor(review, "admin")
+        assert worker.once()
+        assert state(engine, review)["result"]["category"] == "other"
+        assert VoiceReadModel(engine).public_texts(city["id"])
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE reviews SET transcript='Харчо друга' WHERE id=:id"), {"id": review}
+            )
+        assert service.schedule() == 0
+        assert VoiceReadModel(engine).public_texts(city["id"])
+        with TestClient(create_app(settings)) as client:
+            login(client)
+            assert "Харчо друга" in client.get("/guide/admin/reviews-2/humor").text
+            assert "Харчо друга" not in client.get("/guide/admin/reviews-2").text
     finally:
         provider.close()

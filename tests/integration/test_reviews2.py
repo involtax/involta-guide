@@ -428,7 +428,7 @@ def test_location_reset_cascades_analysis_votes_without_touching_other_catalogue
         provider.close()
 
 
-@pytest.mark.parametrize("action", ["ОК", "Баг"])
+@pytest.mark.parametrize("action", ["ОК", "Баг", "Юмор"])
 def test_real_reviews2_template_in_browser(database, action):
     import os
     from pathlib import Path
@@ -477,6 +477,7 @@ def test_real_reviews2_template_in_browser(database, action):
                 assert page.locator(".reviews2-actions button").all_text_contents() == [
                     "ОК",
                     "Баг",
+                    "Юмор",
                     "Удалить",
                 ]
                 assert page.locator("input[type=search]").count() == 0
@@ -485,11 +486,20 @@ def test_real_reviews2_template_in_browser(database, action):
             page.get_by_role("button", name=action, exact=True).click()
             page.get_by_text("Здесь пока нет отзывов.", exact=True).wait_for()
             page.locator(".reviews2-filters a").filter(
-                has_text="ОК" if action == "ОК" else "Баги"
+                has_text={"ОК": "ОК", "Баг": "Баги", "Юмор": "Юмор"}[action]
             ).click()
             page.locator(".reviews2-card").wait_for()
             page.screenshot(
-                path=str(shots / ("approved-390.png" if action == "ОК" else "manual-bug-390.png")),
+                path=str(
+                    shots
+                    / (
+                        {
+                            "ОК": "approved-390.png",
+                            "Баг": "manual-bug-390.png",
+                            "Юмор": "manual-humor-390.png",
+                        }[action]
+                    )
+                ),
                 full_page=True,
             )
             page.get_by_role("button", name="Удалить", exact=True).click()
