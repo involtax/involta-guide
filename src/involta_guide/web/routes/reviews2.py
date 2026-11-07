@@ -55,7 +55,7 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(f"""SELECT r.id,r.number,r.transcript,r.ip,r.user_agent,r.created_at,
-              l.name location_name,l.slug,a.result,a.source_text,a.job_id,a.manual_category,j.status job_status,j.error
+              l.name location_name,l.slug,a.result,a.source_text,a.job_id,a.manual_category,j.status job_status,j.applied,j.error
               {BASE_QUERY} WHERE {LIVE} AND ({BUCKET})=:status
               ORDER BY r.created_at DESC,r.number DESC LIMIT 20 OFFSET :offset"""),
                     {"status": status, "offset": (page - 1) * 20},
@@ -71,6 +71,7 @@ def routes(prefix: str) -> APIRouter:
                 item["result"]
                 and item["source_text"] == item["transcript"]
                 and item["job_status"] == "done"
+                and item["applied"]
             )
         return render(
             request,
@@ -173,7 +174,7 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_deleted','review_marked_bug') ORDER BY created_at"
+                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_analysis_applied','review_analysis_acknowledged','review_auto_apply_failed','review_deleted','review_marked_bug') ORDER BY created_at"
                     ),
                     {"id": identity},
                 ).mappings()

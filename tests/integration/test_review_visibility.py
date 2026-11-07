@@ -34,8 +34,8 @@ def test_new_visible_then_classification_controls_every_public_feed(database, ca
         assert read.publication_states(city["id"], [review])[review] == int(visible)
         assert state(engine, review)["approved_at"] is None
         with TestClient(create_app(settings)) as client:
-            assert (SOURCE in client.get("/guide/" + city["slug"]).text) == visible
-            assert (SOURCE in client.get("/guide/").text) == visible
+            assert (RESULT["edited_text"] in client.get("/guide/" + city["slug"]).text) == visible
+            assert (RESULT["edited_text"] in client.get("/guide/").text) == visible
             rows = client.get(
                 "/guide/voice/api/v1/reviews", params={"location": city["slug"]}
             ).json()["rows"]
@@ -192,7 +192,7 @@ def test_manual_humor_from_new_or_ok_keeps_text_and_reverses_votes(database, app
             assert detail["actor"] == str(
                 conn.execute(text("SELECT id FROM admin_sessions")).scalar_one()
             )
-            assert len(detail["removed_votes"]) == int(approved)
+            assert len(detail["removed_votes"]) == 1
         with pytest.raises(Conflict):
             service.approve(review, job, "admin")
     finally:
@@ -251,7 +251,7 @@ def test_only_author_sees_other_on_location_and_widget(database, category, hidde
                 if visitor:
                     client.cookies.set("guide_visitor", visitor)
                 page = client.get("/guide/" + city["slug"])
-                assert (SOURCE in page.text) == visible
+                assert (RESULT["edited_text"] in page.text) == visible
                 assert "no-store" in page.headers["cache-control"]
                 assert "cookie" in page.headers["vary"].lower()
                 response = client.get(
@@ -264,9 +264,9 @@ def test_only_author_sees_other_on_location_and_widget(database, category, hidde
                 assert bool(data["rows"]) == visible
                 assert data["publication_statuses"][review] == int(visible)
                 if visible:
-                    assert data["rows"][0]["transcript"] == SOURCE
-                    assert SOURCE in client.get("/guide/" + city["slug"]).text
-                assert SOURCE not in client.get("/guide/").text
+                    assert data["rows"][0]["transcript"] == RESULT["edited_text"]
+                    assert RESULT["edited_text"] in client.get("/guide/" + city["slug"]).text
+                assert RESULT["edited_text"] not in client.get("/guide/").text
         read = VoiceReadModel(engine)
         assert not read.public_texts(city["id"])
         assert not read.latest_public_texts()

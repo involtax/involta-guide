@@ -169,8 +169,8 @@ def test_home_header_uses_first_confirmed_mention_even_without_vote(database):
         assert worker.once()
         analysis = state(engine, review)
         assert analysis["result"] and not analysis["approved_at"]
-        assert read.latest_public_texts()[0]["restaurant_name"] is None
-        assert read.latest_public_texts()[0]["author_name"] is None
+        assert read.latest_public_texts()[0]["restaurant_name"] == "Листва"
+        assert read.latest_public_texts()[0]["author_name"] == "Иван"
         service.approve(review, str(analysis["job_id"]), "admin")
         entry = read.latest_public_texts()[0]
         assert entry["restaurant_name"] == "Листва" and entry["author_name"] == "Иван"
