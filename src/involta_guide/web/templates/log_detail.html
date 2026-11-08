@@ -14,7 +14,9 @@
 </header>
 {%if d.diagnostics%}
 <section class="panel" aria-label="Диагностика ответа">
-<dl class="admin-facts">{%for key,label in [('max_output_tokens','Лимит ответа'),('input_tokens','Входные токены'),('output_tokens','Выходные токены'),('reasoning_tokens','Из них — рассуждения')]%}<div><dt>{{label}}</dt><dd>{{d.diagnostics[key] if d.diagnostics[key] is not none else 'Нет данных'}}</dd></div>{%endfor%}</dl>
+<h3>Расход токенов</h3>
+<dl class="admin-facts">{%for key,label in [('total_tokens','Всего токенов'),('input_tokens','Входные токены'),('cached_input_tokens','Из входных — кешированные'),('output_tokens','Выходные токены'),('reasoning_tokens','Из выходных — рассуждения'),('max_output_tokens','Лимит ответа')]%}<div><dt>{{label}}</dt><dd data-token-count="{{key}}">{{d.diagnostics[key] if d.diagnostics[key] is not none else 'Нет данных'}}</dd></div>{%endfor%}</dl>
+<p>Всего — входные плюс выходные токены по данным OpenAI. Кешированные токены уже входят во входные, рассуждения — в выходные. Лимит ответа не является расходом.</p>
 {%if d.diagnostics.next_step%}<p role="status">{{d.diagnostics.next_step}}</p>{%endif%}
 </section>
 {%endif%}

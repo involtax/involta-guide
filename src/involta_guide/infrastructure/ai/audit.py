@@ -246,10 +246,19 @@ class AIAudit:
                 request_body = generation["request_json"] or {}
                 response_body = generation["response_json"] or {}
                 usage = response_body.get("usage") or {}
+                total_tokens = usage.get("total_tokens")
+                if total_tokens is None and all(
+                    isinstance(usage.get(key), int) for key in ("input_tokens", "output_tokens")
+                ):
+                    total_tokens = usage["input_tokens"] + usage["output_tokens"]
                 reason = (response_body.get("incomplete_details") or {}).get("reason")
                 diagnostics = {
                     "max_output_tokens": request_body.get("max_output_tokens"),
+                    "total_tokens": total_tokens,
                     "input_tokens": usage.get("input_tokens"),
+                    "cached_input_tokens": (usage.get("input_tokens_details") or {}).get(
+                        "cached_tokens"
+                    ),
                     "output_tokens": usage.get("output_tokens"),
                     "reasoning_tokens": (usage.get("output_tokens_details") or {}).get(
                         "reasoning_tokens"
