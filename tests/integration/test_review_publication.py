@@ -42,7 +42,11 @@ def test_primary_failure_unpublishes_but_retains_audio_and_logs(database, voice_
     consumer = Consumer(engine, client_for(settings, vs))
     assert consumer.once() == 1
     assert queries.get("reviews", reference)["publication_status"] == 1
-    assert VoiceReadModel(engine).public_texts(city["id"])[0]["state"] == "accepted"
+    assert not VoiceReadModel(engine).public_texts(city["id"])
+    assert (
+        VoiceReadModel(engine).public_texts(city["id"], visitor=meta.visitor)[0]["state"]
+        == "accepted"
+    )
 
     class PrimaryFailure(FakeProvider):
         def call(self, kind, request, audio, mime):
@@ -114,7 +118,11 @@ def test_comparison_failure_does_not_unpublish_primary_text(database, voice_data
     assert Consumer(engine, client_for(settings, vs)).once() == 2
     stored = queries.get("reviews", reference)
     assert stored["publication_status"] == 1
-    assert VoiceReadModel(engine).public_texts(city["id"])[0]["transcript"] == stored["transcript"]
+    assert not VoiceReadModel(engine).public_texts(city["id"])
+    assert (
+        VoiceReadModel(engine).public_texts(city["id"], visitor=meta.visitor)[0]["transcript"]
+        == stored["transcript"]
+    )
     with ve.connect() as conn:
         assert (
             conn.execute(

@@ -173,7 +173,10 @@ def test_admin_button_current_catalogue_old_event_and_soft_delete_guards(databas
         assert response.status_code == 200
         assert "Перераспознаётся" in response.text
         assert 'hx-trigger="every 2s"' in response.text
-        assert read.public_texts(city["id"])[0]["transcript"] == "Прежний отзыв."
+        assert (
+            read.public_texts(city["id"], visitor=before["visitor"])[0]["transcript"]
+            == "Прежний отзыв."
+        )
         assert (
             client.post(path, data=posted, headers={"origin": "http://testserver"}).status_code
             == 200
@@ -193,7 +196,10 @@ def test_admin_button_current_catalogue_old_event_and_soft_delete_guards(databas
         assert consumer.once() == 1
         assert Worker(ve, vs, Words("Также ресторан. горы.")).once()
         assert consumer.once() == 1
-        assert read.public_texts(city["id"])[0]["transcript"] == "Также ресторан Горы."
+        assert (
+            read.public_texts(city["id"], visitor=before["visitor"])[0]["transcript"]
+            == "Также ресторан Горы."
+        )
         after = queries.get("reviews", ref)
         assert (after["id"], after["created_at"], after["number"], after["audio"]) == (
             before["id"],

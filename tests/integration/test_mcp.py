@@ -80,6 +80,10 @@ def review(engine, location_id, number, *, publication=1, status="transcribed", 
                 "created_at": datetime(2026, 11, 1, tzinfo=UTC) + timedelta(minutes=number),
             },
         )
+    from .voice_fixture import classified
+
+    if status == "transcribed":
+        classified(engine, identity)
     return identity
 
 

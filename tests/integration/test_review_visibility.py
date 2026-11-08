@@ -14,15 +14,33 @@ from .test_web import login, token
 
 
 @pytest.mark.parametrize("category", ["ok", "humor", "bugs", "other"])
-def test_new_visible_then_classification_controls_every_public_feed(database, category):
-    settings, engine, city, review, _, _, worker, provider, _ = prepared(
+def test_only_author_sees_pending_then_classification_controls_every_public_feed(
+    database, category
+):
+    settings, engine, city, review, event, _, worker, provider, _ = prepared(
         database, {**RESULT, "category": category}
     )
     read = VoiceReadModel(engine)
+    owner = event["metadata"]["visitor"]
     try:
-        assert read.public_texts(city["id"])
-        assert read.latest_public_texts()
-        assert PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
+        assert not read.public_texts(city["id"])
+        assert not read.latest_public_texts()
+        assert not PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
+        assert read.public_texts(city["id"], visitor=owner)[0]["transcript"] == SOURCE
+        assert read.publication_states(city["id"], [review], visitor=owner)[review] == 1
+        assert read.publication_states(city["id"], [review])[review] == 0
+        with TestClient(create_app(settings)) as client:
+            assert SOURCE not in client.get("/guide/" + city["slug"]).text
+            client.cookies.set("guide_visitor", owner)
+            assert SOURCE in client.get("/guide/" + city["slug"]).text
+            response = client.get(
+                "/guide/voice/api/v1/reviews",
+                params={"location": city["slug"], "pending": review},
+            ).json()
+            assert response["rows"][0]["transcript"] == SOURCE
+            assert response["publication_statuses"][review] == 1
+            # Even the author's cookie does not personalize the home feed.
+            assert SOURCE not in client.get("/guide/").text
         assert worker.once()
         visible = category in ("ok", "humor")
         assert bool(read.public_texts(city["id"])) == visible
@@ -46,7 +64,28 @@ def test_new_visible_then_classification_controls_every_public_feed(database, ca
                 text("UPDATE reviews SET transcript='Новая расшифровка' WHERE id=:id"),
                 {"id": review},
             )
-        assert read.public_texts(city["id"])
+        assert not read.public_texts(city["id"])
+        assert read.public_texts(city["id"], visitor=owner)[0]["transcript"] == "Новая расшифровка"
+    finally:
+        provider.close()
+
+
+@pytest.mark.parametrize("job_status", ["queued", "running", "failed", "cancelled"])
+def test_unfinished_or_failed_classification_stays_private_to_author(database, job_status):
+    settings, engine, city, review, event, _, worker, provider, _ = prepared(database)
+    try:
+        assert worker.once()
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE jobs SET status=:status WHERE id=:id"),
+                {"id": state(engine, review)["job_id"], "status": job_status},
+            )
+        read = VoiceReadModel(engine)
+        owner = event["metadata"]["visitor"]
+        assert read.public_texts(city["id"], visitor=owner)[0]["transcript"] == SOURCE
+        assert not read.public_texts(city["id"], visitor="another-browser")
+        assert not read.latest_public_texts()
+        assert not PublicGuide(engine, settings).location(city["slug"]).location.reviews.items
     finally:
         provider.close()
 

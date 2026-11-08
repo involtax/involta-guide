@@ -8,11 +8,12 @@ from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.main import create_app
 
 from .test_web import login, token
-from .voice_fixture import imported
+from .voice_fixture import classified, imported
 
 
 def test_shared_public_feed_delete_and_late_event_cannot_resurrect(database):
     settings, engine, _, queries, city, reference, event = imported(database)
+    classified(engine, reference)
     app = create_app(settings)
     path = (
         "/guide/admin/reviews/"
@@ -67,16 +68,18 @@ def test_shared_public_feed_delete_and_late_event_cannot_resurrect(database):
 def test_public_latest_ten_are_automatic_primary_text_only(database):
     settings, engine, _, queries, city, ref, event = imported(database)
     for n in range(12):
+        reference = str(uuid4())
         Consumer(engine, None).import_event(
             {
                 **event,
                 "event_id": str(uuid4()),
-                "reference": str(uuid4()),
+                "reference": reference,
                 "sequence": n + 2,
                 "transcript": "GigaAM отзыв " + str(n),
                 "created_at": f"2026-11-03T01:{n:02d}:00Z",
             }
         )
+        classified(engine, reference)
     read = VoiceReadModel(engine)
     reviews = read.public_texts(city["id"])
     assert len(reviews) == 10

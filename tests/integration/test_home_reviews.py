@@ -8,6 +8,7 @@ from involta_guide.infrastructure.voice.read_model import VoiceReadModel
 from involta_guide.main import create_app
 
 from .test_location_search import add_location
+from .voice_fixture import classified
 
 
 def add_review(engine, location, transcript, created_at, *, status="transcribed", publication=1):
@@ -27,6 +28,8 @@ def add_review(engine, location, transcript, created_at, *, status="transcribed"
                 "created": created_at,
             },
         )
+    if status == "transcribed":
+        classified(engine, reference)
     return reference
 
 
@@ -59,10 +62,7 @@ def test_global_feed_has_only_ten_newest_public_reviews_and_public_active_locati
     pending = add_review(engine, cities[0], None, base + timedelta(hours=2), status="received")
     rows = VoiceReadModel(engine).latest_public_texts()
     assert len(rows) == 10
-    assert rows[0]["transcript"] is None
-    assert [row["transcript"] for row in rows[1:]] == [
-        f"Публичный отзыв {i}" for i in range(11, 2, -1)
-    ]
+    assert [row["transcript"] for row in rows] == [f"Публичный отзыв {i}" for i in range(11, 1, -1)]
     assert {row["location_name"] for row in rows} == {"Первый город", "Второй город"}
     assert all(
         set(row)
@@ -80,7 +80,7 @@ def test_global_feed_has_only_ten_newest_public_reviews_and_public_active_locati
     with TestClient(create_app(settings)) as client:
         home = client.get("/guide/")
         assert home.text.count('class="home-review"') == 10
-        assert "Расшифровка…" in home.text
+        assert "Расшифровка…" not in home.text
         assert "Недоступный отзыв" not in home.text and "Непубличная локация" not in home.text
         assert "private-audio" not in home.text and "private-visitor" not in home.text
         assert 'class="city-grid"' not in home.text and 'class="pagination"' not in home.text
@@ -203,7 +203,7 @@ def test_home_header_shows_known_restaurant_before_approval_but_votes_wait_for_o
                 text("UPDATE reviews SET transcript='Новая расшифровка' WHERE id=:id"),
                 {"id": review},
             )
-        assert read.latest_public_texts()[0]["restaurant_name"] is None
+        assert not read.latest_public_texts()
         assert len(calls) == 1  # All analysis calls are mocked; reading schedules nothing.
     finally:
         provider.client.close()
@@ -234,6 +234,6 @@ def test_unknown_suggestion_waits_for_ok_and_failed_analysis_never_supplies_head
             conn.execute(
                 text("UPDATE jobs SET status='failed' WHERE id=:id"), {"id": analysis["job_id"]}
             )
-        assert read.latest_public_texts()[0]["restaurant_name"] is None
+        assert not read.latest_public_texts()
     finally:
         provider.close()
