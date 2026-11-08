@@ -50,32 +50,6 @@
   user-select: none;
   pointer-events: none;
 }
-.panorama-pause {
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 88%);
-  color: #747474;
-  font-size: 16px;
-}
-.panorama-pause[hidden] {
-  display: none;
-}
-.panorama-pause svg {
-  vertical-align: middle;
-}
-.panorama-play-icon,
-.panorama-pause[aria-pressed="true"] .panorama-pause-icon {
-  display: none;
-}
-.panorama-pause[aria-pressed="true"] .panorama-play-icon {
-  display: inline;
-}
 .restaurant-list--panorama,
 .restaurant-list--panorama > .restaurant:first-of-type {
   border-top: 0;
