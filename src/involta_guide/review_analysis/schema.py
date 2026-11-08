@@ -22,7 +22,7 @@ class Mention(BaseModel):
 
 class Analysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    category: Literal["ok", "humor", "bugs", "other"]
+    category: Literal["ok", "humor", "bugs", "other", "watched"]
     author_name: str | None = Field(max_length=100)
     edited_text: str = Field(max_length=20000)
     mentions: list[Mention] = Field(max_length=30)

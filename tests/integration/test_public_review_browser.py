@@ -9,7 +9,7 @@ from sqlalchemy import text
 from involta_guide.main import create_app
 
 from .test_web import login
-from .voice_fixture import imported
+from .voice_fixture import classified, imported
 
 
 def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(database):
@@ -19,6 +19,7 @@ def test_one_server_rendered_feed_and_admin_delete_at_mobile_and_desktop(databas
             text("UPDATE reviews SET author_name=:name WHERE id=:id"),
             {"name": "Алекс", "id": reference},
         )
+    classified(engine, reference)
     app = create_app(settings)
     screenshots = Path("var/screenshots")
     screenshots.mkdir(parents=True, exist_ok=True)

@@ -64,6 +64,7 @@ def owned_tables(settings: Settings) -> set[str]:
         "search_attempts",
         "review_analyses",
         "review_restaurant_votes",
+        "vip_visitors",
     }
 
 

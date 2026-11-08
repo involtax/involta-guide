@@ -21,11 +21,18 @@ from involta_guide.web.http import (
 from involta_guide.web.routes.admin import render
 from involta_voice.db import row
 
-LABELS = {"new": "Новый", "ok": "ОК", "humor": "Юмор", "bugs": "Баги", "other": "Разное"}
+LABELS = {
+    "new": "Новый",
+    "ok": "ОК",
+    "humor": "Юмор",
+    "bugs": "Баги",
+    "other": "Разное",
+    "watched": "Досмотрел",
+}
 BUCKET = """CASE
  WHEN a.manual_category IS NOT NULL THEN a.manual_category
  WHEN a.source_text IS DISTINCT FROM r.transcript OR a.result IS NULL OR j.status IS DISTINCT FROM 'done' THEN 'new'
- WHEN a.result->>'category' IN ('humor','bugs','other') THEN a.result->>'category'
+ WHEN a.result->>'category' IN ('humor','bugs','other','watched') THEN a.result->>'category'
  WHEN a.approved_at IS NULL THEN 'new'
  ELSE a.result->>'category' END"""
 BASE_QUERY = "FROM reviews r JOIN locations l ON l.id=r.location_id LEFT JOIN review_analyses a ON a.review_id=r.id LEFT JOIN jobs j ON j.id=a.job_id"
@@ -55,7 +62,8 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(f"""SELECT r.id,r.number,r.transcript,r.ip,r.user_agent,r.created_at,
-              l.name location_name,l.slug,a.result,a.source_text,a.job_id,a.manual_category,j.status job_status,j.error
+              l.name location_name,l.slug,a.result,a.source_text,a.job_id,a.manual_category,j.status job_status,j.error,
+              EXISTS(SELECT 1 FROM vip_visitors v WHERE v.visitor_id=r.visitor) is_vip
               {BASE_QUERY} WHERE {LIVE} AND ({BUCKET})=:status
               ORDER BY r.created_at DESC,r.number DESC LIMIT 20 OFFSET :offset"""),
                     {"status": status, "offset": (page - 1) * 20},
@@ -113,6 +121,8 @@ def routes(prefix: str) -> APIRouter:
             service.mark_bug(identity, principal["id"])
         elif action == "humor":
             service.mark_humor(identity, principal["id"])
+        elif action == "watched":
+            service.mark_watched(identity, principal["id"])
         elif action == "delete":
             service.delete(identity, principal["id"])
         else:
@@ -173,7 +183,7 @@ def routes(prefix: str) -> APIRouter:
                 dict(r)
                 for r in conn.execute(
                     text(
-                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_deleted','review_marked_bug') ORDER BY created_at"
+                        "SELECT action,detail,created_at FROM audit WHERE target=:id AND action IN ('review_analysis_approved','review_deleted','review_marked_bug','review_marked_humor','review_marked_watched') ORDER BY created_at"
                     ),
                     {"id": identity},
                 ).mappings()

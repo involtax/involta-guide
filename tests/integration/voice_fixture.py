@@ -1,10 +1,31 @@
 import hashlib
+import json
 from uuid import uuid4
+
+from sqlalchemy import text
 
 from involta_guide.infrastructure.voice.consumer import Consumer
 
 from .test_jobs import setup
 from .test_voice_service import metadata, recording
+
+
+def classified(engine, reference, category="ok"):
+    """Saved successful analysis for feed fixtures; no model call or moderation approval."""
+    job = uuid4()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO jobs(id,kind,review_id,status) VALUES(:id,'review_analysis',:review,'done')"
+            ),
+            {"id": job, "review": reference},
+        )
+        conn.execute(
+            text("""INSERT INTO review_analyses(review_id,job_id,source_text,result)
+                SELECT id,:job,coalesce(transcript,''),CAST(:result AS jsonb)
+                FROM reviews WHERE id=:review"""),
+            {"job": job, "review": reference, "result": json.dumps({"category": category})},
+        )
 
 
 def imported(database):

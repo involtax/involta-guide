@@ -54,11 +54,16 @@ def test_received_then_primary_import_is_automatic_and_replay_safe(database, voi
 
     read = VoiceReadModel(engine)
     assert read.listing()["total"] == 1
-    assert read.public_texts(city["id"])[0]["state"] == "accepted"
+    assert not read.public_texts(city["id"])
+    assert read.public_texts(city["id"], visitor=data.visitor)[0]["state"] == "accepted"
     assert Worker(voice_engine, voice_settings, FakeProvider()).once()
     assert consumer.once() == 1
     assert consumer.once() == 0
-    assert read.public_texts(city["id"])[0]["transcript"] == "Был здесь сегодня, было вкусно."
+    assert not read.public_texts(city["id"])
+    assert (
+        read.public_texts(city["id"], visitor=data.visitor)[0]["transcript"]
+        == "Был здесь сегодня, было вкусно."
+    )
     assert queries.rows("review_texts") == []
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM review_decisions")).scalar_one() == 0
