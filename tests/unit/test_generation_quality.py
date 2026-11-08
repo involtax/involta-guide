@@ -176,7 +176,7 @@ def test_research_prompt_has_one_contract_and_city_voice():
     prompt = (FIXTURE.parents[2] / "data/prompts/restaurant-research-v4.txt").read_text()
     assert "candidates" in prompt and "sourceRefs" in prompt
     assert "личный рейтинг Алекса" in prompt
-    assert "одно-два живых" in prompt
+    assert "ровно одно короткое" in prompt
     assert "не выдумывай" in prompt.lower()
     assert "alexStar" not in prompt
     assert "rankingReport" not in prompt and "candidateReview" not in prompt
