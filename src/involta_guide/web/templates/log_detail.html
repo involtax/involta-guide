@@ -17,6 +17,9 @@
 <h3>Расход токенов</h3>
 <dl class="admin-facts">{%for key,label in [('total_tokens','Всего токенов'),('input_tokens','Входные токены'),('cached_input_tokens','Из входных — кешированные'),('output_tokens','Выходные токены'),('reasoning_tokens','Из выходных — рассуждения'),('max_output_tokens','Лимит ответа')]%}<div><dt>{{label}}</dt><dd data-token-count="{{key}}">{{d.diagnostics[key] if d.diagnostics[key] is not none else 'Нет данных'}}</dd></div>{%endfor%}</dl>
 <p>Всего — входные плюс выходные токены по данным OpenAI. Кешированные токены уже входят во входные, рассуждения — в выходные. Лимит ответа не является расходом.</p>
+{%set estimate=d.diagnostics.cost_estimate%}
+<p><strong>Примерная стоимость: {%if estimate.available%}≈ {{estimate.display}}{%else%}Нет оценки{%endif%}</strong></p>
+{%if estimate.available%}<p>Токены и веб-поиск · вызовов поиска: {{estimate.web_search_calls}}. {%if not estimate.cache_known%}Кеш не указан: входные посчитаны без скидки. {%endif%}Оценка по <a href="{{estimate.pricing_url}}" target="_blank" rel="noopener noreferrer">стандартным тарифам OpenAI</a> от {{estimate.pricing_date}}, без налогов и индивидуальных скидок; фактическое списание может отличаться.</p>{%else%}<p>{{estimate.reason}}</p>{%endif%}
 {%if d.diagnostics.next_step%}<p role="status">{{d.diagnostics.next_step}}</p>{%endif%}
 </section>
 {%endif%}

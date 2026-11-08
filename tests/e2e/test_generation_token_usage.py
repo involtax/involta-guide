@@ -44,10 +44,19 @@ def test_token_summary_on_mobile_then_desktop(database):
                     ("reasoning_tokens", "4000"),
                 ]:
                     expect(page.locator(f'[data-token-count="{key}"]')).to_have_text(value)
+                expect(
+                    page.get_by_text("Примерная стоимость: ≈ $0.0620", exact=True)
+                ).to_be_visible()
                 assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
                 page.get_by_role(
                     "heading", name="Расход токенов", exact=True
                 ).scroll_into_view_if_needed()
+                page.get_by_text(
+                    "Примерная стоимость: ≈ $0.0620", exact=True
+                ).scroll_into_view_if_needed()
+                expect(
+                    page.get_by_text("Примерная стоимость: ≈ $0.0620", exact=True)
+                ).to_be_in_viewport()
                 page.screenshot(path=str(shots / f"summary-{width}.png"))
             assert calls == ["POST"]
             browser.close()

@@ -11,6 +11,8 @@ from sqlalchemy import Engine, text
 
 from involta_guide.config import Settings
 
+from .cost_estimate import estimate_cost
+
 HISTORY = """WITH history AS (
  SELECT j.*,l.name location_name,r.location_slug,r.number run_number,r.path log_path,
  g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
@@ -255,6 +257,7 @@ class AIAudit:
                 diagnostics = {
                     "max_output_tokens": request_body.get("max_output_tokens"),
                     "total_tokens": total_tokens,
+                    "cost_estimate": estimate_cost(request_body, response_body),
                     "input_tokens": usage.get("input_tokens"),
                     "cached_input_tokens": (usage.get("input_tokens_details") or {}).get(
                         "cached_tokens"

@@ -57,6 +57,10 @@ def test_tokens_survive_errors_export_without_double_counting_and_do_not_trigger
         assert counts["total_tokens"] == total
         assert counts["cached_input_tokens"] == cached
         assert counts["reasoning_tokens"] == reasoning
+        estimate = counts["cost_estimate"]
+        assert estimate["available"] == (usage is not None)
+        if cached is not None:
+            assert estimate["amount"] == "0.062"
         if usage:
             assert counts["input_tokens"] == usage["input_tokens"]
             assert counts["output_tokens"] == usage["output_tokens"]
@@ -71,6 +75,7 @@ def test_tokens_survive_errors_export_without_double_counting_and_do_not_trigger
             for _ in range(2):
                 page = client.get(path)
                 assert page.status_code == 200 and "Расход токенов" in page.text
+                assert "Примерная стоимость" in page.text
                 expected = total if total is not None else "Нет данных"
                 assert f'data-token-count="total_tokens">{expected}</dd>' in page.text
                 exported = client.get(path + ".json")
