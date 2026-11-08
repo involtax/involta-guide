@@ -19,6 +19,8 @@ def test_public_location_stores_history_without_changing_home_feed_or_enqueuing_
     now = datetime.now(UTC)
     add_review(engine, first, "Старый отзыв просмотренного города", now - timedelta(days=1))
     add_review(engine, second, "Новый отзыв другого города", now)
+    with engine.connect() as conn:
+        jobs_before = set(conn.execute(text("SELECT id FROM jobs")).scalars())
     with TestClient(create_app(settings)) as client:
         response = client.get("/guide/history-first")
         assert response.status_code == 200
@@ -55,4 +57,4 @@ def test_public_location_stores_history_without_changing_home_feed_or_enqueuing_
             cookie.load(header)
         assert cookie[RECENT_LOCATIONS_COOKIE]["max-age"] == str(90 * 86400)
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
+        assert set(conn.execute(text("SELECT id FROM jobs")).scalars()) == jobs_before
