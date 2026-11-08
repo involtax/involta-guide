@@ -3,7 +3,6 @@
   if (!panorama) return;
   const scroller = panorama.querySelector(".panorama-scroller");
   const image = scroller.querySelector("img");
-  const button = panorama.querySelector(".panorama-pause");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = matchMedia("(max-width: 650px)");
   const sizeViewport = () =>
@@ -13,16 +12,14 @@
     );
   sizeViewport();
   panorama.dataset.panoramaEnhanced = "";
-  let paused = false,
-    horizontalDrag = false,
+  let horizontalDrag = false,
     frame = 0,
     previous = 0,
     position = 0,
     direction = -1;
   let resumeAt = 0,
     timer = 0,
-    measuredWidth = 0,
-    buttonState = "";
+    measuredWidth = 0;
   let gesture = null,
     inertia = 0,
     elastic = 0,
@@ -39,7 +36,6 @@
   // Focus and vertical scrolling do not interrupt the decorative motion.
   const allowed = () =>
     mobile.matches &&
-    !paused &&
     !horizontalDrag &&
     !inertia &&
     !bounce &&
@@ -54,7 +50,6 @@
     if (!frame && allowed()) frame = requestAnimationFrame(tick);
   }
   function refresh() {
-    updateButton();
     if (allowed()) startAuto();
     else stopAuto();
   }
@@ -124,7 +119,6 @@
   }
   function tick(now) {
     frame = 0;
-    updateButton();
     if (!allowed()) return;
     if (now < resumeAt) {
       clearTimeout(timer);
@@ -309,30 +303,6 @@
     scroller.scrollLeft = clamp(target, 0, fullEnd());
     resumeLater();
   });
-  button.addEventListener("click", () => {
-    paused = !paused;
-    updateButton();
-    refresh();
-  });
-  function updateButton() {
-    const state = !mobile.matches
-      ? "static"
-      : reduced.matches
-        ? "reduced"
-        : paused
-          ? "paused"
-          : "moving";
-    if (state === buttonState) return;
-    buttonState = state;
-    button.hidden = !mobile.matches || reduced.matches;
-    button.setAttribute(
-      "aria-label",
-      paused
-        ? "Продолжить движение панорамы"
-        : "Приостановить движение панорамы",
-    );
-    button.setAttribute("aria-pressed", String(paused));
-  }
   reduced.addEventListener("change", () => {
     if (reduced.matches) {
       stopInertia();
@@ -351,6 +321,5 @@
   document.addEventListener("visibilitychange", refresh);
   new ResizeObserver(measure).observe(scroller);
   image.addEventListener("load", measure);
-  updateButton();
   if (image.complete) measure();
 })();

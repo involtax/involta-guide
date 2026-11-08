@@ -60,7 +60,7 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
         folder = Path(os.getenv("PANORAMA_SCREENSHOTS_DIR", str(tmp_path)))
         folder.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(folder / f"panorama-{width}.png"), full_page=True)
-        pause = page.locator(".panorama-pause")
+        expect(page.locator(".panorama button")).to_have_count(0)
         if width <= 650:
             position = scroller.evaluate("el=>el.scrollLeft")
             assert abs(position - (1000 - width - 120)) < 20
@@ -76,16 +76,6 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
             page.wait_for_timeout(400)
             assert page.evaluate("scrollY") > 0
             assert scroller.evaluate("el=>el.scrollLeft") < before
-            pause.click()
-            expect(pause).to_have_attribute("aria-pressed", "true")
-            still = scroller.evaluate("el=>el.scrollLeft")
-            page.wait_for_timeout(250)
-            assert scroller.evaluate("el=>el.scrollLeft") == still
-            pause.click()
-            page.wait_for_function(
-                "position=>document.querySelector('.panorama-scroller').scrollLeft<position",
-                arg=still,
-            )
             scroller.focus()
             scroller.press("End")
             assert scroller.evaluate("el=>el.scrollLeft") == 1000 - width
@@ -106,7 +96,6 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
             page.mouse.up()
             assert scroller.evaluate("el=>el.scrollLeft") > 100
         else:
-            expect(pause).to_be_hidden()
             assert scroller.evaluate("el=>el.scrollLeft") == 0
             page.wait_for_timeout(350)
             assert scroller.evaluate("el=>el.scrollLeft") == 0
@@ -132,7 +121,7 @@ def test_reduced_motion_and_no_javascript_keep_the_panorama_usable(database):
             page.goto(origin + "/guide/ples", wait_until="networkidle")
             scroller = page.locator(".panorama-scroller")
             expect(scroller.locator("img")).to_be_visible()
-            expect(page.locator(".panorama-pause")).to_be_hidden()
+            expect(page.locator(".panorama button")).to_have_count(0)
             position = scroller.evaluate("el=>el.scrollLeft")
             page.wait_for_timeout(350)
             assert scroller.evaluate("el=>el.scrollLeft") == position
@@ -147,7 +136,9 @@ def test_reduced_motion_and_no_javascript_keep_the_panorama_usable(database):
             assert scroller.evaluate("el=>el.scrollLeft") == 610
             if javascript:
                 page.emulate_media(reduced_motion="no-preference")
-                expect(page.locator(".panorama-pause")).to_be_visible()
+                page.wait_for_function(
+                    "document.querySelector('.panorama-scroller').scrollLeft < 610"
+                )
             page.close()
         browser.close()
 
@@ -185,7 +176,6 @@ def test_touch_scrolls_the_picture_horizontally_and_the_page_vertically(database
         page.wait_for_timeout(600)
         assert page.evaluate("scrollY") > 25
         assert scroller.evaluate("el=>el.scrollLeft") < before
-        page.locator(".panorama-pause").click()
         page.evaluate("scrollTo(0,0)")
         scroller.evaluate("el=>el.scrollLeft=250")
         swipe(-104, 0)
