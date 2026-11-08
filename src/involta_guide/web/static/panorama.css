@@ -1,0 +1,94 @@
+.city-hero--panorama {
+  position: relative;
+  isolation: isolate;
+}
+.city-hero--panorama h1,
+.city-hero--panorama > div {
+  position: relative;
+  z-index: 2;
+}
+.city-hero--panorama .lead {
+  text-shadow:
+    0 0 12px rgb(255 255 255 / 95%),
+    0 0 3px white;
+}
+.panorama {
+  position: relative;
+  z-index: 0;
+  width: var(--panorama-viewport, 100vw);
+  margin: calc(-1 * clamp(120px, 20vw, 280px)) 0 0
+    calc((100% - var(--panorama-viewport, 100vw)) / 2);
+}
+.panorama-scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.panorama[data-panorama-enhanced] .panorama-scroller {
+  touch-action: pan-y pinch-zoom;
+}
+.panorama-scroller::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.panorama-scroller:focus-visible {
+  outline: 1px solid #8eaed7;
+  outline-offset: 5px;
+}
+.panorama-track {
+  width: 100%;
+  overflow: clip;
+}
+.panorama-image {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  opacity: 0.9;
+  user-select: none;
+  pointer-events: none;
+}
+.panorama-pause {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 88%);
+  color: #747474;
+  font-size: 16px;
+}
+.panorama-pause[hidden] {
+  display: none;
+}
+.panorama-pause svg {
+  vertical-align: middle;
+}
+.panorama-play-icon,
+.panorama-pause[aria-pressed="true"] .panorama-pause-icon {
+  display: none;
+}
+.panorama-pause[aria-pressed="true"] .panorama-play-icon {
+  display: inline;
+}
+.restaurant-list--panorama,
+.restaurant-list--panorama > .restaurant:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (max-width: 650px) {
+  .panorama-track {
+    width: 1000px;
+  }
+  .panorama-scroller {
+    cursor: grab;
+  }
+  .panorama-scroller:active {
+    cursor: grabbing;
+  }
+}

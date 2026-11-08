@@ -4,6 +4,7 @@
 {% endblock %}
 {% block page_styles %}
 <link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">
+{%if panorama%}<link rel="stylesheet" href="{{settings.path('/assets/panorama.css')}}">{%endif%}
 {%if temporary_fill%}<link rel="stylesheet" href="{{settings.path('/assets/public-fill.css')}}">{%endif%}
 {% endblock %}
 {%macro card(r,i)%}
@@ -61,7 +62,7 @@
 {%endmacro%}
 {%block body%}
 <main {%if temporary_fill%}data-fill-state="{{temporary_fill.state}}"{%endif%}>
-<section class="city-hero">
+<section class="city-hero{%if panorama%} city-hero--panorama{%endif%}">
 <h1>Где поесть <br>
 <span class="serif">{{location.in_phrase or 'в '+location.name}}.</span>
 </h1>
@@ -69,6 +70,17 @@
 <p class="lead">{{content.intro or ('Выберите район или курорт ниже.' if children else 'Здесь скоро появится короткая подборка мест, которые стоит посетить. Знаете такое? Расскажите голосом — ваш опыт поможет редакции.')}}</p>
 {%if temporary_fill%}<canvas class="public-fill-spoiler" data-fill-spoiler aria-hidden="true"></canvas>{%endif%}
 </div>
+{%if panorama%}
+<figure class="panorama" data-panorama>
+<div class="panorama-scroller" tabindex="0" role="region" aria-label="Панорама: {{location.name}} — горизонтальная прокрутка">
+<div class="panorama-track"><img class="panorama-image" src="{{settings.path(panorama)}}" width="2172" height="724" alt="Рисованная панорама: {{location.name}}" draggable="false" decoding="async"></div>
+</div>
+<button type="button" class="panorama-pause" aria-label="Приостановить движение панорамы" aria-pressed="false" hidden>
+<svg class="panorama-pause-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+<svg class="panorama-play-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 12 8-12 8Z" fill="currentColor"/></svg>
+</button>
+</figure>
+{%endif%}
 </section>
 {%if children%}
 <section class="location-children">
@@ -93,8 +105,8 @@
 </div>
 </section>
 {%endif%}
-<section class="restaurant-list {%if temporary_fill%}public-fill-section{%endif%}">
-{%if not temporary_fill%}
+<section class="restaurant-list {%if panorama%}restaurant-list--panorama {%endif%}{%if temporary_fill%}public-fill-section{%endif%}">
+{%if not temporary_fill and (not panorama or not content.restaurants)%}
 <div class="section-heading">
 <h2>{{'Стоит зайти' if content.restaurants else 'Подборка в работе'}}</h2>
 </div>
@@ -154,6 +166,7 @@
 </main>
 {%endblock%}
 {%block scripts%}
+{%if panorama%}<script defer src="{{settings.path('/assets/panorama.js')}}"></script>{%endif%}
 <script defer src="{{settings.path('/assets/location-search/restaurant-anchor.js')}}"></script>
 {%if temporary_fill%}
 <script defer src="{{settings.path('/assets/public-fill.js')}}"></script>
