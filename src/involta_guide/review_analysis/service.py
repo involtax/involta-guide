@@ -118,6 +118,8 @@ class ReviewAnalysis:
             if p.get("type") == "output_text"
         )
         result = Analysis.model_validate_json(output)
+        if result.category == "watched" and result.mentions:
+            raise RuleViolation("Категория «Досмотрел» не должна содержать ресторанные голоса")
         known = {r["id"] for r in payload["restaurants"]}
         seen: set[str] = set()
         for mention in result.mentions:
@@ -141,7 +143,7 @@ class ReviewAnalysis:
             review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=job["review_id"])
             live = row(
                 conn,
-                """SELECT j.id FROM jobs j JOIN review_analyses a ON a.job_id=j.id
+                """SELECT j.id,a.manual_category FROM jobs j JOIN review_analyses a ON a.job_id=j.id
                 WHERE j.id=:id AND j.status='running' AND j.lease_owner=:owner AND j.lease_until>now()
                 AND a.source_text=:source FOR UPDATE OF j,a""",
                 id=job["id"],
@@ -156,6 +158,8 @@ class ReviewAnalysis:
                 id=job["id"],
                 result=result.model_dump_json(),
             )
+            if result.category == "watched" and live["manual_category"] is None:
+                self._grant_vip(conn, review["visitor"])
             execute(
                 conn,
                 """UPDATE jobs SET status='done',finished_at=now(),lease_owner=NULL,lease_until=NULL,
@@ -293,6 +297,18 @@ class ReviewAnalysis:
     def mark_humor(self, review_id: str, actor: str) -> None:
         self._mark_category(review_id, actor, "humor")
 
+    def mark_watched(self, review_id: str, actor: str) -> None:
+        self._mark_category(review_id, actor, "watched")
+
+    @staticmethod
+    def _grant_vip(conn: Connection, visitor: str) -> None:
+        execute(
+            conn,
+            """INSERT INTO vip_visitors(visitor_id,level) VALUES(:visitor,1)
+            ON CONFLICT(visitor_id) DO UPDATE SET level=1""",
+            visitor=visitor,
+        )
+
     def _mark_category(self, review_id: str, actor: str, category: str) -> None:
         with self.engine.begin() as conn:
             self._lock_location(conn, review_id)
@@ -303,6 +319,8 @@ class ReviewAnalysis:
             if not review or review["status"] == "deleted":
                 raise NotFound("Отзыв удалён")
             if analysis and analysis["manual_category"] == category:
+                if category == "watched":
+                    self._grant_vip(conn, review["visitor"])
                 return
             if (
                 category == "bugs"
@@ -328,10 +346,16 @@ class ReviewAnalysis:
                 source=review["transcript"] or "",
                 category=category,
             )
+            if category == "watched":
+                self._grant_vip(conn, review["visitor"])
             self._audit(
                 conn,
                 review_id,
-                "review_marked_bug" if category == "bugs" else "review_marked_humor",
+                {
+                    "bugs": "review_marked_bug",
+                    "humor": "review_marked_humor",
+                    "watched": "review_marked_watched",
+                }[category],
                 {
                     "actor": actor,
                     "before": analysis["result"] if analysis else None,
@@ -344,12 +368,27 @@ class ReviewAnalysis:
     def delete(self, review_id: str, actor: str) -> None:
         with self.engine.begin() as conn:
             self._lock_location(conn, review_id)
+            review = row(conn, "SELECT * FROM reviews WHERE id=:id FOR UPDATE", id=review_id)
+            if not review or review["status"] == "deleted":
+                return
+            analysis = row(
+                conn, "SELECT * FROM review_analyses WHERE review_id=:id FOR UPDATE", id=review_id
+            )
             removed = row(
                 conn,
                 "UPDATE reviews SET status='deleted',publication_status=0 WHERE id=:id AND status<>'deleted' RETURNING id",
                 id=review_id,
             )
             if removed:
+                if analysis and (
+                    analysis["manual_category"] == "watched"
+                    or (analysis["result"] or {}).get("category") == "watched"
+                ):
+                    execute(
+                        conn,
+                        "DELETE FROM vip_visitors WHERE visitor_id=:visitor",
+                        visitor=review["visitor"],
+                    )
                 self._audit(conn, review_id, "review_deleted", {"actor": actor})
 
     @staticmethod
