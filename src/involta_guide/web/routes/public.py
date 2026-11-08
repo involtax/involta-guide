@@ -20,6 +20,7 @@ from involta_guide.web.http import (
     remember_location,
     require_diagnostics,
 )
+from involta_guide.web.panoramas import panorama_for
 from involta_guide.web.routes.admin import render
 
 
@@ -462,6 +463,7 @@ def routes(prefix: str) -> APIRouter:
                 "days": DAYS,
                 "opening_status": opening_status,
                 "public_reviews": public_reviews,
+                "panorama": panorama_for(c["slug"]),
                 "review_timezone": timezone(timedelta(hours=3)),
                 "temporary_fill": ctx.jobs.public_fill_state(c["id"])
                 if ctx.settings.temporary_public_fill_enabled
