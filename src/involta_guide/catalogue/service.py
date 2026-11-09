@@ -320,6 +320,25 @@ class CityContent:
                             "after": {"name": item.name, "reason": item.reason},
                         }
                     )
+                else:
+                    # Keep new research leads while preserving every known editorial fact.
+                    enrichment: Record = {}
+                    if not matched["maps_url"] and item.mapsUrl:
+                        enrichment["maps_url"] = item.mapsUrl
+                    sources = list(dict.fromkeys([*matched["sources"], *item.sources]))
+                    if sources != matched["sources"]:
+                        enrichment["sources"] = sources
+                    if enrichment:
+                        changes.extend(
+                            {
+                                "path": ["restaurants", matched["id"], key],
+                                "before": matched[key],
+                                "after": value,
+                            }
+                            for key, value in enrichment.items()
+                        )
+                        repo.change("restaurants", matched["id"], enrichment)
+                        matched = {**matched, **enrichment}
                 # A repeated search never overwrites an existing researched card or assessment.
                 if (
                     matched["verification_status"] != "closed"
@@ -404,10 +423,19 @@ class CityContent:
                 ],
             },
         )
+        pending_research = {
+            row["report"].get("restaurant_id")
+            for row in repo.rows(
+                "jobs", {"location_id": location_id, "kind": "generate"}, limit=10000
+            )
+            if row["status"] in ("queued", "running")
+            and (row["report"] or {}).get("operation") == "research"
+        }
         for identity in dict.fromkeys(
             followups if (job["report"] or {}).get("source") == "server" else []
         ):
-            self._enqueue(repo, location_id, "research", identity)
+            if identity not in pending_research:
+                self._enqueue(repo, location_id, "research", identity)
         repo.audit(
             "content_" + operation,
             job_id,

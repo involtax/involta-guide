@@ -208,6 +208,10 @@ def test_private_api_auth_context_import_run_and_images_untouched(database):
     base = f"/guide/api/admin/locations/{city['id']}/intro"
     with TestClient(create_app(settings)) as client:
         assert client.get(base + "/context").status_code == 401
+        assert (
+            client.get(base + "/context", headers=[(b"Authorization", b"Bearer \xff")]).status_code
+            == 401
+        )
         assert client.post(base + "/run", json={"request_id": str(uuid4())}).status_code == 401
         response = client.get(base + "/context", headers=headers)
         assert response.status_code == 200
@@ -393,3 +397,38 @@ def test_show_first_hidden_researched_place_completes_initial_publication(databa
     content.visibility(restaurant["id"], False)
     assert queries.get("restaurants", restaurant["id"])["active"] == 1
     assert queries.get("locations", city["id"])["initialized_at"] is not None
+
+
+def test_repeat_discovery_enriches_missing_leads_without_rewriting_card(database):
+    _, _, _, queries, city, _, _, content, restaurant = discovered(database)
+    imported(content, city["id"], "research", research(), restaurant["id"])
+    before = queries.get("restaurants", restaurant["id"])
+    payload = {
+        "restaurants": [
+            {
+                "name": before["name"],
+                "mapsUrl": before["maps_url"],
+                "sources": ["https://example.com/new-menu"],
+                "reason": "Новый источник",
+            }
+        ],
+        "warnings": [],
+    }
+    imported(content, city["id"], "discover", payload)
+    after = queries.get("restaurants", restaurant["id"])
+    assert after["description"] == before["description"]
+    assert after["ranking"] == before["ranking"] and after["active"] == before["active"]
+    assert "https://example.com/new-menu" in after["sources"]
+    assert after["id"] == before["id"]
+
+
+def test_discovery_keeps_its_additions_when_another_research_scope_is_pending(database):
+    _, _, _, queries, city, jobs, queue, content, restaurant = discovered(database)
+    content.enqueue(city["id"], "research", restaurant["id"], "assessment")
+    identity = content.enqueue(city["id"], "discover")
+    running_research = queue.claim()
+    assert running_research["report"]["operation"] == "research"
+    jobs.process(queue.claim())
+    assert queries.get("jobs", identity)["status"] == "done"
+    research_jobs = [j for j in queries.rows("jobs") if j["report"].get("operation") == "research"]
+    assert len(research_jobs) == 1 and research_jobs[0]["report"]["scope"] == "assessment"

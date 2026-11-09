@@ -29,7 +29,9 @@ class Run(BaseModel):
 def authenticate(request: Request) -> None:
     secret = context(request).settings.agent_api_token.get_secret_value()
     authorization = request.headers.get("authorization", "")
-    if len(secret) < 32 or not hmac.compare_digest(authorization, "Bearer " + secret):
+    if len(secret) < 32 or not hmac.compare_digest(
+        authorization.encode(), ("Bearer " + secret).encode()
+    ):
         raise HTTPException(401, "Требуется Bearer-токен административного API")
 
 
