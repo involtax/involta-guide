@@ -1,31 +1,29 @@
-import struct
-
 from involta_guide.web import panoramas
 
 
 def test_new_image_is_discovered_without_registry_or_restart(tmp_path, monkeypatch):
     monkeypatch.setattr(panoramas, "PANORAMA_DIRECTORY", tmp_path)
     assert panoramas.panorama_for("new-place") is None
-    (tmp_path / "new-place.png").write_bytes(b"image")
-    assert panoramas.panorama_for("new-place") == "/assets/panoramas/new-place.png"
-    (tmp_path / "new-place.png").unlink()
+    (tmp_path / "new-place.avif").write_bytes(b"image")
+    assert panoramas.panorama_for("new-place") == "/assets/panoramas/new-place.avif"
+    (tmp_path / "new-place.avif").unlink()
     assert panoramas.panorama_for("new-place") is None
-    (tmp_path / "directory.png").mkdir()
+    (tmp_path / "directory.avif").mkdir()
     assert panoramas.panorama_for("directory") is None
 
 
 def test_image_lookup_cannot_escape_the_panorama_directory(tmp_path, monkeypatch):
     monkeypatch.setattr(panoramas, "PANORAMA_DIRECTORY", tmp_path / "images")
-    (tmp_path / "secret.png").write_bytes(b"private")
-    for slug in ["../secret", "/secret", "..", "ples.png", "ples/other", "плёс", ""]:
+    (tmp_path / "secret.avif").write_bytes(b"private")
+    for slug in ["../secret", "/secret", "..", "ples.avif", "ples/other", "плёс", ""]:
         assert panoramas.panorama_for(slug) is None
 
 
-def test_versioned_panorama_dimensions_match_the_reserved_layout():
-    assert panoramas.panorama_for("ples") == "/assets/panoramas/ples.png"
-    for image in panoramas.PANORAMA_DIRECTORY.glob("*.png"):
-        header = image.read_bytes()[:33]
-        assert header[:8] == b"\x89PNG\r\n\x1a\n", image
-        assert header[12:16] == b"IHDR", image
-        assert struct.unpack(">II", header[16:24]) == (2172, 724), image
-        assert header[24:26] == bytes([8, 6]), f"{image}: expected 8-bit RGBA"
+def test_only_avif_panoramas_are_versioned():
+    assert panoramas.panorama_for("ples") == "/assets/panoramas/ples.avif"
+    images = list(panoramas.PANORAMA_DIRECTORY.iterdir())
+    assert images
+    for image in images:
+        assert image.is_file() and image.suffix == ".avif", image
+        header = image.read_bytes()[:32]
+        assert header[4:8] == b"ftyp" and b"avif" in header[8:], image

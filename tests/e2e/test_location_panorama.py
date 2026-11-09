@@ -7,6 +7,7 @@ from integration.test_voice_upload_transport import serving
 from playwright.sync_api import expect, sync_playwright
 
 from involta_guide.main import create_app
+from involta_guide.web.panoramas import PANORAMA_DIRECTORY
 
 
 def prepared_panorama(database):
@@ -37,6 +38,24 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(origin + "/guide/ples", wait_until="networkidle")
+        if width == 320:
+            for asset in PANORAMA_DIRECTORY.glob("*.avif"):
+                response = page.request.get(origin + "/guide/assets/panoramas/" + asset.name)
+                assert response.status == 200
+                assert response.headers["content-type"].split(";")[0] == "image/avif"
+                decoded = page.evaluate("""async url => {
+                    const img = new Image(); img.src = url; await img.decode();
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+                    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                    let transparent = false, visible = false;
+                    for (let i = 3; i < pixels.length; i += 4) {
+                        transparent ||= pixels[i] < 255; visible ||= pixels[i] > 0;
+                    }
+                    return [img.naturalWidth, img.naturalHeight, transparent, visible];
+                }""", origin + "/guide/assets/panoramas/" + asset.name)
+                assert decoded == [2172, 724, True, True], asset.name
         scroller = page.locator(".panorama-scroller")
         image = scroller.locator("img")
         expect(image).to_be_visible()
