@@ -146,11 +146,20 @@ def test_client_requests_only_public_certificate_and_saves_private_credentials(
             ).encode()
         if args[1:3] == ["run", "view"]:
             return b'{"status":"completed","conclusion":"success"}'
-        if args[1:3] == ["run", "download"]:
-            folder = Path(args[args.index("--dir") + 1])
-            folder.mkdir()
-            (folder / "credentials.cms.b64").write_text(ciphertext)
-            return b""
+        if args[1] == "api" and args[2].endswith("/jobs"):
+            return json.dumps(
+                {
+                    "jobs": [
+                        {
+                            "check_run_url": "https://api.github.com/repos/involtax/involta-guide/check-runs/456"
+                        }
+                    ]
+                }
+            ).encode()
+        if args[1] == "api" and "/annotations" in args[2]:
+            return json.dumps(
+                [{"title": "Encrypted agent API key", "message": "agent-api-cms-v1:" + ciphertext}]
+            ).encode()
         raise AssertionError(args)
 
     request_id = []
@@ -167,20 +176,44 @@ def test_client_requests_only_public_certificate_and_saves_private_credentials(
     captured = capsys.readouterr()
     assert token not in captured.out + captured.err
     assert not any("PRIVATE KEY" in str(args) for args in calls)
+    assert not any(args[:3] == ["gh", "run", "download"] for args in calls)
+    assert all("blob.core.windows.net" not in str(args) for args in calls)
 
 
-def test_workflow_uses_existing_protected_channel_and_only_encrypted_artifact(tmp_path):
+def test_workflow_uses_existing_protected_channel_and_only_encrypted_check(tmp_path):
     import yaml
 
     workflow = yaml.safe_load((ROOT / ".github/workflows/agent-api-access.yml").read_text())
     job = workflow["jobs"]["deliver"]
     assert job["environment"] == "prod" and "refs/heads/main" in job["if"]
     steps = job["steps"]
-    upload = next(
-        step for step in steps if step.get("uses", "").startswith("actions/upload-artifact")
+    assert not any(step.get("uses", "").startswith("actions/upload-artifact") for step in steps)
+    publish = next(
+        step
+        for step in steps
+        if step.get("name") == "Publish encrypted credentials in the GitHub check result"
     )
-    assert upload["with"]["path"] == "${{ runner.temp }}/credentials.cms.b64"
-    assert upload["with"]["retention-days"] == 1
+    token = "private-api-token-" + "p" * 40
+    key, cert = recipient(tmp_path, "publish")
+    encrypted = module("agent-api-key.py").encrypted_credentials(token, cert.read_text())
+    (tmp_path / "credentials.cms.b64").write_text(encrypted)
+    output = subprocess.run(
+        ["bash", "-c", publish["run"]],
+        env={**os.environ, "RUNNER_TEMP": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "::notice " in output and "agent-api-cms-v1:" + encrypted in output
+    assert token not in output
+    (tmp_path / "credentials.cms.b64").write_text(token)
+    rejected = subprocess.run(
+        ["bash", "-c", publish["run"]],
+        env={**os.environ, "RUNNER_TEMP": str(tmp_path)},
+        capture_output=True,
+        text=True,
+    )
+    assert rejected.returncode != 0 and token not in rejected.stdout + rejected.stderr
     validation = steps[1]["run"]
     _, cert = recipient(tmp_path)
     subprocess.run(
