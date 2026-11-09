@@ -157,10 +157,13 @@ def test_success_pins_digest_and_cleans_credentials(tmp_path):
     assert not list(root.glob(".registry.*"))
     assert "test-only-registry-password" not in result.stdout + result.stderr
     assert json.loads(state.read_text())["services"]["worker"]["sha"] == A
-    assert (
-        (root / ".env.production").read_text()
-        == "PRIVATE_CONFIGURATION=unchanged\nDATABASE_URL=postgresql://guide:fake-password@localhost/guide\n"
-    )
+    from dotenv import dotenv_values
+
+    configured = dotenv_values(root / ".env.production", interpolate=False)
+    assert configured["PRIVATE_CONFIGURATION"] == "unchanged"
+    assert configured["DATABASE_URL"] == "postgresql://guide:fake-password@localhost/guide"
+    assert len(configured["AGENT_API_TOKEN"]) == 64
+    assert (root / ".env.production").stat().st_mode & 0o777 == 0o600
 
 
 def test_failed_update_restores_previous_release_without_deleting_data(tmp_path):

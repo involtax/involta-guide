@@ -277,6 +277,9 @@ failed() {
   exit "$status"
 }
 trap 'failed $?' ERR
+if [[ "$mode" == deploy || "$mode" == recover ]]; then
+  python3 -B "$script_dir/agent-api-key.py" ensure "$DEPLOY_ROOT/.env.production"
+fi
 trap 'failed 143' HUP TERM
 trap 'failed 130' INT
 changed=1
