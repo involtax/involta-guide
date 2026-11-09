@@ -424,11 +424,18 @@ def test_repeat_discovery_enriches_missing_leads_without_rewriting_card(database
 
 def test_discovery_keeps_its_additions_when_another_research_scope_is_pending(database):
     _, _, _, queries, city, jobs, queue, content, restaurant = discovered(database)
+    result = research()
+    result["assessment"] = None
+    imported(content, city["id"], "research", result, restaurant["id"], "card")
     content.enqueue(city["id"], "research", restaurant["id"], "assessment")
     identity = content.enqueue(city["id"], "discover")
     running_research = queue.claim()
     assert running_research["report"]["operation"] == "research"
     jobs.process(queue.claim())
     assert queries.get("jobs", identity)["status"] == "done"
-    research_jobs = [j for j in queries.rows("jobs") if j["report"].get("operation") == "research"]
+    research_jobs = [
+        j
+        for j in queries.rows("jobs")
+        if j["report"].get("operation") == "research" and j["status"] in ("queued", "running")
+    ]
     assert len(research_jobs) == 1 and research_jobs[0]["report"]["scope"] == "assessment"

@@ -12,13 +12,13 @@ from involta_guide.application.services.editorial import CARD_FIELDS, match_rest
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import score
 
-from .prompts import SYSTEM
+from .prompts import RESEARCH_SYSTEM, SYSTEM
 from .schemas import RESULTS, Discoveries, Introduction, Research
 
 PROMPTS = {
     "intro": "city-introduction-v1.txt",
     "discover": "restaurant-discovery-v1.txt",
-    "research": "restaurant-research-v1.txt",
+    "research": "restaurant-research-v2.txt",
 }
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -29,15 +29,19 @@ def digest(value: Any) -> str:
     ).hexdigest()
 
 
+def card_complete(row: Record) -> bool:
+    """The same factual foundation is required for assessment and publication."""
+    values = (row.get(field) for field in ("name", "description", "maps_url", "phone"))
+    return all(isinstance(value, str) and value.strip() for value in values) and bool(
+        row.get("sources")
+    )
+
+
 def eligible(row: Record) -> bool:
     return bool(
         not row["hidden"]
         and row["verification_status"] == "verified"
-        and row["name"]
-        and row["description"]
-        and row["maps_url"]
-        and row["phone"]
-        and row["sources"]
+        and card_complete(row)
         and score((row.get("ranking") or {}).get("scores", {})) is not None
     )
 
@@ -77,6 +81,11 @@ class CityContent:
             restaurant = require(repo, "restaurants", restaurant_id, lock=True)
             if restaurant["location_id"] != location_id:
                 raise Conflict("Ресторан принадлежит другой локации")
+            if scope == "assessment" and not card_complete(restaurant):
+                raise Conflict(
+                    "Карточка ресторана не заполнена. Сначала запустите полное исследование "
+                    "(scope=all): карточка и оценки вместе."
+                )
             # Exclude editorial stars, review votes and infrastructure fields from AI context.
             data["restaurant"] = {
                 field: restaurant[column]
@@ -98,6 +107,7 @@ class CityContent:
         )
         model = repo.setting("generation_model", self.model)
         schema = RESULTS[operation].response_schema()
+        system = RESEARCH_SYSTEM if operation == "research" else SYSTEM
         state = digest(
             {
                 "operation": operation,
@@ -112,7 +122,7 @@ class CityContent:
             "location_id": location_id,
             "restaurant_id": restaurant_id,
             "scope": scope,
-            "system": SYSTEM,
+            "system": system,
             "prompt": prompt,
             "input": data,
             "schema": schema,
@@ -124,7 +134,7 @@ class CityContent:
                     "prompt": prompt,
                     "schema": schema,
                     "model": model,
-                    "system": SYSTEM,
+                    "system": system,
                 }
             ),
         }
@@ -145,11 +155,6 @@ class CityContent:
         request_id: str | None = None,
         model: str | None = None,
     ) -> str:
-        prepared = self._prepare(repo, location_id, operation, restaurant_id, scope)
-        if model:
-            from involta_guide.application.services.jobs import JobService
-
-            prepared["model"] = JobService._model(model)
         if request_id:
             old = repo.get("jobs", request_id)
             if old:
@@ -164,6 +169,11 @@ class CityContent:
                 ) != "server":
                     raise Conflict("request_id уже использован для другого действия")
                 return old["id"]
+        prepared = self._prepare(repo, location_id, operation, restaurant_id, scope)
+        if model:
+            from involta_guide.application.services.jobs import JobService
+
+            prepared["model"] = JobService._model(model)
         for old in repo.rows("jobs", {"location_id": location_id, "kind": "generate"}, limit=10000):
             report = old["report"] or {}
             if (
@@ -346,9 +356,7 @@ class CityContent:
                     and (
                         matched["verification_status"] != "verified"
                         or score((matched["ranking"] or {}).get("scores", {})) is None
-                        or not matched["description"]
-                        or not matched["maps_url"]
-                        or not matched["phone"]
+                        or not card_complete(matched)
                     )
                 ):
                     followups.append(matched["id"])
@@ -382,6 +390,11 @@ class CityContent:
                 )
                 values["sources"] = list(dict.fromkeys([*restaurant["sources"], *card["sources"]]))
             if research.assessment is not None:
+                if not card_complete({**restaurant, **values}):
+                    raise RuleViolation(
+                        "Оценка не сохранена: сначала нужна заполненная карточка "
+                        "с описанием, картой, телефоном и источниками."
+                    )
                 assessment = research.assessment.model_dump(mode="json")
                 # An incomplete investigation must not erase an earlier complete rating.
                 if score(assessment["scores"]) is not None or restaurant["ranking"] is None:

@@ -183,6 +183,7 @@ class Queries:
         return result
 
     def restaurant_browser(self, query: str = "", location_id: int | None = None) -> Record:
+        from involta_guide.catalogue.service import card_complete
         from involta_guide.domain.rules import (
             FACTOR_LABELS,
             FACTORS,
@@ -231,6 +232,7 @@ class Queries:
                 }
                 card["review_count"] = len(approved)
                 card["score"] = restaurant_score(card)
+                card["card_complete"] = card_complete(card)
             cards.sort(key=restaurant_rank_key)
             for index, card in enumerate(cards, start=1):
                 card["display_rank"] = index if card["active"] else None
