@@ -1,0 +1,54 @@
+name: Agent API access
+run-name: Agent API access / ${{ inputs.request_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Unique request UUID
+        required: true
+        type: string
+      certificate:
+        description: Ephemeral recipient certificate (public only)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: involta-guide-production
+  cancel-in-progress: false
+jobs:
+  deliver:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate public recipient request
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AGENT_RECIPIENT_CERTIFICATE: ${{ inputs.certificate }}
+        run: |
+          python3 - <<'PY'
+          import os, uuid
+          assert str(uuid.UUID(os.environ['REQUEST_ID'])) == os.environ['REQUEST_ID']
+          cert = os.environ['AGENT_RECIPIENT_CERTIFICATE']
+          assert len(cert) <= 8192 and cert.startswith('-----BEGIN CERTIFICATE-----\n')
+          PY
+      - name: Retrieve encrypted credentials through the existing SSH channel
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          AGENT_RECIPIENT_CERTIFICATE: ${{ inputs.certificate }}
+        run: bash deploy/ssh-release.sh agent-api > "$RUNNER_TEMP/credentials.cms.b64"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-key-${{ inputs.request_id }}
+          path: ${{ runner.temp }}/credentials.cms.b64
+          retention-days: 1
+          if-no-files-found: error
