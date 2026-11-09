@@ -156,11 +156,6 @@ class JobService:
             CityContent(self.uow, self.provider.model).initial(repo, location)
             return self._public_state(repo, location)
 
-    def rebuild(self, location_id: int, *, actor: str | None = None) -> str:
-        from involta_guide.catalogue.service import CityContent
-
-        return CityContent(self.uow, self.provider.model).enqueue(location_id, "discover")
-
     def regenerate(self, job_id: str, *, model: str | None = None) -> str:
         from involta_guide.catalogue.service import CityContent
 

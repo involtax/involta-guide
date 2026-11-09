@@ -153,10 +153,6 @@ class Assessment(StrictResult):
             raise ValueError("Нужны обоснования всех восьми факторов")
         return self
 
-    @classmethod
-    def response_schema(cls) -> dict[str, Any]:
-        return super().response_schema()
-
 
 class Research(StrictResult):
     status: Literal["verified", "needs_verification", "closed"]
