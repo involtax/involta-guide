@@ -46,9 +46,13 @@ jobs:
           DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           AGENT_RECIPIENT_CERTIFICATE: ${{ inputs.certificate }}
         run: bash deploy/ssh-release.sh agent-api > "$RUNNER_TEMP/credentials.cms.b64"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: agent-key-${{ inputs.request_id }}
-          path: ${{ runner.temp }}/credentials.cms.b64
-          retention-days: 1
-          if-no-files-found: error
+      - name: Publish encrypted credentials in the GitHub check result
+        run: |
+          python3 - <<'PYCODE'
+          import base64, os
+          from pathlib import Path
+          encrypted = (Path(os.environ['RUNNER_TEMP']) / 'credentials.cms.b64').read_text().strip()
+          data = base64.b64decode(encrypted, validate=True)
+          assert 300 <= len(data) <= 16384 and data[0] == 0x30
+          print('::notice file=deploy/agent-access.py,line=1,title=Encrypted agent API key::agent-api-cms-v1:' + encrypted)
+          PYCODE

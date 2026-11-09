@@ -110,25 +110,35 @@ def acquire(destination: Path) -> None:
             time.sleep(3)
         else:
             raise RuntimeError("Credential delivery timed out; no local credential changed")
-        artifact = folder / "artifact"
-        command(
-            [
-                "gh",
-                "run",
-                "download",
-                str(run_id),
-                "--repo",
-                REPOSITORY,
-                "--name",
-                "agent-key-" + request_id,
-                "--dir",
-                str(artifact),
-            ]
-        )
+        jobs = json.loads(command(["gh", "api", f"repos/{REPOSITORY}/actions/runs/{run_id}/jobs"]))
+        encrypted = None
+        for job in jobs["jobs"]:
+            check_url = job["check_run_url"]
+            if not re.fullmatch(
+                r"https://api\.github\.com/repos/" + REPOSITORY + r"/check-runs/[0-9]+", check_url
+            ):
+                raise RuntimeError("Unexpected credential check origin")
+            annotations = json.loads(
+                command(
+                    [
+                        "gh",
+                        "api",
+                        check_url.removeprefix("https://api.github.com/")
+                        + "/annotations?per_page=100",
+                    ]
+                )
+            )
+            for annotation in annotations:
+                if annotation.get("title") == "Encrypted agent API key" and annotation.get(
+                    "message", ""
+                ).startswith("agent-api-cms-v1:"):
+                    if encrypted is not None:
+                        raise RuntimeError("Ambiguous credential delivery")
+                    encrypted = annotation["message"].removeprefix("agent-api-cms-v1:").strip()
+        if not encrypted or len(encrypted) > 16384:
+            raise RuntimeError("Encrypted credentials are absent from GitHub check results")
         envelope = folder / "envelope.der"
-        envelope.write_bytes(
-            base64.b64decode((artifact / "credentials.cms.b64").read_bytes(), validate=False)
-        )
+        envelope.write_bytes(base64.b64decode(encrypted, validate=True))
         payload = command(
             [
                 "openssl",
