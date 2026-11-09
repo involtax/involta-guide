@@ -43,7 +43,8 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
                 response = page.request.get(origin + "/guide/assets/panoramas/" + asset.name)
                 assert response.status == 200
                 assert response.headers["content-type"].split(";")[0] == "image/avif"
-                decoded = page.evaluate("""async url => {
+                decoded = page.evaluate(
+                    """async url => {
                     const img = new Image(); img.src = url; await img.decode();
                     const canvas = document.createElement('canvas');
                     canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
@@ -54,7 +55,9 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
                         transparent ||= pixels[i] < 255; visible ||= pixels[i] > 0;
                     }
                     return [img.naturalWidth, img.naturalHeight, transparent, visible];
-                }""", origin + "/guide/assets/panoramas/" + asset.name)
+                }""",
+                    origin + "/guide/assets/panoramas/" + asset.name,
+                )
                 assert decoded == [2172, 724, True, True], asset.name
         scroller = page.locator(".panorama-scroller")
         image = scroller.locator("img")
