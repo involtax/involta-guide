@@ -11,7 +11,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 TOKEN = re.compile(r"[A-Za-z0-9_+/=-]{32,256}")
-KEY_LINE = re.compile(r"^\s*(?:export\s+)?AGENT_API_TOKEN\s*=\s*(.*?)\s*$", re.MULTILINE)
+KEY_LINE = re.compile(
+    r"^[ \t]*(?:export[ \t]+)?AGENT_API_TOKEN[ \t]*=[ \t]*(.*?)[ \t]*$", re.MULTILINE
+)
 
 
 def server_token(path: Path, *, create: bool) -> str:
@@ -25,17 +27,23 @@ def server_token(path: Path, *, create: bool) -> str:
             if len(token) < 2 or token[-1] != token[0]:
                 raise ValueError("Invalid quoted API key")
             token = token[1:-1]
-        if not TOKEN.fullmatch(token):
-            raise ValueError("Invalid existing API key; it was not replaced")
-        return token
+        if token:
+            if not TOKEN.fullmatch(token):
+                raise ValueError("Invalid existing API key; it was not replaced")
+            return token
     if not create:
         raise ValueError("Deploy the API-enabled release first")
     token = secrets.token_hex(32)
+    updated = (
+        KEY_LINE.sub("AGENT_API_TOKEN=" + token, content, count=1)
+        if matches
+        else content.rstrip("\n") + "\nAGENT_API_TOKEN=" + token + "\n"
+    )
     temporary = path.with_name(path.name + ".agent-api-tmp")
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "w") as stream:
-            stream.write(content.rstrip("\n") + "\nAGENT_API_TOKEN=" + token + "\n")
+            stream.write(updated)
             stream.flush()
             os.fsync(stream.fileno())
         temporary.replace(path)

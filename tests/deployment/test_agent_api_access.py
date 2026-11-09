@@ -195,3 +195,21 @@ def test_workflow_uses_existing_protected_channel_and_only_encrypted_artifact(tm
     )
     assert "PRIVATE KEY" not in validation
     assert "secrets.AGENT_API_TOKEN" not in json.dumps(workflow)
+
+
+@pytest.mark.parametrize("blank", ["", "''", '""', "   "])
+def test_blank_api_key_never_reads_the_next_secret_and_can_be_provisioned(tmp_path, blank):
+    server = module("agent-api-key.py")
+    path = tmp_path / ".env.production"
+    other_secret = "keep-other-secret-" + "x" * 40
+    original = "AGENT_API_TOKEN=" + blank + "\nOPENAI_API_KEY=" + other_secret + "\n"
+    path.write_text(original)
+    with pytest.raises(ValueError):
+        server.server_token(path, create=False)
+    assert path.read_text() == original
+    token = server.server_token(path, create=True)
+    assert token != other_secret and len(token) == 64
+    assert (
+        path.read_text() == "AGENT_API_TOKEN=" + token + "\nOPENAI_API_KEY=" + other_secret + "\n"
+    )
+    assert server.server_token(path, create=False) == token
