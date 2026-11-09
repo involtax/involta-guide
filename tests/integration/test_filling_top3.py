@@ -15,6 +15,7 @@ from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_background_generation import configured, envelope, task
 from .test_jobs import provider_payload, setup
 
@@ -165,9 +166,9 @@ def test_migration_changes_only_unsubmitted_prompts_and_can_restore_them(databas
         connection.execute(
             text("UPDATE settings SET value=:prompt WHERE key='prompt'"), {"prompt": custom}
         )
-    service.enqueue_public_fill(city["id"])
+    enqueue_fixture(service, city["id"])
     other = queries.directory(query="Шуя")["rows"][0]
-    service.enqueue_public_fill(other["id"])
+    enqueue_fixture(service, other["id"])
     jobs = queries.rows("jobs")
     submitted = next(job for job in jobs if job["location_id"] == city["id"])
     pending = next(job for job in jobs if job["location_id"] == other["id"])

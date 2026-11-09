@@ -20,6 +20,13 @@ class FakeAI:
     model = "fake-no-paid-requests"
 
     def generate(self, prompt, job_id):
+        if prompt.startswith("Операция:"):
+            from .test_incremental_content import ContentAI
+
+            result = ContentAI().generate(prompt, job_id)
+            if "intro" in result:
+                result["intro"] = "Сгенерировано"
+            return result
         return {
             "intro": "Сгенерировано",
             "restaurants": [CARD],

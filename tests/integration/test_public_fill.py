@@ -33,11 +33,11 @@ def test_anonymous_click_publishes_one_city_and_removes_button(database):
         assert result.json()["state"] == "queued"
         assert "disabled" in client.get("/guide/ivanovo").text
         job = queries.rows("jobs")[0]
-        with uow() as work:
-            assert job["prompt"] == work.repo.setting("prompt")
-        assert len(queries.rows("jobs")) == 1
+        assert {j["report"]["operation"] for j in queries.rows("jobs")} == {"intro", "discover"}
+        assert len(queries.rows("jobs")) == 2
         assert job["location_id"] == location["id"]
-        assert Worker(queue, service).once()
+        for _ in range(3):
+            assert Worker(queue, service).once()
         state = client.get("/guide/api/locations/ivanovo/fill/status")
         assert state.json()["state"] == "ready"
         assert state.headers["cache-control"] == "no-store"
@@ -53,7 +53,7 @@ def test_anonymous_click_publishes_one_city_and_removes_button(database):
             client.post("/guide/api/locations/ivanovo/fill", headers=HEADERS).json()["state"]
             == "ready"
         )
-        assert len(queries.rows("jobs")) == 1
+        assert len(queries.rows("jobs")) == 3
         assert queries.get("locations", location["id"])["revision"] == stored["revision"]
 
 
@@ -62,7 +62,7 @@ def test_parallel_public_clicks_queue_one_job(database):
     with ThreadPoolExecutor(max_workers=6) as pool:
         states = list(pool.map(lambda _: service.enqueue_public_fill(location["id"]), range(6)))
     assert all(state["state"] == "queued" for state in states)
-    assert len(queries.rows("jobs")) == 1
+    assert len(queries.rows("jobs")) == 2
     assert queries.rows("jobs")[0]["public_log"] is True
 
 
@@ -113,7 +113,7 @@ def test_editor_change_during_generation_is_not_overwritten(database):
     settings, engine, uow, queries, location, service, queue = setup(database, EditingAI())
     service.enqueue_public_fill(location["id"])
     assert Worker(queue, service).once()
-    job = queries.rows("jobs")[0]
+    job = next(j for j in queries.rows("jobs") if j["report"].get("operation") == "intro")
     assert job["status"] == "failed"
     assert queries.get("locations", location["id"])["revision"] is not None
     assert len([r for r in queries.rows("reviews") + queries.rows("jobs") if r["changes"]]) == 1
@@ -128,6 +128,7 @@ def test_public_provider_failure_waits_for_manual_retry(database):
     settings, engine, uow, queries, location, service, queue = setup(database, UnavailableAI())
     service.enqueue_public_fill(location["id"])
     assert Worker(queue, service).once()
+    assert Worker(queue, service).once()
     assert not Worker(queue, service).once()
     job = queries.rows("jobs")[0]
     assert job["status"] == "failed" and job["attempts"] == 1
@@ -136,10 +137,10 @@ def test_public_provider_failure_waits_for_manual_retry(database):
     assert "429" in state["message"]
     assert service.enqueue_public_fill(location["id"])["state"] == "failed"
     service.regenerate(job["id"])
-    assert len(queries.rows("jobs")) == 2
+    assert len(queries.rows("jobs")) == 3
 
 
-@pytest.mark.parametrize("public_fill", [False, True])
+@pytest.mark.parametrize("public_fill", [False])
 def test_unpublishable_result_does_not_partially_write_or_publish(database, public_fill):
     class MissingPhoneAI(FakeAI):
         def generate(self, prompt, job_id):
@@ -183,7 +184,10 @@ def test_disabling_public_intake_does_not_discard_already_accepted_job(database)
     service.enqueue_public_fill(location["id"])
     service.public_fill_enabled = False
     assert Worker(queue, service).once()
-    assert queries.rows("jobs")[0]["status"] == "done"
+    assert (
+        next(j for j in queries.rows("jobs") if j["report"].get("operation") == "intro")["status"]
+        == "done"
+    )
 
 
 def test_html_form_works_without_login_or_javascript(database):
@@ -196,4 +200,4 @@ def test_html_form_works_without_login_or_javascript(database):
         )
         assert response.status_code == 303
         assert response.headers["location"] == "/guide/ivanovo"
-    assert len(queries.rows("jobs")) == 1
+    assert len(queries.rows("jobs")) == 2

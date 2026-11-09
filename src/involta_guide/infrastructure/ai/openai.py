@@ -106,9 +106,13 @@ class OpenAIProvider:
 
     def generate(self, prompt: str, job_id: str) -> Record:
         with self.engine.connect() as conn:
-            selected_model = conn.execute(
-                text("SELECT model FROM jobs WHERE id=:id"), {"id": job_id}
-            ).scalar_one()
+            selected_job = (
+                conn.execute(text("SELECT model,report FROM jobs WHERE id=:id"), {"id": job_id})
+                .mappings()
+                .one()
+            )
+        selected_model = selected_job["model"]
+        operation = (selected_job["report"] or {}).get("operation")
         body = {
             "model": selected_model,
             "input": [
@@ -130,7 +134,15 @@ class OpenAIProvider:
         }
         from involta_guide.infrastructure.ai.background import BackgroundGeneration
 
-        body.update(tools=[{"type": "web_search_preview"}], background=True, store=True)
+        if operation:
+            body["input"][0]["content"] = selected_job["report"]["system"]
+            body["text"]["format"].update(
+                name="content_" + operation,
+                schema=selected_job["report"]["schema"],
+            )
+        body.update(background=True, store=True)
+        if operation != "intro":
+            body["tools"] = [{"type": "web_search_preview"}]
         result = BackgroundGeneration(self).advance(job_id, body)
         output = "".join(
             part.get("text", "")

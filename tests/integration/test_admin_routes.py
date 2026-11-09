@@ -104,12 +104,18 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
         assert (
             client.post(
                 "/guide/admin/settings/filling",
-                data={"_csrf": csrf, "prompt": prompt, "model": "gpt-5"},
+                data={
+                    "_csrf": csrf,
+                    "intro": prompt,
+                    "discover": prompt,
+                    "research": prompt,
+                    "model": "gpt-5",
+                },
                 headers=HEADERS,
             ).status_code
             == 200
         )
-        assert queries.setting("prompt") == prompt
+        assert queries.setting("content_intro_prompt") == prompt
         assert queries.setting("generation_model") == "gpt-5"
         assert queries.rows("jobs") == []
         assert (
@@ -121,7 +127,8 @@ def test_routes_settings_filters_auth_and_old_addresses(database):
             == 200
         )
         assert (
-            queries.setting("prompt") == prompt and queries.setting("generation_model") == "gpt-5"
+            queries.setting("content_intro_prompt") == prompt
+            and queries.setting("generation_model") == "gpt-5"
         )
         for path in (
             "/admin/settings/filling",
@@ -213,8 +220,8 @@ def test_pending_generation_cannot_overwrite_manual_intro(database):
     )
     Worker(queue, service).once()
     assert queries.get("locations", city["id"])["intro"] == "Вручную после запуска"
-    job = queries.rows("jobs")[0]
-    assert job["status"] == "failed" and "изменена" in job["error"]
+    job = next(j for j in queries.rows("jobs") if j["report"].get("operation") == "intro")
+    assert job["status"] == "failed" and "изменился" in job["error"]
 
 
 def test_restaurant_numbers_concurrent_stable_and_slug_updates_log_path(database):

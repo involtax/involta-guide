@@ -10,6 +10,7 @@ from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import provider_payload, setup
 
 
@@ -36,7 +37,7 @@ def test_model_snapshot_changes_generation_only_and_records_actual_model(databas
     provider.client = httpx.Client(transport=httpx.MockTransport(handler))
     service.provider = provider
     service.save_filling_settings("Первый промпт для будущего наполнения. " * 3, "gpt-5")
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queries.rows("jobs")[0]
     service.save_filling_settings("Второй промпт для будущего наполнения. " * 3, "gpt-4.1")
     assert queries.get("jobs", job["id"])["prompt"] == "Первый промпт для будущего наполнения. " * 3
@@ -77,7 +78,7 @@ def test_legacy_numbers_remain_stable_when_backfilled_and_repeated(database):
 
 def test_concurrent_manual_repeats_get_one_new_number_and_preserve_old_failure(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     old = queue.claim()
     queue.fail(old, "Original failure", retry=False)
 
@@ -89,7 +90,7 @@ def test_concurrent_manual_repeats_get_one_new_number_and_preserve_old_failure(d
 
     with ThreadPoolExecutor(2) as pool:
         result = list(pool.map(repeat, range(2)))
-    assert sum(bool(r) for r in result) == 1
+    assert len({r for r in result if r}) == 1
     audit = AIAudit(engine, settings)
     assert audit.resolve("ivanovo", 1) == old["id"]
     new_id = next(r for r in result if r)
@@ -131,14 +132,14 @@ def test_reset_deletion_cannot_erase_daily_provider_limits(database):
     provider.client = httpx.Client(transport=httpx.MockTransport(handle))
     service.provider = provider
     try:
-        service.enqueue_public_fill(city["id"])
+        enqueue_fixture(service, city["id"])
         assert Worker(queue, service).once()
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM generation_requests"))
             conn.execute(text("DELETE FROM ai_usage"))
             conn.execute(text("DELETE FROM audit"))
         other = queries.directory(query="Шуя")["rows"][0]
-        service.enqueue_public_fill(other["id"])
+        enqueue_fixture(service, other["id"])
         job = queries.rows("jobs", {"location_id": other["id"]})[0]
         with pytest.raises(RuleViolation, match="лимит"):
             provider.generate("new request", job["id"])

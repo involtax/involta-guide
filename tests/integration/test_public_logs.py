@@ -5,12 +5,13 @@ from fastapi.testclient import TestClient
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import setup
 
 
 def test_public_logs_show_only_deliberate_public_fill_and_redact_secrets(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     public_job = queries.rows("jobs")[0]
     other = queries.directory(query="Абрау-Дюрсо")["rows"][0]
     with uow() as tx:

@@ -26,11 +26,13 @@
 <p>Промпт и модель применяются только к будущим запросам. Сохранение не запускает наполнение и не меняет текущие задания.</p>
 <form method="post" action="{{settings.path('/admin/settings/filling')}}" class="stack">{{csrf()}}
 {{generation_model_picker('Модель новых запросов наполнения',generation_model)}}
-<label>Промпт наполнения<textarea name="prompt" rows="18" minlength="50" maxlength="30000">{{prompt}}</textarea></label>
+{%for op,label in [('intro','Вступление города'),('discover','Поиск ресторанов и окрестностей'),('research','Исследование одного ресторана')]%}
+<label>{{label}}<textarea name="{{op}}" rows="12" minlength="50" maxlength="30000">{{content_prompts[op]}}</textarea></label>
+{%endfor%}
 <button>Сохранить настройки наполнения</button>
 </form>
 </section><section class="panel">{%include 'generation_models.html'%}
-<p>Первичное наполнение запускается на публичной странице пустого города.</p>
+<p>Вступление и поиск запускаются независимо на странице города. Поиск добавляет места в каталог; новые места исследуются отдельно. Рейтинг рассчитывает сервер по восьми оценкам.</p>
 <a href="{{settings.path('/admin/locations')}}?status=empty">Пустые локации</a>
 </section>
 {%endif%}

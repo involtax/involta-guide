@@ -10,7 +10,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
-from .editor_fixture import FixtureEditor
+from .editor_fixture import FixtureEditor, enqueue_fixture, legacy_catalogue
 from .test_background_generation import task
 from .test_editorial import CONTENT
 from .test_jobs import setup
@@ -39,8 +39,8 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
             )
         if manual_scope:
             conn.execute(text("UPDATE locations SET coverage_note='Ручной охват' WHERE id=34"))
-    service.enqueue_public_fill(34)
-    service.enqueue_public_fill(622)
+    enqueue_fixture(service, 34)
+    enqueue_fixture(service, 622)
     jobs = {j["location_id"]: j for j in queries.rows("jobs")}
     frozen = {"input": [{"role": "user", "content": old.COVERAGE_NOTES[622]}]}
     with engine.begin() as conn:
@@ -57,7 +57,7 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
             {"job": jobs[622]["id"], "usage": usage, "body": json.dumps(frozen)},
         )
     before_locations = queries.rows("locations")
-    before_restaurants = queries.rows("restaurants")
+    before_restaurants = legacy_catalogue(engine)
     before_reviews = queries.rows("reviews")
     command.upgrade(config, "unbiased_city_scope")
     command.upgrade(config, "unbiased_city_scope")
@@ -67,7 +67,7 @@ def test_upgrade_removes_seeded_clues_without_changing_content_or_recorded_input
             assert after.pop("coverage_note") == ""
             before = {k: v for k, v in before.items() if k != "coverage_note"}
         assert after == before
-    assert queries.rows("restaurants") == before_restaurants
+    assert legacy_catalogue(engine) == before_restaurants
     assert queries.rows("reviews") == before_reviews
     expected_jobs = {j["id"]: dict(j) for j in jobs.values()}
     expected_jobs[jobs[34]["id"]]["prompt"] = current.PROMPT

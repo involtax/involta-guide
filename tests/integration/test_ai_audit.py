@@ -9,6 +9,7 @@ from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import provider_payload, setup
 from .test_web import login
 
@@ -38,7 +39,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
         )
     )
     service.provider = provider
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     try:
         assert Worker(queue, service).once()
     finally:
@@ -90,7 +91,7 @@ def test_full_response_survives_validation_failure_and_is_admin_only(database):
 
 def test_audit_preserves_each_attempt_success_and_legacy_data(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queries.rows("jobs")[0]
     audit = AIAudit(engine, settings)
     assert not audit.detail(job["id"])["trace_available"]

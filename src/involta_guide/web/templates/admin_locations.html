@@ -29,9 +29,10 @@
 <h3 id="location-intro-heading">Вступление</h3>
 {%if entered_intro is not none%}<p role="alert">Текущее вступление: {{selected.content.intro}}</p>{%endif%}
 <form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/intro')}}" class="stack">{{csrf()}}
-<input type="hidden" name="expected" value="{{c.revision or ''}}">
+<input type="hidden" name="expected" value="{{intro_expected}}">
 <label for="location-intro-text">Вступление</label><textarea id="location-intro-text" name="intro" rows="8" maxlength="30000">{{entered_intro if entered_intro is not none else selected.content.intro}}</textarea>
 <button>Сохранить вступление</button></form>
+<form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/content/intro')}}">{{csrf()}}<button {{"disabled" if "intro" in content_pending else ""}}>{{"Вступление готовится…" if "intro" in content_pending else "Написать вступление"}}</button></form>
 <details><summary>Журнал ручных правок вступления</summary>
 {%for event in selected.intro_events%}<article><p>{{event.created_at}} · сессия {{event.data.admin_session_id}}</p>
 {%for field in event.data.diff%}<dl><dt>Было</dt><dd>{{field.before}}</dd><dt>Стало</dt><dd>{{field.after}}</dd></dl>{%endfor%}</article>{%else%}<p>Ручных правок пока нет.</p>{%endfor%}</details>
@@ -142,7 +143,14 @@ checked
 </details>
 {%endif%}
 </section>
-{%if not c.is_hub%}<section class="panel"><h3>Подборка</h3><p>Новый поиск по тому же промпту, что и первичное наполнение. Текущая страница обновится после успешной сборки.</p><p>Рестораны, отзывы, голоса и аудио сохраняются.</p><p><a href="{{settings.path('/admin/settings/filling')}}">Настройки наполнения →</a></p><form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/rebuild')}}">{{csrf()}}<button {%if selected.generation and selected.generation.status in ('queued','running')%}disabled{%endif%}>{{'Собирается…' if selected.generation and selected.generation.status in ('queued','running') else 'Пересобрать подборку'}}</button></form>{%if selected.generation and selected.generation.number%}<p><a href="{{settings.path('/logs/'+c.slug+'/'+selected.generation.number|string)}}">{{c.name}} / {{selected.generation.number}} →</a></p>{%endif%}</section>{%endif%}
+{%if not c.is_hub%}<section class="panel"><h3>Поиск ресторанов</h3>
+<p>Вступление и рестораны обновляются независимо. Поиск дополняет каталог города и окрестностей; новые места исследуются отдельно. Существующие карточки и оценки сохраняются.</p>
+<div class="content-actions">
+
+<form method="post" action="{{settings.path('/admin/locations/'+c.slug+'/content/discover')}}">{{csrf()}}<button {{"disabled" if "discover" in content_pending else ""}}>{{"Поиск выполняется…" if "discover" in content_pending else "Найти ещё места"}}</button></form>
+</div>
+<p><a href="{{settings.path('/admin/restaurants/'+c.slug)}}">Рестораны города →</a> · <a href="{{settings.path('/admin/settings/filling')}}">Промпты и модель →</a> · <a href="{{settings.path('/logs/'+c.slug)}}">Логи →</a></p>
+</section>{%endif%}
 {%endif%}
 {%endif%}
 {%if selected is none%}<section class="restaurant-empty"><h2>Выберите город</h2><p>Слева доступны все локации, включая пустые.</p></section>{%endif%}

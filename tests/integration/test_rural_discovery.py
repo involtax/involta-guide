@@ -16,7 +16,7 @@ from sqlalchemy import text
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
-from .editor_fixture import FixtureEditor
+from .editor_fixture import FixtureEditor, enqueue_fixture, legacy_catalogue
 from .test_background_generation import configured, envelope, task
 from .test_editorial import CONTENT
 from .test_jobs import setup
@@ -116,7 +116,7 @@ def test_prompt_activation_preserves_recorded_requests_and_can_restore_previous_
             text("UPDATE settings SET value=:prompt WHERE key='prompt'"), {"prompt": previous}
         )
     for key in (34, 622):
-        service.enqueue_public_fill(key)
+        enqueue_fixture(service, key)
     jobs = {j["location_id"]: j for j in queries.rows("jobs")}
     frozen = {"input": [{"role": "user", "content": previous}], "schema": "recorded"}
     with engine.begin() as conn:
@@ -133,7 +133,7 @@ def test_prompt_activation_preserves_recorded_requests_and_can_restore_previous_
             {"job": jobs[622]["id"], "usage": usage, "body": json.dumps(frozen)},
         )
     locations = queries.rows("locations")
-    restaurants = queries.rows("restaurants")
+    restaurants = legacy_catalogue(engine)
     reviews = queries.rows("reviews")
     command.upgrade(config, "rural_discovery")
     assert queries.setting("prompt") == current.PROMPT
@@ -141,7 +141,7 @@ def test_prompt_activation_preserves_recorded_requests_and_can_restore_previous_
     assert queries.get("jobs", jobs[622]["id"])["prompt"] == previous
     assert task(engine, jobs[622])["request_json"] == frozen
     assert queries.rows("locations") == locations
-    assert queries.rows("restaurants") == restaurants
+    assert legacy_catalogue(engine) == restaurants
     assert queries.rows("reviews") == reviews
     if manual_edits:
         with engine.begin() as conn:

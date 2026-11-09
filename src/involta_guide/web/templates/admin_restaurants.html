@@ -27,6 +27,14 @@
 {%for r in restaurant_cards%}
 <article class="restaurant-record">
 <header class="restaurant-record-heading"><span class="restaurant-position">{{'%02d'|format(r.display_rank) if r.display_rank is not none else '—'}}</span><div><h3><a href="{{settings.path('/admin/restaurants/'+r.number|string)}}">{{r.name}} / {{r.number}}</a></h3><p>{{r.cuisine or 'Кухня не указана'}} · {{r.location_name}}</p><div class="restaurant-badges"><span>{{'Активен' if r.active else 'Неактивен'}}</span>{%if r.alex_star%}<span>★ Звезда Алекса</span>{%endif%}</div></div><div class="restaurant-score"><strong>{{'%.2f'|format(r.score) if r.score is not none else '—'}}</strong><span>/ 10 · 8 критериев</span></div></header>
+<div class="content-actions">
+{%for action,label in [('all','Исследовать'),('card','Обновить карточку'),('assessment','Переоценить')]%}
+<form method="post" action="{{settings.path('/admin/restaurants/'+r.number|string+'/content/'+action)}}">{{csrf()}}<button {{"disabled" if r.content_pending else ""}}>{{label}}</button></form>
+{%endfor%}
+<form method="post" action="{{settings.path('/admin/restaurants/'+r.number|string+'/content/'+('show' if r.hidden else 'hide'))}}">{{csrf()}}<button>{{'Показать' if r.hidden else 'Скрыть'}}</button></form>
+</div>
+<p class="restaurant-muted">{{'Скрыт администратором' if r.hidden else {'verified':'Проверен','needs_verification':'Требует проверки','closed':'Закрыт'}.get(r.verification_status,'Требует проверки')}}</p>
+
 <p class="restaurant-description">{{r.description or 'Описание не сохранено.'}}</p>
 <dl class="restaurant-facts">
 <div><dt>Телефон</dt><dd>{%if r.phone%}<a href="tel:{{r.phone}}">{{r.phone}}</a>{%else%}Не указан{%endif%}</dd></div>

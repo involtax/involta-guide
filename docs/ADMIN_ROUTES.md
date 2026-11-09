@@ -9,7 +9,10 @@ admin-сессию, same-origin и CSRF. Вход `/admin`, выход `/admin/l
 | Обзор | `/admin` | Сводка и переходы |
 | Статистика | `/admin/stats` | Последние 30 дней, даты в столбцах; хиты, уники, отзывы, хиты / уники; без пагинации |
 | Локации | `/admin/locations`, `/admin/locations/{slug}` | Sidebar, настройки географии/навигации, отдельный POST `/intro` с revision |
-| Пересобрать подборку | POST `/admin/locations/{slug}/rebuild` | Админ + CSRF; тот же промпт наполнения; сохраняет рестораны, отзывы, голоса, аудио и логи |
+| Написать вступление | POST `/admin/locations/{slug}/content/intro` | Админ + CSRF; меняет только вступление |
+| Найти ещё места | POST `/admin/locations/{slug}/content/discover` | Админ + CSRF; дополняет каталог, исследует новые места |
+| Исследовать / карточка / оценки | POST `/admin/restaurants/{number}/content/{all\|card\|assessment}` | Отдельная операция над рестораном, админ + CSRF |
+| Скрыть / показать | POST `/admin/restaurants/{number}/content/{hide\|show}` | Без удаления данных, админ + CSRF |
 | Рестораны | `/admin/restaurants`, `/admin/restaurants/{slug}`, `/admin/restaurants/{number}` | Город в пути, ссылка на публичную страницу в новой вкладке, рейтинг и данные карточки |
 | Отзывы | `/admin/reviews`, `/admin/reviews/{slug}` | Города слева, лента справа; permalink `/{slug}/{number}` открывает страницу и якорь |
 | Повтор доставки | POST `/admin/reviews/inbox/{event_id}/retry` | Повтор сохранённого ошибочного Voice event |
@@ -72,3 +75,5 @@ UUID-редирект `/admin/voice/legacy/{uuid}`, конвертер стар�
 Ручная проверка и порядок перехода: [BETA_CORE_RUNBOOK.md](BETA_CORE_RUNBOOK.md).
 
 Наполнение и модели без денежного учёта: [FILLING.md](FILLING.md).
+
+Закрытый machine API с отдельным Bearer-токеном: [контракт и примеры](INCREMENTAL_CONTENT.md#закрытый-api). Старый `/rebuild` удалён.

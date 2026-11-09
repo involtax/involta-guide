@@ -151,42 +151,34 @@ class JobService:
             state = self._public_state(repo, location)
             if not state["can_start"]:
                 return state
-            self._queue_generation(repo, location)
+            from involta_guide.catalogue.service import CityContent
+
+            CityContent(self.uow, self.provider.model).initial(repo, location)
             return self._public_state(repo, location)
 
     def rebuild(self, location_id: int, *, actor: str | None = None) -> str:
-        """Same generation request as initial filling; current content stays live."""
-        with self.uow() as uow:
-            location = require(uow.repo, "locations", location_id, lock=True)
-            if not location["active"] or location["is_hub"] or location["reset_pending"]:
-                raise RuleViolation("Локация недоступна для пересборки")
-            job_id = self._queue_generation(uow.repo, location)
-            if not job_id:
-                raise Conflict("Для этой локации уже есть запрос в очереди или в работе")
-            uow.repo.audit(
-                "selection_rebuild",
-                job_id,
-                json.dumps({"location_id": location_id, "actor": actor}),
-            )
-            return job_id
+        from involta_guide.catalogue.service import CityContent
+
+        return CityContent(self.uow, self.provider.model).enqueue(location_id, "discover")
 
     def regenerate(self, job_id: str, *, model: str | None = None) -> str:
-        with self.uow() as uow:
-            uow.repo.health()
-            old = require(uow.repo, "jobs", job_id)
+        from involta_guide.catalogue.service import CityContent
+
+        with self.uow() as work:
+            old = require(work.repo, "jobs", job_id)
             if old["kind"] != "generate":
                 raise RuleViolation("Новый запрос доступен только для наполнения")
-            location = require(uow.repo, "locations", old["location_id"], lock=True)
-            if not location["active"] or location["is_hub"] or location["reset_pending"]:
-                raise RuleViolation("Локация отключена")
-            if (location["initialized_at"] is not None and old["status"] == "done") or old[
-                "content_epoch"
-            ] != location["content_epoch"]:
-                raise Conflict("Подборка уже наполнена; пересоберите её на странице локации")
-            new_id = self._queue_generation(uow.repo, location, model=model)
-            if not new_id:
-                raise Conflict("Для этой локации уже есть запрос в очереди или в работе")
-            return new_id
+            location = require(work.repo, "locations", old["location_id"])
+            if old["content_epoch"] != location["content_epoch"]:
+                raise Conflict("Цикл локации изменился")
+            report = old["report"] or {}
+        return CityContent(self.uow, self.provider.model).enqueue(
+            old["location_id"],
+            report.get("operation", "discover"),
+            report.get("restaurant_id"),
+            report.get("scope", "all"),
+            model=model,
+        )
 
     def set_prompt(self, prompt: str) -> None:
         if not 50 <= len(prompt) <= 30000:
@@ -196,6 +188,11 @@ class JobService:
             uow.repo.audit("prompt", "generation")
 
     def process(self, job: Record) -> None:
+        if (job.get("report") or {}).get("operation"):
+            from involta_guide.catalogue.service import CityContent
+
+            CityContent(self.uow, self.provider.model).process(job, self.provider)
+            return
         if job["kind"] == "reset":
             # The worker attaches its infrastructure reset coordinator, outside HTTP.
             if self.reset_handler is None:

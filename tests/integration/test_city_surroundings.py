@@ -15,7 +15,7 @@ from sqlalchemy import text
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
-from .editor_fixture import FixtureEditor
+from .editor_fixture import FixtureEditor, enqueue_fixture, legacy_catalogue
 from .test_background_generation import configured, envelope, task
 from .test_editorial import CONTENT
 from .test_filling_top3 import shortlist
@@ -194,7 +194,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
             text("UPDATE locations SET coverage_note='Прежний охват' WHERE id IN (34,622)")
         )
     for location_id in (34, 622):
-        service.enqueue_public_fill(location_id)
+        enqueue_fixture(service, location_id)
     jobs = {j["location_id"]: j for j in queries.rows("jobs")}
     submitted, pending = jobs[622], jobs[34]
     frozen = {"input": [{"role": "user", "content": original_prompt}], "marker": "frozen"}
@@ -217,7 +217,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
             initialized_at=now() WHERE id=34""")
         )
     before_locations = queries.rows("locations")
-    before_catalogue = queries.rows("restaurants")
+    before_catalogue = legacy_catalogue(engine)
     before_reviews = queries.rows("reviews")
     assert before_catalogue and before_reviews
     command.upgrade(config, "city_surroundings")
@@ -228,7 +228,7 @@ def test_scope_migration_preserves_content_and_frozen_requests_and_can_undo(data
             assert after.pop("coverage_note") == CONTRACT.COVERAGE_NOTES[before["id"]]
             before = {k: v for k, v in before.items() if k != "coverage_note"}
         assert after == before
-    assert queries.rows("restaurants") == before_catalogue
+    assert legacy_catalogue(engine) == before_catalogue
     assert queries.rows("reviews") == before_reviews
     assert queries.get("jobs", pending["id"])["prompt"] == CONTRACT.PROMPT
     assert queries.get("jobs", submitted["id"])["prompt"] == original_prompt

@@ -16,6 +16,7 @@ from involta_guide.infrastructure.ai.openai import OpenAIProvider
 from involta_guide.infrastructure.jobs.worker import Worker
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_background_generation import configured, envelope
 from .test_jobs import FakeAI, setup
 from .test_web import login
@@ -102,9 +103,9 @@ def test_contract_upgrade_preserves_submitted_requests_history_and_admin_prompt_
     old_prompt = "Сохранённый старый промпт до смены контракта. " * 2
     with uow() as tx:
         tx.repo.set_setting("prompt", old_prompt)
-    service.enqueue_public_fill(city["id"])
+    enqueue_fixture(service, city["id"])
     other = queries.directory(query="Шуя")["rows"][0]
-    service.enqueue_public_fill(other["id"])
+    enqueue_fixture(service, other["id"])
     submitted = next(j for j in queries.rows("jobs") if j["location_id"] == city["id"])
     untouched = next(j for j in queries.rows("jobs") if j["location_id"] == other["id"])
     old_request = {
