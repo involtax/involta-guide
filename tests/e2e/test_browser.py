@@ -240,8 +240,8 @@ def test_browser_public_htmx_intro_logs_and_rebuild(database, tmp_path):
                     page.keyboard.press("Escape")
                     expect(voice).to_have_attribute("data-voice-state", "idle")
                 page.goto(base + "/admin/locations/ivanovo")
-                rebuild = page.locator('form[action$="/rebuild"]')
-                button = rebuild.get_by_role("button", name="Пересобрать подборку")
+                rebuild = page.locator('form[action$="/content/discover"]')
+                button = rebuild.get_by_role("button", name="Найти ещё места")
                 expect(button).to_be_visible()
                 before_location = queries.get("locations", location["id"])
                 before_restaurants = queries.rows("restaurants", {"location_id": location["id"]})
@@ -262,7 +262,7 @@ def test_browser_public_htmx_intro_logs_and_rebuild(database, tmp_path):
                 )
                 assert len(pending) == 1
                 page.goto(base + "/admin/locations/ivanovo")
-                expect(page.locator('form[action$="/rebuild"] button')).to_be_disabled()
+                expect(page.locator('form[action$="/content/discover"] button')).to_be_disabled()
                 assert not errors
                 browser.close()
         finally:

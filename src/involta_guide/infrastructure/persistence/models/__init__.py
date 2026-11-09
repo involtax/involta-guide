@@ -50,6 +50,8 @@ class LocationRow(Base):
 
 
 class RestaurantRow(Base):
+    hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    verification_status: Mapped[str] = mapped_column(Text, server_default="needs_verification")
     __tablename__ = "restaurants"
     ranking: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     number: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)

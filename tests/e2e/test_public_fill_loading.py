@@ -40,7 +40,7 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
         expect(page.locator("[data-fill-message]")).to_have_text(
             "Сканируем город и его окрестности.", timeout=7500
         )
-        assert len(queries.rows("jobs")) == 1
+        assert len(queries.rows("jobs")) == 2
         page.reload()  # Return to an already queued job: no grey button or second POST.
         expect(page.locator("[data-fill-waiting]")).to_be_visible()
         expect(page.get_by_role("button", name="Запарсить эти данные")).to_be_hidden()
@@ -51,7 +51,8 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
             page.screenshot(path=str(Path(evidence) / f"waiting-{width}.png"), full_page=True)
         navigations = []
         page.on("framenavigated", lambda frame: navigations.append(frame.url))
-        assert Worker(queue, service).once()  # Fake provider; real PostgreSQL commit and HTTP GET.
+        for _ in range(3):
+            assert Worker(queue, service).once()  # Fake provider; real PostgreSQL commits.
         assert queries.get("locations", location["id"])["initialized_at"] is not None
         assert len(queries.rows("restaurants")) == 1
         expect(page.get_by_role("heading", name="Стоит зайти", exact=True)).to_be_visible(
@@ -64,7 +65,7 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
         if evidence:
             page.screenshot(path=str(Path(evidence) / f"ready-{width}.png"), full_page=True)
         assert len(submissions) == 1
-        assert len(queries.rows("jobs")) == 1
+        assert len(queries.rows("jobs")) == 3
         assert not errors, errors
         browser.close()
 
@@ -109,11 +110,12 @@ def test_lost_post_response_and_status_failures_still_reveal_committed_data(data
         page.wait_for_function("document.querySelector('form[hidden]') !== null")
         expect(page.locator("[data-fill-waiting]")).to_be_visible()
         expect(page.get_by_role("button", name="Запарсить эти данные")).to_be_hidden()
-        assert Worker(queue, service).once()
+        for _ in range(3):
+            assert Worker(queue, service).once()
         expect(page.get_by_role("heading", name="Тестовый ресторан")).to_be_visible(timeout=15000)
         assert post_count == 1
         assert status_count >= 4
-        assert len(queries.rows("jobs")) == 1
+        assert len(queries.rows("jobs")) == 3
         browser.close()
 
 
@@ -147,6 +149,7 @@ def test_failed_job_stops_loading_and_does_not_offer_duplicate_public_generation
             == "none"
         )
         assert Worker(queue, service).once()
+        assert Worker(queue, service).once()
         expect(page.get_by_role("status")).to_contain_text("429", timeout=10000)
         expect(page.locator("[data-fill-waiting]")).to_be_hidden()
         expect(page.locator("[data-fill-spoiler]")).to_be_hidden()
@@ -154,7 +157,7 @@ def test_failed_job_stops_loading_and_does_not_offer_duplicate_public_generation
         page.reload()
         expect(page.locator("[data-fill-waiting]")).to_be_hidden()
         expect(page.get_by_role("status")).to_contain_text("429")
-        assert len(queries.rows("jobs")) == 1
+        assert len(queries.rows("jobs")) == 2
         browser.close()
 
 
@@ -162,7 +165,8 @@ def test_publication_between_page_content_and_status_reads_reloads_to_fresh_cont
     settings, _, _, queries, _, service, queue = setup(database)
     stale_page = queries.public("ivanovo")
     service.enqueue_public_fill(stale_page["location"]["id"])
-    assert Worker(queue, service).once()
+    for _ in range(3):
+        assert Worker(queue, service).once()
     app = create_app(settings)
     app.state.context.jobs = service
     public = app.state.context.queries.public

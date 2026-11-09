@@ -23,6 +23,7 @@ from involta_guide.web.routes import (
     admin,
     admin_content,
     agents,
+    content_api,
     public,
     reviews2,
     search,
@@ -74,7 +75,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from starlette.concurrency import run_in_threadpool
 
         response = await call_next(request)
-        if request.url.path == settings.path("/mcp"):
+        if request.url.path == settings.path("/mcp") or request.url.path.startswith(
+            settings.path("/api/admin/")
+        ):
             response.headers.update({"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
             return response
         token = request.cookies.get("guide_admin", "")
@@ -178,6 +181,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(admin.routes(settings.base_path))
     app.include_router(admin_content.routes(settings.base_path))
+    app.include_router(content_api.routes(settings.base_path))
     # Specific review diagnostics must precede generic /logs/{slug} routes.
     app.include_router(voice_admin.routes(settings.base_path))
     app.include_router(reviews2.routes(settings.base_path))

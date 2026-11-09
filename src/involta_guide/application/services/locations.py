@@ -75,8 +75,12 @@ class LocationService:
             location = require(repo, "locations", key, lock=True)
             if location["is_hub"] or location["reset_pending"]:
                 raise Conflict("Локация не принимает изменение вступления")
-            if location["revision"] != expected:
-                raise Conflict("Город изменён другим действием. Сравните тексты и сохраните снова.")
+            from involta_guide.catalogue.service import digest
+
+            if expected not in (digest(location["intro"]), location["revision"]):
+                raise Conflict(
+                    "Вступление изменено другим действием. Сравните тексты и сохраните снова."
+                )
             if location["intro"] == text:
                 return False
             repo.change(

@@ -7,13 +7,14 @@ from sqlalchemy import text
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.main import create_app
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import setup
 from .test_web import login
 
 
 def test_slug_rename_updates_stored_keys_and_paths_without_touching_responses(database):
     settings, engine, uow, queries, location, service, queue = setup(database)
-    service.enqueue_public_fill(location["id"])
+    enqueue_fixture(service, location["id"])
     job = queries.rows("jobs")[0]
     audit = AIAudit(engine, settings)
     audit.record(job["id"], "response", {"status": 200, "body": "original immutable answer"})

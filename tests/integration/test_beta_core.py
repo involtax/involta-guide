@@ -19,6 +19,7 @@ from involta_voice.reset import purge
 from involta_voice.service import VoiceService
 from involta_voice.worker import Worker
 
+from .editor_fixture import enqueue_fixture
 from .test_jobs import FakeAI
 from .test_voice_service import metadata, recording
 from .test_voice_service import voice_database as voice_database
@@ -67,18 +68,20 @@ def submission(city, epoch=1):
     )
 
 
-def test_first_fill_success_blocks_public_retry_and_admin_regeneration(database):
+def test_first_fill_blocks_public_retry_but_admin_can_search_again(database):
     _, engine, queries, city, jobs, queue = core(database)
     with ThreadPoolExecutor(3) as pool:
         list(pool.map(lambda _: jobs.enqueue_public_fill(city["id"]), range(3)))
-    assert len(queries.rows("jobs")) == 1
-    job = queue.claim()
-    jobs.process(job)
+    assert len(queries.rows("jobs")) == 2
+    for _ in range(3):
+        jobs.process(queue.claim())
     assert queries.get("locations", city["id"])["initialized_at"]
     assert jobs.public_fill_state(city["id"])["state"] == "ready"
     assert jobs.enqueue_public_fill(city["id"])["can_start"] is False
-    with pytest.raises(Conflict):
-        jobs.regenerate(job["id"])
+    before = queries.rows("restaurants")
+    job = next(j for j in queries.rows("jobs") if j["report"].get("operation") == "discover")
+    assert jobs.regenerate(job["id"])
+    assert queries.rows("restaurants") == before
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM audit"))
     assert jobs.public_fill_state(city["id"])["can_start"] is False
@@ -110,7 +113,7 @@ def test_reset_survives_external_failure_without_resurrection(
     consumer = Consumer(engine, None)
     for event in events:
         consumer.import_event(event)
-    jobs.enqueue_public_fill(city["id"])
+    enqueue_fixture(jobs, city["id"])
     generation = queue.claim()
     jobs.process(generation)
     previous_log = queries.rows("request_logs")[0]["number"]
@@ -419,7 +422,7 @@ def test_late_guide_result_and_debug_are_fenced_after_reset(database, voice_data
             return super().generate(*args)
 
     jobs.provider = Delayed()
-    jobs.enqueue_public_fill(city["id"])
+    enqueue_fixture(jobs, city["id"])
     oldjob = queries.rows("jobs")[0]
 
     class Client:

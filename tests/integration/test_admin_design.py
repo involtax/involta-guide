@@ -178,7 +178,7 @@ def test_all_admin_screens_share_shell_and_fit_desktop_tablet_mobile(database, m
                     if name in ("city", "voice-review"):
                         page.screenshot(path=str(shots / f"{name}-viewport-{width}.png"))
                     if name == "city":
-                        page.locator('form[action$="/rebuild"]').locator("..").screenshot(
+                        page.locator('form[action$="/content/discover"]').locator("..").screenshot(
                             path=str(shots / f"city-rebuild-{width}.png")
                         )
                 if name == "voice-review":

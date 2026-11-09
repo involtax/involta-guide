@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.datastructures import FormData
 
 from involta_guide.application.commands.schemas import LocationInput
+from involta_guide.catalogue.service import PROMPTS, CityContent, digest
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.location_search import search_locations
 from involta_guide.domain.location_slug import location_slug
@@ -94,11 +95,25 @@ def location_page(
         for row in sorted(choices, key=lambda row: (row["name"], row["id"]))
         if row["id"] != current_id
     ]
+    pending = []
+    if current_id:
+        with ctx.jobs.uow() as work:
+            pending = [
+                row
+                for row in work.repo.rows(
+                    "jobs", {"location_id": current_id, "kind": "generate"}, limit=10000
+                )
+                if row["status"] in ("queued", "running")
+            ]
     return render(
         request,
         "admin.html",
         {
             "active_section": "locations",
+            "intro_expected": digest(selected["location"]["intro"])
+            if selected and selected["location"]
+            else "",
+            "content_pending": [row["report"].get("operation") for row in pending if row["report"]],
             "message": message or params.get("message", ""),
             "q": params.get("q", ""),
             "status": status,
@@ -121,6 +136,18 @@ def restaurant_page(request: Request, slug: str | None = None) -> Response:
     location_id = ctx.queries.admin_location(slug)["location"]["id"] if slug else None
     data = ctx.queries.restaurant_browser(request.query_params.get("q", ""), location_id)
     cards = data["restaurant_cards"]
+    with ctx.jobs.uow() as work:
+        active = {
+            row["report"].get("restaurant_id")
+            for row in work.repo.rows(
+                "jobs",
+                {"kind": "generate", **({"location_id": location_id} if location_id else {})},
+                limit=10000,
+            )
+            if row["status"] in ("queued", "running") and row["report"]
+        }
+    for card in cards:
+        card["content_pending"] = card["id"] in active
     pages = max(1, (len(cards) + 19) // 20)
     page = min(pages, number_param(request))
     data["restaurant_cards"] = cards[(page - 1) * 20 : page * 20]
@@ -135,6 +162,17 @@ def restaurant_page(request: Request, slug: str | None = None) -> Response:
             **data,
         },
     )
+
+
+def filling_prompts(request: Request) -> dict[str, str]:
+    from involta_guide.catalogue.service import ROOT
+
+    ctx = context(request)
+    return {
+        op: ctx.queries.setting("content_" + op + "_prompt")
+        or (ROOT / "data/prompts" / filename).read_text()
+        for op, filename in PROMPTS.items()
+    }
 
 
 def routes(prefix: str) -> APIRouter:
@@ -263,18 +301,48 @@ def routes(prefix: str) -> APIRouter:
             ),
         )
 
-    @router.post(prefix + "/admin/locations/{slug}/rebuild")
-    def rebuild_location(
-        request: Request, slug: str, form: FormData = Depends(form_data)
+    @router.post(prefix + "/admin/locations/{slug}/content/{operation}")
+    def content_operation(
+        request: Request, slug: str, operation: str, form: FormData = Depends(form_data)
     ) -> Response:
-        principal = require_admin(request)
+        require_admin(request)
         check_csrf(request, form)
+        if operation not in ("intro", "discover"):
+            raise HTTPException(404)
         ctx = context(request)
         location = ctx.queries.admin_location(slug)["location"]
-        job_id = ctx.jobs.rebuild(location["id"], actor=principal["id"])
-        with ctx.jobs.uow() as uow:
-            log = uow.repo.rows("request_logs", {"job_id": job_id}, limit=1)[0]
+        job_id = CityContent(ctx.jobs.uow, ctx.settings.openai_model).enqueue(
+            location["id"], operation
+        )
+        with ctx.jobs.uow() as work:
+            log = work.repo.rows("request_logs", {"job_id": job_id}, limit=1)[0]
         return log_redirect(request, f"/logs/{slug}/{log['number']}")
+
+    @router.post(prefix + "/admin/restaurants/{number:int}/content/{action}")
+    def restaurant_operation(
+        request: Request, number: int, action: str, form: FormData = Depends(form_data)
+    ) -> Response:
+        require_admin(request)
+        check_csrf(request, form)
+        ctx = context(request)
+        with ctx.jobs.uow() as work:
+            records = work.repo.rows("restaurants", {"number": number}, limit=1)
+            if not records:
+                raise HTTPException(404)
+            restaurant = records[0]
+            from involta_guide.application.services.editorial import require
+
+            location = require(work.repo, "locations", restaurant["location_id"])
+        content = CityContent(ctx.jobs.uow, ctx.settings.openai_model)
+        if action in ("hide", "show"):
+            content.visibility(restaurant["id"], action == "hide")
+            return log_redirect(request, "/admin/restaurants/" + location["slug"])
+        if action not in ("all", "card", "assessment"):
+            raise HTTPException(404)
+        job_id = content.enqueue(location["id"], "research", restaurant["id"], action)
+        with ctx.jobs.uow() as work:
+            log = work.repo.rows("request_logs", {"job_id": job_id}, limit=1)[0]
+        return log_redirect(request, f"/logs/{location['slug']}/{log['number']}")
 
     @router.get(prefix + "/admin/restaurants")
     def restaurants(request: Request) -> Response:
@@ -310,7 +378,7 @@ def routes(prefix: str) -> APIRouter:
             {
                 "active_section": "fill",
                 "message": request.query_params.get("message", ""),
-                "prompt": context(request).queries.setting("prompt"),
+                "content_prompts": filling_prompts(request),
             },
         )
 
@@ -319,8 +387,9 @@ def routes(prefix: str) -> APIRouter:
         require_admin(request)
         check_csrf(request, form)
         try:
-            context(request).jobs.save_filling_settings(
-                str(form.get("prompt") or ""), key(form, "model")
+            ctx = context(request)
+            CityContent(ctx.jobs.uow).save_settings(
+                {op: str(form.get(op) or "") for op in PROMPTS}, key(form, "model")
             )
         except RuleViolation as exc:
             return render(
@@ -329,7 +398,7 @@ def routes(prefix: str) -> APIRouter:
                 {
                     "active_section": "fill",
                     "message": str(exc),
-                    "prompt": str(form.get("prompt") or ""),
+                    "content_prompts": {op: str(form.get(op) or "") for op in PROMPTS},
                     "generation_model": key(form, "model"),
                 },
             )

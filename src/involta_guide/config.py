@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     admin_password: SecretStr = SecretStr("")
     admin_password_hash: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+    agent_api_token: SecretStr = SecretStr("")
     voice_enabled: bool = False
     voice_debug_enabled: bool = True
     voice_url: str = "http://voice:3100"

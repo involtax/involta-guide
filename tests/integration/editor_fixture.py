@@ -48,3 +48,14 @@ def enqueue_fixture(service, location_id):
     with service.uow() as work:
         location = work.repo.get("locations", location_id, lock=True)
         return int(service._queue_generation(work.repo, location) is not None)
+
+
+def legacy_catalogue(engine):
+    """Read the actual old schema during migration tests without today's ORM columns."""
+    from sqlalchemy import text
+
+    with engine.connect() as conn:
+        return [
+            dict(row)
+            for row in conn.execute(text("SELECT * FROM restaurants ORDER BY number")).mappings()
+        ]
