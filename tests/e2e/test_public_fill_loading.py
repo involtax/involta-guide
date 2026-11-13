@@ -55,10 +55,9 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
             assert Worker(queue, service).once()  # Fake provider; real PostgreSQL commits.
         assert queries.get("locations", location["id"])["initialized_at"] is not None
         assert len(queries.rows("restaurants")) == 1
-        expect(page.get_by_role("heading", name="Стоит зайти", exact=True)).to_be_visible(
-            timeout=10000
-        )
-        expect(page.get_by_role("heading", name="Тестовый ресторан")).to_be_visible()
+        expect(page.get_by_role("heading", name="Тестовый ресторан")).to_be_visible(timeout=10000)
+        # Ivanovo has a panorama: publication is signalled by the restaurant, not a heading.
+        expect(page.get_by_role("heading", name="Стоит зайти", exact=True)).to_have_count(0)
         expect(page.locator(".city-hero .lead")).to_have_text("Сгенерировано")
         expect(page.locator("[data-public-fill]")).to_have_count(0)
         assert navigations  # Publication caused the browser to reload itself.

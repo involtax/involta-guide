@@ -121,7 +121,7 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
             assert scroller.evaluate("el=>el.scrollLeft") == 0
             page.wait_for_timeout(350)
             assert scroller.evaluate("el=>el.scrollLeft") == 0
-        page.goto(origin + "/guide/ivanovo", wait_until="networkidle")
+        page.goto(origin + "/guide/kineshma", wait_until="networkidle")
         expect(page.locator("[data-panorama]")).to_have_count(0)
         assert "/assets/panorama.js" not in page.content()
         assert "/assets/panorama.css" not in page.content()
