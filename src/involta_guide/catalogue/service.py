@@ -144,6 +144,7 @@ class CityContent:
         scope: str = "all",
         request_id: str | None = None,
         model: str | None = None,
+        log_group: str | None = None,
     ) -> str:
         prepared = self._prepare(repo, location_id, operation, restaurant_id, scope)
         if model:
@@ -188,7 +189,7 @@ class CityContent:
                 "model": prepared["model"],
                 "prompt": prepared["prompt"],
                 "public_log": True,
-                "report": {**prepared, "source": "server"},
+                "report": {**prepared, "source": "server", "log_group": log_group or identity},
                 "created_at": datetime.now(UTC),
                 "available_at": datetime.now(UTC),
             }
@@ -211,9 +212,10 @@ class CityContent:
             )
 
     def initial(self, repo: Repository, location: Record) -> None:
+        group = None
         if not location["intro"].strip():
-            self._enqueue(repo, location["id"], "intro")
-        self._enqueue(repo, location["id"], "discover")
+            group = self._enqueue(repo, location["id"], "intro")
+        self._enqueue(repo, location["id"], "discover", log_group=group)
 
     def submit(
         self,
@@ -435,7 +437,13 @@ class CityContent:
             followups if (job["report"] or {}).get("source") == "server" else []
         ):
             if identity not in pending_research:
-                self._enqueue(repo, location_id, "research", identity)
+                self._enqueue(
+                    repo,
+                    location_id,
+                    "research",
+                    identity,
+                    log_group=(job["report"] or {}).get("log_group", job_id),
+                )
         repo.audit(
             "content_" + operation,
             job_id,

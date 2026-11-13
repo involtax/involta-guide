@@ -7,6 +7,23 @@
       element.textContent = date.toLocaleString('ru-RU', format);
     }
   });
+  const groupPanel = document.getElementById('log-group-live');
+  if (groupPanel?.dataset.active === 'true') {
+    async function pollGroup() {
+      try {
+        const response = await fetch(groupPanel.dataset.url, {cache: 'no-store', credentials: 'same-origin'});
+        if (!response.ok) throw new Error('group status unavailable');
+        const {group} = await response.json();
+        if (group && group.signature !== groupPanel.dataset.signature) {
+          window.location.reload();
+          return;
+        }
+        if (group && !['queued', 'running'].includes(group.status)) return;
+      } catch { /* A lost connection must not stop observing the existing launch. */ }
+      setTimeout(pollGroup, 10000);
+    }
+    setTimeout(pollGroup, 10000);
+  }
   const panel = document.getElementById('log-live');
   if (!panel || panel.dataset.active !== 'true') return;
   async function poll() {

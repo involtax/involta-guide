@@ -11,6 +11,8 @@ from sqlalchemy import Engine, text
 
 from involta_guide.config import Settings
 
+from .log_groups import group_logs
+
 HISTORY = """WITH history AS (
  SELECT j.*,l.name location_name,r.location_slug,r.number run_number,r.path log_path,
  g.state generation_state,g.response_id,g.poll_count,g.last_error generation_error,
@@ -183,6 +185,68 @@ class AIAudit:
             and state in ("completed", "paused", "unavailable", "queued", "in_progress")
         )
         return job
+
+    def groups(
+        self,
+        page: int,
+        query: str = "",
+        status: str = "",
+        *,
+        job_id: str | None = None,
+        public_only: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        # Compact metadata only: large prompts, schemas, provider responses and
+        # traces are still loaded for the selected request, never for the whole pack.
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    text(
+                        """
+                SELECT j.id::text id,j.kind,j.location_id,j.content_epoch,j.baseline_revision,
+                j.status,j.created_at,j.finished_at,l.name location_name,
+                r.location_slug,r.number run_number,r.path log_path,
+                j.report->>'operation' operation,j.report->>'source' source,
+                j.report->>'scope' scope,j.report->>'log_group' log_group,
+                j.report->>'restaurant_id' restaurant_id,
+                j.report->'input'->'restaurant'->>'name' restaurant_name,
+                jsonb_path_query_array(j.changes,'$[*].diff[*] ? (@.path[0] == "restaurants").path[1]') changed_restaurants
+                FROM jobs j JOIN request_logs r ON r.job_id=j.id
+                JOIN locations l ON l.id=j.location_id
+                """
+                        + (" WHERE " + PUBLIC_GENERATION if public_only else "")
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        groups = group_logs([dict(row) for row in rows])
+        selected = next((g for g in groups if any(r["id"] == job_id for r in g["members"])), None)
+        query = query.casefold()
+        filtered = [
+            g
+            for g in groups
+            if (not status or any(r["status"] == status for r in g["members"]))
+            and (
+                not query
+                or query in g["location_name"].casefold()
+                or any(
+                    query in (r["location_slug"], f"{r['location_slug']}/{r['run_number']}")
+                    for r in g["members"]
+                )
+            )
+        ]
+        total = len(filtered)
+        pages = max(1, (total + 39) // 40)
+        page = min(max(1, page), pages)
+        listing: dict[str, Any] = {
+            "rows": filtered[(page - 1) * 40 : page * 40],
+            "total": total,
+            "page": page,
+            "pages": pages,
+        }
+        if job_id is None and listing["rows"]:
+            selected = listing["rows"][0]
+        return self.clean(listing), self.clean(selected)
 
     def resolve(self, slug: str, number: int, *, public_only: bool = False) -> str | None:
         with self.engine.connect() as conn:

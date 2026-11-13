@@ -1033,3 +1033,10 @@ pre.audit-json {
 @media(max-width:650px) { .nearby-locations .city-grid { grid-template-columns:minmax(0,1fr); } }
 
 .restaurant[id] { scroll-margin-top:24px; }
+
+/* One fill launch, with its unchanged individual request links. */
+.log-group-requests { list-style: none; padding: 0; margin: 20px 0 32px; border-top: 1px solid var(--line); }
+.log-group-requests li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 16px; border-bottom: 1px solid var(--line); }
+.log-group-requests a { flex: 1 1 170px; min-width: 0; padding: 13px 0; overflow-wrap: anywhere; }
+.log-group-requests a[aria-current="page"] { font-weight: 700; }
+.log-group-requests li > span { padding: 13px 0; color: var(--muted); font-size: 13px; }

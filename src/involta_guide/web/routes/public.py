@@ -1,11 +1,13 @@
 from datetime import timedelta, timezone
 from hashlib import sha256
 from textwrap import shorten
+from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from involta_guide.domain.hours import DAYS, opening_status
@@ -184,7 +186,7 @@ def routes(prefix: str) -> APIRouter:
         store = log_store(request)
         ctx = context(request)
         admin = bool(ctx.security.principal(admin_token(request)))
-        listing = store.listing(page, q, status, public_only=not admin)
+        listing, group = store.groups(page, q, status, job_id=job_id, public_only=not admin)
         if not job_id and listing["rows"]:
             job_id = str(listing["rows"][0]["id"])
         detail = store.detail(job_id, public_only=not admin) if job_id else None
@@ -200,6 +202,7 @@ def routes(prefix: str) -> APIRouter:
                 "logs_admin": admin,
                 "audit_public": not admin,
                 "audit_detail": detail,
+                "audit_group": group,
                 "log_location": ctx.queries.location(detail["job"]["location_id"])["location"]
                 if admin and detail
                 else None,
@@ -318,16 +321,27 @@ def routes(prefix: str) -> APIRouter:
         return JSONResponse(detail, headers={**headers, "Vary": "Cookie"})
 
     @router.get(prefix + "/logs/{slug}/{number}/status")
-    def log_status(request: Request, slug: str, number: int) -> Response:
+    def log_status(request: Request, slug: str, number: int, group: bool = False) -> Response:
         store = log_store(request)
+        public_only = not bool(context(request).security.principal(admin_token(request)))
         job = store.status(
             slug,
             number,
-            public_only=not bool(context(request).security.principal(admin_token(request))),
+            public_only=public_only,
         )
         if job is None:
             raise HTTPException(404, "Журнал не найден")
-        return JSONResponse({"job": job}, headers={**log_headers, "Vary": "Cookie"})
+        payload: dict[str, Any] = {"job": job}
+        if group:
+            _, selected = store.groups(
+                1,
+                job_id=store.resolve(slug, number, public_only=public_only),
+                public_only=public_only,
+            )
+            payload["group"] = (
+                {key: selected[key] for key in ("signature", "status")} if selected else None
+            )
+        return JSONResponse(jsonable_encoder(payload), headers={**log_headers, "Vary": "Cookie"})
 
     @router.get(prefix + "/logs/{slug}/{number}")
     def numbered_log(

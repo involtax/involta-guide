@@ -13,7 +13,7 @@
 {%if log_kind=='uploads'%}{%include 'upload_logs.html'%}{%else%}
 <div class="logs-layout">
 <aside class="logs-sidebar admin-sidebar" id="log-requests" aria-label="Запросы">
-<h2>Запросы · {{audit_jobs.total}}</h2>
+<h2>Запуски · {{audit_jobs.total}}</h2>
 <form method="get" action="{{settings.path('/logs')}}" class="stack">
 <label>Город или адрес лога<input name="q" value="{{q}}" placeholder="Иваново или ivanovo/2"></label>
 <label>Статус<select name="status">
@@ -22,7 +22,7 @@
 </select></label><button>Найти</button></form>
 <nav aria-label="Список запросов">
 {%for j in audit_jobs.rows%}
-<a title="{{j.location_name}} / {{j.run_number}} · {{j.stage_label}}" class="log-request {{'selected' if audit_detail and audit_detail.job.log_path==j.log_path else ''}}" href="{{settings.path(j.log_path)}}?{{audit_page(audit_jobs.page)}}" {%if audit_detail and audit_detail.job.log_path==j.log_path%}aria-current="page"{%endif%}>
+<a title="{{j.location_name}} / {{j.run_number}} · {{j.stage_label}}" class="log-request {{'selected' if audit_group and audit_group.group_id==j.group_id else ''}}" href="{{settings.path(j.log_path)}}?{{audit_page(audit_jobs.page)}}" {%if audit_group and audit_group.group_id==j.group_id%}aria-current="page"{%endif%}>
 <strong>{{j.location_name}} / {{j.run_number}}</strong> · <span>{{j.stage_label}}</span>
 </a>
 {%else%}<p>Запросов пока нет.</p>{%endfor%}
@@ -34,7 +34,20 @@
 </nav>
 </aside>
 <section class="logs-content admin-detail" aria-label="Выбранный лог">
+{%if audit_group%}
+<section class="log-group" id="log-group-live" aria-label="Запросы запуска" data-url="{{settings.path(audit_group.log_path)}}/status?group=1" data-active="{{'true' if audit_group.status in ['queued','running'] else 'false'}}" data-signature="{{audit_group.signature}}">
+<h2>{{audit_group.location_name}}</h2>
+<p>Запросов: {{audit_group.request_count}} · {{audit_group.stage_label}}</p>
+<ol class="log-group-requests">
+{%for member in audit_group.members%}
+<li><a href="{{settings.path(member.log_path)}}?{{audit_page(audit_jobs.page)}}#selected-request" {%if audit_detail and audit_detail.job.id==member.id%}aria-current="page"{%endif%}>{{member.operation_label}}</a><span>{{{'queued':'В очереди','running':'В работе','done':'Готово','failed':'Ошибка','cancelled':'Остановлено'}.get(member.status,member.status)}}</span></li>
+{%endfor%}
+</ol>
+</section>
+{%endif%}
+<div id="selected-request">
 {%if audit_detail%}{%include 'log_detail.html'%}{%else%}<h2>Выберите запрос</h2><p>Здесь появятся промт, полный ответ, ошибки и применённые изменения.</p>{%endif%}
+</div>
 </section>
 </div>
 {%endif%}
