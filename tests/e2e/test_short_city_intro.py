@@ -15,7 +15,7 @@ from involta_guide.main import create_app
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_manual_intro_samples_fit_two_lines_in_real_mobile_template(database):
+def test_manual_intro_samples_fit_mobile_template(database):
     settings, _, uow, queries, *_ = setup(database)
     samples = json.loads((ROOT / "docs/design/short-city-introductions/samples.json").read_text())
     catalogue = {row["slug"]: row for row in load_catalog(ROOT)["locations"]}

@@ -1,0 +1,1892 @@
+[
+  {
+    "slug": "adler",
+    "viewport": 320,
+    "characters": 92,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "anapa",
+    "viewport": 320,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "apatity",
+    "viewport": 320,
+    "characters": 82,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-belorusskaya",
+    "viewport": 320,
+    "characters": 77,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "bryansk",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "veliky-novgorod",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "vladimir",
+    "viewport": 320,
+    "characters": 75,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "vyborg",
+    "viewport": 320,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "ekaterinburg",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "ivangorod",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "ivanovo",
+    "viewport": 320,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "kazan",
+    "viewport": 320,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "kineshma",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "korolev",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "medvezhegorsk",
+    "viewport": 320,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-city",
+    "viewport": 320,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "naberezhnye-chelny",
+    "viewport": 320,
+    "characters": 72,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "nizhny-novgorod",
+    "viewport": 320,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "pereslavl-zalessky",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "petergof",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "ples",
+    "viewport": 320,
+    "characters": 74,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "privolzhsk",
+    "viewport": 320,
+    "characters": 90,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "pskov",
+    "viewport": 320,
+    "characters": 78,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "repino",
+    "viewport": 320,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "rostov-na-donu",
+    "viewport": 320,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "ryazan",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "spb",
+    "viewport": 320,
+    "characters": 94,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "saratov",
+    "viewport": 320,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "severodvinsk",
+    "viewport": 320,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "sestroretsk",
+    "viewport": 320,
+    "characters": 95,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "slavyansk-na-kubani",
+    "viewport": 320,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "smolensk",
+    "viewport": 320,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "suzdal",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-taganka",
+    "viewport": 320,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "tarusa",
+    "viewport": 320,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-tverskaya",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "tver",
+    "viewport": 320,
+    "characters": 95,
+    "lines": 4,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "timashevsk",
+    "viewport": 320,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "torzhok",
+    "viewport": 320,
+    "characters": 83,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-chistye-prudy",
+    "viewport": 320,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "shuya",
+    "viewport": 320,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "yaroslavl",
+    "viewport": 320,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 270,
+    "overflow": false
+  },
+  {
+    "slug": "adler",
+    "viewport": 375,
+    "characters": 92,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "anapa",
+    "viewport": 375,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "apatity",
+    "viewport": 375,
+    "characters": 82,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-belorusskaya",
+    "viewport": 375,
+    "characters": 77,
+    "lines": 2,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "bryansk",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "veliky-novgorod",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "vladimir",
+    "viewport": 375,
+    "characters": 75,
+    "lines": 2,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "vyborg",
+    "viewport": 375,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "ekaterinburg",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "ivangorod",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "ivanovo",
+    "viewport": 375,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "kazan",
+    "viewport": 375,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "kineshma",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "korolev",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "medvezhegorsk",
+    "viewport": 375,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-city",
+    "viewport": 375,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "naberezhnye-chelny",
+    "viewport": 375,
+    "characters": 72,
+    "lines": 2,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "nizhny-novgorod",
+    "viewport": 375,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "pereslavl-zalessky",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "petergof",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "ples",
+    "viewport": 375,
+    "characters": 74,
+    "lines": 2,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "privolzhsk",
+    "viewport": 375,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "pskov",
+    "viewport": 375,
+    "characters": 78,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "repino",
+    "viewport": 375,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "rostov-na-donu",
+    "viewport": 375,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "ryazan",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "spb",
+    "viewport": 375,
+    "characters": 94,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "saratov",
+    "viewport": 375,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "severodvinsk",
+    "viewport": 375,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "sestroretsk",
+    "viewport": 375,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "slavyansk-na-kubani",
+    "viewport": 375,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "smolensk",
+    "viewport": 375,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "suzdal",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-taganka",
+    "viewport": 375,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "tarusa",
+    "viewport": 375,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-tverskaya",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "tver",
+    "viewport": 375,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "timashevsk",
+    "viewport": 375,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "torzhok",
+    "viewport": 375,
+    "characters": 83,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-chistye-prudy",
+    "viewport": 375,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "shuya",
+    "viewport": 375,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "yaroslavl",
+    "viewport": 375,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 325,
+    "overflow": false
+  },
+  {
+    "slug": "adler",
+    "viewport": 390,
+    "characters": 92,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "anapa",
+    "viewport": 390,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "apatity",
+    "viewport": 390,
+    "characters": 82,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-belorusskaya",
+    "viewport": 390,
+    "characters": 77,
+    "lines": 2,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "bryansk",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "veliky-novgorod",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "vladimir",
+    "viewport": 390,
+    "characters": 75,
+    "lines": 2,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "vyborg",
+    "viewport": 390,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "ekaterinburg",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "ivangorod",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "ivanovo",
+    "viewport": 390,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "kazan",
+    "viewport": 390,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "kineshma",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "korolev",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "medvezhegorsk",
+    "viewport": 390,
+    "characters": 81,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-city",
+    "viewport": 390,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "naberezhnye-chelny",
+    "viewport": 390,
+    "characters": 72,
+    "lines": 2,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "nizhny-novgorod",
+    "viewport": 390,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "pereslavl-zalessky",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "petergof",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "ples",
+    "viewport": 390,
+    "characters": 74,
+    "lines": 2,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "privolzhsk",
+    "viewport": 390,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "pskov",
+    "viewport": 390,
+    "characters": 78,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "repino",
+    "viewport": 390,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "rostov-na-donu",
+    "viewport": 390,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "ryazan",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "spb",
+    "viewport": 390,
+    "characters": 94,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "saratov",
+    "viewport": 390,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "severodvinsk",
+    "viewport": 390,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "sestroretsk",
+    "viewport": 390,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "slavyansk-na-kubani",
+    "viewport": 390,
+    "characters": 85,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "smolensk",
+    "viewport": 390,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "suzdal",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-taganka",
+    "viewport": 390,
+    "characters": 86,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "tarusa",
+    "viewport": 390,
+    "characters": 89,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-tverskaya",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "tver",
+    "viewport": 390,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "timashevsk",
+    "viewport": 390,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "torzhok",
+    "viewport": 390,
+    "characters": 83,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-chistye-prudy",
+    "viewport": 390,
+    "characters": 84,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "shuya",
+    "viewport": 390,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "yaroslavl",
+    "viewport": 390,
+    "characters": 87,
+    "lines": 3,
+    "font": "16px",
+    "width": 340,
+    "overflow": false
+  },
+  {
+    "slug": "adler",
+    "viewport": 430,
+    "characters": 92,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "anapa",
+    "viewport": 430,
+    "characters": 81,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "apatity",
+    "viewport": 430,
+    "characters": 82,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-belorusskaya",
+    "viewport": 430,
+    "characters": 77,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "bryansk",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "veliky-novgorod",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "vladimir",
+    "viewport": 430,
+    "characters": 75,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "vyborg",
+    "viewport": 430,
+    "characters": 90,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "ekaterinburg",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "ivangorod",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "ivanovo",
+    "viewport": 430,
+    "characters": 86,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "kazan",
+    "viewport": 430,
+    "characters": 88,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "kineshma",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "korolev",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "medvezhegorsk",
+    "viewport": 430,
+    "characters": 81,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-city",
+    "viewport": 430,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "naberezhnye-chelny",
+    "viewport": 430,
+    "characters": 72,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "nizhny-novgorod",
+    "viewport": 430,
+    "characters": 89,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "pereslavl-zalessky",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "petergof",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "ples",
+    "viewport": 430,
+    "characters": 74,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "privolzhsk",
+    "viewport": 430,
+    "characters": 90,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "pskov",
+    "viewport": 430,
+    "characters": 78,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "repino",
+    "viewport": 430,
+    "characters": 86,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "rostov-na-donu",
+    "viewport": 430,
+    "characters": 84,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "ryazan",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "spb",
+    "viewport": 430,
+    "characters": 94,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "saratov",
+    "viewport": 430,
+    "characters": 91,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "severodvinsk",
+    "viewport": 430,
+    "characters": 89,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "sestroretsk",
+    "viewport": 430,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "slavyansk-na-kubani",
+    "viewport": 430,
+    "characters": 85,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "smolensk",
+    "viewport": 430,
+    "characters": 91,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "suzdal",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-taganka",
+    "viewport": 430,
+    "characters": 86,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "tarusa",
+    "viewport": 430,
+    "characters": 89,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-tverskaya",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "tver",
+    "viewport": 430,
+    "characters": 95,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "timashevsk",
+    "viewport": 430,
+    "characters": 88,
+    "lines": 3,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "torzhok",
+    "viewport": 430,
+    "characters": 83,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-chistye-prudy",
+    "viewport": 430,
+    "characters": 84,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "shuya",
+    "viewport": 430,
+    "characters": 88,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "yaroslavl",
+    "viewport": 430,
+    "characters": 87,
+    "lines": 2,
+    "font": "16px",
+    "width": 380,
+    "overflow": false
+  },
+  {
+    "slug": "adler",
+    "viewport": 1440,
+    "characters": 92,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "anapa",
+    "viewport": 1440,
+    "characters": 81,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "apatity",
+    "viewport": 1440,
+    "characters": 82,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-belorusskaya",
+    "viewport": 1440,
+    "characters": 77,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "bryansk",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "veliky-novgorod",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "vladimir",
+    "viewport": 1440,
+    "characters": 75,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "vyborg",
+    "viewport": 1440,
+    "characters": 90,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "ekaterinburg",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "ivangorod",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "ivanovo",
+    "viewport": 1440,
+    "characters": 86,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "kazan",
+    "viewport": 1440,
+    "characters": 88,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "kineshma",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "korolev",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "medvezhegorsk",
+    "viewport": 1440,
+    "characters": 81,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-city",
+    "viewport": 1440,
+    "characters": 90,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "naberezhnye-chelny",
+    "viewport": 1440,
+    "characters": 72,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "nizhny-novgorod",
+    "viewport": 1440,
+    "characters": 89,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "pereslavl-zalessky",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "petergof",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "ples",
+    "viewport": 1440,
+    "characters": 74,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "privolzhsk",
+    "viewport": 1440,
+    "characters": 90,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "pskov",
+    "viewport": 1440,
+    "characters": 78,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "repino",
+    "viewport": 1440,
+    "characters": 86,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "rostov-na-donu",
+    "viewport": 1440,
+    "characters": 84,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "ryazan",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "spb",
+    "viewport": 1440,
+    "characters": 94,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "saratov",
+    "viewport": 1440,
+    "characters": 91,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "severodvinsk",
+    "viewport": 1440,
+    "characters": 89,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "sestroretsk",
+    "viewport": 1440,
+    "characters": 95,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "slavyansk-na-kubani",
+    "viewport": 1440,
+    "characters": 85,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "smolensk",
+    "viewport": 1440,
+    "characters": 91,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "suzdal",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-taganka",
+    "viewport": 1440,
+    "characters": 86,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "tarusa",
+    "viewport": 1440,
+    "characters": 89,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-tverskaya",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "tver",
+    "viewport": 1440,
+    "characters": 95,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "timashevsk",
+    "viewport": 1440,
+    "characters": 88,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "torzhok",
+    "viewport": 1440,
+    "characters": 83,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "moskva-chistye-prudy",
+    "viewport": 1440,
+    "characters": 84,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "shuya",
+    "viewport": 1440,
+    "characters": 88,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  },
+  {
+    "slug": "yaroslavl",
+    "viewport": 1440,
+    "characters": 87,
+    "lines": 2,
+    "font": "18px",
+    "width": 570,
+    "overflow": false
+  }
+]
