@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from involta_guide.catalogue.schemas import Operation, Scope
-from involta_guide.catalogue.service import CityContent
+from involta_guide.catalogue.service import CityContent, card_complete
 from involta_guide.web.http import context
 
 
@@ -128,17 +128,20 @@ def routes(prefix: str) -> APIRouter:
                 "intro": location["intro"],
                 "restaurants": [
                     {
-                        key: row[key]
-                        for key in (
-                            "id",
-                            "number",
-                            "name",
-                            "active",
-                            "hidden",
-                            "verification_status",
-                            "maps_url",
-                            "ranking",
-                        )
+                        "card_complete": card_complete(row),
+                        **{
+                            key: row[key]
+                            for key in (
+                                "id",
+                                "number",
+                                "name",
+                                "active",
+                                "hidden",
+                                "verification_status",
+                                "maps_url",
+                                "ranking",
+                            )
+                        },
                     }
                     for row in work.repo.rows(
                         "restaurants", {"location_id": location_id}, limit=10000
