@@ -12,11 +12,11 @@ from involta_guide.application.services.editorial import CARD_FIELDS, match_rest
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import score
 
-from .prompts import RESEARCH_SYSTEM, SYSTEM
+from .prompts import INTRO_SYSTEM, RESEARCH_SYSTEM, SYSTEM
 from .schemas import RESULTS, Discoveries, Introduction, Research
 
 PROMPTS = {
-    "intro": "city-introduction-v1.txt",
+    "intro": "city-introduction-v2.txt",
     "discover": "restaurant-discovery-v1.txt",
     "research": "restaurant-research-v2.txt",
 }
@@ -107,7 +107,7 @@ class CityContent:
         )
         model = repo.setting("generation_model", self.model)
         schema = RESULTS[operation].response_schema()
-        system = RESEARCH_SYSTEM if operation == "research" else SYSTEM
+        system = {"intro": INTRO_SYSTEM, "research": RESEARCH_SYSTEM}.get(operation, SYSTEM)
         state = digest(
             {
                 "operation": operation,
