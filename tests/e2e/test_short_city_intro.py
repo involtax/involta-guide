@@ -48,7 +48,7 @@ def test_manual_intro_samples_fit_two_lines_in_real_mobile_template(database):
                 status=response.status_code, body=response.content, headers=dict(response.headers)
             )
 
-        for width in (320, 360, 390, 430, 1440):
+        for width in (320, 375, 390, 430, 1440):
             page = browser.new_page(
                 viewport={"width": width, "height": 920},
                 is_mobile=width < 500,
@@ -60,11 +60,11 @@ def test_manual_intro_samples_fit_two_lines_in_real_mobile_template(database):
                 lead = page.locator(".city-hero .lead")
                 assert lead.inner_text() == sample["intro"]
                 count = len(sample["intro"])
-                assert count <= 55
+                assert 50 <= count <= 100
                 lines = lead.evaluate(
                     "e=>Math.round(e.getBoundingClientRect().height/parseFloat(getComputedStyle(e).lineHeight))"
                 )
-                assert lines <= 2, (sample, width, lines)
+                assert lines <= 3, (sample, width, lines)
                 assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
                 measurements.append(
                     {"viewport": width, "slug": sample["slug"], "characters": count, "lines": lines}

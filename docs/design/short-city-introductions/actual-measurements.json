@@ -2,151 +2,151 @@
   {
     "viewport": 320,
     "slug": "naberezhnye-chelny",
-    "characters": 50,
-    "lines": 2
+    "characters": 81,
+    "lines": 3
   },
   {
     "viewport": 320,
     "slug": "medvezhegorsk",
-    "characters": 52,
-    "lines": 2
+    "characters": 77,
+    "lines": 3
   },
   {
     "viewport": 320,
     "slug": "anapa",
-    "characters": 45,
-    "lines": 2
+    "characters": 66,
+    "lines": 3
   },
   {
     "viewport": 320,
     "slug": "ivanovo",
-    "characters": 51,
-    "lines": 2
+    "characters": 78,
+    "lines": 3
   },
   {
     "viewport": 320,
     "slug": "ples",
-    "characters": 42,
-    "lines": 2
+    "characters": 75,
+    "lines": 3
   },
   {
-    "viewport": 360,
+    "viewport": 375,
     "slug": "naberezhnye-chelny",
-    "characters": 50,
-    "lines": 2
+    "characters": 81,
+    "lines": 3
   },
   {
-    "viewport": 360,
+    "viewport": 375,
     "slug": "medvezhegorsk",
-    "characters": 52,
-    "lines": 2
+    "characters": 77,
+    "lines": 3
   },
   {
-    "viewport": 360,
+    "viewport": 375,
     "slug": "anapa",
-    "characters": 45,
+    "characters": 66,
     "lines": 2
   },
   {
-    "viewport": 360,
+    "viewport": 375,
     "slug": "ivanovo",
-    "characters": 51,
-    "lines": 2
+    "characters": 78,
+    "lines": 3
   },
   {
-    "viewport": 360,
+    "viewport": 375,
     "slug": "ples",
-    "characters": 42,
+    "characters": 75,
     "lines": 2
   },
   {
     "viewport": 390,
     "slug": "naberezhnye-chelny",
-    "characters": 50,
+    "characters": 81,
     "lines": 2
   },
   {
     "viewport": 390,
     "slug": "medvezhegorsk",
-    "characters": 52,
+    "characters": 77,
     "lines": 2
   },
   {
     "viewport": 390,
     "slug": "anapa",
-    "characters": 45,
+    "characters": 66,
     "lines": 2
   },
   {
     "viewport": 390,
     "slug": "ivanovo",
-    "characters": 51,
-    "lines": 2
+    "characters": 78,
+    "lines": 3
   },
   {
     "viewport": 390,
     "slug": "ples",
-    "characters": 42,
-    "lines": 1
+    "characters": 75,
+    "lines": 2
   },
   {
     "viewport": 430,
     "slug": "naberezhnye-chelny",
-    "characters": 50,
+    "characters": 81,
     "lines": 2
   },
   {
     "viewport": 430,
     "slug": "medvezhegorsk",
-    "characters": 52,
+    "characters": 77,
     "lines": 2
   },
   {
     "viewport": 430,
     "slug": "anapa",
-    "characters": 45,
-    "lines": 1
+    "characters": 66,
+    "lines": 2
   },
   {
     "viewport": 430,
     "slug": "ivanovo",
-    "characters": 51,
+    "characters": 78,
     "lines": 2
   },
   {
     "viewport": 430,
     "slug": "ples",
-    "characters": 42,
-    "lines": 1
+    "characters": 75,
+    "lines": 2
   },
   {
     "viewport": 1440,
     "slug": "naberezhnye-chelny",
-    "characters": 50,
-    "lines": 1
+    "characters": 81,
+    "lines": 2
   },
   {
     "viewport": 1440,
     "slug": "medvezhegorsk",
-    "characters": 52,
-    "lines": 1
+    "characters": 77,
+    "lines": 2
   },
   {
     "viewport": 1440,
     "slug": "anapa",
-    "characters": 45,
-    "lines": 1
+    "characters": 66,
+    "lines": 2
   },
   {
     "viewport": 1440,
     "slug": "ivanovo",
-    "characters": 51,
-    "lines": 1
+    "characters": 78,
+    "lines": 2
   },
   {
     "viewport": 1440,
     "slug": "ples",
-    "characters": 42,
-    "lines": 1
+    "characters": 75,
+    "lines": 2
   }
 ]

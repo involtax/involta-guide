@@ -63,5 +63,5 @@ def test_intro_has_short_default_and_no_old_text_or_restaurant_instructions(data
     assert previous not in str(prepared["input"]) and "intro" not in prepared["input"]
     assert "Текущий текст дан" not in prepared["prompt"]
     assert "mapsUrl" not in prepared["system"] and "openingHours" not in prepared["system"]
-    assert "55" in prepared["system"]
+    assert "50 до 100" in prepared["system"]
     assert "mapsUrl" in content.prepare(city["id"], "discover")["system"]
