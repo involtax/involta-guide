@@ -9,7 +9,16 @@ from playwright.sync_api import expect, sync_playwright
 from involta_guide.main import create_app
 
 
-def test_home_panorama_spoilers_and_navigation(database, tmp_path):
+def test_home_panorama_spoilers_and_navigation(database, tmp_path, monkeypatch):
+    from involta_guide.web.routes import public
+
+    def predictable_sample(cities, count):
+        return sorted(
+            cities, key=lambda city: (city["slug"] != "pereslavl-zalessky", city["slug"])
+        )[:count]
+
+    # Exercise the longest title on every viewport, independently of random selection.
+    monkeypatch.setattr(public, "sample", predictable_sample)
     settings, _ = database
     with serving(create_app(settings)) as origin, sync_playwright() as p:
         browser = p.chromium.launch(
@@ -53,7 +62,8 @@ def test_home_panorama_spoilers_and_navigation(database, tmp_path):
             page.goto(origin + "/guide/")
             card = page.locator(".home-city-link").nth(1)
             href = card.get_attribute("href")
-            card.click(position={"x": 30, "y": 80})
+            card.scroll_into_view_if_needed()
+            card.click(position={"x": 30, "y": card.bounding_box()["height"] - 8})
             page.wait_for_url(origin + href)
             assert not errors, errors
             page.close()
