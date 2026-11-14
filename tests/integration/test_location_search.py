@@ -95,7 +95,7 @@ def test_catalogue_request_has_compact_fields_validators_and_no_visitors_or_jobs
             assert len(selects) == 3
             home = client.get("/guide/")
             assert 'id="location-catalogue"' not in home.text
-            assert len(selects) == 3
+            assert len(selects) == 4  # Homepage selects eligible panorama cities.
             assert client.get("/guide/api/locations/suggest?q=и").status_code == 404
             assert (
                 client.get("/guide/", params={"q": "x" * 101}, follow_redirects=False).status_code

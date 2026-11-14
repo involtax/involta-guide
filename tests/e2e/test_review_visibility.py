@@ -34,11 +34,11 @@ def test_author_sees_transcript_before_other_browser_and_home(database):
             expect(other_page.get_by_text(SOURCE, exact=True)).to_have_count(0)
             assert worker.once()  # Mocked classifier; publication requires no manual OK.
             other_page.reload()
-            expect(other_page.get_by_text(SOURCE, exact=True)).to_have_count(1)
-            other_page.get_by_text(SOURCE, exact=True).scroll_into_view_if_needed()
-            other_page.screenshot(path=str(screenshots / "classified-home-desktop.png"))
+            expect(other_page.get_by_text(SOURCE, exact=True)).to_have_count(0)
             other_page.goto(path)
             expect(other_page.get_by_text(SOURCE, exact=True)).to_have_count(1)
+            other_page.get_by_text(SOURCE, exact=True).scroll_into_view_if_needed()
+            other_page.screenshot(path=str(screenshots / "classified-city-desktop.png"))
             browser.close()
     finally:
         provider.close()
