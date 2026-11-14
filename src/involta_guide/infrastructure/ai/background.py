@@ -295,7 +295,8 @@ def resume_generation(
     *,
     reprocess: bool = False,
     expected_version: str | None = None,
-) -> None:
+    request_id: str | None = None,
+) -> bool:
     """Explicitly resume GETs or revalidate a cached result, never create another POST."""
     with engine.begin() as conn:
         location_id = conn.execute(
@@ -321,6 +322,17 @@ def resume_generation(
             .mappings()
             .first()
         )
+        report = dict(job["report"] or {})
+        requests = dict(report.get("reprocess_requests", {}))
+        if request_id is not None:
+            if not reprocess or report.get("operation") not in ("intro", "discover", "research"):
+                raise RuleViolation("API переобрабатывает только ответы наполнения города")
+            if request_id in requests:
+                if requests[request_id] != expected_version:
+                    raise Conflict("request_id уже использован с другой версией страницы")
+                return False
+            if not task or task["state"] != "completed" or not task["response_json"]:
+                raise RuleViolation("Нет завершённого сохранённого ответа для переобработки")
         if (
             not task
             or not task["response_id"]
@@ -361,3 +373,11 @@ def resume_generation(
             ),
             {"id": job_id},
         )
+        if request_id is not None:
+            requests[request_id] = expected_version
+            report["reprocess_requests"] = requests
+            conn.execute(
+                text("UPDATE jobs SET report=CAST(:report AS jsonb) WHERE id=:id"),
+                {"id": job_id, "report": json.dumps(report)},
+            )
+        return True
