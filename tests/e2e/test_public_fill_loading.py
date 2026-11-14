@@ -20,7 +20,11 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
         browser = p.chromium.launch(
             executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
         )
-        page = browser.new_page(viewport={"width": width, "height": 950})
+        page = browser.new_page(
+            viewport={"width": width, "height": 950},
+            is_mobile=width < 500,
+            has_touch=width < 500,
+        )
         errors, submissions = [], []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on(
@@ -30,7 +34,8 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
         page.goto(origin + "/guide/ivanovo")
         expect(page.get_by_role("button", name="Запарсить эти данные")).to_be_visible()
         assert queries.rows("jobs") == []  # Opening a city never starts generation.
-        page.get_by_role("button", name="Запарсить эти данные").click()
+        button = page.get_by_role("button", name="Запарсить эти данные")
+        button.tap() if width < 500 else button.click()
         expect(page.locator("[data-fill-waiting]")).to_be_visible()
         expect(page.get_by_role("button", name="Запарсить эти данные")).to_be_hidden()
         expect(page.locator("[data-fill-spoiler]")).to_be_visible()

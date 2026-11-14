@@ -1,0 +1,21 @@
+{
+  "restaurants": [
+    {
+      "name": "Первый тестовый ресторан",
+      "mapsUrl": "https://yandex.ru/maps/org/fixture/1/",
+      "sources": [
+        "https://example.test/first"
+      ],
+      "reason": "Тестовый кандидат"
+    },
+    {
+      "name": "Второй тестовый ресторан",
+      "mapsUrl": "https://yandex.com.ge/maps/org/fixture/2/",
+      "sources": [
+        "https://example.test/second"
+      ],
+      "reason": "Тестовый кандидат с региональной картой"
+    }
+  ],
+  "warnings": []
+}

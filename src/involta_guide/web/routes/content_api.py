@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from involta_guide.catalogue.schemas import Operation, Scope
 from involta_guide.catalogue.service import CityContent, card_complete
+from involta_guide.infrastructure.ai.audit import AIAudit
+from involta_guide.infrastructure.ai.background import resume_generation
 from involta_guide.web.http import context
 
 
@@ -24,6 +26,10 @@ class ImportResult(BaseModel):
 class Run(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: UUID
+
+
+class Reprocess(Run):
+    expected_revision: UUID | None
 
 
 def authenticate(request: Request) -> None:
@@ -157,7 +163,37 @@ def routes(prefix: str) -> APIRouter:
             row = require(work.repo, "jobs", str(job_id))
             if not (row["report"] or {}).get("operation"):
                 raise HTTPException(404)
-            return {key: row[key] for key in ("id", "status", "applied", "error", "report")}
+            location = require(work.repo, "locations", row["location_id"])
+            return {
+                **{key: row[key] for key in ("id", "status", "applied", "error", "report")},
+                "location_id": row["location_id"],
+                "location_revision": location["revision"],
+            }
+
+    @router.post("/jobs/{job_id}/reprocess", status_code=202)
+    def reprocess(
+        request: Request,
+        job_id: UUID,
+        body: dict[str, Any] = Depends(bounded_body),
+    ) -> dict[str, Any]:
+        value = Reprocess.model_validate(body)
+        job(request, job_id)  # Same content-only scope and 404 as the status endpoint.
+        ctx = context(request)
+        queued = resume_generation(
+            ctx.engine,
+            str(job_id),
+            ctx.settings.generation_wait_seconds,
+            reprocess=True,
+            expected_version=str(value.expected_revision) if value.expected_revision else None,
+            request_id=str(value.request_id),
+        )
+        if queued:
+            AIAudit(ctx.engine, ctx.settings).record(
+                str(job_id),
+                "generation_reprocessed",
+                {"new_generation": False, "source": "api", "request_id": str(value.request_id)},
+            )
+        return {"job_id": str(job_id)}
 
     @router.post("/restaurants/{restaurant_id}/visibility/{visibility}")
     def visibility(
