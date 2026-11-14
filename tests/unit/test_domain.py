@@ -126,3 +126,29 @@ def test_external_urls_and_numeric_review_scales():
     assert ReviewFragment.model_validate(entry).rating == 0
     with pytest.raises(ValidationError):
         ReviewFragment.model_validate({**entry, "rating": 11})
+
+
+def test_regional_yandex_maps_url_is_kept_intact():
+    from involta_guide.catalogue.schemas import Card, Discovery
+
+    url = "https://yandex.com.ge/maps/org/roscha_vikonda/97317027367/"
+    fields = {"name": "Роща", "mapsUrl": url, "sources": [url]}
+    assert Discovery(**fields, reason="Ресторан в Рыбинске").mapsUrl == url
+    assert Card(**fields).mapsUrl == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://yandex.com.ge.evil.test/maps/org/1/",
+        "https://fake-yandex.com.ge/maps/org/1/",
+        "https://yandex.com.ge@evil.test/maps/org/1/",
+        "https://user:password@yandex.com.ge/maps/org/1/",
+        "http://yandex.com.ge/maps/org/1/",
+    ],
+)
+def test_regional_map_support_keeps_rejecting_unsafe_urls(url):
+    from involta_guide.application.commands.schemas import RestaurantInput
+
+    with pytest.raises(ValueError, match="Нужна HTTPS-ссылка на Яндекс Карты"):
+        RestaurantInput.maps(url)

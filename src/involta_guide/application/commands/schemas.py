@@ -79,7 +79,8 @@ class RestaurantInput(BaseModel):
             or url.username
             or url.password
             or not (
-                url.hostname in ("yandex.ru", "yandex.com", "yandex.by", "yandex.kz", "ya.ru")
+                url.hostname
+                in ("yandex.ru", "yandex.com", "yandex.com.ge", "yandex.by", "yandex.kz", "ya.ru")
                 or (url.hostname or "").endswith(".yandex.ru")
             )
         ):
