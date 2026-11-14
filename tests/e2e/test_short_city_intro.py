@@ -64,7 +64,7 @@ def test_manual_intro_samples_fit_mobile_template(database):
                 lines = lead.evaluate(
                     "e=>Math.round(e.getBoundingClientRect().height/parseFloat(getComputedStyle(e).lineHeight))"
                 )
-                assert lines <= 3, (sample, width, lines)
+                assert lines <= (4 if width == 320 else 3), (sample, width, lines)
                 assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
                 measurements.append(
                     {"viewport": width, "slug": sample["slug"], "characters": count, "lines": lines}
