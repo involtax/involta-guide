@@ -46,27 +46,18 @@ def routes(prefix: str) -> APIRouter:
         if request.url.query:
             return RedirectResponse(ctx.settings.path("/"), status_code=308)
         request.state.audience_page = True
+        catalogue = ctx.queries.public_location_catalogue()
         return request.app.state.templates.TemplateResponse(
             request=request,
             name="directory.html",
             context={
                 "settings": ctx.settings,
-                "home_reviews": VoiceReadModel(ctx.engine).latest_public_texts(),
-                "review_timezone": timezone(timedelta(hours=3)),
-                "months": (
-                    "янв",
-                    "фев",
-                    "мар",
-                    "апр",
-                    "мая",
-                    "июн",
-                    "июл",
-                    "авг",
-                    "сен",
-                    "окт",
-                    "ноя",
-                    "дек",
-                ),
+                "panorama_cities": [
+                    {**city, "panorama": panorama_for(slug)}
+                    for slug in ("ivanovo", "ples", "suzdal")
+                    for city in catalogue
+                    if city["slug"] == slug and panorama_for(slug)
+                ],
                 "kinds": KINDS,
                 "indexable": True,
             },

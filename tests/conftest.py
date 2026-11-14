@@ -44,6 +44,7 @@ def sample_catalog_root(tmp_path_factory):
         "ples",
         "shuya",
         "sirius",
+        "suzdal",
         "sochi",
         "veliky-novgorod",
         "yaroslavl",

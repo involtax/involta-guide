@@ -11,18 +11,18 @@ from .test_editorial import CONTENT
 from .test_jobs import setup
 
 
-def test_home_reviews_replace_city_grid_and_choices_cover_all_types(database):
+def test_home_panorama_links_and_choices_cover_all_types(database):
     settings, _, uow, queries, city, _, _ = setup(database)
     editor = EditorialService(uow)
     other = next(row for row in queries.directory(kind="resort")["rows"] if row["listed"])
     with TestClient(create_app(settings)) as client:
-        assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
+        assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
         editor.save(city["id"], CONTENT, None)
-        assert f'href="/guide/{city["slug"]}"' not in client.get("/guide/").text
+        assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
         editor.save(other["id"], CONTENT, None)
         home = client.get("/guide/")
-        assert f'href="/guide/{city["slug"]}"' not in home.text
-        assert "Пульс:" in home.text and 'class="city-grid"' not in home.text
+        assert f'href="/guide/{city["slug"]}"' in home.text
+        assert "Узнаёшь город?" in home.text and 'class="city-grid"' not in home.text
         assert f'href="/guide/{other["slug"]}"' not in home.text
         assert '<select name="kind"' not in home.text
         catalogue = client.get("/guide/api/locations/catalogue").json()
@@ -64,3 +64,24 @@ def test_guide_serves_the_complete_pinned_vad_bundle_without_voice_service(datab
             elif name.endswith((".js", ".mjs")):
                 assert "javascript" in response.headers["content-type"]
         assert client.get("/guide/voice/vad/%2e%2e%2fwidget.v1.js").status_code == 404
+
+
+def test_home_omits_unavailable_panorama_cities(database, monkeypatch):
+    from sqlalchemy import text
+
+    from involta_guide.web.routes import public
+
+    settings, engine = database
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE locations SET active=0 WHERE slug='ivanovo'"))
+        connection.execute(text("UPDATE locations SET listed=false WHERE slug='ples'"))
+    original = public.panorama_for
+    monkeypatch.setattr(
+        public, "panorama_for", lambda slug: None if slug == "suzdal" else original(slug)
+    )
+    with TestClient(create_app(settings)) as client:
+        home = client.get("/guide/")
+        assert home.status_code == 200
+        assert 'class="home-cities"' not in home.text
+        assert "home-cities.js" not in home.text
+        assert 'class="home-city"' not in home.text

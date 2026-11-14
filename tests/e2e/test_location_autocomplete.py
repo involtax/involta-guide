@@ -207,7 +207,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         field = page.get_by_role("combobox", name="Поиск локаций и ресторанов")
         shell = page.locator(".search-surface")
         panel = page.locator(".search-suggestions")
-        city_top = page.locator(".home-reviews").bounding_box()["y"]
+        city_top = page.locator(".home-cities").bounding_box()["y"]
         assert shell.evaluate("el=>el.offsetHeight") == 80
         assert shell.evaluate("el=>getComputedStyle(el).borderRadius") == "40px"
         field.fill("н")
@@ -218,7 +218,7 @@ def test_morph_reverses_without_hiding_reopened_panel_and_respects_reduced_motio
         page.wait_for_function("!document.querySelector('.search-surface').getAnimations().length")
         expanded_height = shell.evaluate("el=>el.getBoundingClientRect().height")
         assert expanded_height > 80
-        assert page.locator(".home-reviews").bounding_box()["y"] == city_top
+        assert page.locator(".home-cities").bounding_box()["y"] == city_top
         field.press("Escape")
         expect(panel).to_be_visible()
         page.get_by_role("button", name="Выбери", exact=True).focus()

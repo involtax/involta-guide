@@ -17,6 +17,26 @@
 </h1>
 {%with search_label='Поиск локаций и ресторанов', search_label_hidden=true%}{%include 'location_search.html'%}{%endwith%}
 </section>
+{% if panorama_cities %}
+<section class="home-cities" aria-labelledby="home-cities-title">
+<h2 id="home-cities-title">Узнаёшь город?</h2>
+<div class="home-cities-grid">
+{% for city in panorama_cities %}
+<article class="home-city">
+<a class="home-city-link" href="{{settings.path('/'+city.slug)}}" aria-label="Открыть страницу города"></a>
+<div class="home-city-heading">
+<h3><a class="home-city-name" href="{{settings.path('/'+city.slug)}}">
+<span>{{city.name}}</span><canvas aria-hidden="true"></canvas>
+</a></h3>
+<span class="home-city-arrow" aria-hidden="true">→</span>
+</div>
+<img class="home-city-image" src="{{settings.path(city.panorama)}}" width="2172" height="724" alt="Угадай город по рисунку" loading="lazy" decoding="async">
+</article>
+{% endfor %}
+</div>
+</section>
+{% endif %}
+{# Home review feed is paused by design; city review feeds remain active.
 <section class="home-reviews" aria-labelledby="home-reviews-title">
 <div class="section-heading"><h2 id="home-reviews-title">Пульс:</h2></div>
 <div class="home-reviews-list">
@@ -47,9 +67,11 @@
 {%else%}<p class="home-reviews-empty">Пока нет отзывов.</p>{%endfor%}
 </div>
 </section>
+#}
 </main>
 {%endblock%}
 {% block scripts %}
+{% if panorama_cities %}<script defer src="{{settings.path('/assets/home-cities.js')}}"></script>{% endif %}
 <script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
 <script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
 <script defer src="{{settings.path('/assets/location-search/hybrid-search.js')}}"></script>
