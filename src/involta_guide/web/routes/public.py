@@ -1,5 +1,6 @@
 from datetime import timedelta, timezone
 from hashlib import sha256
+from random import sample
 from textwrap import shorten
 from typing import Any
 from urllib.parse import urlencode
@@ -46,18 +47,17 @@ def routes(prefix: str) -> APIRouter:
         if request.url.query:
             return RedirectResponse(ctx.settings.path("/"), status_code=308)
         request.state.audience_page = True
-        catalogue = ctx.queries.public_location_catalogue()
+        panorama_cities = [
+            {**city, "panorama": panorama}
+            for city in ctx.queries.public_location_catalogue()
+            if city["kind"] == "city" and (panorama := panorama_for(city["slug"]))
+        ]
         return request.app.state.templates.TemplateResponse(
             request=request,
             name="directory.html",
             context={
                 "settings": ctx.settings,
-                "panorama_cities": [
-                    {**city, "panorama": panorama_for(slug)}
-                    for slug in ("ivanovo", "ples", "suzdal")
-                    for city in catalogue
-                    if city["slug"] == slug and panorama_for(slug)
-                ],
+                "panorama_cities": sample(panorama_cities, min(7, len(panorama_cities))),
                 "kinds": KINDS,
                 "indexable": True,
             },

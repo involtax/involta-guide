@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from involta_guide.main import create_app
@@ -77,7 +78,7 @@ def test_home_omits_unavailable_panorama_cities(database, monkeypatch):
         connection.execute(text("UPDATE locations SET listed=false WHERE slug='ples'"))
     original = public.panorama_for
     monkeypatch.setattr(
-        public, "panorama_for", lambda slug: None if slug == "suzdal" else original(slug)
+        public, "panorama_for", lambda slug: original(slug) if slug in {"ivanovo", "ples"} else None
     )
     with TestClient(create_app(settings)) as client:
         home = client.get("/guide/")
@@ -85,3 +86,34 @@ def test_home_omits_unavailable_panorama_cities(database, monkeypatch):
         assert 'class="home-cities"' not in home.text
         assert "home-cities.js" not in home.text
         assert 'class="home-city"' not in home.text
+
+
+@pytest.mark.full_catalog
+def test_home_random_panorama_selection_has_no_duplicates_and_handles_small_pool(
+    database, monkeypatch
+):
+    from random import Random
+
+    from involta_guide.web.routes import public
+
+    settings, _ = database
+    monkeypatch.setattr(public, "sample", Random(42).sample)
+    with TestClient(create_app(settings)) as client:
+        selections = []
+        for _ in range(3):
+            response = client.get("/guide/")
+            cities = response.context["panorama_cities"]
+            slugs = [city["slug"] for city in cities]
+            assert len(slugs) == len(set(slugs)) == 7
+            assert all(
+                city["kind"] == "city" and public.panorama_for(city["slug"]) for city in cities
+            )
+            selections.append(slugs)
+        assert selections[0] != selections[1]
+        assert len({slug for selection in selections for slug in selection}) > 7
+        original = public.panorama_for
+        monkeypatch.setattr(
+            public, "panorama_for", lambda slug: original(slug) if slug == "ples" else None
+        )
+        cities = client.get("/guide/").context["panorama_cities"]
+        assert [city["slug"] for city in cities] == ["ples"]
