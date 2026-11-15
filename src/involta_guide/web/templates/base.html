@@ -10,21 +10,21 @@
 <link rel="help" title="Гид для ИИ-ассистентов — MCP" href="{{settings.url('/for-agents')}}">
 <link rel="alternate" type="text/plain" title="Инструкция для ИИ-ассистентов" href="{{settings.url('/llms.txt')}}">
 {% block social_meta %}{% endblock %}
-<link rel="stylesheet" href="{{ settings.path('/assets/style.css') }}">
+<link rel="stylesheet" href="{{ settings.asset('/assets/style.css') }}">
 {% block page_styles %}{% endblock %}
 {% if admin_ui|default(false) or audit_public is defined %}
-<link rel="stylesheet" href="{{ settings.path('/assets/admin.css') }}">
+<link rel="stylesheet" href="{{ settings.asset('/assets/admin.css') }}">
 {% endif %}
 {% if admin_ui|default(false) %}
-<script defer src="{{ settings.path('/assets/htmx.min.js') }}">
+<script defer src="{{ settings.asset('/assets/htmx.min.js') }}">
 </script>
-<link rel="stylesheet" href="{{settings.path('/assets/location-search/location-search.css')}}">
-<script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
-<script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
-<script defer src="{{settings.path('/assets/location-search/location-search.js')}}"></script>
-<script defer src="{{ settings.path('/assets/admin.js') }}">
+<link rel="stylesheet" href="{{settings.asset('/assets/location-search/location-search.css')}}">
+<script defer src="{{settings.asset('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
+<script defer src="{{settings.asset('/assets/location-search/location-index.js')}}"></script>
+<script defer src="{{settings.asset('/assets/location-search/location-search.js')}}"></script>
+<script defer src="{{ settings.asset('/assets/admin.js') }}">
 </script>
-<script defer src="{{ settings.path('/assets/review-player.js') }}"></script>
+<script defer src="{{ settings.asset('/assets/review-player.js') }}"></script>
 {% endif %}
 </head>
 <body>

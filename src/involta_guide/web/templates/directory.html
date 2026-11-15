@@ -5,8 +5,8 @@
 {% endwith %}
 {% endblock %}
 {% block page_styles %}
-<link rel="stylesheet" href="{{settings.path('/assets/location-search/location-search.css')}}">
-<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">
+<link rel="stylesheet" href="{{settings.asset('/assets/location-search/location-search.css')}}">
+<link rel="stylesheet" href="{{settings.asset('/assets/home.css')}}">
 {% endblock %}
 {% block body %}
 <main class="home-page">
@@ -71,9 +71,9 @@
 </main>
 {%endblock%}
 {% block scripts %}
-{% if panorama_cities %}<script defer src="{{settings.path('/assets/home-cities.js')}}"></script>{% endif %}
-<script defer src="{{settings.path('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
-<script defer src="{{settings.path('/assets/location-search/location-index.js')}}"></script>
-<script defer src="{{settings.path('/assets/location-search/hybrid-search.js')}}"></script>
-<script defer src="{{settings.path('/assets/location-search/location-search.js')}}"></script>
+{% if panorama_cities %}<script defer src="{{settings.asset('/assets/home-cities.js')}}"></script>{% endif %}
+<script defer src="{{settings.asset('/assets/location-search/autoComplete-10.2.10.min.js')}}"></script>
+<script defer src="{{settings.asset('/assets/location-search/location-index.js')}}"></script>
+<script defer src="{{settings.asset('/assets/location-search/hybrid-search.js')}}"></script>
+<script defer src="{{settings.asset('/assets/location-search/location-search.js')}}"></script>
 {% endblock %}

@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     def path(self, path: str = "/") -> str:
         return self.base_path + path
 
+    def asset(self, path: str) -> str:
+        """Bind page resources to the deployed release, including after rollback."""
+        return f"{self.path(path)}?v={self.release_sha}"
+
     def url(self, path: str = "/") -> str:
         from urllib.parse import urlsplit
 
