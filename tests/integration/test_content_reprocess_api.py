@@ -1,5 +1,6 @@
 """Private recovery of cached content responses, with no repeat provider request."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
@@ -167,3 +168,48 @@ def test_repeated_command_after_another_failure_does_not_requeue(saved_failure, 
     assert client.post(url, json=body, headers=headers).status_code == 202
     assert queries.get("jobs", identity)["status"] == "failed"
     assert calls == ["POST"]
+
+
+@pytest.mark.parametrize(
+    "map_url",
+    [
+        "https://yandex.uz/maps/org/fixture/2/",
+        "https://yandex.future-region.test/maps/org/fixture/2/",
+    ],
+)
+def test_reprocess_retains_original_response_and_recovers_optional_map_failure(
+    saved_failure, map_url
+):
+    client, headers, identity, _, uow, queries, service, queue, calls = saved_failure
+    # Emulate a response saved by the previous release, before its strict map check failed.
+    with uow() as work:
+        original = work.session.execute(
+            text("SELECT response_json FROM generation_requests WHERE job_id=:id"), {"id": identity}
+        ).scalar_one()
+        content = original["output"][0]["content"][0]
+        raw = json.loads(content["text"])
+        raw["restaurants"][1]["mapsUrl"] = map_url
+        content["text"] = json.dumps(raw)
+        work.session.execute(
+            text(
+                "UPDATE generation_requests SET response_json=CAST(:body AS jsonb) WHERE job_id=:id"
+            ),
+            {"id": identity, "body": json.dumps(original)},
+        )
+    url = f"/guide/api/admin/jobs/{identity}/reprocess"
+    body = {"request_id": str(uuid4()), "expected_revision": None}
+    assert client.post(url, json=body, headers=headers).status_code == 202
+    assert Worker(queue, service).once()
+    job = queries.get("jobs", identity)
+    assert job["status"] == "done" and job["applied"]
+    assert len(queries.rows("restaurants")) == 2
+    assert len([j for j in queries.rows("jobs") if j["report"].get("operation") == "research"]) == 2
+    assert bool(job["report"]["map_warnings"]) == ("future-region" in map_url)
+    with uow() as work:
+        saved = work.session.execute(
+            text("SELECT response_json FROM generation_requests WHERE job_id=:id"), {"id": identity}
+        ).scalar_one()
+    assert saved == original
+    assert client.post(url, json=body, headers=headers).status_code == 202
+    assert len(queries.rows("jobs")) == 3
+    assert calls == ["POST"]  # Only the fixture's first, mocked request; no new provider call.

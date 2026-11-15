@@ -4,6 +4,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from involta_guide.infrastructure.jobs.worker import Worker
@@ -16,8 +17,18 @@ from .test_public_fill import HEADERS
 PAYLOAD = Path(__file__).resolve().parents[1] / "fixtures/regional-yandex-discovery.json"
 
 
-def test_public_fill_accepts_regional_map_and_continues_to_research(database):
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://yandex.com.ge/maps/org/fixture/2/",
+        "https://yandex.uz/maps/org/fixture/2/",
+        "https://yandex.future-region.test/maps/org/fixture/2/",
+        "https://[malformed/",
+    ],
+)
+def test_public_fill_accepts_regional_map_and_continues_to_research(database, url):
     discovery = json.loads(PAYLOAD.read_text())
+    discovery["restaurants"][1]["mapsUrl"] = url
 
     class Replay:
         model = "local-saved-response-no-network"
@@ -57,7 +68,15 @@ def test_public_fill_accepts_regional_map_and_continues_to_research(database):
         assert len(rows) == len(discovery["restaurants"]) == 2
         assert {r["name"] for r in rows} == {r["name"] for r in discovery["restaurants"]}
         regional = next(r for r in rows if r["name"] == "Второй тестовый ресторан")
-        assert regional["maps_url"] == "https://yandex.com.ge/maps/org/fixture/2/"
+        unsupported = "future-region" in url or "malformed" in url
+        assert regional["maps_url"] == ("" if unsupported else url)
+        warnings = search["report"]["map_warnings"]
+        assert len(warnings) == int(unsupported)
+        if unsupported:
+            assert warnings[0]["path"] == "restaurants[1].mapsUrl"
+            log = client.get("/guide/logs/rybinsk/2.json").json()
+            assert log["job"]["report"]["map_warnings"] == warnings
+            assert log["job"]["stage_label"] == "Обработано с замечаниями к картам"
         followups = [j for j in jobs if j["report"]["operation"] == "research"]
         assert len(followups) == 2 and all(j["status"] == "queued" for j in followups)
         assert client.get("/guide/api/locations/rybinsk/fill/status").json()["state"] == "queued"

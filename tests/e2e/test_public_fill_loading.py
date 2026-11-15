@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import pytest
-from integration.test_jobs import setup
+from integration.test_jobs import FakeAI, setup
 from integration.test_voice_upload_transport import serving
 from playwright.sync_api import expect, sync_playwright
 
@@ -12,7 +12,16 @@ from involta_guide.main import create_app
 
 @pytest.mark.parametrize("width", [320, 390, 1280])
 def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(database, width):
-    settings, _, _, queries, location, service, queue = setup(database)
+    class UnsupportedMapAI(FakeAI):
+        def generate(self, prompt, job_id):
+            result = super().generate(prompt, job_id)
+            if prompt.startswith("Операция: discover."):
+                result["restaurants"][0]["mapsUrl"] = (
+                    "https://yandex.future-region.test/maps/org/1/"
+                )
+            return result
+
+    settings, _, _, queries, location, service, queue = setup(database, UnsupportedMapAI())
     app = create_app(settings)
     app.state.context.jobs = service
     with serving(app) as origin, sync_playwright() as p:
@@ -60,6 +69,10 @@ def test_waiting_reload_and_committed_restaurants_appear_without_user_refresh(da
             assert Worker(queue, service).once()  # Fake provider; real PostgreSQL commits.
         assert queries.get("locations", location["id"])["initialized_at"] is not None
         assert len(queries.rows("restaurants")) == 1
+        discovery = next(
+            j for j in queries.rows("jobs") if j["report"].get("operation") == "discover"
+        )
+        assert discovery["report"]["map_warnings"][0]["path"] == "restaurants[0].mapsUrl"
         expect(page.get_by_role("heading", name="Тестовый ресторан")).to_be_visible(timeout=10000)
         # Ivanovo has a panorama: publication is signalled by the restaurant, not a heading.
         expect(page.get_by_role("heading", name="Стоит зайти", exact=True)).to_have_count(0)

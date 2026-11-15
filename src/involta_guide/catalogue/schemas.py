@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
@@ -166,3 +167,41 @@ RESULTS: dict[str, type[StrictResult]] = {
     "discover": Discoveries,
     "research": Research,
 }
+
+
+def parse_result(
+    operation: str, result: dict[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """An optional map must not invalidate otherwise useful research or a whole search.
+
+    Keep strict validation for the rest of the contract. Diagnostics belong to the
+    job report, outside the model's bounded warnings array; the saved response stays raw.
+    """
+    cleaned = deepcopy(result)
+    warnings: list[dict[str, str]] = []
+
+    def optional_map(item: Any, path: str) -> None:
+        if not isinstance(item, dict) or item.get("mapsUrl") in (None, ""):
+            return
+        value = item["mapsUrl"]
+        try:
+            if not isinstance(value, str):
+                raise ValueError("Карта должна быть HTTPS-ссылкой на Яндекс Карты")
+            RestaurantInput.maps(value)
+        except ValueError:
+            item["mapsUrl"] = None
+            # Do not copy a rejected URL (possibly with credentials) into public diagnostics.
+            warnings.append(
+                {
+                    "path": path,
+                    "reason": "Неподдержанная или некорректная ссылка карты исключена; "
+                    "остальные данные сохранены. Известная карта не заменяется.",
+                }
+            )
+
+    if operation == "discover" and isinstance(cleaned.get("restaurants"), list):
+        for index, item in enumerate(cleaned["restaurants"]):
+            optional_map(item, f"restaurants[{index}].mapsUrl")
+    elif operation == "research":
+        optional_map(cleaned.get("card"), "card.mapsUrl")
+    return RESULTS[operation].model_validate(cleaned).model_dump(mode="json"), warnings

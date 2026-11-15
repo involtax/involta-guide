@@ -73,18 +73,33 @@ class RestaurantInput(BaseModel):
     def maps(cls, value: str) -> str:
         from urllib.parse import urlsplit
 
-        url = urlsplit(value)
+        message = "Нужна HTTPS-ссылка на Яндекс Карты"
+        try:
+            url = urlsplit(value)
+            port = url.port
+        except ValueError as exc:
+            raise ValueError(message) from exc
         if (
             url.scheme != "https"
-            or url.username
-            or url.password
+            or url.username is not None
+            or url.password is not None
+            or port not in (None, 443)
+            or any(ord(char) <= 32 or char == "\\" for char in value)
             or not (
                 url.hostname
-                in ("yandex.ru", "yandex.com", "yandex.com.ge", "yandex.by", "yandex.kz", "ya.ru")
+                in (
+                    "yandex.ru",
+                    "yandex.com",
+                    "yandex.com.ge",
+                    "yandex.by",
+                    "yandex.kz",
+                    "yandex.uz",
+                    "ya.ru",
+                )
                 or (url.hostname or "").endswith(".yandex.ru")
             )
         ):
-            raise ValueError("Нужна HTTPS-ссылка на Яндекс Карты")
+            raise ValueError(message)
         return value
 
     @field_validator("sources")
