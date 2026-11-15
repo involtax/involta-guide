@@ -3,9 +3,9 @@
 {% include 'open_graph.html' %}
 {% endblock %}
 {% block page_styles %}
-<link rel="stylesheet" href="{{settings.path('/assets/home.css')}}">
-{%if panorama%}<link rel="stylesheet" href="{{settings.path('/assets/panorama.css')}}">{%endif%}
-{%if temporary_fill%}<link rel="stylesheet" href="{{settings.path('/assets/public-fill.css')}}">{%endif%}
+<link rel="stylesheet" href="{{settings.asset('/assets/home.css')}}">
+{%if panorama%}<link rel="stylesheet" href="{{settings.asset('/assets/panorama.css')}}">{%endif%}
+{%if temporary_fill%}<link rel="stylesheet" href="{{settings.asset('/assets/public-fill.css')}}">{%endif%}
 {% endblock %}
 {%macro card(r,i)%}
 <article class="restaurant" id="restaurant-{{r.id}}">
@@ -163,12 +163,12 @@
 </main>
 {%endblock%}
 {%block scripts%}
-{%if panorama%}<script defer src="{{settings.path('/assets/panorama.js')}}"></script>{%endif%}
-<script defer src="{{settings.path('/assets/location-search/restaurant-anchor.js')}}"></script>
+{%if panorama%}<script defer src="{{settings.asset('/assets/panorama.js')}}"></script>{%endif%}
+<script defer src="{{settings.asset('/assets/location-search/restaurant-anchor.js')}}"></script>
 {%if temporary_fill%}
-<script defer src="{{settings.path('/assets/public-fill.js')}}"></script>
+<script defer src="{{settings.asset('/assets/public-fill.js')}}"></script>
 {%endif%}
-<script type="module" src="{{settings.path('/assets/hours.js')}}">
+<script type="module" src="{{settings.asset('/assets/hours.js')}}">
 </script>
-{%if not location.is_hub%}<script defer src="{{settings.path('/voice/widget.v1.js')}}?v={{settings.release_sha}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}" data-content-epoch="{{location.content_epoch}}"></script>{%endif%}
+{%if not location.is_hub%}<script defer src="{{settings.asset('/voice/widget.v1.js')}}" data-target="guide-voice" data-api-base="{{settings.path('/voice/api/v1')}}" data-location="{{location.slug}}" data-content-epoch="{{location.content_epoch}}"></script>{%endif%}
 {%endblock%}
