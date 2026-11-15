@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from involta_guide.application.ports.repositories import Record, UowFactory
 from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
@@ -109,6 +109,16 @@ class LocationService:
 class Queries:
     def __init__(self, uow: UowFactory) -> None:
         self.uow = uow
+
+    def visitor_is_vip(self, visitor: str | None) -> bool:
+        if not visitor:
+            return False
+        try:
+            UUID(visitor)
+        except ValueError:
+            return False
+        with self.uow() as work:
+            return work.repo.visitor_is_vip(visitor)
 
     def health(self) -> None:
         with self.uow() as uow:
