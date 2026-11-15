@@ -101,7 +101,9 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
             assert scroller.evaluate("el=>el.scrollLeft") < before
             scroller.focus()
             scroller.press("End")
-            assert scroller.evaluate("el=>el.scrollLeft") == scroller.evaluate("el=>el.scrollWidth-el.clientWidth")
+            assert scroller.evaluate("el=>el.scrollLeft") == scroller.evaluate(
+                "el=>el.scrollWidth-el.clientWidth"
+            )
             box = scroller.bounding_box()
             page.mouse.move(width / 2, box["y"] + box["height"] - 30)
             page.mouse.wheel(180, 0)

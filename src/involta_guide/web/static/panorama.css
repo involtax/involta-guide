@@ -60,6 +60,7 @@
   pointer-events: none;
 }
 .panorama-secret {
+  transform: translateY(40px);
   display: block;
   width: calc(var(--panorama-secret-height) * 9);
   height: auto;
