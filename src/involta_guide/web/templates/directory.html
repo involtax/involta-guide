@@ -55,8 +55,8 @@
 </span>
 </div>
 <div class="home-review-meta">
-{%if review.author_name%}
-<span class="home-review-author" title="{{review.author_name}}">{{review.author_name}}</span>
+{%if review.author_name or review.author_is_gold%}
+<span class="home-review-author" title="{{review.author_name or ''}}">{% if review.author_is_gold %}<img class="review-crown" src="{{ settings.asset('/assets/gold-crown.svg') }}" alt="GOLD" width="16" height="16">{% endif %}{{review.author_name or ''}}</span>
 <span class="home-review-meta-divider" aria-hidden="true">·</span>
 {%endif%}
 <time title="{{posted.strftime('%d.%m.%Y %H:%M')}}" datetime="{{posted.isoformat()}}">{{posted.day}} {{months[posted.month-1]}} · {{posted.strftime('%H:%M')}}</time>

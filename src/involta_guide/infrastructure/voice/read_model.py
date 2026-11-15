@@ -66,6 +66,7 @@ class VoiceReadModel:
                 for r in conn.execute(
                     text(f"""SELECT r.id::text reference,
                 coalesce(edited_text,transcript) transcript,author_name,created_at,number,publication_status,
+                EXISTS(SELECT 1 FROM vip_visitors v WHERE v.visitor_id=r.visitor AND v.level>0) author_is_gold,
                 CASE WHEN status='transcribed' THEN 'result_ready' ELSE 'accepted' END state
                 FROM reviews r WHERE location_id=:location AND {VISITOR_REVIEW}
                 ORDER BY created_at DESC,number DESC LIMIT 10"""),
@@ -80,6 +81,7 @@ class VoiceReadModel:
                 for item in conn.execute(
                     text(f"""SELECT coalesce(r.edited_text,r.transcript) transcript,r.created_at,r.number,
                     r.author_name,venue.name restaurant_name,
+                    EXISTS(SELECT 1 FROM vip_visitors v WHERE v.visitor_id=r.visitor AND v.level>0) author_is_gold,
                     l.name location_name,l.slug location_slug
                     FROM reviews r JOIN locations l ON l.id=r.location_id
                     LEFT JOIN review_analyses a ON a.review_id=r.id

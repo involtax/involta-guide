@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<main class="about-page gold-page">
+<h1>Свои <em>люди.</em></h1>
+<p class="gold-intro">Твой голос уже с золотом.</p>
+<ol class="about-steps" role="list">
+<li><h2>Давай<br><em>познакомимся.</em></h2>
+<p>Скажи своё имя в отзыве — мы красиво подпишем его. С именем теплее.</p></li>
+<li><h2>Расскажи<br><em>о любимом.</em></h2>
+<p>Есть ресторан, который ты любишь и считаешь достойным? Оставь ему голосовой отзыв. Твой отзыв получит <img class="review-crown" src="{{ settings.asset('/assets/gold-crown.svg') }}" alt="корону" width="16" height="16"> — знак GOLD.</p></li>
+</ol>
+<a class="gold-back" href="{{ settings.path('/') }}">Найти свой город →</a>
+</main>
+{% endblock %}
+{% block footer %}{% endblock %}

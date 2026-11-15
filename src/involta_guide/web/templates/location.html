@@ -144,7 +144,7 @@
 {%set posted=review.created_at.astimezone(review_timezone)%}
 <article class="home-review" data-reference="{{review.reference}}" data-processing="{{'true' if review.state=='accepted' else 'false'}}">
 <div class="home-review-meta">
-{%if review.author_name%}<span class="review-author">{{review.author_name}}</span>{%endif%}
+{% if review.author_name or review.author_is_gold %}<span class="review-author">{% if review.author_is_gold %}<img class="review-crown" src="{{ settings.asset('/assets/gold-crown.svg') }}" alt="GOLD" width="16" height="16">{% endif %}{{ review.author_name or "" }}</span>{% endif %}
 <time datetime="{{posted.isoformat()}}" title="UTC+3">{{posted.strftime('%d.%m.%Y · %H:%M')}}</time>
 </div>
 <p class="transcript">{{review.transcript or 'Расшифровка…'}}</p>

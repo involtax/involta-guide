@@ -6,6 +6,7 @@
 Контекст продукта и карта профильных документов: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
 Авторский подход: [docs/PROJECT_MANIFESTO.md](docs/PROJECT_MANIFESTO.md).
 Текущая лента отзывов, GigaAM-only публикация и переход БД: [docs/ADMIN_REVIEWS.md](docs/ADMIN_REVIEWS.md).
+Страница GOLD и короны авторов отзывов: [docs/GOLD.md](docs/GOLD.md).
 
 Ресторанный справочник России: города, районы, курорты и направления.
 **Python 3.13+, FastAPI, Jinja2, HTMX, PostgreSQL 17.** Без Node.js и frontend-сборки.
