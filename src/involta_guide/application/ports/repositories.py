@@ -2,6 +2,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 Record = dict[str, Any]
+MapResolver = Callable[[list[str]], dict[str, str]]
 
 
 class Repository(Protocol):

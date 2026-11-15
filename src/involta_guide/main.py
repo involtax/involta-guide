@@ -15,6 +15,7 @@ from involta_guide.application.services.locations import LocationService, Querie
 from involta_guide.config import Settings
 from involta_guide.domain.entities import Conflict, NotFound, RuleViolation
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
+from involta_guide.infrastructure.maps import verified_yandex_maps
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 from involta_guide.infrastructure.security import ADMIN_SESSION_MAX_AGE, Security
 from involta_guide.web.context import Context
@@ -45,7 +46,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine,
         Queries(factory),
         LocationService(factory),
-        JobService(factory, provider, public_fill_enabled=settings.temporary_public_fill_enabled),
+        JobService(
+            factory,
+            provider,
+            public_fill_enabled=settings.temporary_public_fill_enabled,
+            map_resolver=verified_yandex_maps,
+        ),
         Security(settings, factory),
     )
     from involta_guide.mcp.server import MCPTransport, create_server

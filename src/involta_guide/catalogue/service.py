@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from involta_guide.application.ports.repositories import Record, Repository, UowFactory
+from involta_guide.application.ports.repositories import MapResolver, Record, Repository, UowFactory
 from involta_guide.application.services.editorial import CARD_FIELDS, match_restaurant, require
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import score
 
 from .prompts import INTRO_SYSTEM, RESEARCH_SYSTEM, SYSTEM
-from .schemas import RESULTS, Discoveries, Introduction, Research
+from .schemas import RESULTS, Discoveries, Introduction, Research, parse_result
 
 PROMPTS = {
     "intro": "city-introduction-v2.txt",
@@ -47,9 +47,12 @@ def eligible(row: Record) -> bool:
 
 
 class CityContent:
-    def __init__(self, uow: UowFactory, model: str = "gpt-4.1") -> None:
+    def __init__(
+        self, uow: UowFactory, model: str = "gpt-4.1", *, map_resolver: MapResolver | None = None
+    ) -> None:
         self.uow = uow
         self.model = model
+        self.map_resolver = map_resolver
 
     def _prepare(
         self,
@@ -237,15 +240,38 @@ class CityContent:
         restaurant_id: str | None = None,
         scope: str = "all",
     ) -> Record:
-        payload = RESULTS[operation].model_validate(result).model_dump(mode="json")
-        signature = digest([location_id, operation, restaurant_id, scope, expected, payload])
+        signature_fields = [location_id, operation, restaurant_id, scope, expected]
+        # A retry stays the same even if a later release learns this regional domain.
+        # Retain the normalized signature for imports recorded before raw hashing existed.
+        raw_signature = digest([*signature_fields, result])
+        # An accepted retry must not depend on Yandex's current availability.
+        with self.uow() as work:
+            previous = work.repo.get("jobs", request_id)
+            if previous and "import_raw_signature" in (previous["report"] or {}):
+                if previous["report"]["import_raw_signature"] != raw_signature:
+                    raise Conflict("request_id уже использован с другими данными")
+                return {
+                    "job_id": previous["id"],
+                    "status": previous["status"],
+                    "applied": previous["applied"],
+                }
+        payload, map_warnings = parse_result(
+            operation, result, self.map_resolver if not previous else None
+        )
+        signature = digest([*signature_fields, payload])
         with self.uow() as work:
             repo = work.repo
             # Serialize against queued jobs, editors and other imports for this location.
             location = require(repo, "locations", location_id, lock=True)
             old = repo.get("jobs", request_id, lock=True)
             if old:
-                if (old["report"] or {}).get("import_signature") != signature:
+                report = old["report"] or {}
+                matches = (
+                    report["import_raw_signature"] == raw_signature
+                    if "import_raw_signature" in report
+                    else report.get("import_signature") == signature
+                )
+                if not matches:
                     raise Conflict("request_id уже использован с другими данными")
                 return {"job_id": old["id"], "status": old["status"], "applied": old["applied"]}
             prepared = self._prepare(repo, location_id, operation, restaurant_id, scope)
@@ -270,10 +296,11 @@ class CityContent:
                         **prepared,
                         "source": "external-agent",
                         "import_signature": signature,
+                        "import_raw_signature": raw_signature,
                     },
                 },
             )
-            self._apply(repo, request_id, prepared, payload)
+            self._apply(repo, request_id, prepared, payload, map_warnings)
             return {"job_id": request_id, "status": "done", "applied": True}
 
     def process(self, job: Record, provider: Any) -> None:
@@ -284,7 +311,7 @@ class CityContent:
             + json.dumps(prepared["input"], ensure_ascii=False, default=str)
         )
         result = provider.generate(prompt, job["id"])
-        payload = RESULTS[prepared["operation"]].model_validate(result).model_dump(mode="json")
+        payload, map_warnings = parse_result(prepared["operation"], result, self.map_resolver)
         with self.uow() as work:
             repo = work.repo
             current = self._prepare(
@@ -298,9 +325,17 @@ class CityContent:
                 raise Conflict("Worker lease lost")
             if current["state"] != prepared["state"]:
                 raise Conflict("Блок изменился после запуска; ответ сохранён в логе без применения")
-            self._apply(repo, job["id"], prepared, payload)
+            self._apply(repo, job["id"], prepared, payload, map_warnings)
 
-    def _apply(self, repo: Repository, job_id: str, prepared: Record, payload: Record) -> None:
+    def _apply(
+        self,
+        repo: Repository,
+        job_id: str,
+        prepared: Record,
+        payload: Record,
+        map_warnings: list[dict[str, str]] | None = None,
+    ) -> None:
+        map_warnings = list(map_warnings or [])
         operation, location_id = prepared["operation"], prepared["location_id"]
         location = require(repo, "locations", location_id)
         changes = []
@@ -391,16 +426,28 @@ class CityContent:
                     }
                 )
                 values["sources"] = list(dict.fromkeys([*restaurant["sources"], *card["sources"]]))
+            missing_map = bool(map_warnings) and not {**restaurant, **values}["maps_url"]
+            if missing_map and research.status == "verified":
+                values["verification_status"] = "needs_verification"
             if research.assessment is not None:
-                if not card_complete({**restaurant, **values}):
+                if missing_map:
+                    map_warnings.append(
+                        {
+                            "path": "assessment",
+                            "reason": "Оценки не применены: нет проверенной "
+                            "карты. Карточка сохранена для проверки и не публикуется.",
+                        }
+                    )
+                elif not card_complete({**restaurant, **values}):
                     raise RuleViolation(
                         "Оценка не сохранена: сначала нужна заполненная карточка "
                         "с описанием, картой, телефоном и источниками."
                     )
-                assessment = research.assessment.model_dump(mode="json")
-                # An incomplete investigation must not erase an earlier complete rating.
-                if score(assessment["scores"]) is not None or restaurant["ranking"] is None:
-                    values["ranking"] = assessment
+                else:
+                    assessment = research.assessment.model_dump(mode="json")
+                    # An incomplete investigation must not erase an earlier complete rating.
+                    if score(assessment["scores"]) is not None or restaurant["ranking"] is None:
+                        values["ranking"] = assessment
             values["active"] = int(eligible({**restaurant, **values}))
             changes.extend(
                 {
@@ -431,7 +478,11 @@ class CityContent:
                 "finished_at": now,
                 "lease_owner": None,
                 "lease_until": None,
-                "report": {**(job["report"] or {}), "result": payload},
+                "report": {
+                    **(job["report"] or {}),
+                    "result": payload,
+                    "map_warnings": map_warnings,
+                },
                 "changes": [
                     *job["changes"],
                     {"location_id": location_id, "at": now.isoformat(), "diff": changes},
@@ -460,7 +511,11 @@ class CityContent:
         repo.audit(
             "content_" + operation,
             job_id,
-            json.dumps({"changes": changes}, ensure_ascii=False, default=str),
+            json.dumps(
+                {"changes": changes, "map_warnings": map_warnings},
+                ensure_ascii=False,
+                default=str,
+            ),
         )
 
     def visibility(self, restaurant_id: str, hidden: bool) -> None:

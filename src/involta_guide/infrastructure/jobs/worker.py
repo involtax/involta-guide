@@ -12,6 +12,7 @@ from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.infrastructure.ai.audit import AIAudit
 from involta_guide.infrastructure.ai.errors import GenerationPending, ProviderUnavailable
 from involta_guide.infrastructure.ai.openai import OpenAIProvider
+from involta_guide.infrastructure.maps import verified_yandex_maps
 from involta_guide.infrastructure.persistence.unit_of_work import PostgresUow, create_database
 
 from .queue import JobQueue
@@ -133,6 +134,7 @@ def main() -> None:
             lambda: PostgresUow(engine),
             provider,
             public_fill_enabled=settings.temporary_public_fill_enabled,
+            map_resolver=verified_yandex_maps,
         ),
     )
 

@@ -168,6 +168,8 @@ class AIAudit:
                     job["stage_label"] = "Обработка остановлена; запрос OpenAI сохранён"
         if job["status"] == "done" and (job.get("quality_report") or {}).get("status") == "partial":
             job["stage_label"] = "Поиск неполный"
+        if job["status"] == "done" and (job.get("report") or {}).get("map_warnings"):
+            job["stage_label"] = "Обработано с замечаниями к картам"
         job["can_reprocess"] = (
             job["kind"] == "generate"
             and job["status"] in ("failed", "cancelled")
