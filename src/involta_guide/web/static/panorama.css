@@ -45,7 +45,7 @@
 }
 .panorama-track {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   width: calc(var(--panorama-city-width) + var(--panorama-secret-height) * 9);
   overflow: clip;
 }
