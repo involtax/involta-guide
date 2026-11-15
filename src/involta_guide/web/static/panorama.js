@@ -2,7 +2,8 @@
   const panorama = document.querySelector("[data-panorama]");
   if (!panorama) return;
   const scroller = panorama.querySelector(".panorama-scroller");
-  const image = scroller.querySelector("img");
+  const image = scroller.querySelector(".panorama-image");
+  const track = scroller.querySelector(".panorama-track");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = matchMedia("(max-width: 650px)");
   const sizeViewport = () =>
@@ -26,9 +27,10 @@
     bounce = null,
     wheelTimer = 0;
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-  const fullEnd = () => Math.max(0, image.offsetWidth - scroller.clientWidth);
+  const cityEnd = () => Math.max(0, image.offsetWidth - scroller.clientWidth);
+  const fullEnd = () => Math.max(0, track.offsetWidth - scroller.clientWidth);
   function autoBounds() {
-    const end = fullEnd(),
+    const end = cityEnd(),
       inset = image.offsetWidth * (mobile.matches ? 0.12 : 0.1);
     const low = Math.min(inset, end / 2);
     return { low, high: Math.max(low, end - inset) };
@@ -36,6 +38,7 @@
   // Focus and vertical scrolling do not interrupt the decorative motion.
   const allowed = () =>
     mobile.matches &&
+    scroller.scrollLeft <= cityEnd() &&
     !horizontalDrag &&
     !inertia &&
     !bounce &&
@@ -74,19 +77,19 @@
     clearBounce();
     elastic =
       Math.sign(raw) * 66 * (1 - Math.exp((-Math.abs(raw) * 0.48) / 66));
-    image.style.transform = `translate3d(${elastic}px,0,0)`;
+    track.style.transform = `translate3d(${elastic}px,0,0)`;
   }
   function settle() {
     clearTimeout(wheelTimer);
     clearBounce();
     const from = elastic;
     elastic = 0;
-    image.style.transform = "";
+    track.style.transform = "";
     if (Math.abs(from) < 0.5 || reduced.matches) {
       resumeLater();
       return;
     }
-    bounce = image.animate(
+    bounce = track.animate(
       [
         { transform: `translate3d(${from}px,0,0)`, offset: 0 },
         { transform: `translate3d(${-from * 0.07}px,0,0)`, offset: 0.78 },
@@ -108,7 +111,7 @@
       stopInertia();
       clearBounce();
       elastic = 0;
-      image.style.transform = "";
+      track.style.transform = "";
       scroller.scrollLeft = autoBounds().high;
       direction = -1;
       measuredWidth = scroller.clientWidth;
@@ -293,7 +296,7 @@
     stopInertia();
     clearBounce();
     elastic = 0;
-    image.style.transform = "";
+    track.style.transform = "";
     const target =
       event.key === "Home"
         ? 0
@@ -308,7 +311,7 @@
       stopInertia();
       clearBounce();
       elastic = 0;
-      image.style.transform = "";
+      track.style.transform = "";
     }
     refresh();
   });

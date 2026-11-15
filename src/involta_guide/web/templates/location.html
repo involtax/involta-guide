@@ -73,7 +73,7 @@
 {%if panorama%}
 <figure class="panorama" data-panorama>
 <div class="panorama-scroller" tabindex="0" role="region" aria-label="Панорама: {{location.name}} — горизонтальная прокрутка">
-<div class="panorama-track"><img class="panorama-image" src="{{settings.path(panorama)}}" width="2172" height="724" alt="Рисованная панорама: {{location.name}}" draggable="false" decoding="async"></div>
+<div class="panorama-track"><img class="panorama-image" src="{{settings.path(panorama)}}" width="2172" height="724" alt="Рисованная панорама: {{location.name}}" draggable="false" decoding="async"><img class="panorama-secret" src="{{settings.path('/assets/secret-route.avif')}}" width="6516" height="724" alt="Любопытность :) Дальше — интереснее. Тсс… Это уже секретное место. Скажи в голосовом отзыве: я досмотрел. Игра продолжится." draggable="false" decoding="async" loading="lazy"></div>
 </div>
 
 </figure>
