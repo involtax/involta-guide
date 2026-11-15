@@ -129,10 +129,12 @@ def test_panorama_geometry_motion_and_full_manual_range(database, tmp_path, widt
         secret = scroller.locator(".panorama-secret")
         secret.evaluate("el=>el.decode()")
         assert secret.evaluate("el=>[el.naturalWidth,el.naturalHeight]") == [6516, 724]
-        page.wait_for_timeout(2200)
+        page.wait_for_timeout(400)
         assert scroller.evaluate("el=>el.scrollLeft") == end
         page.screenshot(path=str(folder / f"secret-{width}.png"))
         assert scroller.evaluate("el=>el.scrollLeft") == end
+        page.wait_for_timeout(2100)
+        assert scroller.evaluate("el=>el.scrollLeft") <= expected_width - width
         page.goto(origin + "/guide/kineshma", wait_until="networkidle")
         expect(page.locator("[data-panorama]")).to_have_count(0)
         assert "/assets/panorama.js" not in page.content()
@@ -171,7 +173,7 @@ def test_reduced_motion_and_no_javascript_keep_the_panorama_usable(database):
             if javascript:
                 page.emulate_media(reduced_motion="no-preference")
                 page.wait_for_timeout(2100)
-                assert scroller.evaluate("el=>el.scrollLeft") == 1780
+                assert scroller.evaluate("el=>el.scrollLeft") <= 610
                 scroller.press("Home")
                 page.wait_for_function(
                     "document.querySelector('.panorama-scroller').scrollLeft > 0"
@@ -221,11 +223,11 @@ def test_touch_scrolls_the_picture_horizontally_and_the_page_vertically(database
         assert page.evaluate("scrollY") < 1
         scroller.evaluate("el=>el.scrollLeft=610")
         swipe(-180, 0)
-        page.wait_for_timeout(1600)
+        page.wait_for_timeout(700)
         secret_position = scroller.evaluate("el=>el.scrollLeft")
         assert secret_position > 700
-        page.wait_for_timeout(2200)
-        assert abs(scroller.evaluate("el=>el.scrollLeft") - secret_position) < 2
+        page.wait_for_timeout(3500)
+        assert scroller.evaluate("el=>el.scrollLeft") <= 610
         browser.close()
 
 
@@ -248,4 +250,43 @@ def test_autoplay_stays_in_city_after_full_round_trip(database):
         assert max(positions) <= 491
         assert max(positions) - min(positions) > 300
         assert positions[-1] > min(positions) + 100
+        browser.close()
+
+
+def test_secret_return_waits_for_release_and_can_be_interrupted(database):
+    with serving(prepared_panorama(database)) as origin, sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--no-sandbox"]
+        )
+        page = browser.new_page(viewport={"width": 390, "height": 950})
+        page.goto(origin + "/guide/ples", wait_until="networkidle")
+        scroller = page.locator(".panorama-scroller")
+        scroller.focus()
+        scroller.press("End")
+        box = scroller.bounding_box()
+        page.mouse.move(180, box["y"] + box["height"] - 40)
+        page.mouse.down()
+        end = scroller.evaluate("el=>el.scrollLeft")
+        page.wait_for_timeout(1400)
+        assert scroller.evaluate("el=>el.scrollLeft") == end
+        page.mouse.up()
+        page.wait_for_timeout(750)
+        assert scroller.evaluate("el=>el.scrollLeft") == end
+        page.wait_for_timeout(500)
+        moving = scroller.evaluate("el=>el.scrollLeft")
+        assert 610 < moving < end
+        page.mouse.down()
+        stopped = scroller.evaluate("el=>el.scrollLeft")
+        page.wait_for_timeout(1200)
+        assert scroller.evaluate("el=>el.scrollLeft") == stopped
+        page.mouse.up()
+        # Wheel activity restarts the one-second countdown, even at the edge.
+        scroller.press("End")
+        for _ in range(3):
+            page.wait_for_timeout(600)
+            page.mouse.wheel(-10, 0)
+        current = scroller.evaluate("el=>el.scrollLeft")
+        assert current > end - 50
+        page.wait_for_timeout(2300)
+        assert scroller.evaluate("el=>el.scrollLeft") <= 610
         browser.close()
