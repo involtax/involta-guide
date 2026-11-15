@@ -53,7 +53,7 @@ def test_only_author_sees_pending_then_classification_controls_every_public_feed
         assert state(engine, review)["approved_at"] is None
         with TestClient(create_app(settings)) as client:
             assert (SOURCE in client.get("/guide/" + city["slug"]).text) == visible
-            assert (SOURCE in client.get("/guide/").text) == visible
+            assert SOURCE not in client.get("/guide/").text
             rows = client.get(
                 "/guide/voice/api/v1/reviews", params={"location": city["slug"]}
             ).json()["rows"]

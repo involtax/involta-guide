@@ -33,9 +33,9 @@ def test_public_location_stores_history_without_changing_home_feed_or_enqueuing_
         client.get("/guide/history-first")
         assert client.cookies.get(RECENT_LOCATIONS_COOKIE) == f"{first}.{second}"
         home = client.get("/guide/")
-        assert home.text.index("Новый отзыв другого города") < home.text.index(
-            "Старый отзыв просмотренного города"
-        )
+        assert "Новый отзыв другого города" not in home.text
+        assert "Старый отзыв просмотренного города" not in home.text
+        assert "Узнаёшь город?" in home.text
         for path, expected_status in [
             ("/guide/", 200),
             ("/guide/history-missing", 404),

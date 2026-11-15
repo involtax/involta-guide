@@ -79,12 +79,12 @@ def test_global_feed_has_only_ten_newest_public_reviews_and_public_active_locati
     )
     with TestClient(create_app(settings)) as client:
         home = client.get("/guide/")
-        assert home.text.count('class="home-review"') == 10
+        assert 'class="home-review"' not in home.text
         assert "Расшифровка…" not in home.text
         assert "Недоступный отзыв" not in home.text and "Непубличная локация" not in home.text
         assert "private-audio" not in home.text and "private-visitor" not in home.text
         assert 'class="city-grid"' not in home.text and 'class="pagination"' not in home.text
-        assert 'href="/guide/feed-first"' in home.text and 'href="/guide/feed-second"' in home.text
+        assert 'href="/guide/feed-first"' not in home.text
         assert home.headers["cache-control"] == "private, no-store"
         with engine.begin() as connection:
             connection.execute(
@@ -101,21 +101,23 @@ def test_global_feed_has_only_ten_newest_public_reviews_and_public_active_locati
             )
 
 
-def test_home_empty_feed_and_escaped_transcript_with_local_time(database):
+def test_home_does_not_render_reviews_or_query_the_paused_feed(database, monkeypatch):
     settings, engine = database
     city = add_location(engine, "Тестовый город", "feed-safe")
+    add_review(engine, city, "Скрытый на главной отзыв", datetime(2026, 11, 6, tzinfo=UTC))
+
+    def unexpected_read(*args, **kwargs):
+        raise AssertionError("Homepage should not query the paused review feed")
+
+    monkeypatch.setattr(VoiceReadModel, "latest_public_texts", unexpected_read)
     with TestClient(create_app(settings)) as client:
-        empty = client.get("/guide/")
-        assert "Пульс:" in empty.text and "Пока нет отзывов." in empty.text
-        assert 'class="home-review"' not in empty.text
-        transcript = '<img src=x onerror="window.__reviewXss=true"> Вкусный суп.'
-        add_review(engine, city, transcript, datetime(2026, 11, 6, 23, 30, tzinfo=UTC))
         home = client.get("/guide/")
-        assert transcript not in home.text and "&lt;img" in home.text
-        assert "7 ноя · 02:30" in home.text and "2026-11-07T02:30:00+03:00" in home.text
+        assert "Узнаёшь город?" in home.text
+        assert "Скрытый на главной отзыв" not in home.text
+        assert "Пульс:" not in home.text
+        assert 'class="home-review"' not in home.text
         assert "ЕДА. ЛЮДИ. КАЧЕСТВО." in home.text
-        assert "Куда отправимся?" not in home.text and "Прислушиваемся к вам." not in home.text
-        assert "Пульс:" in client.get("/guide/?q=%20%20").text
+        assert "Узнаёшь город?" in client.get("/guide/?q=%20%20").text
 
 
 def prepared_pulse(database, *, restaurant_name="Листва", author="Иван"):
@@ -160,7 +162,7 @@ def prepared_pulse(database, *, restaurant_name="Листва", author="Иван
     return context
 
 
-def test_home_header_shows_known_restaurant_before_approval_but_votes_wait_for_ok(database):
+def test_feed_knows_restaurant_before_approval_but_votes_wait_for_ok(database):
     from .test_reviews2 import state
 
     settings, engine, city, review, _, service, worker, provider, calls = prepared_pulse(database)
@@ -181,10 +183,6 @@ def test_home_header_shows_known_restaurant_before_approval_but_votes_wait_for_o
                 ).scalar_one()
                 is False
             )
-        with TestClient(create_app(settings)) as client:
-            before = client.get("/guide/").text
-            assert 'class="home-review-restaurant" title="Листва">Листва</span>' in before
-            assert 'class="home-review-author" title="Иван">Иван</span>' not in before
         service.approve(review, str(analysis["job_id"]), "admin")
         entry = read.latest_public_texts()[0]
         assert entry["restaurant_name"] == "Листва" and entry["author_name"] == "Иван"
@@ -192,12 +190,6 @@ def test_home_header_shows_known_restaurant_before_approval_but_votes_wait_for_o
         with engine.connect() as conn:
             # Only the second mention has a vote; it must not replace the first.
             assert conn.execute(text("SELECT count(*) FROM review_restaurant_votes")).scalar() == 1
-        with TestClient(create_app(settings)) as client:
-            home = client.get("/guide/").text
-            assert 'class="home-review-restaurant" title="Листва">Листва</span>' in home
-            assert 'class="home-review-author" title="Иван">Иван</span>' in home
-            assert f'href="/guide/{city["slug"]}"' in home
-            assert 'class="home-review-restaurant" title="Втором месте"' not in home
         with engine.begin() as conn:
             conn.execute(
                 text("UPDATE reviews SET transcript='Новая расшифровка' WHERE id=:id"),
