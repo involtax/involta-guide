@@ -2,7 +2,8 @@
   const panorama = document.querySelector("[data-panorama]");
   if (!panorama) return;
   const scroller = panorama.querySelector(".panorama-scroller");
-  const image = scroller.querySelector("img");
+  const image = scroller.querySelector(".panorama-image");
+  const track = scroller.querySelector(".panorama-track");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = matchMedia("(max-width: 650px)");
   const sizeViewport = () =>
@@ -24,11 +25,14 @@
     inertia = 0,
     elastic = 0,
     bounce = null,
-    wheelTimer = 0;
+    wheelTimer = 0,
+    returnTimer = 0,
+    returnFrame = 0;
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-  const fullEnd = () => Math.max(0, image.offsetWidth - scroller.clientWidth);
+  const cityEnd = () => Math.max(0, image.offsetWidth - scroller.clientWidth);
+  const fullEnd = () => Math.max(0, track.offsetWidth - scroller.clientWidth);
   function autoBounds() {
-    const end = fullEnd(),
+    const end = cityEnd(),
       inset = image.offsetWidth * (mobile.matches ? 0.12 : 0.1);
     const low = Math.min(inset, end / 2);
     return { low, high: Math.max(low, end - inset) };
@@ -36,7 +40,9 @@
   // Focus and vertical scrolling do not interrupt the decorative motion.
   const allowed = () =>
     mobile.matches &&
+    scroller.scrollLeft <= cityEnd() &&
     !horizontalDrag &&
+    !returnFrame &&
     !inertia &&
     !bounce &&
     !document.hidden &&
@@ -53,11 +59,41 @@
     if (allowed()) startAuto();
     else stopAuto();
   }
+  function stopReturn() {
+    clearTimeout(returnTimer);
+    cancelAnimationFrame(returnFrame);
+    returnFrame = 0;
+  }
+  function scheduleReturn() {
+    clearTimeout(returnTimer);
+    if (scroller.scrollLeft <= cityEnd() || gesture || inertia || bounce ||
+        returnFrame || document.hidden || reduced.matches) return;
+    returnTimer = setTimeout(() => {
+      if (gesture || inertia || bounce || document.hidden || reduced.matches) return;
+      stopAuto();
+      const from = scroller.scrollLeft, target = autoBounds().high;
+      const started = performance.now();
+      function returnToCity(now) {
+        const progress = Math.min(1, (now - started) / 900);
+        // Smooth acceleration and braking, independent of the distance travelled.
+        const eased = progress * progress * (3 - 2 * progress);
+        scroller.scrollLeft = from + (target - from) * eased;
+        if (progress < 1) returnFrame = requestAnimationFrame(returnToCity);
+        else {
+          returnFrame = 0;
+          direction = -1;
+          resumeLater();
+        }
+      }
+      returnFrame = requestAnimationFrame(returnToCity);
+    }, 1000);
+  }
   function resumeLater() {
     stopAuto();
     resumeAt = performance.now() + 1800;
     clearTimeout(timer);
     timer = setTimeout(startAuto, 1800);
+    scheduleReturn();
   }
   function stopInertia() {
     cancelAnimationFrame(inertia);
@@ -74,19 +110,19 @@
     clearBounce();
     elastic =
       Math.sign(raw) * 66 * (1 - Math.exp((-Math.abs(raw) * 0.48) / 66));
-    image.style.transform = `translate3d(${elastic}px,0,0)`;
+    track.style.transform = `translate3d(${elastic}px,0,0)`;
   }
   function settle() {
     clearTimeout(wheelTimer);
     clearBounce();
     const from = elastic;
     elastic = 0;
-    image.style.transform = "";
+    track.style.transform = "";
     if (Math.abs(from) < 0.5 || reduced.matches) {
       resumeLater();
       return;
     }
-    bounce = image.animate(
+    bounce = track.animate(
       [
         { transform: `translate3d(${from}px,0,0)`, offset: 0 },
         { transform: `translate3d(${-from * 0.07}px,0,0)`, offset: 0.78 },
@@ -105,10 +141,11 @@
       return;
     }
     if (measuredWidth !== scroller.clientWidth) {
+      stopReturn();
       stopInertia();
       clearBounce();
       elastic = 0;
-      image.style.transform = "";
+      track.style.transform = "";
       scroller.scrollLeft = autoBounds().high;
       direction = -1;
       measuredWidth = scroller.clientWidth;
@@ -189,6 +226,8 @@
   }
   scroller.addEventListener("pointerdown", (event) => {
     if (!event.isPrimary || event.button !== 0 || !fullEnd()) return;
+    stopReturn();
+    stopInertia();
     gesture = {
       id: event.pointerId,
       x: event.clientX,
@@ -234,7 +273,10 @@
     if (!gesture || event.pointerId !== gesture.id) return;
     const done = gesture;
     gesture = null;
-    if (done.axis !== "x") return;
+    if (done.axis !== "x") {
+      scheduleReturn();
+      return;
+    }
     horizontalDrag = false;
     if (Math.abs(elastic) > 0.5) settle();
     else if (
@@ -246,7 +288,7 @@
       momentum(done.velocity);
     else resumeLater();
   }
-  scroller.addEventListener("pointerup", release);
+  window.addEventListener("pointerup", release);
   scroller.addEventListener("pointercancel", release);
   scroller.addEventListener("lostpointercapture", (event) => {
     if (
@@ -258,6 +300,8 @@
   scroller.addEventListener(
     "wheel",
     (event) => {
+      stopReturn();
+      scheduleReturn();
       if (!fullEnd()) return;
       const dx = event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX;
       if (!dx || (!event.shiftKey && Math.abs(dx) <= Math.abs(event.deltaY)))
@@ -289,11 +333,12 @@
   scroller.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
+    stopReturn();
     stopAuto();
     stopInertia();
     clearBounce();
     elastic = 0;
-    image.style.transform = "";
+    track.style.transform = "";
     const target =
       event.key === "Home"
         ? 0
@@ -305,12 +350,14 @@
   });
   reduced.addEventListener("change", () => {
     if (reduced.matches) {
+      stopReturn();
       stopInertia();
       clearBounce();
       elastic = 0;
-      image.style.transform = "";
+      track.style.transform = "";
     }
     refresh();
+    scheduleReturn();
   });
   mobile.addEventListener("change", () => {
     measuredWidth = 0;
@@ -318,7 +365,18 @@
     measure();
   });
   window.addEventListener("resize", sizeViewport);
-  document.addEventListener("visibilitychange", refresh);
+  scroller.addEventListener("scroll", () => {
+    if (!returnFrame) scheduleReturn();
+  }, { passive: true });
+  window.addEventListener("scroll", () => {
+    stopReturn();
+    scheduleReturn();
+  }, { passive: true });
+  document.addEventListener("visibilitychange", () => {
+    stopReturn();
+    refresh();
+    scheduleReturn();
+  });
   new ResizeObserver(measure).observe(scroller);
   image.addEventListener("load", measure);
   if (image.complete) measure();
