@@ -123,6 +123,12 @@ PostgreSQL + HTTP + Chromium: декодирование, размеры и пр
 [мобильный экран, 390 px](design/location-panorama/mobile.png) ·
 [десктоп, 1440 px](design/location-panorama/desktop.png).
 
+Партия из 10 дополнительных городов проверена на 320, 390 и 1440 px.
+Скриншоты локальных страниц с тестовыми описаниями и ресторанами:
+[Смоленск, 390 px](design/location-panorama/batch-10/mobile-smolensk.png) ·
+[Нижний Новгород, 1440 px](design/location-panorama/batch-10/desktop-nizhny-novgorod.png).
+В каталоге панорам сохранены чистые AVIF; номера и подписи листов выбора туда не входят.
+
 ## Главная: «Узнаёшь город?»
 
 При каждой загрузке главная выбирает 7 случайных городов без повторов

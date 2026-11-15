@@ -12,10 +12,21 @@ from .test_editorial import CONTENT
 from .test_jobs import setup
 
 
-def test_home_panorama_links_and_choices_cover_all_types(database):
+def test_home_panorama_links_and_choices_cover_all_types(database, monkeypatch):
+    from involta_guide.web.routes import public
+
     settings, _, uow, queries, city, _, _ = setup(database)
     editor = EditorialService(uow)
     other = next(row for row in queries.directory(kind="resort")["rows"] if row["listed"])
+    # This test covers eligibility, not random selection. Give both types an image
+    # and keep the pool small; adding real artwork must not affect the assertions.
+    image = public.panorama_for(city["slug"])
+    assert image
+    monkeypatch.setattr(
+        public,
+        "panorama_for",
+        lambda slug: image if slug in {city["slug"], other["slug"]} else None,
+    )
     with TestClient(create_app(settings)) as client:
         assert f'href="/guide/{city["slug"]}"' in client.get("/guide/").text
         editor.save(city["id"], CONTENT, None)
