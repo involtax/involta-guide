@@ -29,6 +29,16 @@ class PostgresRepository:
         if pending:
             raise RuleViolation("Переход БД не завершён: выполните явную очистку Guide-аудио")
 
+    def visitor_is_vip(self, visitor: str) -> bool:
+        return bool(
+            self.session.execute(
+                text(
+                    "SELECT EXISTS(SELECT 1 FROM vip_visitors WHERE visitor_id=:visitor AND level>0)"
+                ),
+                {"visitor": visitor},
+            ).scalar_one()
+        )
+
     def table(self, name: str) -> Any:
         return Base.metadata.tables[name]
 

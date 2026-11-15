@@ -157,6 +157,28 @@ h4 {
   padding-top: 9px;
   font-weight: 400;
 }
+.brand .brand-gold {
+  position: relative;
+  display: inline-block;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+}
+.brand-crown {
+  position: absolute;
+  top: -14px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  color: #f6c900;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(18deg);
+  pointer-events: none;
+}
 main {
   max-width: 1232px;
   padding: 0 48px;
