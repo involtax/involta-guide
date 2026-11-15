@@ -61,7 +61,7 @@ async def bounded_body(request: Request) -> dict[str, Any]:
 
 def service(request: Request) -> CityContent:
     ctx = context(request)
-    return CityContent(ctx.jobs.uow, ctx.settings.openai_model)
+    return CityContent(ctx.jobs.uow, ctx.settings.openai_model, map_resolver=ctx.jobs.map_resolver)
 
 
 def routes(prefix: str) -> APIRouter:

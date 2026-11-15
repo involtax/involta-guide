@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 
 from involta_guide.application.commands.schemas import RestaurantInput
+from involta_guide.catalogue.service import CityContent
 from involta_guide.domain.entities import Conflict
 
 from .test_incremental_content import discovered, imported, research
@@ -101,3 +102,56 @@ def test_import_retry_does_not_ignore_different_rejected_url_or_erase_known_map(
     rows = queries.rows("restaurants")
     assert len(rows) == 1 and rows[0]["maps_url"] == restaurant["maps_url"]
     assert rows[0]["sources"] == [*restaurant["sources"], "https://example.test/new-menu"]
+
+
+def test_verified_map_is_applied_and_idempotent_retry_does_not_check_network(database):
+    _, engine, uow, queries, city, _, _, _, _ = discovered(database)
+    checked = []
+    original = "https://yandex.future-region.test/maps/org/place/987123/"
+    canonical = "https://yandex.ru/maps/org/987123/"
+
+    def verify(urls):
+        assert engine.pool.checkedout() == 0  # Never hold a DB transaction across HTTP.
+        checked.append(urls)
+        return {original: canonical}
+
+    content = CityContent(uow, map_resolver=verify)
+    request_id = str(uuid4())
+    raw = {
+        "restaurants": [
+            {
+                "name": "Новое место",
+                "mapsUrl": original,
+                "sources": ["https://example.test/menu"],
+                "reason": "Источник",
+            }
+        ]
+    }
+    expected = content.prepare(city["id"], "discover")["expected"]
+    result = content.submit(city["id"], "discover", request_id, expected, raw)
+    assert content.submit(city["id"], "discover", request_id, expected, raw) == result
+    assert checked == [[original]]
+    row = next(r for r in queries.rows("restaurants") if r["name"] == "Новое место")
+    assert row["maps_url"] == canonical
+    assert raw["restaurants"][0]["mapsUrl"] == original
+    assert "проверена" in queries.get("jobs", request_id)["report"]["map_warnings"][0]["reason"]
+
+
+def test_server_job_uses_verified_map_before_validation(database):
+    from involta_guide.infrastructure.jobs.worker import Worker
+
+    from .test_incremental_content import ContentAI
+    from .test_jobs import setup
+
+    class AI(ContentAI):
+        def generate(self, prompt, job_id):
+            result = super().generate(prompt, job_id)
+            result["restaurants"][0]["mapsUrl"] = "https://yandex.future-region.test/maps/org/123/"
+            return result
+
+    _, _, uow, queries, city, jobs, queue = setup(database, AI())
+    jobs.map_resolver = lambda urls: dict.fromkeys(urls, "https://yandex.ru/maps/org/123/")
+    identity = CityContent(uow).enqueue(city["id"], "discover")
+    assert Worker(queue, jobs).once()
+    assert queries.get("jobs", identity)["status"] == "done"
+    assert queries.rows("restaurants")[0]["maps_url"] == "https://yandex.ru/maps/org/123/"

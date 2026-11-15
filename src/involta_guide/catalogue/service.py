@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from involta_guide.application.ports.repositories import Record, Repository, UowFactory
+from involta_guide.application.ports.repositories import MapResolver, Record, Repository, UowFactory
 from involta_guide.application.services.editorial import CARD_FIELDS, match_restaurant, require
 from involta_guide.domain.entities import Conflict, RuleViolation
 from involta_guide.domain.rules import score
@@ -47,9 +47,12 @@ def eligible(row: Record) -> bool:
 
 
 class CityContent:
-    def __init__(self, uow: UowFactory, model: str = "gpt-4.1") -> None:
+    def __init__(
+        self, uow: UowFactory, model: str = "gpt-4.1", *, map_resolver: MapResolver | None = None
+    ) -> None:
         self.uow = uow
         self.model = model
+        self.map_resolver = map_resolver
 
     def _prepare(
         self,
@@ -237,12 +240,25 @@ class CityContent:
         restaurant_id: str | None = None,
         scope: str = "all",
     ) -> Record:
-        payload, map_warnings = parse_result(operation, result)
         signature_fields = [location_id, operation, restaurant_id, scope, expected]
-        signature = digest([*signature_fields, payload])
         # A retry stays the same even if a later release learns this regional domain.
         # Retain the normalized signature for imports recorded before raw hashing existed.
         raw_signature = digest([*signature_fields, result])
+        # An accepted retry must not depend on Yandex's current availability.
+        with self.uow() as work:
+            previous = work.repo.get("jobs", request_id)
+            if previous and "import_raw_signature" in (previous["report"] or {}):
+                if previous["report"]["import_raw_signature"] != raw_signature:
+                    raise Conflict("request_id уже использован с другими данными")
+                return {
+                    "job_id": previous["id"],
+                    "status": previous["status"],
+                    "applied": previous["applied"],
+                }
+        payload, map_warnings = parse_result(
+            operation, result, self.map_resolver if not previous else None
+        )
+        signature = digest([*signature_fields, payload])
         with self.uow() as work:
             repo = work.repo
             # Serialize against queued jobs, editors and other imports for this location.
@@ -295,7 +311,7 @@ class CityContent:
             + json.dumps(prepared["input"], ensure_ascii=False, default=str)
         )
         result = provider.generate(prompt, job["id"])
-        payload, map_warnings = parse_result(prepared["operation"], result)
+        payload, map_warnings = parse_result(prepared["operation"], result, self.map_resolver)
         with self.uow() as work:
             repo = work.repo
             current = self._prepare(

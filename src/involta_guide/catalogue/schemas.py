@@ -4,6 +4,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 from involta_guide.application.commands.schemas import Hours, RestaurantInput
+from involta_guide.application.ports.repositories import MapResolver
 from involta_guide.domain.rules import FACTORS
 
 Operation = Literal["intro", "discover", "research"]
@@ -170,7 +171,7 @@ RESULTS: dict[str, type[StrictResult]] = {
 
 
 def parse_result(
-    operation: str, result: dict[str, Any]
+    operation: str, result: dict[str, Any], map_resolver: MapResolver | None = None
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """An optional map must not invalidate otherwise useful research or a whole search.
 
@@ -179,11 +180,38 @@ def parse_result(
     """
     cleaned = deepcopy(result)
     warnings: list[dict[str, str]] = []
+    entries: list[tuple[Any, str]] = []
+    if operation == "discover" and isinstance(cleaned.get("restaurants"), list):
+        entries = [
+            (item, f"restaurants[{index}].mapsUrl")
+            for index, item in enumerate(cleaned["restaurants"])
+        ]
+    elif operation == "research":
+        entries = [(cleaned.get("card"), "card.mapsUrl")]
+    urls = [
+        item["mapsUrl"]
+        for item, _ in entries
+        if isinstance(item, dict) and isinstance(item.get("mapsUrl"), str)
+    ]
+    # Called once, before validation/application and outside any database transaction.
+    resolved = map_resolver(urls) if map_resolver and urls else {}
 
     def optional_map(item: Any, path: str) -> None:
         if not isinstance(item, dict) or item.get("mapsUrl") in (None, ""):
             return
         value = item["mapsUrl"]
+        if isinstance(value, str) and value in resolved:
+            replacement = RestaurantInput.maps(resolved[value])
+            if replacement != value:
+                item["mapsUrl"] = replacement
+                warnings.append(
+                    {
+                        "path": path,
+                        "reason": "Карточка с тем же ID проверена; "
+                        "ссылка заменена на " + replacement,
+                    }
+                )
+                return
         try:
             if not isinstance(value, str):
                 raise ValueError("Карта должна быть HTTPS-ссылкой на Яндекс Карты")
@@ -199,9 +227,6 @@ def parse_result(
                 }
             )
 
-    if operation == "discover" and isinstance(cleaned.get("restaurants"), list):
-        for index, item in enumerate(cleaned["restaurants"]):
-            optional_map(item, f"restaurants[{index}].mapsUrl")
-    elif operation == "research":
-        optional_map(cleaned.get("card"), "card.mapsUrl")
+    for item, path in entries:
+        optional_map(item, path)
     return RESULTS[operation].model_validate(cleaned).model_dump(mode="json"), warnings

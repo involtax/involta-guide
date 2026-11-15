@@ -10,6 +10,7 @@ from involta_guide.application.commands.schemas import (
 )
 from involta_guide.application.ports.repositories import (
     AIProvider,
+    MapResolver,
     Record,
     Repository,
     UowFactory,
@@ -33,10 +34,12 @@ class JobService:
         provider: AIProvider,
         *,
         public_fill_enabled: bool = True,
+        map_resolver: MapResolver | None = None,
     ) -> None:
         self.uow = uow
         self.provider = provider
         self.public_fill_enabled = public_fill_enabled
+        self.map_resolver = map_resolver
         self.reset_handler: Callable[[Record], None] | None = None
 
     def generation_model(self) -> str:
@@ -186,7 +189,9 @@ class JobService:
         if (job.get("report") or {}).get("operation"):
             from involta_guide.catalogue.service import CityContent
 
-            CityContent(self.uow, self.provider.model).process(job, self.provider)
+            CityContent(self.uow, self.provider.model, map_resolver=self.map_resolver).process(
+                job, self.provider
+            )
             return
         if job["kind"] == "reset":
             # The worker attaches its infrastructure reset coordinator, outside HTTP.
