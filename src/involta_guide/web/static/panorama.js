@@ -22,7 +22,7 @@
     timer = 0,
     measuredWidth = 0;
   let gesture = null,
-    inertia = 0,
+    touchActive = false,
     elastic = 0,
     bounce = null,
     wheelTimer = 0,
@@ -43,7 +43,7 @@
     scroller.scrollLeft <= cityEnd() &&
     !horizontalDrag &&
     !returnFrame &&
-    !inertia &&
+    !touchActive &&
     !bounce &&
     !document.hidden &&
     !reduced.matches;
@@ -66,10 +66,10 @@
   }
   function scheduleReturn() {
     clearTimeout(returnTimer);
-    if (scroller.scrollLeft <= cityEnd() || gesture || inertia || bounce ||
+    if (scroller.scrollLeft <= cityEnd() || gesture || touchActive || bounce ||
         returnFrame || document.hidden || reduced.matches) return;
     returnTimer = setTimeout(() => {
-      if (gesture || inertia || bounce || document.hidden || reduced.matches) return;
+      if (gesture || touchActive || bounce || document.hidden || reduced.matches) return;
       stopAuto();
       const from = scroller.scrollLeft, target = autoBounds().high;
       const started = performance.now();
@@ -94,10 +94,6 @@
     clearTimeout(timer);
     timer = setTimeout(startAuto, 1800);
     scheduleReturn();
-  }
-  function stopInertia() {
-    cancelAnimationFrame(inertia);
-    inertia = 0;
   }
   function clearBounce() {
     if (bounce) {
@@ -142,7 +138,6 @@
     }
     if (measuredWidth !== scroller.clientWidth) {
       stopReturn();
-      stopInertia();
       clearBounce();
       elastic = 0;
       track.style.transform = "";
@@ -192,52 +187,31 @@
     scroller.scrollLeft = position;
     frame = requestAnimationFrame(tick);
   }
-  function momentum(velocity) {
-    let last = performance.now(),
-      offset = scroller.scrollLeft;
-    function advance(now) {
-      inertia = 0;
-      if (document.hidden || reduced.matches) {
-        settle();
-        return;
-      }
-      const dt = Math.min(now - last, 32);
-      last = now;
-      velocity *= Math.exp(-dt / 300);
-      offset += velocity * dt;
-      const bounded = clamp(offset, 0, fullEnd());
-      scroller.scrollLeft = bounded;
-      if (offset !== bounded) {
-        rubber(
-          bounded -
-            offset +
-            Math.sign(bounded - offset) * Math.abs(velocity) * 36,
-        );
-        settle();
-        return;
-      }
-      if (Math.abs(velocity) < 0.025) {
-        resumeLater();
-        return;
-      }
-      inertia = requestAnimationFrame(advance);
-    }
-    inertia = requestAnimationFrame(advance);
-  }
-  scroller.addEventListener("pointerdown", (event) => {
-    if (!event.isPrimary || event.button !== 0 || !fullEnd()) return;
+  // Let the browser own touch scrolling, axis selection and momentum.
+  // pointercancel is normal when Safari takes over a native scroll gesture.
+  scroller.addEventListener("touchstart", () => {
+    touchActive = true;
+    stopAuto();
     stopReturn();
-    stopInertia();
+    clearBounce();
+    elastic = 0;
+    track.style.transform = "";
+  }, { passive: true });
+  function releaseTouch(event) {
+    touchActive = event.touches.length > 0;
+    if (!touchActive) resumeLater();
+  }
+  scroller.addEventListener("touchend", releaseTouch, { passive: true });
+  scroller.addEventListener("touchcancel", releaseTouch, { passive: true });
+  scroller.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch" || !event.isPrimary || event.button !== 0 || !fullEnd()) return;
+    stopReturn();
     gesture = {
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       scroll: scroller.scrollLeft,
       axis: "",
-      lastX: event.clientX,
-      time: performance.now(),
-      velocity: 0,
-      type: event.pointerType,
     };
   });
   scroller.addEventListener("pointermove", (event) => {
@@ -249,7 +223,6 @@
       if (gesture.axis === "x") {
         horizontalDrag = true;
         stopAuto();
-        stopInertia();
         clearBounce();
         scroller.setPointerCapture(event.pointerId);
         gesture.scroll = scroller.scrollLeft;
@@ -257,13 +230,6 @@
     }
     if (gesture.axis !== "x") return;
     if (event.cancelable) event.preventDefault();
-    const now = performance.now(),
-      elapsed = Math.max(1, now - gesture.time);
-    gesture.velocity =
-      gesture.velocity * 0.55 +
-      clamp(-(event.clientX - gesture.lastX) / elapsed, -2.5, 2.5) * 0.45;
-    gesture.lastX = event.clientX;
-    gesture.time = now;
     const desired = gesture.scroll - dx,
       bounded = clamp(desired, 0, fullEnd());
     scroller.scrollLeft = bounded;
@@ -279,13 +245,6 @@
     }
     horizontalDrag = false;
     if (Math.abs(elastic) > 0.5) settle();
-    else if (
-      done.type === "touch" &&
-      event.type === "pointerup" &&
-      Math.abs(done.velocity) > 0.04 &&
-      !reduced.matches
-    )
-      momentum(done.velocity);
     else resumeLater();
   }
   window.addEventListener("pointerup", release);
@@ -308,7 +267,6 @@
         return;
       if (event.cancelable) event.preventDefault();
       stopAuto();
-      stopInertia();
       const delta =
         dx *
         (event.deltaMode === 1
@@ -335,7 +293,6 @@
     event.preventDefault();
     stopReturn();
     stopAuto();
-    stopInertia();
     clearBounce();
     elastic = 0;
     track.style.transform = "";
@@ -351,7 +308,6 @@
   reduced.addEventListener("change", () => {
     if (reduced.matches) {
       stopReturn();
-      stopInertia();
       clearBounce();
       elastic = 0;
       track.style.transform = "";
@@ -366,7 +322,9 @@
   });
   window.addEventListener("resize", sizeViewport);
   scroller.addEventListener("scroll", () => {
-    if (!returnFrame) scheduleReturn();
+    // Native momentum continues after touchend. Every scroll postpones both
+    // autoplay and the secret return; our own animation frames must not do so.
+    if (!frame && !returnFrame) resumeLater();
   }, { passive: true });
   window.addEventListener("scroll", () => {
     stopReturn();

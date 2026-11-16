@@ -31,9 +31,6 @@
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
-.panorama[data-panorama-enhanced] .panorama-scroller {
-  touch-action: pan-y pinch-zoom;
-}
 .panorama-scroller::-webkit-scrollbar {
   display: none;
   width: 0;
