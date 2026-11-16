@@ -216,18 +216,40 @@ def test_touch_scrolls_the_picture_horizontally_and_the_page_vertically(database
         swipe(0, -104)
         page.wait_for_timeout(600)
         assert page.evaluate("scrollY") > 25
-        assert scroller.evaluate("el=>el.scrollLeft") < before
+        assert abs(scroller.evaluate("el=>el.scrollLeft") - before) < 10
         page.evaluate("scrollTo(0,0)")
-        scroller.evaluate("el=>el.scrollLeft=250")
-        swipe(-104, 0)
-        page.wait_for_timeout(250)
-        assert scroller.evaluate("el=>el.scrollLeft") > 340
+        page.evaluate("""() => {
+            window.touchCancels = 0;
+            document.querySelector('.panorama-scroller').addEventListener(
+                'pointercancel', () => window.touchCancels++);
+        }""")
+        # Native scrolling cancels Pointer Events but must finish the whole swipe.
+        for dx, dy in [(-180, 0), (-180, 20), (-180, -20)]:
+            scroller.evaluate("el=>el.scrollLeft=250")
+            swipe(dx, dy)
+            page.wait_for_timeout(250)
+            assert scroller.evaluate("el=>el.scrollLeft") > 390
+        assert page.evaluate("window.touchCancels") >= 3
         assert page.evaluate("scrollY") < 1
         scroller.evaluate("el=>el.scrollLeft=610")
         swipe(-180, 0)
         page.wait_for_timeout(700)
         secret_position = scroller.evaluate("el=>el.scrollLeft")
         assert secret_position > 700
+        # Holding the secret pauses its return even after the browser cancelled
+        # Pointer Events for the preceding native swipe.
+        box = scroller.bounding_box()
+        session.send(
+            "Input.dispatchTouchEvent",
+            {
+                "type": "touchStart",
+                "touchPoints": [{"x": 180, "y": box["y"] + box["height"] * 0.7}],
+            },
+        )
+        held = scroller.evaluate("el=>el.scrollLeft")
+        page.wait_for_timeout(1400)
+        assert abs(scroller.evaluate("el=>el.scrollLeft") - held) < 2
+        session.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(3500)
         assert scroller.evaluate("el=>el.scrollLeft") <= 610
         browser.close()
