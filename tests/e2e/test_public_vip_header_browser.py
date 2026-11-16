@@ -44,7 +44,10 @@ def test_gold_header_mobile_first_and_admin_link_do_not_overlap(database):
             assert page.locator(".header").bounding_box()["height"] == before_height
             assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
             page.locator(".header").screenshot(path=str(shots / f"gold-{width}.png"))
-            brand = page.locator(".brand")
+            page.get_by_role("link", name="О GOLD").click()
+            expect(page).to_have_url(origin + "/guide/gold")
+            expect(page.get_by_role("heading", name="Свои люди.")).to_be_visible()
+            brand = page.locator(".brand-name")
             brand.tap() if width < 500 else brand.click()
             expect(page).to_have_url(origin + "/guide/")
             ctx.add_cookies([{"name": "guide_admin", "value": admin, "url": origin}])

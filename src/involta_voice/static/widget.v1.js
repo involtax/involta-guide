@@ -1247,10 +1247,21 @@
         element.classList.add("home-review");
         const meta = document.createElement("div");
         meta.className = "home-review-meta";
-        if (data.author_name) {
+        if (data.author_name || data.author_is_gold) {
           const author = document.createElement("span");
           author.className = "review-author";
-          author.textContent = data.author_name;
+          if (data.author_is_gold) {
+            const crown = document.createElement("img");
+            crown.className = "review-crown";
+            crown.src = new URL(
+              "../../../assets/gold-crown.svg",
+              api.href.replace(/\/?$/, "/"),
+            ).href;
+            crown.alt = "GOLD";
+            crown.width = crown.height = 16;
+            author.append(crown);
+          }
+          author.append(document.createTextNode(data.author_name || ""));
           meta.append(author);
         }
         const created =

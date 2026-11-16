@@ -101,6 +101,22 @@ def routes(prefix: str) -> APIRouter:
         response.headers.update(headers)
         return response
 
+    @router.get(prefix + "/gold")
+    def gold(request: Request) -> Response:
+        ctx = context(request)
+        request.state.audience_page = True
+        return request.app.state.templates.TemplateResponse(
+            request=request,
+            name="gold.html",
+            context={
+                "settings": ctx.settings,
+                "title": "GOLD — Инвольта гид",
+                "description": "Твой голос уже с золотом. Расскажи о любимом ресторане.",
+                "canonical": ctx.settings.url("/gold"),
+                "indexable": True,
+            },
+        )
+
     @router.get(prefix + "/about")
     def about(request: Request) -> Response:
         ctx = context(request)

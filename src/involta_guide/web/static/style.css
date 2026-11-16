@@ -170,12 +170,6 @@ h4 {
   right: -6px;
   width: 16px;
   height: 16px;
-  color: #f6c900;
-  fill: currentColor;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   transform: rotate(18deg);
   pointer-events: none;
 }
@@ -1062,3 +1056,12 @@ pre.audit-json {
 .log-group-requests a { flex: 1 1 170px; min-width: 0; padding: 13px 0; overflow-wrap: anywhere; }
 .log-group-requests a[aria-current="page"] { font-weight: 700; }
 .log-group-requests li > span { padding: 13px 0; color: var(--muted); font-size: 13px; }
+
+/* The badge and review marker use the same crown artwork and tilt. */
+.brand-name{display:flex;align-items:baseline;gap:7px}
+.review-crown{display:inline-block;width:16px;height:16px;object-fit:contain;transform:rotate(18deg);vertical-align:-2px;margin-right:6px}
+.gold-page h1{font-size:clamp(38px,10vw,60px);font-weight:400;line-height:1.05;letter-spacing:-.05em;margin:0 0 14px}
+.gold-page h1 em{font-family:Georgia,"Times New Roman",serif;font-weight:400}
+.gold-intro{margin:0 0 40px;font-size:17px}
+.gold-page .about-steps h2{font-size:clamp(30px,8.7vw,48px)}
+.gold-back{display:inline-block;margin-top:36px;font-size:16px;border-bottom:1px solid var(--line);padding-bottom:5px}
